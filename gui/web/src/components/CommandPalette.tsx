@@ -25,6 +25,7 @@ import LightModeIcon from '@mui/icons-material/LightMode'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import { useApp } from '../state/AppContext'
 import { useThemeMode } from '../state/ThemeModeContext'
+import { useI18n } from '../state/I18nContext'
 import type { WorkbenchKey } from '../layout/WorkbenchNav'
 
 interface CommandItem {
@@ -33,20 +34,29 @@ interface CommandItem {
   hint?: string
   icon: React.ReactNode
   group: string
+  keywords?: string
   run: () => void
 }
 
-const WORKBENCH_META: { key: WorkbenchKey; label: string; icon: React.ReactNode; keywords: string }[] = [
-  { key: 'home', label: '首页', icon: <HomeIcon fontSize="small" />, keywords: 'home 首页 概览 dashboard' },
-  { key: 'analysis', label: '分析拆书', icon: <InsightsIcon fontSize="small" />, keywords: 'analysis 分析 拆书' },
-  { key: 'writing', label: '辅助写作 (沉浸创作室与工坊)', icon: <EditNoteIcon fontSize="small" />, keywords: 'writing 写作 创作室 studio 工坊' },
-  { key: 'quality', label: '质量检验', icon: <FactCheckIcon fontSize="small" />, keywords: 'quality 质量 检验' },
-  { key: 'assets', label: '资产库', icon: <FolderOpenIcon fontSize="small" />, keywords: 'assets 资产' },
-  { key: 'advanced', label: '高级功能', icon: <AutoAwesomeIcon fontSize="small" />, keywords: 'advanced 高级' },
-  { key: 'system', label: '系统', icon: <TuneIcon fontSize="small" />, keywords: 'system 系统' },
-  { key: 'settings', label: '设置', icon: <SettingsIcon fontSize="small" />, keywords: 'settings 设置' },
-  { key: 'admin', label: '管理后台', icon: <AdminPanelSettingsIcon fontSize="small" />, keywords: 'admin 管理 后台' },
-  { key: 'help', label: '帮助中心', icon: <HelpOutlineIcon fontSize="small" />, keywords: 'help 帮助 指南 教程 faq' },
+interface WorkbenchMetaItem {
+  key: WorkbenchKey
+  labelToken: string
+  defaultLabel: string
+  icon: React.ReactNode
+  keywords: string
+}
+
+const WORKBENCH_META: WorkbenchMetaItem[] = [
+  { key: 'home', labelToken: 'cmd_nav_home', defaultLabel: '首页', icon: <HomeIcon fontSize="small" />, keywords: 'home 首页 概览 dashboard' },
+  { key: 'analysis', labelToken: 'cmd_nav_analysis', defaultLabel: '分析拆书', icon: <InsightsIcon fontSize="small" />, keywords: 'analysis 分析 拆书' },
+  { key: 'writing', labelToken: 'cmd_nav_writing', defaultLabel: '辅助写作 (沉浸创作室与工坊)', icon: <EditNoteIcon fontSize="small" />, keywords: 'writing 写作 创作室 studio 工坊' },
+  { key: 'quality', labelToken: 'cmd_nav_quality', defaultLabel: '质量检验', icon: <FactCheckIcon fontSize="small" />, keywords: 'quality 质量 检验' },
+  { key: 'assets', labelToken: 'cmd_nav_assets', defaultLabel: '资产库', icon: <FolderOpenIcon fontSize="small" />, keywords: 'assets 资产' },
+  { key: 'advanced', labelToken: 'cmd_nav_advanced', defaultLabel: '高级功能', icon: <AutoAwesomeIcon fontSize="small" />, keywords: 'advanced 高级' },
+  { key: 'system', labelToken: 'cmd_nav_system', defaultLabel: '系统', icon: <TuneIcon fontSize="small" />, keywords: 'system 系统' },
+  { key: 'settings', labelToken: 'cmd_nav_settings', defaultLabel: '设置', icon: <SettingsIcon fontSize="small" />, keywords: 'settings 设置' },
+  { key: 'admin', labelToken: 'cmd_nav_admin', defaultLabel: '管理后台', icon: <AdminPanelSettingsIcon fontSize="small" />, keywords: 'admin 管理 后台' },
+  { key: 'help', labelToken: 'cmd_nav_help', defaultLabel: '帮助中心', icon: <HelpOutlineIcon fontSize="small" />, keywords: 'help 帮助 指南 教程 faq' },
 ]
 
 /** 简单模糊匹配：query 的字符按序出现在 target 中 */
@@ -64,6 +74,7 @@ function fuzzyMatch(query: string, target: string): boolean {
 }
 
 export default function CommandPalette() {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -75,30 +86,33 @@ export default function CommandPalette() {
     const list: CommandItem[] = []
     // 工作台跳转
     for (const wb of WORKBENCH_META) {
+      const localizedLabel = t(wb.labelToken, wb.defaultLabel)
       list.push({
         id: `wb-${wb.key}`,
-        label: `前往${wb.label}`,
+        label: `${t('cmd_goto_prefix', '前往')}${localizedLabel}`,
         hint: wb.key === 'home' ? 'Alt+1' : wb.key === 'writing' ? 'Alt+3' : undefined,
         icon: wb.icon,
-        group: '工作台',
+        group: t('cmd_group_workbench', '工作台'),
+        keywords: wb.keywords,
         run: () => setWorkbench(wb.key),
       })
     }
     // 主题切换
     list.push({
       id: 'theme-toggle',
-      label: mode === 'dark' ? '切换为亮色模式' : '切换为暗色模式',
+      label: mode === 'dark' ? t('cmd_theme_light', '切换为亮色模式') : t('cmd_theme_dark', '切换为暗色模式'),
       icon: mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />,
-      group: '操作',
+      group: t('cmd_group_actions', '操作'),
+      keywords: 'theme mode dark light 模式 亮色 暗色 主题',
       run: () => setMode(mode === 'dark' ? 'light' : 'dark'),
     })
     return list
-  }, [setWorkbench, mode, setMode])
+  }, [setWorkbench, mode, setMode, t])
 
   const filtered = useMemo(() => {
     if (!query.trim()) return items
     return items.filter((it) =>
-      fuzzyMatch(query, `${it.label} ${it.group} ${it.hint ?? ''}`)
+      fuzzyMatch(query, `${it.label} ${it.group} ${it.hint ?? ''} ${it.keywords ?? ''}`)
     )
   }, [items, query])
 
@@ -180,7 +194,7 @@ export default function CommandPalette() {
         <TextField
           autoFocus
           fullWidth
-          placeholder="搜索工作台或操作…"
+          placeholder={t('cmd_search_placeholder', '搜索工作台或操作…')}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -220,7 +234,7 @@ export default function CommandPalette() {
       <Box ref={listRef} sx={{ maxHeight: 320, overflowY: 'auto', px: 1.5, pb: 1.5 }}>
         {filtered.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-            没有匹配的结果
+            {t('cmd_empty', '没有匹配的结果')}
           </Typography>
         ) : (
           <List dense disablePadding>
@@ -272,9 +286,13 @@ export default function CommandPalette() {
       </Box>
       <Divider />
       <Box sx={{ px: 2, py: 1, display: 'flex', gap: 2 }}>
-        {['↑↓ 导航', '↵ 选择', 'esc 关闭'].map((t) => (
-          <Typography key={t} variant="caption" color="text.secondary">
-            {t}
+        {[
+          t('cmd_shortcut_nav', '↑↓ 导航'),
+          t('cmd_shortcut_select', '↵ 选择'),
+          t('cmd_shortcut_close', 'esc 关闭'),
+        ].map((item) => (
+          <Typography key={item} variant="caption" color="text.secondary">
+            {item}
           </Typography>
         ))}
       </Box>
@@ -284,6 +302,7 @@ export default function CommandPalette() {
 
 /** 命令面板触发按钮（放在 AppBar 上） */
 export function CommandPaletteTrigger() {
+  const { t } = useI18n()
   const openPalette = () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }))
   }
@@ -307,7 +326,7 @@ export function CommandPaletteTrigger() {
     >
       <SearchIcon fontSize="small" />
       <Box component="span" sx={{ flex: 1 }}>
-        搜索…
+        {t('cmd_search_btn', '搜索…')}
       </Box>
       <Typography
         variant="caption"

@@ -3501,6 +3501,158 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '{m} 分钟',
     'en-US': '{m} mins',
   },
+
+  // ==========================================
+  // 命令面板 (CommandPalette)
+  // ==========================================
+  cmd_search_placeholder: {
+    'zh-CN': '搜索工作台或操作…',
+    'en-US': 'Search workbenches or actions…',
+  },
+  cmd_empty: {
+    'zh-CN': '没有匹配的结果',
+    'en-US': 'No matching results',
+  },
+  cmd_group_workbench: {
+    'zh-CN': '工作台',
+    'en-US': 'Workbenches',
+  },
+  cmd_group_actions: {
+    'zh-CN': '操作',
+    'en-US': 'Actions',
+  },
+  cmd_goto_prefix: {
+    'zh-CN': '前往',
+    'en-US': 'Go to ',
+  },
+  cmd_nav_home: {
+    'zh-CN': '首页',
+    'en-US': 'Home',
+  },
+  cmd_nav_analysis: {
+    'zh-CN': '分析拆书',
+    'en-US': 'Book Analysis',
+  },
+  cmd_nav_writing: {
+    'zh-CN': '辅助写作 (沉浸创作室与工坊)',
+    'en-US': 'Writing Studio & Workbenches',
+  },
+  cmd_nav_quality: {
+    'zh-CN': '质量检验',
+    'en-US': 'Quality Check',
+  },
+  cmd_nav_assets: {
+    'zh-CN': '资产库',
+    'en-US': 'Asset Library',
+  },
+  cmd_nav_advanced: {
+    'zh-CN': '高级功能',
+    'en-US': 'Advanced Features',
+  },
+  cmd_nav_system: {
+    'zh-CN': '系统',
+    'en-US': 'System',
+  },
+  cmd_nav_settings: {
+    'zh-CN': '设置',
+    'en-US': 'Settings',
+  },
+  cmd_nav_admin: {
+    'zh-CN': '管理后台',
+    'en-US': 'Admin Console',
+  },
+  cmd_nav_help: {
+    'zh-CN': '帮助中心',
+    'en-US': 'Help Center',
+  },
+  cmd_theme_dark: {
+    'zh-CN': '切换为暗色模式',
+    'en-US': 'Switch to Dark Mode',
+  },
+  cmd_theme_light: {
+    'zh-CN': '切换为亮色模式',
+    'en-US': 'Switch to Light Mode',
+  },
+  cmd_shortcut_nav: {
+    'zh-CN': '↑↓ 导航',
+    'en-US': '↑↓ Navigate',
+  },
+  cmd_shortcut_select: {
+    'zh-CN': '↵ 选择',
+    'en-US': '↵ Select',
+  },
+  cmd_shortcut_close: {
+    'zh-CN': 'esc 关闭',
+    'en-US': 'esc Close',
+  },
+  cmd_search_btn: {
+    'zh-CN': '搜索…',
+    'en-US': 'Search…',
+  },
+
+  // ==========================================
+  // 首启引导 (OnboardingWizard)
+  // ==========================================
+  onboarding_s1_title: {
+    'zh-CN': '欢迎使用暮冬念春',
+    'en-US': 'Welcome to Exoscribe',
+  },
+  onboarding_s1_body: {
+    'zh-CN': '把优秀小说拆成可复用的写作资产，再用这些资产驱动创作。全流程在本机完成，不会上传任何数据。三步上手，随时可跳过。',
+    'en-US': 'Deconstruct masterworks into reusable writing assets, then drive creative prose. 100% offline & local, never uploading data. 3 steps to start, skip anytime.',
+  },
+  onboarding_next: {
+    'zh-CN': '下一步',
+    'en-US': 'Next',
+  },
+  onboarding_s2_title: {
+    'zh-CN': '第一步：导入并拆书',
+    'en-US': 'Step 1: Import & Deconstruct',
+  },
+  onboarding_s2_body: {
+    'zh-CN': '到「分析」页导入一本 TXT 全本，选择题材后启动拆书。拆解完成后自动生成文风卡、笔法卡、结构/商业观测等资产与万字分析报告。',
+    'en-US': 'Go to "Analysis" to import a full TXT novel, select a genre, and start deconstruction. Automatically extracts voice cards, prose cards, structure/commercial metrics, and comprehensive reports.',
+  },
+  onboarding_goto_import: {
+    'zh-CN': '去导入',
+    'en-US': 'Go to Import',
+  },
+  onboarding_s3_title: {
+    'zh-CN': '第二步：查看资产与质检',
+    'en-US': 'Step 2: Inspect Assets & QC',
+  },
+  onboarding_s3_body: {
+    'zh-CN': '「资产库」浏览全部结构化资产；「质检」页可对任意章节跑 12 维质量检查与全书质检；「写作」页用资产注入辅助生成新章节。',
+    'en-US': 'Browse all structured assets in "Asset Library"; run 12-dimensional QC and full-book checks in "Quality"; generate chapters with asset injection in "Writing".',
+  },
+  onboarding_get_started: {
+    'zh-CN': '开始使用',
+    'en-US': 'Get Started',
+  },
+  onboarding_skip: {
+    'zh-CN': '跳过',
+    'en-US': 'Skip',
+  },
+  onboarding_prev: {
+    'zh-CN': '上一步',
+    'en-US': 'Back',
+  },
+
+  // ==========================================
+  // 就地说明 (InlineGuide)
+  // ==========================================
+  inline_guide_collapse: {
+    'zh-CN': '收起说明',
+    'en-US': 'Collapse guide',
+  },
+  inline_guide_expand: {
+    'zh-CN': '展开说明',
+    'en-US': 'Expand guide',
+  },
+  inline_guide_example: {
+    'zh-CN': '示例',
+    'en-US': 'Example',
+  },
 }
 
 

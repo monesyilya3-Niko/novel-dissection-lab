@@ -12,6 +12,7 @@ import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { WorkbenchKey } from '../layout/WorkbenchNav'
 import { readStorage, writeStorage } from '../safeStorage'
+import { useI18n } from '../state/I18nContext'
 
 const STORAGE_KEY = 'novellab.onboarded'
 
@@ -34,6 +35,7 @@ export default function OnboardingWizard({
   onDone: () => void
   onNavigate: (k: WorkbenchKey) => void
 }) {
+  const { t } = useI18n()
   const [step, setStep] = useState(0)
 
   const finish = (go?: WorkbenchKey | unknown) => {
@@ -46,37 +48,43 @@ export default function OnboardingWizard({
   const steps = useMemo<Step[]>(
     () => [
       {
-        title: '欢迎使用暮冬念春',
+        title: t('onboarding_s1_title', '欢迎使用暮冬念春'),
         body: (
           <Typography variant="body2" color="text.secondary">
-            把优秀小说拆成可复用的写作资产，再用这些资产驱动创作。
-            全流程在本机完成，不会上传任何数据。三步上手，随时可跳过。
+            {t(
+              'onboarding_s1_body',
+              '把优秀小说拆成可复用的写作资产，再用这些资产驱动创作。全流程在本机完成，不会上传任何数据。三步上手，随时可跳过。',
+            )}
           </Typography>
         ),
-        cta: { label: '下一步' },
+        cta: { label: t('onboarding_next', '下一步') },
       },
       {
-        title: '第一步：导入并拆书',
+        title: t('onboarding_s2_title', '第一步：导入并拆书'),
         body: (
           <Typography variant="body2" color="text.secondary">
-            到「分析」页导入一本 TXT 全本，选择题材后启动拆书。
-            拆解完成后自动生成文风卡、笔法卡、结构/商业观测等资产与万字分析报告。
+            {t(
+              'onboarding_s2_body',
+              '到「分析」页导入一本 TXT 全本，选择题材后启动拆书。拆解完成后自动生成文风卡、笔法卡、结构/商业观测等资产与万字分析报告。',
+            )}
           </Typography>
         ),
-        cta: { label: '去导入', go: 'analysis' },
+        cta: { label: t('onboarding_goto_import', '去导入'), go: 'analysis' },
       },
       {
-        title: '第二步：查看资产与质检',
+        title: t('onboarding_s3_title', '第二步：查看资产与质检'),
         body: (
           <Typography variant="body2" color="text.secondary">
-            「资产库」浏览全部结构化资产；「质检」页可对任意章节跑 12 维质量检查
-            与全书质检；「写作」页用资产注入辅助生成新章节。
+            {t(
+              'onboarding_s3_body',
+              '「资产库」浏览全部结构化资产；「质检」页可对任意章节跑 12 维质量检查与全书质检；「写作」页用资产注入辅助生成新章节。',
+            )}
           </Typography>
         ),
-        cta: { label: '开始使用' },
+        cta: { label: t('onboarding_get_started', '开始使用') },
       },
     ],
-    [],
+    [t],
   )
 
   const current = steps[step]
@@ -98,11 +106,11 @@ export default function OnboardingWizard({
       </DialogContent>
       <DialogActions>
         <Button size="small" color="inherit" onClick={() => finish()}>
-          跳过
+          {t('onboarding_skip', '跳过')}
         </Button>
         {step > 0 && (
           <Button size="small" onClick={() => setStep((s) => s - 1)}>
-            上一步
+            {t('onboarding_prev', '上一步')}
           </Button>
         )}
         <Button
