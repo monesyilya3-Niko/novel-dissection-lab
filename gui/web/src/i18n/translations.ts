@@ -3093,6 +3093,414 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '警告线必须 ≤ 及格线',
     'en-US': 'Warn line must be ≤ pass line',
   },
+
+  // ==========================================
+  // 管理后台 (AdminWorkbench)
+  // ==========================================
+  admin_title: {
+    'zh-CN': '管理后台',
+    'en-US': 'Admin Console',
+  },
+  admin_subtitle: {
+    'zh-CN': 'ADMIN CONSOLE',
+    'en-US': 'ADMIN CONSOLE',
+  },
+  admin_login_notice: {
+    'zh-CN': '后台管理仅限本机访问。首次启动的初始密码见数据目录下的 admin-初始密码.txt（改密后自动删除）。',
+    'en-US': 'Console access is restricted to localhost. Initial password for first launch is in admin-初始密码.txt (auto-deleted after change).',
+  },
+  admin_username: {
+    'zh-CN': '用户名',
+    'en-US': 'Username',
+  },
+  admin_password: {
+    'zh-CN': '密码',
+    'en-US': 'Password',
+  },
+  admin_login_btn: {
+    'zh-CN': '登 录',
+    'en-US': 'Sign In',
+  },
+  admin_logging_in: {
+    'zh-CN': '登录中…',
+    'en-US': 'Signing In…',
+  },
+  admin_force_change_notice: {
+    'zh-CN': '首次登录请立即修改初始密码，修改完成前其他功能不可用。',
+    'en-US': 'Please change initial password immediately upon first login. Other features are locked until updated.',
+  },
+  admin_tab_dashboard: {
+    'zh-CN': '仪表盘',
+    'en-US': 'Dashboard',
+  },
+  admin_tab_books: {
+    'zh-CN': '书库管理',
+    'en-US': 'Books',
+  },
+  admin_tab_assets: {
+    'zh-CN': '资产管理',
+    'en-US': 'Assets',
+  },
+  admin_tab_audit: {
+    'zh-CN': '操作日志',
+    'en-US': 'Audit Logs',
+  },
+  admin_tab_sessions: {
+    'zh-CN': '会话管理',
+    'en-US': 'Sessions',
+  },
+  admin_tab_security: {
+    'zh-CN': '安全设置',
+    'en-US': 'Security',
+  },
+  admin_logout: {
+    'zh-CN': '退出',
+    'en-US': 'Logout',
+  },
+  admin_refresh: {
+    'zh-CN': '刷新',
+    'en-US': 'Refresh',
+  },
+  admin_help_guide: {
+    'zh-CN': '查看管理后台指南',
+    'en-US': 'View Admin Console Guide',
+  },
+
+  // 仪表盘
+  admin_dash_title: {
+    'zh-CN': '系统仪表盘',
+    'en-US': 'System Dashboard',
+  },
+  admin_dash_books: {
+    'zh-CN': '书籍',
+    'en-US': 'Books',
+  },
+  admin_dash_analyzing: {
+    'zh-CN': '本分析中',
+    'en-US': 'analyzing',
+  },
+  admin_dash_idle: {
+    'zh-CN': '全部空闲',
+    'en-US': 'All idle',
+  },
+  admin_dash_assets: {
+    'zh-CN': '资产',
+    'en-US': 'Assets',
+  },
+  admin_dash_reports: {
+    'zh-CN': '报告',
+    'en-US': 'Reports',
+  },
+  admin_dash_reports_sub: {
+    'zh-CN': '拆书/笔法报告',
+    'en-US': 'Deconstruction & Style Reports',
+  },
+  admin_dash_disk_usage: {
+    'zh-CN': '数据占用',
+    'en-US': 'Disk Usage',
+  },
+  admin_dash_uptime: {
+    'zh-CN': '运行',
+    'en-US': 'Uptime',
+  },
+  admin_dash_disk_breakdown: {
+    'zh-CN': '磁盘占用',
+    'en-US': 'Disk Breakdown',
+  },
+  admin_dash_recent_books: {
+    'zh-CN': '最近书籍',
+    'en-US': 'Recent Books',
+  },
+  admin_dash_chapters_suffix: {
+    'zh-CN': '章',
+    'en-US': 'chs',
+  },
+  admin_dash_recent_ops: {
+    'zh-CN': '最近操作',
+    'en-US': 'Recent Operations',
+  },
+
+  // 书库管理
+  admin_books_title: {
+    'zh-CN': '书库管理',
+    'en-US': 'Book Management',
+  },
+  admin_books_count_suffix: {
+    'zh-CN': '本',
+    'en-US': 'books',
+  },
+  admin_col_book_title: {
+    'zh-CN': '书名',
+    'en-US': 'Title',
+  },
+  admin_col_chapters: {
+    'zh-CN': '章节',
+    'en-US': 'Chapters',
+  },
+  admin_col_status: {
+    'zh-CN': '状态',
+    'en-US': 'Status',
+  },
+  admin_col_actions: {
+    'zh-CN': '操作',
+    'en-US': 'Actions',
+  },
+  admin_books_delete_btn: {
+    'zh-CN': '删除',
+    'en-US': 'Delete',
+  },
+  admin_books_delete_analyzing_tip: {
+    'zh-CN': '分析中的书籍不可删除',
+    'en-US': 'Books being analyzed cannot be deleted',
+  },
+  admin_books_delete_tip: {
+    'zh-CN': '删除本书全部数据',
+    'en-US': 'Delete all data for this book',
+  },
+  admin_books_empty: {
+    'zh-CN': '暂无书籍',
+    'en-US': 'No books available',
+  },
+  admin_books_dialog_title: {
+    'zh-CN': '确认删除',
+    'en-US': 'Confirm Deletion',
+  },
+  admin_books_dialog_desc: {
+    'zh-CN': '将彻底删除《{title}》的状态文件、原文、分析资产与数据库记录，此操作不可恢复。继续吗？',
+    'en-US': 'Permanently delete all state files, manuscripts, analytical assets, and database records for "{title}". This operation cannot be undone. Continue?',
+  },
+  admin_cancel: {
+    'zh-CN': '取消',
+    'en-US': 'Cancel',
+  },
+  admin_confirm_delete: {
+    'zh-CN': '确认删除',
+    'en-US': 'Confirm Delete',
+  },
+  admin_deleting: {
+    'zh-CN': '删除中…',
+    'en-US': 'Deleting…',
+  },
+  admin_books_partial_delete: {
+    'zh-CN': '《{title}》删除不完全，残留需手动清理：{warnings}',
+    'en-US': '"{title}" was partially deleted. Manual cleanup required: {warnings}',
+  },
+  admin_books_delete_success: {
+    'zh-CN': '已删除《{title}》，清理：{removed}',
+    'en-US': 'Deleted "{title}", cleaned: {removed}',
+  },
+
+  // 资产管理
+  admin_assets_title: {
+    'zh-CN': '资产管理',
+    'en-US': 'Asset Management',
+  },
+  admin_assets_kind_all: {
+    'zh-CN': '全部',
+    'en-US': 'All',
+  },
+  admin_assets_kind_voice_card: {
+    'zh-CN': '笔法卡',
+    'en-US': 'Voice Cards',
+  },
+  admin_assets_kind_genre_pack: {
+    'zh-CN': '题材包',
+    'en-US': 'Genre Packs',
+  },
+  admin_assets_kind_genre_prose_card: {
+    'zh-CN': '笔法卡片',
+    'en-US': 'Prose Cards',
+  },
+  admin_assets_kind_report: {
+    'zh-CN': '报告',
+    'en-US': 'Reports',
+  },
+  admin_assets_filter_kind: {
+    'zh-CN': '类型',
+    'en-US': 'Type',
+  },
+  admin_col_name: {
+    'zh-CN': '名称',
+    'en-US': 'Name',
+  },
+  admin_col_kind: {
+    'zh-CN': '类型',
+    'en-US': 'Kind',
+  },
+  admin_assets_delete_confirm: {
+    'zh-CN': '删除资产「{name}」？（将移入回收站）',
+    'en-US': 'Delete asset "{name}"? (Moved to recycle bin)',
+  },
+  admin_assets_delete_success: {
+    'zh-CN': '已删除资产「{name}」',
+    'en-US': 'Deleted asset "{name}"',
+  },
+  admin_assets_empty: {
+    'zh-CN': '暂无资产',
+    'en-US': 'No assets available',
+  },
+
+  // 操作日志
+  admin_audit_title: {
+    'zh-CN': '操作日志（最近 200 条）',
+    'en-US': 'Audit Logs (Recent 200)',
+  },
+  admin_audit_filter_action: {
+    'zh-CN': '按动作过滤',
+    'en-US': 'Filter by Action',
+  },
+  admin_audit_filter_action_ph: {
+    'zh-CN': '如 admin.login',
+    'en-US': 'e.g. admin.login',
+  },
+  admin_audit_filter_user: {
+    'zh-CN': '按用户过滤',
+    'en-US': 'Filter by User',
+  },
+  admin_audit_filter_user_ph: {
+    'zh-CN': '如 admin',
+    'en-US': 'e.g. admin',
+  },
+  admin_audit_filter_btn: {
+    'zh-CN': '筛选',
+    'en-US': 'Filter',
+  },
+  admin_audit_clear_btn: {
+    'zh-CN': '清除',
+    'en-US': 'Clear',
+  },
+  admin_col_time: {
+    'zh-CN': '时间',
+    'en-US': 'Time',
+  },
+  admin_col_user: {
+    'zh-CN': '用户',
+    'en-US': 'User',
+  },
+  admin_col_ip: {
+    'zh-CN': 'IP',
+    'en-US': 'IP',
+  },
+  admin_col_action: {
+    'zh-CN': '动作',
+    'en-US': 'Action',
+  },
+  admin_col_detail: {
+    'zh-CN': '详情',
+    'en-US': 'Detail',
+  },
+  admin_audit_empty: {
+    'zh-CN': '暂无日志',
+    'en-US': 'No audit logs',
+  },
+
+  // 会话管理
+  admin_sessions_title: {
+    'zh-CN': '在线会话',
+    'en-US': 'Active Sessions',
+  },
+  admin_sessions_revoke_current_confirm: {
+    'zh-CN': '这是你当前正在使用的会话！吊销后你将立即被登出。确定继续吗？',
+    'en-US': 'This is your current active session! You will be logged out immediately upon revoking. Continue?',
+  },
+  admin_sessions_revoke_confirm: {
+    'zh-CN': '确定吊销会话 {id}？该会话将立即失效。',
+    'en-US': 'Revoke session {id}? It will be invalidated immediately.',
+  },
+  admin_col_session_id: {
+    'zh-CN': '会话 ID（前缀）',
+    'en-US': 'Session ID (Prefix)',
+  },
+  admin_col_created_at: {
+    'zh-CN': '创建时间',
+    'en-US': 'Created At',
+  },
+  admin_col_expires_at: {
+    'zh-CN': '过期时间',
+    'en-US': 'Expires At',
+  },
+  admin_session_current: {
+    'zh-CN': '当前',
+    'en-US': 'Current',
+  },
+  admin_session_revoke_btn: {
+    'zh-CN': '吊销',
+    'en-US': 'Revoke',
+  },
+  admin_sessions_empty: {
+    'zh-CN': '无在线会话',
+    'en-US': 'No active sessions',
+  },
+
+  // 安全设置
+  admin_sec_title: {
+    'zh-CN': '修改密码',
+    'en-US': 'Change Password',
+  },
+  admin_sec_subtitle: {
+    'zh-CN': '修改后所有已登录会话立即失效，需要重新登录。',
+    'en-US': 'All active sessions will be invalidated upon change, requiring re-login.',
+  },
+  admin_sec_mismatch: {
+    'zh-CN': '两次输入的新密码不一致',
+    'en-US': 'New passwords do not match',
+  },
+  admin_sec_min_length: {
+    'zh-CN': '新密码至少 8 位',
+    'en-US': 'New password must be at least 8 characters',
+  },
+  admin_sec_success: {
+    'zh-CN': '密码已修改，历史会话已吊销，请重新登录。',
+    'en-US': 'Password changed successfully. Existing sessions revoked, please sign in again.',
+  },
+  admin_sec_old_pw: {
+    'zh-CN': '原密码',
+    'en-US': 'Current Password',
+  },
+  admin_sec_new_pw: {
+    'zh-CN': '新密码（至少 8 位）',
+    'en-US': 'New Password (at least 8 chars)',
+  },
+  admin_sec_confirm_pw: {
+    'zh-CN': '确认新密码',
+    'en-US': 'Confirm New Password',
+  },
+  admin_sec_submit_btn: {
+    'zh-CN': '修改密码',
+    'en-US': 'Change Password',
+  },
+  admin_sec_submitting: {
+    'zh-CN': '提交中…',
+    'en-US': 'Submitting…',
+  },
+  admin_sec_specs_title: {
+    'zh-CN': '安全说明',
+    'en-US': 'Security Specifications',
+  },
+  admin_sec_specs_item1: {
+    'zh-CN': '· 密码经 PBKDF2-HMAC-SHA256（20 万轮）加盐哈希存储，服务端不保存明文',
+    'en-US': '· Password stored with PBKDF2-HMAC-SHA256 (200k rounds) salted hash, plaintext never stored',
+  },
+  admin_sec_specs_item2: {
+    'zh-CN': '· 会话 Cookie 为 HttpOnly，有效期 12 小时',
+    'en-US': '· Session cookie is HttpOnly with 12-hour expiration',
+  },
+  admin_sec_specs_item3: {
+    'zh-CN': '· 连续 5 次登录失败将锁定 IP 5 分钟',
+    'en-US': '· 5 consecutive failed logins lock IP for 5 minutes',
+  },
+  admin_sec_specs_item4: {
+    'zh-CN': '· 所有管理操作记入审计日志',
+    'en-US': '· All administrative operations recorded in audit log',
+  },
+  admin_uptime_hours_mins: {
+    'zh-CN': '{h} 小时 {m} 分',
+    'en-US': '{h}h {m}m',
+  },
+  admin_uptime_mins: {
+    'zh-CN': '{m} 分钟',
+    'en-US': '{m} mins',
+  },
 }
 
 

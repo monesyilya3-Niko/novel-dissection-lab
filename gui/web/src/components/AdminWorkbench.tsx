@@ -41,6 +41,7 @@ import {
 } from '../api/client'
 import { ink, fadeUp } from '../ink'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
+import { useI18n } from '../state/I18nContext'
 
 function fmtSize(bytes: number): string {
   if (!bytes) return '0 B'
@@ -49,11 +50,15 @@ function fmtSize(bytes: number): string {
   return `${bytes} B`
 }
 
-function fmtUptime(seconds: number): string {
+function fmtUptime(seconds: number, t?: (k: string, fb?: string) => string): string {
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
-  if (h > 0) return `${h} 小时 ${m} 分`
-  return `${m} 分钟`
+  if (h > 0) {
+    return t
+      ? t('admin_uptime_hours_mins', `${h} 小时 ${m} 分`).replace('{h}', String(h)).replace('{m}', String(m))
+      : `${h} 小时 ${m} 分`
+  }
+  return t ? t('admin_uptime_mins', `${m} 分钟`).replace('{m}', String(m)) : `${m} 分钟`
 }
 
 export default function AdminWorkbench() {
@@ -104,6 +109,7 @@ export default function AdminWorkbench() {
 // ---------------------------------------------------------------------------
 
 function LoginForm({ onDone }: { onDone: (mustChange: boolean) => void }) {
+  const { t } = useI18n()
   const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -144,25 +150,25 @@ function LoginForm({ onDone }: { onDone: (mustChange: boolean) => void }) {
           </Box>
           <Box>
             <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700, letterSpacing: '0.1em' }}>
-              管理后台
+              {t('admin_title', '管理后台')}
             </Typography>
             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)', letterSpacing: '0.2em' }}>
-              ADMIN CONSOLE
+              {t('admin_subtitle', 'ADMIN CONSOLE')}
             </Typography>
           </Box>
         </Box>
         <Box sx={{ p: 4 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3, lineHeight: 1.7 }}>
-            后台管理仅限本机访问。首次启动的初始密码见数据目录下的 admin-初始密码.txt（改密后自动删除）。
+            {t('admin_login_notice', '后台管理仅限本机访问。首次启动的初始密码见数据目录下的 admin-初始密码.txt（改密后自动删除）。')}
           </Typography>
           {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
           <TextField
-            fullWidth label="用户名" value={username} disabled={busy}
+            fullWidth label={t('admin_username', '用户名')} value={username} disabled={busy}
             onChange={(e) => setUsername(e.target.value)} sx={{ mb: 2 }}
             autoComplete="username" variant="outlined"
           />
           <TextField
-            fullWidth label="密码" type="password" value={password} disabled={busy}
+            fullWidth label={t('admin_password', '密码')} type="password" value={password} disabled={busy}
             onChange={(e) => setPassword(e.target.value)} autoComplete="current-password"
             onKeyDown={(e) => { if (e.key === 'Enter') submit() }} sx={{ mb: 3 }}
             variant="outlined"
@@ -172,7 +178,7 @@ function LoginForm({ onDone }: { onDone: (mustChange: boolean) => void }) {
             disabled={busy || !password} onClick={submit}
             sx={{ borderRadius: 2.5, py: 1.4, fontSize: 15 }}
           >
-            {busy ? '登录中…' : '登 录'}
+            {busy ? t('admin_logging_in', '登录中…') : t('admin_login_btn', '登 录')}
           </Button>
         </Box>
       </Paper>
@@ -190,6 +196,7 @@ function AdminPanels({ username, onLogout, forceChangePw, clearForceChangePw }: 
   forceChangePw: boolean
   clearForceChangePw: () => void
 }) {
+  const { t } = useI18n()
   // 首次登录强制改密：锁定在安全设置页，其他 Tab 禁用
   const [tab, setTab] = useState(forceChangePw ? 5 : 0)
   useEffect(() => { if (forceChangePw) setTab(5) }, [forceChangePw])
@@ -202,20 +209,20 @@ function AdminPanels({ username, onLogout, forceChangePw, clearForceChangePw }: 
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {forceChangePw && (
         <Alert severity="warning" sx={{ borderRadius: 0 }}>
-          首次登录请立即修改初始密码，修改完成前其他功能不可用。
+          {t('admin_force_change_notice', '首次登录请立即修改初始密码，修改完成前其他功能不可用。')}
         </Alert>
       )}
       <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: 1, borderColor: 'divider', pr: 2 }}>
         <Tabs value={tab} onChange={(_, v) => { if (!forceChangePw) setTab(v) }} sx={{ px: 2, flex: 1 }}>
-          <Tab label="仪表盘" disabled={forceChangePw} />
-          <Tab label="书库管理" disabled={forceChangePw} />
-          <Tab label="资产管理" disabled={forceChangePw} />
-          <Tab label="操作日志" disabled={forceChangePw} />
-          <Tab label="会话管理" disabled={forceChangePw} />
-          <Tab label="安全设置" />
+          <Tab label={t('admin_tab_dashboard', '仪表盘')} disabled={forceChangePw} />
+          <Tab label={t('admin_tab_books', '书库管理')} disabled={forceChangePw} />
+          <Tab label={t('admin_tab_assets', '资产管理')} disabled={forceChangePw} />
+          <Tab label={t('admin_tab_audit', '操作日志')} disabled={forceChangePw} />
+          <Tab label={t('admin_tab_sessions', '会话管理')} disabled={forceChangePw} />
+          <Tab label={t('admin_tab_security', '安全设置')} />
         </Tabs>
         <Chip label={username} size="small" sx={{ mr: 1 }} />
-        <Button size="small" startIcon={<LogoutIcon />} onClick={logout}>退出</Button>
+        <Button size="small" startIcon={<LogoutIcon />} onClick={logout}>{t('admin_logout', '退出')}</Button>
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: 2 }}>
         {tab === 0 && <DashboardPanel />}
@@ -234,6 +241,7 @@ function AdminPanels({ username, onLogout, forceChangePw, clearForceChangePw }: 
 // ---------------------------------------------------------------------------
 
 function DashboardPanel() {
+  const { t } = useI18n()
   const [data, setData] = useState<AdminDashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -257,21 +265,39 @@ function DashboardPanel() {
   if (!data) return null
 
   const cards = [
-    { label: '书籍', value: String(data.books.total), sub: data.books.analyzing > 0 ? `${data.books.analyzing} 本分析中` : '全部空闲' },
-    { label: '资产', value: String(data.assetsTotal), sub: Object.entries(data.assetsByKind).map(([k, v]) => `${k} ${v}`).join(' · ') || '—' },
-    { label: '报告', value: String(data.reportsTotal), sub: '拆书/笔法报告' },
-    { label: '数据占用', value: fmtSize(data.diskTotalBytes), sub: `运行 ${fmtUptime(data.uptimeSeconds)}` },
+    {
+      label: t('admin_dash_books', '书籍'),
+      value: String(data.books.total),
+      sub: data.books.analyzing > 0
+        ? `${data.books.analyzing} ${t('admin_dash_analyzing', '本分析中')}`
+        : t('admin_dash_idle', '全部空闲'),
+    },
+    {
+      label: t('admin_dash_assets', '资产'),
+      value: String(data.assetsTotal),
+      sub: Object.entries(data.assetsByKind).map(([k, v]) => `${k} ${v}`).join(' · ') || '—',
+    },
+    {
+      label: t('admin_dash_reports', '报告'),
+      value: String(data.reportsTotal),
+      sub: t('admin_dash_reports_sub', '拆书/笔法报告'),
+    },
+    {
+      label: t('admin_dash_disk_usage', '数据占用'),
+      value: fmtSize(data.diskTotalBytes),
+      sub: `${t('admin_dash_uptime', '运行')} ${fmtUptime(data.uptimeSeconds, t)}`,
+    },
   ]
 
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">系统仪表盘</Typography>
+        <Typography variant="h6">{t('admin_dash_title', '系统仪表盘')}</Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <ContextHelpButton guideKey="admin" title="查看管理后台指南" />
+          <ContextHelpButton guideKey="admin" title={t('admin_help_guide', '查看管理后台指南')} />
           <Chip size="small" label={`v${data.version}`} />
           <Chip size="small" label={`Python ${data.python}`} />
-          <Button variant="outlined" size="small" onClick={load}>刷新</Button>
+          <Button variant="outlined" size="small" onClick={load}>{t('admin_refresh', '刷新')}</Button>
         </Box>
       </Box>
       <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -288,7 +314,7 @@ function DashboardPanel() {
         ))}
       </Grid>
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle2" gutterBottom>磁盘占用</Typography>
+        <Typography variant="subtitle2" gutterBottom>{t('admin_dash_disk_breakdown', '磁盘占用')}</Typography>
         {Object.entries(data.diskBytes).map(([k, v]) => (
           <Box key={k} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
             <Typography variant="body2" color="text.secondary">{k}/</Typography>
@@ -298,12 +324,12 @@ function DashboardPanel() {
       </Paper>
       {data.books.items.length > 0 && (
         <Paper sx={{ p: 2, mb: 2 }}>
-          <Typography variant="subtitle2" gutterBottom>最近书籍</Typography>
+          <Typography variant="subtitle2" gutterBottom>{t('admin_dash_recent_books', '最近书籍')}</Typography>
           {data.books.items.map((b) => (
             <Box key={b.bookId} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
               <Typography variant="body2">{b.title}</Typography>
               <Typography variant="body2" color="text.secondary">
-                {b.totalChapters} 章 · {b.status}
+                {b.totalChapters} {t('admin_dash_chapters_suffix', '章')} · {b.status}
               </Typography>
             </Box>
           ))}
@@ -311,7 +337,7 @@ function DashboardPanel() {
       )}
       {data.recentAudit && data.recentAudit.length > 0 && (
         <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle2" gutterBottom>最近操作</Typography>
+          <Typography variant="subtitle2" gutterBottom>{t('admin_dash_recent_ops', '最近操作')}</Typography>
           {data.recentAudit.map((e, i) => (
             <Box key={i} sx={{ display: 'flex', gap: 1, py: 0.5, alignItems: 'center' }}>
               <Chip size="small" label={e.action} sx={{ maxWidth: 180 }} />
@@ -332,6 +358,7 @@ function DashboardPanel() {
 // ---------------------------------------------------------------------------
 
 function BooksPanel() {
+  const { t } = useI18n()
   const [books, setBooks] = useState<AdminBookSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -359,9 +386,11 @@ function BooksPanel() {
     try {
       const r = await adminApi.deleteBook(confirm.bookId)
       if (r.status === 'partial') {
-        setError(`《${confirm.title}》删除不完全，残留需手动清理：${r.warnings.join('；')}`)
+        const tmpl = t('admin_books_partial_delete', '《{title}》删除不完全，残留需手动清理：{warnings}')
+        setError(tmpl.replace('{title}', confirm.title).replace('{warnings}', r.warnings.join('；')))
       } else {
-        setNotice(`已删除《${confirm.title}》，清理：${r.removed.join('、')}`)
+        const tmpl = t('admin_books_delete_success', '已删除《{title}》，清理：{removed}')
+        setNotice(tmpl.replace('{title}', confirm.title).replace('{removed}', r.removed.join('、')))
       }
       setConfirm(null)
       load()
@@ -377,8 +406,10 @@ function BooksPanel() {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">书库管理（{books.length} 本）</Typography>
-        <Button variant="outlined" size="small" onClick={load}>刷新</Button>
+        <Typography variant="h6">
+          {t('admin_books_title', '书库管理')}（{books.length} {t('admin_books_count_suffix', '本')}）
+        </Typography>
+        <Button variant="outlined" size="small" onClick={load}>{t('admin_refresh', '刷新')}</Button>
       </Box>
       {notice && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice('')}>{notice}</Alert>}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -386,10 +417,10 @@ function BooksPanel() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>书名</TableCell>
-              <TableCell>章节</TableCell>
-              <TableCell>状态</TableCell>
-              <TableCell align="right">操作</TableCell>
+              <TableCell>{t('admin_col_book_title', '书名')}</TableCell>
+              <TableCell>{t('admin_col_chapters', '章节')}</TableCell>
+              <TableCell>{t('admin_col_status', '状态')}</TableCell>
+              <TableCell align="right">{t('admin_col_actions', '操作')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -405,33 +436,33 @@ function BooksPanel() {
                   <Button
                     size="small" color="error"
                     disabled={b.status === 'analyzing'}
-                    title={b.status === 'analyzing' ? '分析中的书籍不可删除' : '删除本书全部数据'}
+                    title={b.status === 'analyzing' ? t('admin_books_delete_analyzing_tip', '分析中的书籍不可删除') : t('admin_books_delete_tip', '删除本书全部数据')}
                     onClick={() => setConfirm(b)}
                   >
-                    删除
+                    {t('admin_books_delete_btn', '删除')}
                   </Button>
                 </TableCell>
               </TableRow>
             ))}
             {books.length === 0 && (
               <TableRow><TableCell colSpan={4} align="center" sx={{ color: 'text.secondary', py: 3 }}>
-                暂无书籍
+                {t('admin_books_empty', '暂无书籍')}
               </TableCell></TableRow>
             )}
           </TableBody>
         </Table>
       </Paper>
       <Dialog open={!!confirm} onClose={() => setConfirm(null)}>
-        <DialogTitle>确认删除</DialogTitle>
+        <DialogTitle>{t('admin_books_dialog_title', '确认删除')}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            将彻底删除《{confirm?.title}》的状态文件、原文、分析资产与数据库记录，此操作不可恢复。继续吗？
+            {t('admin_books_dialog_desc', '将彻底删除《{title}》的状态文件、原文、分析资产与数据库记录，此操作不可恢复。继续吗？').replace('{title}', confirm?.title || '')}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirm(null)} disabled={deleting}>取消</Button>
+          <Button onClick={() => setConfirm(null)} disabled={deleting}>{t('admin_cancel', '取消')}</Button>
           <Button color="error" onClick={doDelete} disabled={deleting}>
-            {deleting ? '删除中…' : '确认删除'}
+            {deleting ? t('admin_deleting', '删除中…') : t('admin_confirm_delete', '确认删除')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -444,21 +475,26 @@ function BooksPanel() {
 // ---------------------------------------------------------------------------
 
 const ASSET_KINDS = ['', 'voice_card', 'genre_pack', 'genre_prose_card', 'report']
-const ASSET_KIND_LABELS: Record<string, string> = {
-  '': '全部',
-  voice_card: '笔法卡',
-  genre_pack: '题材包',
-  genre_prose_card: '笔法卡片',
-  report: '报告',
-}
 
 function AssetsPanel() {
+  const { t } = useI18n()
   const [kind, setKind] = useState('')
   const [items, setItems] = useState<{ id: string; name: string; kind: string }[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+
+  const getKindLabel = (k: string) => {
+    switch (k) {
+      case '': return t('admin_assets_kind_all', '全部')
+      case 'voice_card': return t('admin_assets_kind_voice_card', '笔法卡')
+      case 'genre_pack': return t('admin_assets_kind_genre_pack', '题材包')
+      case 'genre_prose_card': return t('admin_assets_kind_genre_prose_card', '笔法卡片')
+      case 'report': return t('admin_assets_kind_report', '报告')
+      default: return k
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -477,10 +513,11 @@ function AssetsPanel() {
   useEffect(() => { load() }, [load])
 
   const del = async (itemKind: string, id: string, name: string) => {
-    if (!window.confirm(`删除资产「${name}」？（将移入回收站）`)) return
+    const confirmMsg = t('admin_assets_delete_confirm', '删除资产「{name}」？（将移入回收站）').replace('{name}', name)
+    if (!window.confirm(confirmMsg)) return
     try {
       await adminApi.deleteAsset(itemKind, id)
-      setNotice(`已删除资产「${name}」`)
+      setNotice(t('admin_assets_delete_success', '已删除资产「{name}」').replace('{name}', name))
       load()
     } catch (e) {
       setError(friendlyError(e))
@@ -490,17 +527,19 @@ function AssetsPanel() {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">资产管理（{total}）</Typography>
+        <Typography variant="h6">
+          {t('admin_assets_title', '资产管理')}（{total}）
+        </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel>类型</InputLabel>
-            <Select value={kind} label="类型" onChange={(e) => setKind(e.target.value)}>
+            <InputLabel>{t('admin_assets_filter_kind', '类型')}</InputLabel>
+            <Select value={kind} label={t('admin_assets_filter_kind', '类型')} onChange={(e) => setKind(e.target.value)}>
               {ASSET_KINDS.map((k) => (
-                <MenuItem key={k} value={k}>{ASSET_KIND_LABELS[k]}</MenuItem>
+                <MenuItem key={k} value={k}>{getKindLabel(k)}</MenuItem>
               ))}
             </Select>
           </FormControl>
-          <Button variant="outlined" size="small" onClick={load}>刷新</Button>
+          <Button variant="outlined" size="small" onClick={load}>{t('admin_refresh', '刷新')}</Button>
         </Box>
       </Box>
       {notice && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice('')}>{notice}</Alert>}
@@ -510,9 +549,9 @@ function AssetsPanel() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>名称</TableCell>
-                <TableCell>类型</TableCell>
-                <TableCell align="right">操作</TableCell>
+                <TableCell>{t('admin_col_name', '名称')}</TableCell>
+                <TableCell>{t('admin_col_kind', '类型')}</TableCell>
+                <TableCell align="right">{t('admin_col_actions', '操作')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -520,19 +559,19 @@ function AssetsPanel() {
                 <TableRow key={it.id}>
                   <TableCell>{it.name}</TableCell>
                   <TableCell>
-                    <Chip size="small" label={ASSET_KIND_LABELS[it.kind] || it.kind} />
+                    <Chip size="small" label={getKindLabel(it.kind)} />
                   </TableCell>
                   <TableCell align="right">
                     <Button size="small" color="error"
                       onClick={() => del(it.kind, it.id, it.name)}>
-                      删除
+                      {t('admin_books_delete_btn', '删除')}
                     </Button>
                   </TableCell>
                 </TableRow>
               ))}
               {items.length === 0 && (
                 <TableRow><TableCell colSpan={3} align="center" sx={{ color: 'text.secondary', py: 3 }}>
-                  暂无资产
+                  {t('admin_assets_empty', '暂无资产')}
                 </TableCell></TableRow>
               )}
             </TableBody>
@@ -548,6 +587,7 @@ function AssetsPanel() {
 // ---------------------------------------------------------------------------
 
 function AuditPanel() {
+  const { t } = useI18n()
   const [entries, setEntries] = useState<AdminAuditEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -579,19 +619,19 @@ function AuditPanel() {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">操作日志（最近 200 条）</Typography>
-        <Button variant="outlined" size="small" onClick={load}>刷新</Button>
+        <Typography variant="h6">{t('admin_audit_title', '操作日志（最近 200 条）')}</Typography>
+        <Button variant="outlined" size="small" onClick={load}>{t('admin_refresh', '刷新')}</Button>
       </Box>
       <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-        <TextField size="small" label="按动作过滤" placeholder="如 admin.login"
+        <TextField size="small" label={t('admin_audit_filter_action', '按动作过滤')} placeholder={t('admin_audit_filter_action_ph', '如 admin.login')}
           value={filterAction} onChange={e => setFilterAction(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') applyFilter() }} sx={{ width: 220 }} />
-        <TextField size="small" label="按用户过滤" placeholder="如 admin"
+        <TextField size="small" label={t('admin_audit_filter_user', '按用户过滤')} placeholder={t('admin_audit_filter_user_ph', '如 admin')}
           value={filterUser} onChange={e => setFilterUser(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') applyFilter() }} sx={{ width: 180 }} />
-        <Button variant="outlined" size="small" onClick={applyFilter}>筛选</Button>
+        <Button variant="outlined" size="small" onClick={applyFilter}>{t('admin_audit_filter_btn', '筛选')}</Button>
         {(applied.action || applied.user) && (
-          <Button size="small" onClick={clearFilter}>清除</Button>
+          <Button size="small" onClick={clearFilter}>{t('admin_audit_clear_btn', '清除')}</Button>
         )}
       </Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -600,11 +640,11 @@ function AuditPanel() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>时间</TableCell>
-                <TableCell>用户</TableCell>
-                <TableCell>IP</TableCell>
-                <TableCell>动作</TableCell>
-                <TableCell>详情</TableCell>
+                <TableCell>{t('admin_col_time', '时间')}</TableCell>
+                <TableCell>{t('admin_col_user', '用户')}</TableCell>
+                <TableCell>{t('admin_col_ip', 'IP')}</TableCell>
+                <TableCell>{t('admin_col_action', '动作')}</TableCell>
+                <TableCell>{t('admin_col_detail', '详情')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -620,7 +660,7 @@ function AuditPanel() {
               ))}
               {entries.length === 0 && (
                 <TableRow><TableCell colSpan={5} align="center" sx={{ color: 'text.secondary', py: 3 }}>
-                  暂无日志
+                  {t('admin_audit_empty', '暂无日志')}
                 </TableCell></TableRow>
               )}
             </TableBody>
@@ -636,6 +676,7 @@ function AuditPanel() {
 // ---------------------------------------------------------------------------
 
 function SessionsPanel() {
+  const { t } = useI18n()
   const [sessions, setSessions] = useState<AdminSession[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -656,8 +697,8 @@ function SessionsPanel() {
 
   const revoke = async (id: string, isCurrent: boolean) => {
     if (isCurrent) {
-      if (!window.confirm(`这是你当前正在使用的会话！吊销后你将立即被登出。确定继续吗？`)) return
-    } else if (!window.confirm(`确定吊销会话 ${id}？该会话将立即失效。`)) {
+      if (!window.confirm(t('admin_sessions_revoke_current_confirm', '这是你当前正在使用的会话！吊销后你将立即被登出。确定继续吗？'))) return
+    } else if (!window.confirm(t('admin_sessions_revoke_confirm', '确定吊销会话 {id}？该会话将立即失效。').replace('{id}', id))) {
       return
     }
     try {
@@ -671,8 +712,10 @@ function SessionsPanel() {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">在线会话（{sessions.length}）</Typography>
-        <Button variant="outlined" size="small" onClick={load}>刷新</Button>
+        <Typography variant="h6">
+          {t('admin_sessions_title', '在线会话')}（{sessions.length}）
+        </Typography>
+        <Button variant="outlined" size="small" onClick={load}>{t('admin_refresh', '刷新')}</Button>
       </Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {loading ? <CircularProgress /> : (
@@ -680,12 +723,12 @@ function SessionsPanel() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>会话 ID（前缀）</TableCell>
-                <TableCell>用户</TableCell>
-                <TableCell>IP</TableCell>
-                <TableCell>创建时间</TableCell>
-                <TableCell>过期时间</TableCell>
-                <TableCell>操作</TableCell>
+                <TableCell>{t('admin_col_session_id', '会话 ID（前缀）')}</TableCell>
+                <TableCell>{t('admin_col_user', '用户')}</TableCell>
+                <TableCell>{t('admin_col_ip', 'IP')}</TableCell>
+                <TableCell>{t('admin_col_created_at', '创建时间')}</TableCell>
+                <TableCell>{t('admin_col_expires_at', '过期时间')}</TableCell>
+                <TableCell>{t('admin_col_actions', '操作')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -693,20 +736,22 @@ function SessionsPanel() {
                 <TableRow key={s.id} sx={s.current ? { backgroundColor: 'action.selected' } : undefined}>
                   <TableCell sx={{ fontFamily: 'monospace' }}>
                     {s.id}
-                    {s.current && <Chip size="small" label="当前" color="primary" sx={{ ml: 1 }} />}
+                    {s.current && <Chip size="small" label={t('admin_session_current', '当前')} color="primary" sx={{ ml: 1 }} />}
                   </TableCell>
                   <TableCell>{s.username}</TableCell>
                   <TableCell>{s.ip}</TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{s.createdAt}</TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{s.expiresAt}</TableCell>
                   <TableCell>
-                    <Button size="small" color="warning" onClick={() => revoke(s.id, !!s.current)}>吊销</Button>
+                    <Button size="small" color="warning" onClick={() => revoke(s.id, !!s.current)}>
+                      {t('admin_session_revoke_btn', '吊销')}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
               {sessions.length === 0 && (
                 <TableRow><TableCell colSpan={6} align="center" sx={{ color: 'text.secondary', py: 3 }}>
-                  无在线会话
+                  {t('admin_sessions_empty', '无在线会话')}
                 </TableCell></TableRow>
               )}
             </TableBody>
@@ -725,6 +770,7 @@ function SecurityPanel({ onLogout, onPasswordChanged }: {
   onLogout: () => void
   onPasswordChanged?: () => void
 }) {
+  const { t } = useI18n()
   const [oldPw, setOldPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [newPw2, setNewPw2] = useState('')
@@ -735,12 +781,12 @@ function SecurityPanel({ onLogout, onPasswordChanged }: {
   const submit = async () => {
     setError('')
     setOk('')
-    if (newPw !== newPw2) { setError('两次输入的新密码不一致'); return }
-    if (newPw.length < 8) { setError('新密码至少 8 位'); return }
+    if (newPw !== newPw2) { setError(t('admin_sec_mismatch', '两次输入的新密码不一致')); return }
+    if (newPw.length < 8) { setError(t('admin_sec_min_length', '新密码至少 8 位')); return }
     setBusy(true)
     try {
       await adminApi.changePassword(oldPw, newPw)
-      setOk('密码已修改，历史会话已吊销，请重新登录。')
+      setOk(t('admin_sec_success', '密码已修改，历史会话已吊销，请重新登录。'))
       setOldPw(''); setNewPw(''); setNewPw2('')
       onPasswordChanged?.()
       setTimeout(onLogout, 1500)
@@ -758,29 +804,29 @@ function SecurityPanel({ onLogout, onPasswordChanged }: {
 
   return (
     <Box sx={{ maxWidth: 480 }}>
-      <Typography variant="h6" gutterBottom>修改密码</Typography>
+      <Typography variant="h6" gutterBottom>{t('admin_sec_title', '修改密码')}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        修改后所有已登录会话立即失效，需要重新登录。
+        {t('admin_sec_subtitle', '修改后所有已登录会话立即失效，需要重新登录。')}
       </Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {ok && <Alert severity="success" sx={{ mb: 2 }}>{ok}</Alert>}
-      <TextField fullWidth label="原密码" type="password" value={oldPw} disabled={busy}
+      <TextField fullWidth label={t('admin_sec_old_pw', '原密码')} type="password" value={oldPw} disabled={busy}
         onChange={(e) => setOldPw(e.target.value)} sx={{ mb: 2 }} autoComplete="current-password" />
-      <TextField fullWidth label="新密码（至少 8 位）" type="password" value={newPw} disabled={busy}
+      <TextField fullWidth label={t('admin_sec_new_pw', '新密码（至少 8 位）')} type="password" value={newPw} disabled={busy}
         onChange={(e) => setNewPw(e.target.value)} sx={{ mb: 2 }} autoComplete="new-password" />
-      <TextField fullWidth label="确认新密码" type="password" value={newPw2} disabled={busy}
+      <TextField fullWidth label={t('admin_sec_confirm_pw', '确认新密码')} type="password" value={newPw2} disabled={busy}
         onChange={(e) => setNewPw2(e.target.value)} sx={{ mb: 2 }} autoComplete="new-password"
         onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
       <Button variant="contained" disabled={busy || !oldPw || !newPw} onClick={submit}>
-        {busy ? '提交中…' : '修改密码'}
+        {busy ? t('admin_sec_submitting', '提交中…') : t('admin_sec_submit_btn', '修改密码')}
       </Button>
       <Paper sx={{ p: 2, mt: 3 }}>
-        <Typography variant="subtitle2" gutterBottom>安全说明</Typography>
-        <Typography variant="body2" color="text.secondary">
-          · 密码经 PBKDF2-HMAC-SHA256（20 万轮）加盐哈希存储，服务端不保存明文{'\n'}
-          · 会话 Cookie 为 HttpOnly，有效期 12 小时{'\n'}
-          · 连续 5 次登录失败将锁定 IP 5 分钟{'\n'}
-          · 所有管理操作记入审计日志
+        <Typography variant="subtitle2" gutterBottom>{t('admin_sec_specs_title', '安全说明')}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
+          {t('admin_sec_specs_item1', '· 密码经 PBKDF2-HMAC-SHA256（20 万轮）加盐哈希存储，服务端不保存明文')}{'\n'}
+          {t('admin_sec_specs_item2', '· 会话 Cookie 为 HttpOnly，有效期 12 小时')}{'\n'}
+          {t('admin_sec_specs_item3', '· 连续 5 次登录失败将锁定 IP 5 分钟')}{'\n'}
+          {t('admin_sec_specs_item4', '· 所有管理操作记入审计日志')}
         </Typography>
       </Paper>
     </Box>
