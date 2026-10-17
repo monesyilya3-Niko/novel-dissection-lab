@@ -488,9 +488,11 @@ function AssetsPanel() {
   const getKindLabel = (k: string) => {
     switch (k) {
       case '': return t('admin_assets_kind_all', '全部')
-      case 'voice_card': return t('admin_assets_kind_voice_card', '笔法卡')
+      case 'voice_card':
+      case 'voice': return t('admin_assets_kind_voice_card', '笔法卡')
       case 'genre_pack': return t('admin_assets_kind_genre_pack', '题材包')
-      case 'genre_prose_card': return t('admin_assets_kind_genre_prose_card', '笔法卡片')
+      case 'genre_prose_card':
+      case 'prose_card': return t('admin_assets_kind_genre_prose_card', '笔法卡片')
       case 'report': return t('admin_assets_kind_report', '报告')
       default: return k
     }

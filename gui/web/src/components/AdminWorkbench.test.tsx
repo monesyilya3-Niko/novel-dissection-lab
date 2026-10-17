@@ -71,7 +71,7 @@ describe('AdminWorkbench 管理工作台双语国际化与运维功能测试', (
     vi.mocked(adminApi.assets).mockResolvedValue({
       total: 2,
       items: [
-        { id: 'a1', name: '快节奏悬疑笔法', kind: 'genre_pack' as const, path: '/a1', size: 1024, mtime: 123456 },
+        { id: 'a1', name: '快节奏悬疑笔法', kind: 'voice' as const, path: '/a1', size: 1024, mtime: 123456 },
         { id: 'a2', name: '赛博朋克题材包', kind: 'genre_pack' as const, path: '/a2', size: 2048, mtime: 123456 },
       ],
     })
