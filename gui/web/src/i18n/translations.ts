@@ -2662,7 +2662,296 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '资产 JSON 内容',
     'en-US': 'Asset JSON Content',
   },
+  system_tab_status: {
+    'zh-CN': '系统状态',
+    'en-US': 'System Status',
+  },
+  system_tab_compliance: {
+    'zh-CN': '版权合规',
+    'en-US': 'Copyright Compliance',
+  },
+  system_tab_models: {
+    'zh-CN': '模型配置',
+    'en-US': 'Model Config',
+  },
+  system_tab_settings: {
+    'zh-CN': '设置',
+    'en-US': 'Settings',
+  },
+  system_status_title: {
+    'zh-CN': '系统状态',
+    'en-US': 'System Status',
+  },
+  system_status_refresh: {
+    'zh-CN': '刷新',
+    'en-US': 'Refresh',
+  },
+  system_disk_title: {
+    'zh-CN': '磁盘占用',
+    'en-US': 'Disk Usage',
+  },
+  system_disk_assets: {
+    'zh-CN': '资产：',
+    'en-US': 'Assets: ',
+  },
+  system_disk_reports: {
+    'zh-CN': '报告：',
+    'en-US': 'Reports: ',
+  },
+  system_disk_corpus: {
+    'zh-CN': '语料：',
+    'en-US': 'Corpus: ',
+  },
+  system_disk_novel: {
+    'zh-CN': '写作：',
+    'en-US': 'Writing: ',
+  },
+  system_disk_db: {
+    'zh-CN': '数据库：',
+    'en-US': 'Database: ',
+  },
+  system_disk_total: {
+    'zh-CN': '总计：',
+    'en-US': 'Total: ',
+  },
+  system_counts_title: {
+    'zh-CN': '数据统计',
+    'en-US': 'Data Statistics',
+  },
+  system_counts_assets_prefix: {
+    'zh-CN': '资产 ',
+    'en-US': 'Assets: ',
+  },
+  system_counts_assets_unit: {
+    'zh-CN': ' 个 | 报告 ',
+    'en-US': ' | Reports: ',
+  },
+  system_counts_reports_unit: {
+    'zh-CN': ' 份 | 已拆书 ',
+    'en-US': ' | Analyzed Books: ',
+  },
+  system_counts_books_unit: {
+    'zh-CN': ' 本',
+    'en-US': ' books',
+  },
+  system_model_title: {
+    'zh-CN': '模型状态',
+    'en-US': 'Model Status',
+  },
+  system_model_configured: {
+    'zh-CN': '已配置',
+    'en-US': 'Configured',
+  },
+  system_model_unconfigured: {
+    'zh-CN': '未配置',
+    'en-US': 'Unconfigured',
+  },
+  system_paths_title: {
+    'zh-CN': '路径',
+    'en-US': 'Paths',
+  },
+  system_comp_title: {
+    'zh-CN': '版权合规扫描',
+    'en-US': 'Copyright Compliance Scan',
+  },
+  system_comp_btn_scan: {
+    'zh-CN': '全量扫描',
+    'en-US': 'Full Scan',
+  },
+  system_comp_summary_total: {
+    'zh-CN': '共 ',
+    'en-US': 'Total ',
+  },
+  system_comp_summary_assets: {
+    'zh-CN': ' 个资产：',
+    'en-US': ' assets: ',
+  },
+  system_settings_title: {
+    'zh-CN': '系统设置',
+    'en-US': 'System Settings',
+  },
+  system_settings_service: {
+    'zh-CN': '服务',
+    'en-US': 'Services',
+  },
+  system_settings_port: {
+    'zh-CN': '端口：',
+    'en-US': 'Port: ',
+  },
+  system_settings_batch_size: {
+    'zh-CN': '批次大小：',
+    'en-US': 'Batch Size: ',
+  },
+  system_settings_chars_unit: {
+    'zh-CN': ' 字符',
+    'en-US': ' chars',
+  },
+  system_settings_env_title: {
+    'zh-CN': '环境变量覆盖',
+    'en-US': 'Environment Overrides',
+  },
+  system_settings_env_unset: {
+    'zh-CN': '（未设置）',
+    'en-US': '(Not set)',
+  },
+  system_settings_notice: {
+    'zh-CN': '设置修改请通过环境变量或直接编辑 gui/config.py。GUI 写入设置属阶段三规划。',
+    'en-US': 'To modify settings, use environment variables or edit gui/config.py directly. GUI writing is planned for Phase 3.',
+  },
+  model_mgr_title: {
+    'zh-CN': '模型管理',
+    'en-US': 'Model Management',
+  },
+  model_mgr_add_btn: {
+    'zh-CN': '添加模型',
+    'en-US': 'Add Model',
+  },
+  model_mgr_empty_hint: {
+    'zh-CN': '暂无模型配置，点击「添加模型」开始',
+    'en-US': 'No model configured yet, click "Add Model" to begin',
+  },
+  model_mgr_chip_key_set: {
+    'zh-CN': '已配 Key',
+    'en-US': 'Key Set',
+  },
+  model_mgr_role_prefix: {
+    'zh-CN': '角色：',
+    'en-US': 'Roles: ',
+  },
+  model_mgr_btn_test: {
+    'zh-CN': '测试',
+    'en-US': 'Test',
+  },
+  model_mgr_btn_testing: {
+    'zh-CN': '测试中',
+    'en-US': 'Testing...',
+  },
+  model_mgr_btn_key: {
+    'zh-CN': '密钥',
+    'en-US': 'API Key',
+  },
+  model_mgr_btn_edit: {
+    'zh-CN': '编辑',
+    'en-US': 'Edit',
+  },
+  model_mgr_btn_delete: {
+    'zh-CN': '删除',
+    'en-US': 'Delete',
+  },
+  model_mgr_dialog_edit_prefix: {
+    'zh-CN': '编辑模型: ',
+    'en-US': 'Edit Model: ',
+  },
+  model_mgr_dialog_add: {
+    'zh-CN': '添加模型',
+    'en-US': 'Add Model',
+  },
+  model_mgr_quick_preset: {
+    'zh-CN': '快速选择预设：',
+    'en-US': 'Quick Presets: ',
+  },
+  model_mgr_field_id: {
+    'zh-CN': '模型 ID',
+    'en-US': 'Model ID',
+  },
+  model_mgr_field_id_helper: {
+    'zh-CN': '唯一标识，如 my-gpt4',
+    'en-US': 'Unique identifier, e.g. my-gpt4',
+  },
+  model_mgr_field_label: {
+    'zh-CN': '显示名称',
+    'en-US': 'Display Name',
+  },
+  model_mgr_field_protocol: {
+    'zh-CN': '协议',
+    'en-US': 'Protocol',
+  },
+  model_mgr_proto_openai: {
+    'zh-CN': 'OpenAI 兼容',
+    'en-US': 'OpenAI Compatible',
+  },
+  model_mgr_proto_anthropic: {
+    'zh-CN': 'Anthropic',
+    'en-US': 'Anthropic',
+  },
+  model_mgr_proto_ollama: {
+    'zh-CN': 'Ollama',
+    'en-US': 'Ollama',
+  },
+  model_mgr_field_base_url: {
+    'zh-CN': 'Base URL',
+    'en-US': 'Base URL',
+  },
+  model_mgr_field_base_url_helper: {
+    'zh-CN': '如 https://api.openai.com/v1',
+    'en-US': 'e.g. https://api.openai.com/v1',
+  },
+  model_mgr_field_name: {
+    'zh-CN': '模型名称',
+    'en-US': 'Model Name',
+  },
+  model_mgr_field_name_helper: {
+    'zh-CN': '如 gpt-4o, claude-3-5-sonnet',
+    'en-US': 'e.g. gpt-4o, claude-3-5-sonnet',
+  },
+  model_mgr_field_note: {
+    'zh-CN': '备注',
+    'en-US': 'Notes',
+  },
+  model_mgr_btn_cancel: {
+    'zh-CN': '取消',
+    'en-US': 'Cancel',
+  },
+  model_mgr_btn_save: {
+    'zh-CN': '保存',
+    'en-US': 'Save',
+  },
+  model_mgr_btn_add: {
+    'zh-CN': '添加',
+    'en-US': 'Add',
+  },
+  model_mgr_key_dialog_title: {
+    'zh-CN': '设置 API Key: ',
+    'en-US': 'Set API Key: ',
+  },
+  model_mgr_key_field: {
+    'zh-CN': 'API Key',
+    'en-US': 'API Key',
+  },
+  model_mgr_key_helper: {
+    'zh-CN': 'Key 将加密存储在本地 .secrets.json',
+    'en-US': 'Key will be encrypted and stored locally in .secrets.json',
+  },
+  model_mgr_msg_updated: {
+    'zh-CN': '模型已更新',
+    'en-US': 'Model updated',
+  },
+  model_mgr_msg_added: {
+    'zh-CN': '模型已添加',
+    'en-US': 'Model added',
+  },
+  model_mgr_confirm_delete: {
+    'zh-CN': '确认删除模型 ',
+    'en-US': 'Confirm deletion of model ',
+  },
+  model_mgr_msg_deleted: {
+    'zh-CN': ' 已删除',
+    'en-US': ' deleted',
+  },
+  model_mgr_msg_key_saved: {
+    'zh-CN': 'API Key 已保存',
+    'en-US': 'API Key saved',
+  },
+  model_mgr_msg_test_ok: {
+    'zh-CN': ' 连接成功',
+    'en-US': ' connected successfully',
+  },
+  model_mgr_msg_test_fail: {
+    'zh-CN': ' 连接失败: ',
+    'en-US': ' connection failed: ',
+  },
 }
+
 
 
 

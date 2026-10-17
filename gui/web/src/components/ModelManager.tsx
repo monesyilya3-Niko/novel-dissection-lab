@@ -20,6 +20,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import KeyIcon from '@mui/icons-material/Key'
 import { modelApi } from '../api/client'
 import { friendlyError } from '../api/client'
+import { useI18n } from '../state/I18nContext'
 
 interface ModelInfo {
   id: string
@@ -41,6 +42,7 @@ interface Preset {
 }
 
 export default function ModelManager() {
+  const { t } = useI18n()
   const [models, setModels] = useState<ModelInfo[]>([])
   const [presets, setPresets] = useState<Preset[]>([])
   const [loading, setLoading] = useState(true)
@@ -124,7 +126,7 @@ export default function ModelManager() {
       } else {
         await modelApi.add(body)
       }
-      setMessage(editing ? '模型已更新' : '模型已添加')
+      setMessage(editing ? t('model_mgr_msg_updated') : t('model_mgr_msg_added'))
       setShowAdd(false)
       loadModels()
     } catch (e) {
@@ -135,10 +137,10 @@ export default function ModelManager() {
   }
 
   const deleteModel = async (id: string) => {
-    if (!confirm(`确认删除模型 ${id}？`)) return
+    if (!confirm(t('model_mgr_confirm_delete') + id + '？')) return
     try {
       await modelApi.delete(id)
-      setMessage(`模型 ${id} 已删除`)
+      setMessage(`${id}${t('model_mgr_msg_deleted')}`)
       loadModels()
     } catch (e) {
       setError(friendlyError(e))
@@ -150,7 +152,7 @@ export default function ModelManager() {
     setSaving(true)
     try {
       await modelApi.setKey(showKey, apiKey)
-      setMessage('API Key 已保存')
+      setMessage(t('model_mgr_msg_key_saved'))
       setShowKey(null)
       setApiKey('')
       loadModels()
@@ -167,9 +169,9 @@ export default function ModelManager() {
     try {
       const data = await modelApi.test(id)
       if (data.success) {
-        setMessage(`模型 ${id} 连接成功`)
+        setMessage(`${id}${t('model_mgr_msg_test_ok')}`)
       } else {
-        setError(`模型 ${id} 连接失败: ${String(data.error ?? '未知错误')}`)
+        setError(`${id}${t('model_mgr_msg_test_fail')}${String(data.error ?? '未知错误')}`)
       }
     } catch (e) {
       setError(friendlyError(e))
@@ -183,15 +185,15 @@ export default function ModelManager() {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6">模型管理</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>添加模型</Button>
+        <Typography variant="h6">{t('model_mgr_title')}</Typography>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>{t('model_mgr_add_btn')}</Button>
       </Box>
 
       {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage('')}>{message}</Alert>}
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
       {models.length === 0 && (
-        <Alert severity="info" sx={{ mb: 2 }}>暂无模型配置，点击「添加模型」开始</Alert>
+        <Alert severity="info" sx={{ mb: 2 }}>{t('model_mgr_empty_hint')}</Alert>
       )}
 
       {models.map((m) => (
@@ -201,29 +203,29 @@ export default function ModelManager() {
               <Typography variant="subtitle2">
                 {m.label} <Chip label={m.id} size="small" />
                 <Chip label={m.protocol} size="small" color="primary" variant="outlined" sx={{ ml: 0.5 }} />
-                {m.hasKey && <Chip label="已配 Key" size="small" color="success" sx={{ ml: 0.5 }} />}
+                {m.hasKey && <Chip label={t('model_mgr_chip_key_set')} size="small" color="success" sx={{ ml: 0.5 }} />}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12 }}>
                 {m.modelName} @ {m.baseUrl}
               </Typography>
               {m.roles.length > 0 && (
                 <Typography variant="caption" color="text.secondary">
-                  角色：{m.roles.join(', ')}
+                  {t('model_mgr_role_prefix')}{m.roles.join(', ')}
                 </Typography>
               )}
             </Box>
             <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
               <Button size="small" startIcon={<PlayArrowIcon />} onClick={() => testModel(m.id)} disabled={testing === m.id}>
-                {testing === m.id ? '测试中' : '测试'}
+                {testing === m.id ? t('model_mgr_btn_testing') : t('model_mgr_btn_test')}
               </Button>
               <Button size="small" startIcon={<KeyIcon />} onClick={() => { setShowKey(m.id); setApiKey('') }}>
-                密钥
+                {t('model_mgr_btn_key')}
               </Button>
               <Button size="small" startIcon={<EditIcon />} onClick={() => openEdit(m)}>
-                编辑
+                {t('model_mgr_btn_edit')}
               </Button>
               <Button size="small" color="error" startIcon={<DeleteIcon />} onClick={() => deleteModel(m.id)}>
-                删除
+                {t('model_mgr_btn_delete')}
               </Button>
             </Box>
           </Box>
@@ -232,11 +234,11 @@ export default function ModelManager() {
 
       {/* 添加/编辑对话框 */}
       <Dialog open={showAdd} onClose={() => setShowAdd(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editing ? `编辑模型: ${editing.id}` : '添加模型'}</DialogTitle>
+        <DialogTitle>{editing ? `${t('model_mgr_dialog_edit_prefix')}${editing.id}` : t('model_mgr_dialog_add')}</DialogTitle>
         <DialogContent>
           {!editing && presets.length > 0 && (
             <Box sx={{ mb: 2 }}>
-              <Typography variant="caption" color="text.secondary">快速选择预设：</Typography>
+              <Typography variant="caption" color="text.secondary">{t('model_mgr_quick_preset')}</Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                 {presets.map((p) => (
                   <Chip key={p.name} label={p.label} size="small" onClick={() => applyPreset(p)} variant="outlined" />
@@ -245,61 +247,62 @@ export default function ModelManager() {
             </Box>
           )}
           <TextField
-            label="模型 ID" fullWidth size="small" sx={{ mb: 1.5 }}
+            label={t('model_mgr_field_id')} fullWidth size="small" sx={{ mb: 1.5 }}
             value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })}
             disabled={!!editing}
-            helperText="唯一标识，如 my-gpt4"
+            helperText={t('model_mgr_field_id_helper')}
           />
           <TextField
-            label="显示名称" fullWidth size="small" sx={{ mb: 1.5 }}
+            label={t('model_mgr_field_label')} fullWidth size="small" sx={{ mb: 1.5 }}
             value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })}
           />
           <TextField
-            select label="协议" fullWidth size="small" sx={{ mb: 1.5 }}
+            select label={t('model_mgr_field_protocol')} fullWidth size="small" sx={{ mb: 1.5 }}
             value={form.protocol} onChange={(e) => setForm({ ...form, protocol: e.target.value })}
           >
-            <MenuItem value="openai">OpenAI 兼容</MenuItem>
-            <MenuItem value="anthropic">Anthropic</MenuItem>
-            <MenuItem value="ollama">Ollama</MenuItem>
+            <MenuItem value="openai">{t('model_mgr_proto_openai')}</MenuItem>
+            <MenuItem value="anthropic">{t('model_mgr_proto_anthropic')}</MenuItem>
+            <MenuItem value="ollama">{t('model_mgr_proto_ollama')}</MenuItem>
           </TextField>
           <TextField
-            label="Base URL" fullWidth size="small" sx={{ mb: 1.5 }}
+            label={t('model_mgr_field_base_url')} fullWidth size="small" sx={{ mb: 1.5 }}
             value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
-            helperText="如 https://api.openai.com/v1"
+            helperText={t('model_mgr_field_base_url_helper')}
           />
           <TextField
-            label="模型名称" fullWidth size="small" sx={{ mb: 1.5 }}
+            label={t('model_mgr_field_name')} fullWidth size="small" sx={{ mb: 1.5 }}
             value={form.modelName} onChange={(e) => setForm({ ...form, modelName: e.target.value })}
-            helperText="如 gpt-4o, claude-3-5-sonnet"
+            helperText={t('model_mgr_field_name_helper')}
           />
           <TextField
-            label="备注" fullWidth size="small"
+            label={t('model_mgr_field_note')} fullWidth size="small"
             value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowAdd(false)}>取消</Button>
+          <Button onClick={() => setShowAdd(false)}>{t('model_mgr_btn_cancel')}</Button>
           <Button variant="contained" onClick={saveModel} disabled={saving || !form.id || !form.baseUrl || !form.modelName}>
-            {editing ? '保存' : '添加'}
+            {editing ? t('model_mgr_btn_save') : t('model_mgr_btn_add')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* API Key 对话框 */}
       <Dialog open={!!showKey} onClose={() => setShowKey(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>设置 API Key: {showKey}</DialogTitle>
+        <DialogTitle>{t('model_mgr_key_dialog_title')}{showKey}</DialogTitle>
         <DialogContent>
           <TextField
-            label="API Key" fullWidth size="small" type="password"
+            label={t('model_mgr_key_field')} fullWidth size="small" type="password"
             value={apiKey} onChange={(e) => setApiKey(e.target.value)}
-            helperText="Key 将加密存储在本地 .secrets.json"
+            helperText={t('model_mgr_key_helper')}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowKey(null)}>取消</Button>
-          <Button variant="contained" onClick={saveKey} disabled={saving || !apiKey}>保存</Button>
+          <Button onClick={() => setShowKey(null)}>{t('model_mgr_btn_cancel')}</Button>
+          <Button variant="contained" onClick={saveKey} disabled={saving || !apiKey}>{t('model_mgr_btn_save')}</Button>
         </DialogActions>
       </Dialog>
     </Box>
   )
 }
+
