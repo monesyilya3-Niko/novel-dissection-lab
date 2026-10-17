@@ -1,5 +1,6 @@
 // 中英文双语词条词典（暮冬念春 / Exoscribe 国际化架构）。
 export type Locale = 'zh-CN' | 'en-US'
+export type TranslationKey = string
 
 export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   // 品牌与全局头部
@@ -2950,7 +2951,150 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': ' 连接失败: ',
     'en-US': ' connection failed: ',
   },
+
+  // 设置工作台 (SettingsWorkbench)
+  settings_title: {
+    'zh-CN': '系统设置',
+    'en-US': 'System Settings',
+  },
+  settings_section_thresholds: {
+    'zh-CN': '打分阈值',
+    'en-US': 'Scoring Thresholds',
+  },
+  settings_section_writing: {
+    'zh-CN': '写作设置',
+    'en-US': 'Writing Settings',
+  },
+  settings_section_service: {
+    'zh-CN': '服务配置',
+    'en-US': 'Service Configuration',
+  },
+  settings_chip_restart: {
+    'zh-CN': '需重启生效',
+    'en-US': 'Restart Required',
+  },
+  settings_port_prefix: {
+    'zh-CN': '端口：',
+    'en-US': 'Port: ',
+  },
+  settings_batch_size_prefix: {
+    'zh-CN': '批次大小：',
+    'en-US': 'Batch Size: ',
+  },
+  settings_chars_unit: {
+    'zh-CN': ' 字符',
+    'en-US': ' chars',
+  },
+  settings_env_hint: {
+    'zh-CN': '修改端口/批次大小请通过环境变量 NOVEL_LAB_GUI_PORT / NOVEL_LAB_GUI_BATCH_SIZE',
+    'en-US': 'To modify port/batch size, use environment variables NOVEL_LAB_GUI_PORT / NOVEL_LAB_GUI_BATCH_SIZE',
+  },
+  settings_section_paths: {
+    'zh-CN': '路径',
+    'en-US': 'Paths',
+  },
+  settings_section_env: {
+    'zh-CN': '环境变量覆盖',
+    'en-US': 'Environment Overrides',
+  },
+  settings_env_unset: {
+    'zh-CN': '（未设置）',
+    'en-US': '(Not set)',
+  },
+  settings_btn_save: {
+    'zh-CN': '保存设置',
+    'en-US': 'Save Settings',
+  },
+  settings_btn_reset: {
+    'zh-CN': '重置为默认',
+    'en-US': 'Reset to Defaults',
+  },
+  settings_msg_saved: {
+    'zh-CN': '设置已保存',
+    'en-US': 'Settings saved successfully',
+  },
+  settings_msg_reset: {
+    'zh-CN': '已重置为默认值',
+    'en-US': 'Reset to default values successfully',
+  },
+  settings_confirm_reset: {
+    'zh-CN': '确定将所有设置重置为默认值吗？此操作不可恢复。',
+    'en-US': 'Are you sure you want to reset all settings to default values? This operation cannot be undone.',
+  },
+  settings_field_consistency_target: {
+    'zh-CN': '一致性目标分',
+    'en-US': 'Consistency Target',
+  },
+  settings_field_quality_pass_line: {
+    'zh-CN': '质量及格线',
+    'en-US': 'Quality Pass Line',
+  },
+  settings_field_quality_warn_line: {
+    'zh-CN': '质量警告线',
+    'en-US': 'Quality Warn Line',
+  },
+  settings_field_default_words: {
+    'zh-CN': '默认字数',
+    'en-US': 'Default Words',
+  },
+  settings_field_max_attempts: {
+    'zh-CN': '最大改写轮数',
+    'en-US': 'Max Rewrite Attempts',
+  },
+  settings_helper_consistency_target: {
+    'zh-CN': '写作改写循环的一致性达标线（0-100）',
+    'en-US': 'Consistency threshold for writing rewrite loop (0-100)',
+  },
+  settings_helper_quality_pass_line: {
+    'zh-CN': '章节质量 PASS 阈值（默认 75）',
+    'en-US': 'Chapter quality PASS threshold (default 75)',
+  },
+  settings_helper_quality_warn_line: {
+    'zh-CN': '章节质量 WARN 阈值（默认 60）',
+    'en-US': 'Chapter quality WARN threshold (default 60)',
+  },
+  settings_helper_default_words: {
+    'zh-CN': '每章默认目标字数（100-20000）',
+    'en-US': 'Default target words per chapter (100-20000)',
+  },
+  settings_helper_max_attempts: {
+    'zh-CN': '1 初稿 + N-1 次改写（1-10）',
+    'en-US': '1 first draft + N-1 rewrites (1-10)',
+  },
+  settings_err_required: {
+    'zh-CN': '不能为空',
+    'en-US': 'Cannot be empty',
+  },
+  settings_err_nan: {
+    'zh-CN': '请输入数字',
+    'en-US': 'Please enter a number',
+  },
+  settings_err_integer: {
+    'zh-CN': '必须为整数',
+    'en-US': 'Must be an integer',
+  },
+  settings_err_range_100: {
+    'zh-CN': '必须在 0-100 之间',
+    'en-US': 'Must be between 0 and 100',
+  },
+  settings_err_range_words: {
+    'zh-CN': '必须在 100-20000 之间',
+    'en-US': 'Must be between 100 and 20000',
+  },
+  settings_err_range_attempts: {
+    'zh-CN': '必须在 1-10 之间',
+    'en-US': 'Must be between 1 and 10',
+  },
+  settings_err_pass_gte_warn: {
+    'zh-CN': '及格线必须 ≥ 警告线',
+    'en-US': 'Pass line must be ≥ warn line',
+  },
+  settings_err_warn_lte_pass: {
+    'zh-CN': '警告线必须 ≤ 及格线',
+    'en-US': 'Warn line must be ≤ pass line',
+  },
 }
+
 
 
 
