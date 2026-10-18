@@ -4,6 +4,7 @@ import type { EChartsOption } from 'echarts'
 import BaseChart from './BaseChart'
 import { getInkPalette, inkTextStyle, inkTooltip } from '../../charts/inkPalette'
 import { useThemeMode } from '../../state/ThemeModeContext'
+import { useI18n } from '../../state/I18nContext'
 import { ink } from '../../ink'
 
 export interface RadarSeries {
@@ -20,6 +21,7 @@ export interface RadarChartProps {
   height?: number
   /** 自定义 option 覆盖（合并到最终 option）。 */
   optionOverride?: EChartsOption
+  ariaLabel?: string
 }
 
 /** 雷达图：指标 + 系列 → ECharts radar option。 */
@@ -28,8 +30,10 @@ export default function RadarChart({
   series,
   height = 280,
   optionOverride,
+  ariaLabel,
 }: RadarChartProps) {
   const { isDark } = useThemeMode()
+  const { t } = useI18n()
   const option = useMemo<EChartsOption>(() => {
     const palette = getInkPalette(isDark)
     const axisColor = isDark ? ink.nightLine : ink.line
@@ -72,5 +76,5 @@ export default function RadarChart({
     return { ...base, ...optionOverride }
   }, [indicators, series, optionOverride, isDark])
 
-  return <BaseChart option={option} height={height} ariaLabel="雷达图" />
+  return <BaseChart option={option} height={height} ariaLabel={ariaLabel ?? t('chart_aria_radar', '雷达图')} />
 }

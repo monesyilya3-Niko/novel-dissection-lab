@@ -4,6 +4,7 @@ import type { EChartsOption } from 'echarts'
 import BaseChart from './BaseChart'
 import { getInkPalette, inkTextStyle, inkTooltip } from '../../charts/inkPalette'
 import { useThemeMode } from '../../state/ThemeModeContext'
+import { useI18n } from '../../state/I18nContext'
 import { ink } from '../../ink'
 
 export interface BarSeries {
@@ -25,6 +26,7 @@ export interface BarChartProps {
   /** 高度（px）。 */
   height?: number
   optionOverride?: EChartsOption
+  ariaLabel?: string
 }
 
 /** 柱状图：类目 + 系列 → ECharts bar option。 */
@@ -35,8 +37,10 @@ export default function BarChart({
   horizontal = false,
   height = 280,
   optionOverride,
+  ariaLabel,
 }: BarChartProps) {
   const { isDark } = useThemeMode()
+  const { t } = useI18n()
   const option = useMemo<EChartsOption>(() => {
     const palette = getInkPalette(isDark)
     const axisLine = isDark ? ink.nightLine : ink.line
@@ -100,5 +104,5 @@ export default function BarChart({
     return { ...base, ...optionOverride }
   }, [categories, series, stacked, horizontal, optionOverride, isDark])
 
-  return <BaseChart option={option} height={height} ariaLabel="柱状图" />
+  return <BaseChart option={option} height={height} ariaLabel={ariaLabel ?? t('chart_aria_bar', '柱状图')} />
 }

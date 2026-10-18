@@ -8,6 +8,7 @@ import type { EChartsOption } from 'echarts'
 import { lazy, Suspense, useMemo } from 'react'
 const BaseChart = lazy(() => import('./charts/BaseChart'))
 import { useApp } from '../state/AppContext'
+import { useI18n } from '../state/I18nContext'
 import type { QcIssue, QcLayer } from '../types'
 import { palette } from '../theme'
 
@@ -38,6 +39,8 @@ export default function QcVisuals({
   issues?: QcIssue[]
 }) {
   const { qualityPassLine } = useApp()
+  const { t } = useI18n()
+
   // ---- 12 维总览（条形）----
   const barOption = useMemo<EChartsOption | null>(() => {
     const dims = (layers ?? []).flatMap((l) =>
@@ -61,7 +64,10 @@ export default function QcVisuals({
             symbol: 'none',
             lineStyle: { color: palette.error, type: 'dashed' },
             data: [{ xAxis: qualityPassLine }],
-            label: { formatter: `合格线 ${qualityPassLine}`, fontSize: 10 },
+            label: {
+              formatter: t('qc_vis_pass_line', `合格线 ${qualityPassLine}`, { passLine: qualityPassLine }),
+              fontSize: 10,
+            },
           },
           data: dims
             .map((d) => ({
@@ -72,7 +78,7 @@ export default function QcVisuals({
         },
       ],
     }
-  }, [layers, qualityPassLine])
+  }, [layers, qualityPassLine, t])
 
   // ---- 章节×维度热力图（仅含有 raw.perChapter 的维度，维度内归一）----
   const heat = useMemo(() => {
@@ -104,11 +110,20 @@ export default function QcVisuals({
           const dim = withPc[pt.data[1]]
           const ch = chapters[pt.data[0]]
           const rawVal = dim?.pc[ch]
-          return `${dim?.label}<br/>第 ${ch} 章：得分率 ${pt.data[2]}%（原始 ${rawVal}）`
+          return t('qc_vis_ch_tooltip', `${dim?.label}<br/>第 ${ch} 章：得分率 ${pt.data[2]}%（原始 ${rawVal}）`, {
+            label: dim?.label ?? '',
+            ch,
+            pct: pt.data[2],
+            raw: rawVal ?? 0,
+          })
         },
       },
       grid: { left: 110, right: 90, top: 10, bottom: 40 },
-      xAxis: { type: 'category', data: chapters.map((c) => `第${c}章`), axisLabel: { fontSize: 10 } },
+      xAxis: {
+        type: 'category',
+        data: chapters.map((c) => t('qc_vis_ch_label', `第${c}章`, { ch: c })),
+        axisLabel: { fontSize: 10 },
+      },
       yAxis: { type: 'category', data: withPc.map((d) => d.label), axisLabel: { fontSize: 11 } },
       visualMap: {
         min: 0,
@@ -117,14 +132,14 @@ export default function QcVisuals({
         orient: 'vertical',
         right: 0,
         top: 'center',
-        text: ['得分率高', '低'],
+        text: [t('qc_vis_score_high', '得分率高'), t('qc_vis_score_low', '低')],
         // 热力图渐变：两端取主题 error/success，中间浅琥珀为渐变过渡色（无主题对应，保留）。
         inRange: { color: [palette.error, '#ffecb3', palette.success] },
       },
       series: [{ type: 'heatmap', data, label: { show: true, fontSize: 10, formatter: (p: unknown) => String((p as { data: [number, number, number] }).data[2]) } }],
     }
     return { option, chapterCount: chapters.length, dimCount: withPc.length }
-  }, [layers])
+  }, [layers, t])
 
   // ---- 章节问题分布（按严重度堆叠）----
   const issueOption = useMemo<EChartsOption | null>(() => {
@@ -139,16 +154,19 @@ export default function QcVisuals({
     const chapters = [...byChapter.keys()].sort((a, b) => a - b)
     // 严重度配色：high/low 取主题 error/warning；critical/medium 为其深/浅变体（语义区分度需要）。
     const severities: Array<{ key: QcIssue['severity']; label: string; color: string }> = [
-      { key: 'critical', label: '严重', color: '#b71c1c' },
-      { key: 'high', label: '高', color: palette.error },
-      { key: 'medium', label: '中', color: '#ed6c02' },
-      { key: 'low', label: '低', color: palette.warning },
+      { key: 'critical', label: t('qc_vis_sev_critical', '严重'), color: '#b71c1c' },
+      { key: 'high', label: t('qc_vis_sev_high', '高'), color: palette.error },
+      { key: 'medium', label: t('qc_vis_sev_medium', '中'), color: '#ed6c02' },
+      { key: 'low', label: t('qc_vis_sev_low', '低'), color: palette.warning },
     ]
     return {
       tooltip: { trigger: 'axis' },
       legend: { bottom: 0, data: severities.map((s) => s.label) },
       grid: { left: 40, right: 20, top: 20, bottom: 60 },
-      xAxis: { type: 'category', data: chapters.map((c) => `第${c}章`) },
+      xAxis: {
+        type: 'category',
+        data: chapters.map((c) => t('qc_vis_ch_label', `第${c}章`, { ch: c })),
+      },
       yAxis: { type: 'value', minInterval: 1 },
       series: severities.map((s) => ({
         name: s.label,
@@ -158,7 +176,7 @@ export default function QcVisuals({
         data: chapters.map((c) => byChapter.get(c)?.[s.key] ?? 0),
       })),
     }
-  }, [issues])
+  }, [issues, t])
 
   if (!barOption) return null
 
@@ -166,29 +184,50 @@ export default function QcVisuals({
     <Box>
       <Paper sx={{ p: 2, mb: 2 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-          十二维得分总览（红 = 低于合格线 {qualityPassLine}）
+          {t('qc_vis_overview_title', `十二维得分总览（红 = 低于合格线 ${qualityPassLine}）`, { passLine: qualityPassLine })}
         </Typography>
-        <Suspense fallback={<ChartFallback />}><BaseChart option={barOption} height={Math.max(200, 26 * (layers.reduce((n, l) => n + l.dimensions.length, 0) + 2))} ariaLabel="十二维得分总览条形图" notMerge={false} /></Suspense>
+        <Suspense fallback={<ChartFallback />}>
+          <BaseChart
+            option={barOption}
+            height={Math.max(200, 26 * (layers.reduce((n, l) => n + l.dimensions.length, 0) + 2))}
+            ariaLabel={t('qc_vis_overview_aria', '十二维得分总览条形图')}
+            notMerge={false}
+          />
+        </Suspense>
       </Paper>
 
       {heat && (
         <Paper sx={{ p: 2, mb: 2 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-            章节 × 维度 得分率热力图
+            {t('qc_vis_heatmap_title', '章节 × 维度 得分率热力图')}
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-            仅含提供章节粒度的 {heat.dimCount} 个维度；得分为维度内归一（相对该维度各章最高分）。
+            {t('qc_vis_heatmap_desc', `仅含提供章节粒度的 ${heat.dimCount} 个维度；得分为维度内归一（相对该维度各章最高分）。`, { count: heat.dimCount })}
           </Typography>
-          <Suspense fallback={<ChartFallback />}><BaseChart option={heat.option} height={Math.max(180, 34 * heat.dimCount + 70)} ariaLabel="章节维度得分率热力图" notMerge={false} /></Suspense>
+          <Suspense fallback={<ChartFallback />}>
+            <BaseChart
+              option={heat.option}
+              height={Math.max(180, 34 * heat.dimCount + 70)}
+              ariaLabel={t('qc_vis_heatmap_aria', '章节维度得分率热力图')}
+              notMerge={false}
+            />
+          </Suspense>
         </Paper>
       )}
 
       {issueOption && (
         <Paper sx={{ p: 2 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-            章节问题分布（按严重度）
+            {t('qc_vis_issue_title', '章节问题分布（按严重度）')}
           </Typography>
-          <Suspense fallback={<ChartFallback />}><BaseChart option={issueOption} height={240} ariaLabel="章节问题分布柱状图" notMerge={false} /></Suspense>
+          <Suspense fallback={<ChartFallback />}>
+            <BaseChart
+              option={issueOption}
+              height={240}
+              ariaLabel={t('qc_vis_issue_aria', '章节问题分布柱状图')}
+              notMerge={false}
+            />
+          </Suspense>
         </Paper>
       )}
     </Box>

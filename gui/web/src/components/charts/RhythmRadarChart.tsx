@@ -2,6 +2,7 @@
 import { useMemo } from 'react'
 import BaseChart from './BaseChart'
 import { useThemeMode } from '../../state/ThemeModeContext'
+import { useI18n } from '../../state/I18nContext'
 import { ink } from '../../ink'
 
 export interface RhythmRadarChartProps {
@@ -14,6 +15,7 @@ export interface RhythmRadarChartProps {
     conflictEscalation: number // 冲突升级
   }
   height?: number
+  ariaLabel?: string
 }
 
 const DEFAULT_METRICS = {
@@ -28,17 +30,19 @@ const DEFAULT_METRICS = {
 export default function RhythmRadarChart({
   metrics = DEFAULT_METRICS,
   height = 260,
+  ariaLabel,
 }: RhythmRadarChartProps) {
   const { isDark } = useThemeMode()
+  const { t } = useI18n()
 
   const option = useMemo(() => {
     const indicators = [
-      { name: '爽点节奏', max: 100 },
-      { name: '打脸期待', max: 100 },
-      { name: '信息密度', max: 100 },
-      { name: '金手指展开', max: 100 },
-      { name: '章末钩子', max: 100 },
-      { name: '冲突升级', max: 100 },
+      { name: t('chart_rhythm_pacing', '爽点节奏'), max: 100 },
+      { name: t('chart_rhythm_faceslap', '打脸期待'), max: 100 },
+      { name: t('chart_rhythm_infodensity', '信息密度'), max: 100 },
+      { name: t('chart_rhythm_goldenfinger', '金手指展开'), max: 100 },
+      { name: t('chart_rhythm_hook', '章末钩子'), max: 100 },
+      { name: t('chart_rhythm_conflict', '冲突升级'), max: 100 },
     ]
     const values = [
       metrics.shuangdianPacing,
@@ -83,12 +87,12 @@ export default function RhythmRadarChart({
       },
       series: [
         {
-          name: '节奏综合评估',
+          name: t('chart_rhythm_series', '节奏综合评估'),
           type: 'radar' as const,
           data: [
             {
               value: values,
-              name: '网文爽感指数',
+              name: t('chart_rhythm_item_name', '网文爽感指数'),
               itemStyle: { color: '#8B5CF6' },
               lineStyle: { width: 2, color: '#8B5CF6' },
               areaStyle: {
@@ -99,7 +103,7 @@ export default function RhythmRadarChart({
         },
       ],
     }
-  }, [metrics, isDark])
+  }, [metrics, isDark, t])
 
-  return <BaseChart option={option} height={height} />
+  return <BaseChart option={option} height={height} ariaLabel={ariaLabel ?? t('chart_rhythm_aria', '爽点节奏雷达图')} />
 }

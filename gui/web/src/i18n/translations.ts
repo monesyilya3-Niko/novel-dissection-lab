@@ -3921,6 +3921,218 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '删除',
     'en-US': 'Delete',
   },
+
+  // ==========================================
+  // QC 可视化图表 (QcVisuals)
+  // ==========================================
+  qc_vis_overview_title: {
+    'zh-CN': '十二维得分总览（红 = 低于合格线 {passLine}）',
+    'en-US': '12-Dimensional Score Overview (Red = Below Pass Line {passLine})',
+  },
+  qc_vis_overview_aria: {
+    'zh-CN': '十二维得分总览条形图',
+    'en-US': '12-Dimensional Score Overview Bar Chart',
+  },
+  qc_vis_pass_line: {
+    'zh-CN': '合格线 {passLine}',
+    'en-US': 'Pass Line {passLine}',
+  },
+  qc_vis_heatmap_title: {
+    'zh-CN': '章节 × 维度 得分率热力图',
+    'en-US': 'Chapter × Dimension Score Rate Heatmap',
+  },
+  qc_vis_heatmap_desc: {
+    'zh-CN': '仅含提供章节粒度的 {count} 个维度；得分为维度内归一（相对该维度各章最高分）。',
+    'en-US': 'Contains {count} dimensions with chapter granularity; scores normalized to chapter maximums.',
+  },
+  qc_vis_heatmap_aria: {
+    'zh-CN': '章节维度得分率热力图',
+    'en-US': 'Chapter-Dimension Score Rate Heatmap',
+  },
+  qc_vis_score_high: {
+    'zh-CN': '得分率高',
+    'en-US': 'High',
+  },
+  qc_vis_score_low: {
+    'zh-CN': '低',
+    'en-US': 'Low',
+  },
+  qc_vis_ch_label: {
+    'zh-CN': '第{ch}章',
+    'en-US': 'Ch.{ch}',
+  },
+  qc_vis_ch_tooltip: {
+    'zh-CN': '{label}<br/>第 {ch} 章：得分率 {pct}%（原始 {raw}）',
+    'en-US': '{label}<br/>Chapter {ch}: Score Rate {pct}% (Raw {raw})',
+  },
+  qc_vis_issue_title: {
+    'zh-CN': '章节问题分布（按严重度）',
+    'en-US': 'Chapter Issue Distribution (by Severity)',
+  },
+  qc_vis_issue_aria: {
+    'zh-CN': '章节问题分布柱状图',
+    'en-US': 'Chapter Issue Distribution Bar Chart',
+  },
+  qc_vis_sev_critical: {
+    'zh-CN': '严重',
+    'en-US': 'Critical',
+  },
+  qc_vis_sev_high: {
+    'zh-CN': '高',
+    'en-US': 'High',
+  },
+  qc_vis_sev_medium: {
+    'zh-CN': '中',
+    'en-US': 'Medium',
+  },
+  qc_vis_sev_low: {
+    'zh-CN': '低',
+    'en-US': 'Low',
+  },
+
+  // ==========================================
+  // 专业叙事与分析图表 (Specialized Charts)
+  // ==========================================
+  chart_wave_series_current: {
+    'zh-CN': '当前章节',
+    'en-US': 'Current Chapter',
+  },
+  chart_wave_series_tension: {
+    'zh-CN': '情绪张力',
+    'en-US': 'Emotional Tension',
+  },
+  chart_wave_benchmark_default: {
+    'zh-CN': '神作标杆基准',
+    'en-US': 'Masterpiece Benchmark',
+  },
+  chart_wave_lbl_opening: {
+    'zh-CN': '开端',
+    'en-US': 'Opening',
+  },
+  chart_wave_lbl_foreshadow: {
+    'zh-CN': '伏笔',
+    'en-US': 'Foreshadowing',
+  },
+  chart_wave_lbl_microconflict: {
+    'zh-CN': '微冲突',
+    'en-US': 'Micro-conflict',
+  },
+  chart_wave_lbl_testing: {
+    'zh-CN': '试探',
+    'en-US': 'Testing',
+  },
+  chart_wave_lbl_accumulation: {
+    'zh-CN': '积蓄',
+    'en-US': 'Buildup',
+  },
+  chart_wave_lbl_outburst: {
+    'zh-CN': '爆发',
+    'en-US': 'Outburst',
+  },
+  chart_wave_lbl_climax: {
+    'zh-CN': '高潮',
+    'en-US': 'Climax',
+  },
+  chart_wave_lbl_breather: {
+    'zh-CN': '喘息',
+    'en-US': 'Breather',
+  },
+  chart_wave_lbl_counterattack: {
+    'zh-CN': '反扑',
+    'en-US': 'Counterattack',
+  },
+  chart_wave_lbl_resolution: {
+    'zh-CN': '决胜',
+    'en-US': 'Resolution',
+  },
+  chart_wave_lbl_linger: {
+    'zh-CN': '留白',
+    'en-US': 'Afterglow',
+  },
+  chart_rhythm_pacing: {
+    'zh-CN': '爽点节奏',
+    'en-US': 'Pacing & Reward',
+  },
+  chart_rhythm_faceslap: {
+    'zh-CN': '打脸期待',
+    'en-US': 'Anticipation',
+  },
+  chart_rhythm_infodensity: {
+    'zh-CN': '信息密度',
+    'en-US': 'Information Density',
+  },
+  chart_rhythm_goldenfinger: {
+    'zh-CN': '金手指展开',
+    'en-US': 'Core System',
+  },
+  chart_rhythm_hook: {
+    'zh-CN': '章末钩子',
+    'en-US': 'Chapter Cliffhanger',
+  },
+  chart_rhythm_conflict: {
+    'zh-CN': '冲突升级',
+    'en-US': 'Conflict Escalation',
+  },
+  chart_rhythm_series: {
+    'zh-CN': '节奏综合评估',
+    'en-US': 'Rhythm Evaluation',
+  },
+  chart_rate_daily_words: {
+    'zh-CN': '每日字数',
+    'en-US': 'Daily Words',
+  },
+  chart_rate_velocity: {
+    'zh-CN': '平滑速率',
+    'en-US': 'Smoothed Velocity',
+  },
+  chart_rate_y_words: {
+    'zh-CN': '字数',
+    'en-US': 'Words',
+  },
+  chart_rate_y_velocity: {
+    'zh-CN': '速率 (字/天)',
+    'en-US': 'Velocity (words/day)',
+  },
+  chart_wave_aria: {
+    'zh-CN': '情绪起伏波形图',
+    'en-US': 'Emotional Tension Wave Chart',
+  },
+  chart_wave_mark_climax_line: {
+    'zh-CN': '高潮警戒线',
+    'en-US': 'Climax Warning Line',
+  },
+  chart_wave_mark_climax_thresh: {
+    'zh-CN': '高潮阈值 80',
+    'en-US': 'Climax Threshold 80',
+  },
+  chart_rhythm_aria: {
+    'zh-CN': '爽点节奏雷达图',
+    'en-US': 'Pacing & Climax Radar Chart',
+  },
+  chart_rhythm_item_name: {
+    'zh-CN': '网文爽感指数',
+    'en-US': 'Catharsis Index',
+  },
+  chart_rate_aria: {
+    'zh-CN': '创作速率与字数统计折线图',
+    'en-US': 'Creation Rate & Word Count Line Chart',
+  },
+  chart_aria_bar: {
+    'zh-CN': '柱状图',
+    'en-US': 'Bar Chart',
+  },
+  chart_aria_pie: {
+    'zh-CN': '饼图',
+    'en-US': 'Pie Chart',
+  },
+  chart_aria_radar: {
+    'zh-CN': '雷达图',
+    'en-US': 'Radar Chart',
+  },
+  chart_aria_gauge: {
+    'zh-CN': '仪表盘',
+    'en-US': 'Gauge Chart',
+  },
 }
 
 

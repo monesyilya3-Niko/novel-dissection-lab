@@ -2,6 +2,7 @@
 import { useMemo } from 'react'
 import BaseChart from './BaseChart'
 import { useThemeMode } from '../../state/ThemeModeContext'
+import { useI18n } from '../../state/I18nContext'
 import { ink } from '../../ink'
 
 export interface DailyStatPoint {
@@ -13,10 +14,12 @@ export interface DailyStatPoint {
 export interface CreationRateChartProps {
   data: DailyStatPoint[]
   height?: number
+  ariaLabel?: string
 }
 
-export default function CreationRateChart({ data, height = 260 }: CreationRateChartProps) {
+export default function CreationRateChart({ data, height = 260, ariaLabel }: CreationRateChartProps) {
   const { isDark } = useThemeMode()
+  const { t } = useI18n()
 
   const option = useMemo(() => {
     const dates = data.map((d) => d.date.slice(5)) // MM-DD
@@ -28,13 +31,16 @@ export default function CreationRateChart({ data, height = 260 }: CreationRateCh
       return Math.round(avg)
     })
 
+    const dailyWordsLabel = t('chart_rate_daily_words', '每日字数')
+    const velocityLabel = t('chart_rate_velocity', '平滑速率')
+
     return {
       tooltip: {
         trigger: 'axis' as const,
         axisPointer: { type: 'cross' as const },
       },
       legend: {
-        data: ['每日字数', '平滑速率'],
+        data: [dailyWordsLabel, velocityLabel],
         top: 0,
         textStyle: { color: isDark ? ink.moonSoft : ink.textSecondary },
       },
@@ -54,14 +60,14 @@ export default function CreationRateChart({ data, height = 260 }: CreationRateCh
       yAxis: [
         {
           type: 'value' as const,
-          name: '字数',
+          name: t('chart_rate_y_words', '字数'),
           splitLine: { lineStyle: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' } },
           axisLabel: { color: isDark ? ink.moonSoft : ink.textTertiary, fontSize: 11 },
         },
       ],
       series: [
         {
-          name: '每日字数',
+          name: dailyWordsLabel,
           type: 'line' as const,
           smooth: true,
           data: words,
@@ -81,7 +87,7 @@ export default function CreationRateChart({ data, height = 260 }: CreationRateCh
           },
         },
         {
-          name: '平滑速率',
+          name: velocityLabel,
           type: 'line' as const,
           smooth: true,
           lineStyle: { width: 2, type: 'dashed' as const },
@@ -90,7 +96,7 @@ export default function CreationRateChart({ data, height = 260 }: CreationRateCh
         },
       ],
     }
-  }, [data, isDark])
+  }, [data, isDark, t])
 
-  return <BaseChart option={option} height={height} />
+  return <BaseChart option={option} height={height} ariaLabel={ariaLabel ?? t('chart_rate_aria', '创作速率与字数统计折线图')} />
 }
