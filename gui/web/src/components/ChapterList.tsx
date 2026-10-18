@@ -56,6 +56,7 @@ export default function ChapterList() {
             sx={{ alignItems: 'flex-start' }}
           >
             <ListItemText
+              secondaryTypographyProps={{ component: 'div' }}
               primary={
                 <Typography variant="body2" noWrap>
                   {t('analysis_chap_prefix')}{ch.index}{t('analysis_chap_suffix')} {ch.title.replace(/^第[一二三四五六七八九十百千零0-9]+[章回节卷]\s*/, '')}

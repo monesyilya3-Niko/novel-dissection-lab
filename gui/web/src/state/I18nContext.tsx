@@ -67,7 +67,7 @@ export function I18nProvider({
   const t = useCallback(
     (key: string, fallback?: string, params?: TranslationParams): string => {
       const entry = TRANSLATIONS[key]
-      const raw = entry && entry[locale] ? entry[locale] : (fallback ?? key)
+      const raw = entry && entry[locale] !== undefined ? entry[locale] : (fallback ?? key)
       return interpolateParams(raw, params)
     },
     [locale],
@@ -91,7 +91,7 @@ export function useI18n(): I18nState {
       toggleLocale: () => {},
       t: (key: string, fallback?: string, params?: TranslationParams) => {
         const entry = TRANSLATIONS[key]
-        const raw = entry ? entry['zh-CN'] : (fallback ?? key)
+        const raw = entry && entry['zh-CN'] !== undefined ? entry['zh-CN'] : (fallback ?? key)
         return interpolateParams(raw, params)
       },
     }
