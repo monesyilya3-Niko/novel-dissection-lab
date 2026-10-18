@@ -126,6 +126,116 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '目标',
     'en-US': 'Target',
   },
+  editor_empty_text: {
+    'zh-CN': '正文为空，请先编写章节内容',
+    'en-US': 'Draft is empty. Please enter chapter text first.',
+  },
+  editor_poison_modal_title: {
+    'zh-CN': '🛡️ 章节毒点排查诊断',
+    'en-US': '🛡️ Chapter Anti-Poison Audit',
+  },
+  editor_poison_safe_alert: {
+    'zh-CN': '本章未命中任何已知的过度憋屈、圣母资敌、降智舔狗、战力断崖等恶性弃坑毒点，行文节奏舒畅！',
+    'en-US': 'No fatal reader-turnoff taboos (excessive frustration, enemy mercy, IQ drop, power cliffs) detected. Smooth narrative flow!',
+  },
+  editor_poison_issues_found: {
+    'zh-CN': '检出 {count} 处潜在风险（扣分：{score}）：',
+    'en-US': 'Found {count} potential risks (penalty score: {score}):',
+  },
+  editor_poison_line_chip: {
+    'zh-CN': '第 {line} 行',
+    'en-US': 'Line {line}',
+  },
+  editor_poison_matched: {
+    'zh-CN': '命中：{matched}',
+    'en-US': 'Matched: {matched}',
+  },
+  editor_poison_suggestion_label: {
+    'zh-CN': '【改法建议】 {suggestion}',
+    'en-US': '[Suggestion] {suggestion}',
+  },
+  editor_deslop_modal_title: {
+    'zh-CN': '✨ 章节去 AI 味诊断',
+    'en-US': '✨ Chapter Anti-Slop Audit',
+  },
+  editor_deslop_ai_score_chip: {
+    'zh-CN': 'AI 指数: {score} ({verdict})',
+    'en-US': 'AI Index: {score} ({verdict})',
+  },
+  editor_deslop_safe_alert: {
+    'zh-CN': '正文行文极其自然，未检测到任何程式化套路、玄虚比喻、无由排比或俗套口癖！',
+    'en-US': 'Prose flows naturally with no detected clichés, obscure metaphors, empty parallelism, or AI speech patterns!',
+  },
+  editor_deslop_issues_found: {
+    'zh-CN': '检出 {count} 处模式化套路（总字数：{words}，总句数：{sents}，被动句让字密度：{density}‰）：',
+    'en-US': 'Found {count} stylized patterns ({words} words, {sents} sentences, passive density: {density}‰):',
+  },
+  editor_deslop_weight_label: {
+    'zh-CN': '扣分权重：{weight}',
+    'en-US': 'Penalty Weight: {weight}',
+  },
+  editor_deslop_suggestion_label: {
+    'zh-CN': '【优化建议】 {suggestion}',
+    'en-US': '[Optimization Suggestion] {suggestion}',
+  },
+  editor_const_modal_title: {
+    'zh-CN': '📜 章节设定与世界观宪法审查',
+    'en-US': '📜 Novel Constitution & Canon Audit',
+  },
+  editor_const_score_chip: {
+    'zh-CN': '合规得分: {score} ({status})',
+    'en-US': 'Compliance Score: {score} ({status})',
+  },
+  editor_const_compliant: {
+    'zh-CN': '正典合规',
+    'en-US': 'Canon Compliant',
+  },
+  editor_const_risk: {
+    'zh-CN': '存在违宪风险',
+    'en-US': 'Canon Risk Detected',
+  },
+  editor_const_safe_alert: {
+    'zh-CN': '全章设定完美合规，未触碰世界观红线，角色声线与行为严丝合缝！',
+    'en-US': 'Chapter adheres perfectly to canon boundaries with no worldbuilding violations or out-of-character drift!',
+  },
+  editor_const_violations_title: {
+    'zh-CN': '🚫 世界观违宪项 ({count})',
+    'en-US': '🚫 Canon & Worldbuilding Violations ({count})',
+  },
+  editor_const_term_matched: {
+    'zh-CN': '命中禁用词：【{term}】（第 {line} 行）',
+    'en-US': 'Forbidden Term: [{term}] (Line {line})',
+  },
+  editor_const_voice_title: {
+    'zh-CN': '🎭 角色声线脱缰警报 ({count})',
+    'en-US': '🎭 Character Voice Taboo Alerts ({count})',
+  },
+  editor_const_voice_char: {
+    'zh-CN': '角色: {character}',
+    'en-US': 'Character: {character}',
+  },
+  editor_const_voice_forbidden: {
+    'zh-CN': '说了禁说台词：【{phrase}】（第 {line} 行）',
+    'en-US': 'Spoke Forbidden Taboo: [{phrase}] (Line {line})',
+  },
+
+  // 顶层全局与导航 (App & Navigation)
+  app_init_failed: {
+    'zh-CN': '初始化失败：{error}',
+    'en-US': 'Initialization failed: {error}',
+  },
+  nav_open_drawer: {
+    'zh-CN': '打开导航',
+    'en-US': 'Open Navigation',
+  },
+  help_fab_tooltip: {
+    'zh-CN': '帮助中心：术语、指南、工作流',
+    'en-US': 'Help Center: Terms, Guides, Workflows',
+  },
+  help_fab_aria: {
+    'zh-CN': '打开帮助中心',
+    'en-US': 'Open Help Center',
+  },
 
   // 通用动作与状态
   action_save: {

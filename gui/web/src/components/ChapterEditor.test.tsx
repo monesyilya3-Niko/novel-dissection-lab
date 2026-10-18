@@ -169,4 +169,81 @@ describe('ChapterEditor', () => {
       removeStorage('novellab.locale')
     }
   })
+
+  it('在 en-US 语言环境下打开毒点排查弹窗渲染英文标题与警报', async () => {
+    writeStorage('novellab.locale', 'en-US')
+    try {
+      render(
+        <I18nProvider>
+          <ChapterEditor value="A cold wind howled across the frozen wasteland." onChange={noop} />
+        </I18nProvider>,
+      )
+      const poisonBtn = await screen.findByText('🛡️ Anti-Poison Check')
+      fireEvent.click(poisonBtn)
+      await waitFor(() => {
+        expect(screen.getByText('🛡️ Chapter Anti-Poison Audit')).toBeDefined()
+        expect(screen.getByText(/Smooth narrative flow!/)).toBeDefined()
+        expect(screen.getByText('Close & Return')).toBeDefined()
+      })
+    } finally {
+      removeStorage('novellab.locale')
+    }
+  })
+
+  it('在 en-US 语言环境下打开去AI味体检弹窗渲染英文标题与警报', async () => {
+    writeStorage('novellab.locale', 'en-US')
+    try {
+      render(
+        <I18nProvider>
+          <ChapterEditor value="A cold wind howled across the frozen wasteland." onChange={noop} />
+        </I18nProvider>,
+      )
+      const deslopBtn = await screen.findByText('✨ Anti-Slop Audit')
+      fireEvent.click(deslopBtn)
+      await waitFor(() => {
+        expect(screen.getByText('✨ Chapter Anti-Slop Audit')).toBeDefined()
+        expect(screen.getByText(/Prose flows naturally/)).toBeDefined()
+        expect(screen.getByText('Close & Return')).toBeDefined()
+      })
+    } finally {
+      removeStorage('novellab.locale')
+    }
+  })
+
+  it('在 en-US 语言环境下打开设定宪法审查弹窗渲染英文标题与关闭按钮', async () => {
+    writeStorage('novellab.locale', 'en-US')
+    try {
+      render(
+        <I18nProvider>
+          <ChapterEditor value="A cold wind howled across the frozen wasteland." onChange={noop} />
+        </I18nProvider>,
+      )
+      const constBtn = await screen.findByText('📜 Novel Constitution')
+      fireEvent.click(constBtn)
+      await waitFor(() => {
+        expect(screen.getByText('📜 Novel Constitution & Canon Audit')).toBeDefined()
+        expect(screen.getByText('Close & Return')).toBeDefined()
+      })
+    } finally {
+      removeStorage('novellab.locale')
+    }
+  })
+
+  it('在 en-US 语言环境下正文为空点击排查给出英文提示', async () => {
+    writeStorage('novellab.locale', 'en-US')
+    try {
+      render(
+        <I18nProvider>
+          <ChapterEditor value="" onChange={noop} />
+        </I18nProvider>,
+      )
+      const poisonBtn = await screen.findByText('🛡️ Anti-Poison Check')
+      fireEvent.click(poisonBtn)
+      await waitFor(() => {
+        expect(screen.getByText('Draft is empty. Please enter chapter text first.')).toBeDefined()
+      })
+    } finally {
+      removeStorage('novellab.locale')
+    }
+  })
 })

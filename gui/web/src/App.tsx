@@ -141,12 +141,12 @@ function AppShell() {
       }}>
       {initError && (
         <Alert severity="error" sx={{ borderRadius: 0 }}>
-          初始化失败：{initError}
+          {t('app_init_failed', '初始化失败：{error}', { error: initError })}
         </Alert>
       )}
         <Toolbar sx={{ minHeight: 56, gap: 1.5, px: { xs: 2, md: 3 } }}>
           {!wide && (
-            <IconButton color="inherit" edge="start" onClick={() => setDrawerOpen(true)} aria-label="打开导航" sx={{ color: (theme) => theme.palette.mode === 'dark' ? ink.moonWhite : ink.text }}>
+            <IconButton color="inherit" edge="start" onClick={() => setDrawerOpen(true)} aria-label={t('nav_open_drawer', '打开导航')} sx={{ color: (theme) => theme.palette.mode === 'dark' ? ink.moonWhite : ink.text }}>
               <MenuIcon />
             </IconButton>
           )}
@@ -226,11 +226,11 @@ function AppShell() {
       <CommandPalette />
       {/* 全局悬浮帮助按钮：任何页面一键进入帮助中心 */}
       {workbench !== 'help' && (
-        <Tooltip title="帮助中心：术语、指南、工作流" placement="left">
+        <Tooltip title={t('help_fab_tooltip', '帮助中心：术语、指南、工作流')} placement="left">
           <Fab
             size="medium"
             onClick={() => openHelp('start', null)}
-            aria-label="打开帮助中心"
+            aria-label={t('help_fab_aria', '打开帮助中心')}
             sx={{
               position: 'fixed',
               bottom: 24,

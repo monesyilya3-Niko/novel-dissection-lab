@@ -132,7 +132,7 @@ export default function ChapterEditor({
   const handleQuickPoisonCheck = async () => {
     const text = editor?.getText() || value
     if (!text.trim()) {
-      setPoisonError('正文为空，请先编写章节内容')
+      setPoisonError(t('editor_empty_text', '正文为空，请先编写章节内容'))
       setPoisonResult(null)
       setPoisonOpen(true)
       return
@@ -153,7 +153,7 @@ export default function ChapterEditor({
   const handleQuickDeslopCheck = async () => {
     const text = editor?.getText() || value
     if (!text.trim()) {
-      setDeslopError('正文为空，请先编写章节内容')
+      setDeslopError(t('editor_empty_text', '正文为空，请先编写章节内容'))
       setDeslopResult(null)
       setDeslopOpen(true)
       return
@@ -174,7 +174,7 @@ export default function ChapterEditor({
   const handleQuickConstitutionCheck = async () => {
     const text = editor?.getText() || value
     if (!text.trim()) {
-      setConstitutionError('正文为空，请先编写章节内容')
+      setConstitutionError(t('editor_empty_text', '正文为空，请先编写章节内容'))
       setConstitutionResult(null)
       setConstitutionOpen(true)
       return
@@ -304,7 +304,7 @@ export default function ChapterEditor({
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
           <Typography component="span" variant="h6" fontWeight={700}>
-            🛡️ 章节毒点排查诊断
+            {t('editor_poison_modal_title', '🛡️ 章节毒点排查诊断')}
           </Typography>
           {poisonResult && (
             <Chip
@@ -327,30 +327,33 @@ export default function ChapterEditor({
             <>
               {poisonResult.findings.length === 0 ? (
                 <Alert severity="success">
-                  本章未命中任何已知的过度憋屈、圣母资敌、降智舔狗、战力断崖等恶性弃坑毒点，行文节奏舒畅！
+                  {t('editor_poison_safe_alert', '本章未命中任何已知的过度憋屈、圣母资敌、降智舔狗、战力断崖等恶性弃坑毒点，行文节奏舒畅！')}
                 </Alert>
               ) : (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   <Typography variant="caption" color="text.secondary">
-                    检出 <strong>{poisonResult.totalIssues}</strong> 处潜在风险（扣分：{poisonResult.score}）：
+                    {t('editor_poison_issues_found', '检出 {count} 处潜在风险（扣分：{score}）：', {
+                      count: poisonResult.totalIssues,
+                      score: poisonResult.score,
+                    })}
                   </Typography>
                   {poisonResult.findings.map((f, i) => (
                     <Card key={i} variant="outlined" sx={{ bgcolor: 'action.hover' }}>
                       <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                          <Chip size="small" label={`第 ${f.line} 行`} />
+                          <Chip size="small" label={t('editor_poison_line_chip', '第 {line} 行', { line: f.line })} />
                           <Typography variant="subtitle2" fontWeight={700}>
                             {f.typeName}
                           </Typography>
                           <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-                            命中：{f.matched}
+                            {t('editor_poison_matched', '命中：{matched}', { matched: f.matched })}
                           </Typography>
                         </Box>
                         <Typography variant="caption" color="text.primary" display="block">
                           “...{f.snippet}... ”
                         </Typography>
                         <Typography variant="caption" color="success.main" display="block" sx={{ mt: 0.5, fontWeight: 600 }}>
-                          【改法建议】 {f.suggestion}
+                          {t('editor_poison_suggestion_label', '【改法建议】 {suggestion}', { suggestion: f.suggestion })}
                         </Typography>
                       </CardContent>
                     </Card>
@@ -374,12 +377,15 @@ export default function ChapterEditor({
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
           <Typography component="span" variant="h6" fontWeight={700}>
-            ✨ 章节去 AI 味诊断
+            {t('editor_deslop_modal_title', '✨ 章节去 AI 味诊断')}
           </Typography>
           {deslopResult && (
             <Chip
               size="small"
-              label={`AI 指数: ${deslopResult.aiScore.toFixed(1)} (${deslopResult.verdictCn})`}
+              label={t('editor_deslop_ai_score_chip', 'AI 指数: {score} ({verdict})', {
+                score: deslopResult.aiScore.toFixed(1),
+                verdict: deslopResult.verdictCn,
+              })}
               color={deslopResult.aiScore < 15 ? 'success' : deslopResult.aiScore < 35 ? 'warning' : 'error'}
             />
           )}
@@ -397,12 +403,17 @@ export default function ChapterEditor({
             <>
               {deslopResult.issues.length === 0 ? (
                 <Alert severity="success">
-                  正文行文极其自然，未检测到任何程式化套路、玄虚比喻、无由排比或俗套口癖！
+                  {t('editor_deslop_safe_alert', '正文行文极其自然，未检测到任何程式化套路、玄虚比喻、无由排比或俗套口癖！')}
                 </Alert>
               ) : (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   <Typography variant="caption" color="text.secondary">
-                    检出 <strong>{deslopResult.stats.issuesCount}</strong> 处模式化套路（总字数：{deslopResult.stats.wordCount}，总句数：{deslopResult.stats.sentenceCount}，被动句让字密度：{deslopResult.stats.rangDensity.toFixed(1)}‰）：
+                    {t('editor_deslop_issues_found', '检出 {count} 处模式化套路（总字数：{words}，总句数：{sents}，被动句让字密度：{density}‰）：', {
+                      count: deslopResult.stats.issuesCount,
+                      words: deslopResult.stats.wordCount,
+                      sents: deslopResult.stats.sentenceCount,
+                      density: deslopResult.stats.rangDensity.toFixed(1),
+                    })}
                   </Typography>
                   {deslopResult.issues.map((it, i) => (
                     <Card key={i} variant="outlined" sx={{ bgcolor: 'action.hover' }}>
@@ -410,14 +421,14 @@ export default function ChapterEditor({
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                           <Chip size="small" label={it.label} color="warning" />
                           <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-                            扣分权重：{it.weight}
+                            {t('editor_deslop_weight_label', '扣分权重：{weight}', { weight: it.weight })}
                           </Typography>
                         </Box>
                         <Typography variant="caption" color="text.primary" display="block">
                           “...{it.snippet}...”
                         </Typography>
                         <Typography variant="caption" color="info.main" display="block" sx={{ mt: 0.5, fontWeight: 600 }}>
-                          【优化建议】 {it.suggestion}
+                          {t('editor_deslop_suggestion_label', '【优化建议】 {suggestion}', { suggestion: it.suggestion })}
                         </Typography>
                       </CardContent>
                     </Card>
@@ -441,12 +452,17 @@ export default function ChapterEditor({
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
           <Typography component="span" variant="h6" fontWeight={700}>
-            📜 章节设定与世界观宪法审查
+            {t('editor_const_modal_title', '📜 章节设定与世界观宪法审查')}
           </Typography>
           {constitutionResult && (
             <Chip
               size="small"
-              label={`合规得分: ${constitutionResult.compliance_score} (${constitutionResult.is_compliant ? '正典合规' : '存在违宪风险'})`}
+              label={t('editor_const_score_chip', '合规得分: {score} ({status})', {
+                score: constitutionResult.compliance_score,
+                status: constitutionResult.is_compliant
+                  ? t('editor_const_compliant', '正典合规')
+                  : t('editor_const_risk', '存在违宪风险'),
+              })}
               color={constitutionResult.is_compliant ? 'success' : constitutionResult.compliance_score >= 60 ? 'warning' : 'error'}
             />
           )}
@@ -464,7 +480,7 @@ export default function ChapterEditor({
             <>
               {constitutionResult.violations.length === 0 && constitutionResult.character_voice_alerts.length === 0 ? (
                 <Alert severity="success">
-                  {constitutionResult.summary || '全章设定完美合规，未触碰世界观红线，角色声线与行为严丝合缝！'}
+                  {constitutionResult.summary || t('editor_const_safe_alert', '全章设定完美合规，未触碰世界观红线，角色声线与行为严丝合缝！')}
                 </Alert>
               ) : (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -476,7 +492,7 @@ export default function ChapterEditor({
                   {constitutionResult.violations.length > 0 && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, color: ink.accent, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        🚫 世界观违宪项 ({constitutionResult.violations.length})
+                        {t('editor_const_violations_title', '🚫 世界观违宪项 ({count})', { count: constitutionResult.violations.length })}
                       </Typography>
                       {constitutionResult.violations.map((v, i) => (
                         <Card key={i} variant="outlined" sx={{ bgcolor: 'action.hover' }}>
@@ -488,7 +504,10 @@ export default function ChapterEditor({
                                 color={v.severity === 'high' ? 'error' : 'warning'}
                               />
                               <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                                命中禁用词：【{v.matched_term}】（第 {v.line_no} 行）
+                                {t('editor_const_term_matched', '命中禁用词：【{term}】（第 {line} 行）', {
+                                  term: v.matched_term,
+                                  line: v.line_no,
+                                })}
                               </Typography>
                             </Box>
                             <Typography variant="caption" color="text.primary" display="block">
@@ -504,15 +523,18 @@ export default function ChapterEditor({
                   {constitutionResult.character_voice_alerts.length > 0 && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'warning.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        🎭 角色声线脱缰警报 ({constitutionResult.character_voice_alerts.length})
+                        {t('editor_const_voice_title', '🎭 角色声线脱缰警报 ({count})', { count: constitutionResult.character_voice_alerts.length })}
                       </Typography>
                       {constitutionResult.character_voice_alerts.map((ca, i) => (
                         <Card key={i} variant="outlined" sx={{ bgcolor: 'action.hover' }}>
                           <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                              <Chip size="small" label={`角色: ${ca.character}`} color="info" />
+                              <Chip size="small" label={t('editor_const_voice_char', '角色: {character}', { character: ca.character })} color="info" />
                               <Typography variant="caption" color="error" sx={{ fontWeight: 600 }}>
-                                说了禁说台词：【{ca.forbidden_phrase}】（第 {ca.line_no} 行）
+                                {t('editor_const_voice_forbidden', '说了禁说台词：【{phrase}】（第 {line} 行）', {
+                                  phrase: ca.forbidden_phrase,
+                                  line: ca.line_no,
+                                })}
                               </Typography>
                             </Box>
                             <Typography variant="caption" color="text.primary" display="block">
