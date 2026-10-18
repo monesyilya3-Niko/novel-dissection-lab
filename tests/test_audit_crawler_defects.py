@@ -41,6 +41,9 @@ import scripts.check_dp_titles as cdp  # noqa: E402
 import scripts.check_search as csr  # noqa: E402
 import scripts.check_seq as csq  # noqa: E402
 import scripts.check_shorts as csh  # noqa: E402
+import scripts.debug_flaws as cdf  # noqa: E402
+import scripts.inspect_issue_books as cib  # noqa: E402
+import scripts.scan_all_books_crawler_artifacts as csa  # noqa: E402
 
 
 class TestAuditCrawlerDefects(unittest.TestCase):
@@ -570,6 +573,132 @@ class TestAncillaryInspectionScripts(unittest.TestCase):
         self.assertIn("=== 孢子物语 ===", out.getvalue())
 
         conn.close()
+
+    def test_debug_flaws(self):
+        """测试 debug_flaws.py 资产过短、伏笔链过短、短章及广告匹配。"""
+        db_file = self.tmp_path / "flaws.db"
+        conn = sqlite3.connect(str(db_file))
+        conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("""
+                CREATE TABLE essence_books (
+                    id INTEGER PRIMARY KEY,
+                    book_id TEXT,
+                    title TEXT,
+                    source_path TEXT
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE essence_assets (
+                    id INTEGER PRIMARY KEY,
+                    book_id TEXT,
+                    category TEXT,
+                    title TEXT,
+                    content TEXT
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE essence_chains (
+                    id INTEGER PRIMARY KEY,
+                    book_id TEXT,
+                    hook_text TEXT
+                )
+            """)
+
+            # 插入一本书、一个短资产、一个短伏笔链
+            book_txt = self.tmp_path / "flaw_book.txt"
+            book_txt.write_text("第1章 标题\n请到正版网站首发阅读！" + "正文" * 5, encoding="utf-8")
+            conn.execute("INSERT INTO essence_books VALUES (1, 'b1', '测试书', ?)", (str(book_txt),))
+            conn.execute("INSERT INTO essence_assets VALUES (1, 'b1', 'role', '短资产', '太短')")
+            conn.execute("INSERT INTO essence_chains VALUES (1, 'b1', '短钩')")
+            conn.commit()
+
+            report = cdf.debug_corpus_flaws(conn)
+            self.assertEqual(len(report["short_assets"]), 1)
+            self.assertEqual(len(report["short_chains"]), 1)
+            self.assertEqual(len(report["ad_matches"]), 1)
+            self.assertEqual(report["ad_matches"][0]["pattern"], "请到.*首发")
+        finally:
+            conn.close()
+
+        # CLI
+        out = io.StringIO()
+        with mock.patch("sys.stdout", out):
+            code = cdf.main(["--db", str(db_file)])
+        self.assertEqual(code, 0)
+        self.assertIn("调查维度一", out.getvalue())
+
+    def test_inspect_issue_books(self):
+        """测试 inspect_issue_books.py 章节正则模式切片对照。"""
+        db_file, conn = self._create_sample_db()
+        try:
+            book_txt = self.tmp_path / "issue_book.txt"
+            book_txt.write_text(
+                "第一卷 启航\n" + "正文" * 100 + "\n"
+                "第一节 短节\n短\n"
+                "第二卷 远征\n" + "正文" * 100,
+                encoding="utf-8",
+            )
+            conn.execute("INSERT INTO essence_books VALUES (1, '暴力前锋', ?)", (str(book_txt),))
+            conn.commit()
+
+            res = cib.inspect_book_chapter_patterns(conn, title="暴力前锋", min_chars=50)
+            self.assertIsNotNone(res)
+            self.assertEqual(res["with_jie"]["total"], 3)
+            self.assertEqual(res["with_jie"]["short_count"], 1)
+            self.assertEqual(res["no_jie"]["total"], 2)
+            self.assertEqual(res["no_jie"]["short_count"], 0)
+        finally:
+            conn.close()
+
+        # CLI
+        out = io.StringIO()
+        with mock.patch("sys.stdout", out):
+            code = cib.main(["--db", str(db_file), "--title", "暴力前锋"])
+        self.assertEqual(code, 0)
+        self.assertIn("包含[节]", out.getvalue())
+
+    def test_scan_crawler_artifacts(self):
+        """测试 scan_all_books_crawler_artifacts.py 全库爬虫伪标题与切片扫描。"""
+        db_file = self.tmp_path / "scan_artifacts.db"
+        conn = sqlite3.connect(str(db_file))
+        conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("""
+                CREATE TABLE essence_books (
+                    id INTEGER PRIMARY KEY,
+                    book_id TEXT,
+                    title TEXT,
+                    genre TEXT,
+                    total_chapters INTEGER,
+                    total_chars INTEGER,
+                    source_path TEXT
+                )
+            """)
+            # 1. 包含可疑伪标题（如第一天、第二天）的书籍
+            b1_txt = self.tmp_path / "b1_scan.txt"
+            b1_txt.write_text(
+                "第1章 第一天来到荒岛\n" + "正文" * 50 + "\n"
+                "第2章 第二天寻找水源\n" + "正文" * 50 + "\n"
+                "第3章 第三天搭建庇护所\n" + "正文" * 50,
+                encoding="utf-8",
+            )
+            conn.execute("INSERT INTO essence_books VALUES (1, 'b1', '荒岛记', '冒险', 3, 300, ?)", (str(b1_txt),))
+            conn.commit()
+
+            results = csa.scan_crawler_artifacts(conn, bad_title_ratio_thresh=0.01)
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0]["title"], "荒岛记")
+            self.assertIn("假标题率", results[0]["reason"])
+        finally:
+            conn.close()
+
+        # CLI
+        out = io.StringIO()
+        with mock.patch("sys.stdout", out):
+            code = csa.main(["--db", str(db_file)])
+        self.assertEqual(code, 0)
+        self.assertIn("荒岛记", out.getvalue())
 
 
 if __name__ == "__main__":
