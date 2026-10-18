@@ -17,12 +17,21 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(SCRIPTS))
 
 
+def _source_of(mod):
+    try:
+        return Path(mod.__file__).resolve()
+    except (AttributeError, TypeError, OSError):
+        return None
+
+
 def _load(name: str):
-    path = SCRIPTS / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
+    path = (SCRIPTS / f"{name}.py").resolve()
+    mod = sys.modules.get(name)
+    if mod is None or _source_of(mod) != path:
+        spec = importlib.util.spec_from_file_location(name, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
     return mod
 
 
