@@ -102,8 +102,8 @@ export default function PlatformPanel() {
         setPlatforms(list)
         setSelected((prev) => (prev && list.some((pl) => pl.id === prev) ? prev : (list[0]?.id ?? '')))
       })
-      .catch((e) => setError(`加载平台列表失败: ${e}`))
-  }, [])
+      .catch((e) => setError(t('platform_load_err', '加载平台列表失败: {error}', { error: String(e) })))
+  }, [t])
 
   const doCheck = async () => {
     setLoading(true)
@@ -215,19 +215,19 @@ export default function PlatformPanel() {
           <Typography variant="h6" gutterBottom>{t('platform_panel_title', '多平台适配与签约诊断')}</Typography>
 
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
-            <TextField select label="目标平台" value={selected} onChange={(e) => setSelected(e.target.value)} sx={{ minWidth: 180 }} size="small">
+            <TextField select label={t('platform_target_label', '目标平台')} value={selected} onChange={(e) => setSelected(e.target.value)} sx={{ minWidth: 180 }} size="small">
               {platforms.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
             </TextField>
             {currentPlatform && (
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                 {minChars > 0 && (
                   <Chip
-                    label={`${minChars}-${maxChars}字/章`}
+                    label={t('platform_char_range_chip', `${minChars}-${maxChars}字/章`, { min: minChars, max: maxChars })}
                     size="small" color="primary" variant="outlined"
                   />
                 )}
                 {currentPlatform.climax_interval && (
-                  <Chip label={`爽点周期: ${currentPlatform.climax_interval}`} size="small" color="secondary" variant="outlined" />
+                  <Chip label={t('platform_climax_chip', `爽点周期: ${currentPlatform.climax_interval}`, { interval: currentPlatform.climax_interval })} size="small" color="secondary" variant="outlined" />
                 )}
                 {currentPlatform.rhythm_type && (
                   <Chip label={currentPlatform.rhythm_type} size="small" variant="outlined" />
@@ -239,13 +239,13 @@ export default function PlatformPanel() {
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
           <TextField
-            label="章节标题（可选）" fullWidth size="small" sx={{ mb: 1.5 }}
+            label={t('platform_chap_title_optional', '章节标题（可选）')} fullWidth size="small" sx={{ mb: 1.5 }}
             value={chapterTitle} onChange={(e) => setChapterTitle(e.target.value)}
           />
           <TextField
-            label="章节正文" multiline rows={8} fullWidth size="small" sx={{ mb: 1.5 }}
+            label={t('platform_chap_text_label', '章节正文')} multiline rows={8} fullWidth size="small" sx={{ mb: 1.5 }}
             value={chapterText} onChange={(e) => setChapterText(e.target.value)}
-            helperText={currentPlatform ? `建议 ${currentPlatform.chapterMinChars}-${currentPlatform.chapterMaxChars} 字` : ''}
+            helperText={currentPlatform ? t('platform_suggest_chars', `建议 ${minChars}-${maxChars} 字`, { min: minChars, max: maxChars }) : ''}
           />
           <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
             <Button variant="outlined" onClick={doCheck} disabled={!chapterText.trim() || loading || diagnosing}>
@@ -259,14 +259,14 @@ export default function PlatformPanel() {
           {result && (
             <Paper sx={{ p: 2, mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Typography variant="subtitle2">合规检查结果</Typography>
+                <Typography variant="subtitle2">{t('platform_compliance_result', '合规检查结果')}</Typography>
                 <Chip
-                  label={result.compliant ? '合规' : '不合规'}
+                  label={result.compliant ? t('platform_compliant_pass', '合规') : t('platform_compliant_fail', '不合规')}
                   size="small"
                   color={result.compliant ? 'success' : 'error'}
                 />
                 <Typography variant="body2" color="text.secondary">
-                  {String(result.charCount)} 字
+                  {t('platform_char_count_suffix', `${String(result.charCount)} 字`, { count: String(result.charCount ?? '') })}
                 </Typography>
               </Box>
               {issues.length > 0 && (
@@ -285,21 +285,21 @@ export default function PlatformPanel() {
             <Paper sx={{ p: 2, mb: 2, borderLeft: (theme) => `4px solid ${diagnosis.grade === 'A' ? theme.palette.success.main : diagnosis.grade === 'B' ? theme.palette.warning.main : theme.palette.error.main}` }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>签约过稿诊断报告</Typography>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{t('platform_diag_report_title', '签约过稿诊断报告')}</Typography>
                   <Chip
-                    label={`评级 ${diagnosis.grade} · 签约概率: ${diagnosis.signingProb}`}
+                    label={t('platform_diag_grade_chip', `评级 ${diagnosis.grade} · 签约概率: ${diagnosis.signingProb}`, { grade: diagnosis.grade, prob: diagnosis.signingProb })}
                     color={getRatingColor(diagnosis.grade)}
                     size="small"
                   />
                   <Chip
-                    label={`签约潜力分: ${diagnosis.score} / 100`}
+                    label={t('platform_diag_score_chip', `签约潜力分: ${diagnosis.score} / 100`, { score: diagnosis.score })}
                     variant="outlined"
                     color={diagnosis.score >= 80 ? 'success' : diagnosis.score >= 60 ? 'warning' : 'error'}
                     size="small"
                   />
                 </Box>
                 <Typography variant="caption" color="text.secondary">
-                  字数: {diagnosis.charCount} | 对话占比: {(diagnosis.dialogueRatio * 100).toFixed(1)}%
+                  {t('platform_diag_stats_summary', `字数: ${diagnosis.charCount} | 对话占比: ${(diagnosis.dialogueRatio * 100).toFixed(1)}%`, { count: diagnosis.charCount, ratio: (diagnosis.dialogueRatio * 100).toFixed(1) })}
                 </Typography>
               </Box>
 
@@ -308,7 +308,7 @@ export default function PlatformPanel() {
               {diagnosis.vetoRisks.length > 0 && (
                 <Box sx={{ mb: 1.5 }}>
                   <Typography variant="subtitle2" color="error.main" gutterBottom sx={{ fontWeight: 600 }}>
-                    🚨 致命劝退点（直接影响编辑初筛签约）:
+                    🚨 {t('platform_diag_veto_title', '致命劝退点（直接影响编辑初筛签约）:')}
                   </Typography>
                   {diagnosis.vetoRisks.map((risk, idx) => (
                     <Alert key={idx} severity="error" sx={{ mb: 0.75 }}>
@@ -321,7 +321,7 @@ export default function PlatformPanel() {
               {diagnosis.actionableFixes.length > 0 && (
                 <Box sx={{ mt: 1 }}>
                   <Typography variant="subtitle2" color="text.primary" gutterBottom sx={{ fontWeight: 600 }}>
-                    💡 针对性修改建议:
+                    💡 {t('platform_diag_fixes_title', '针对性修改建议:')}
                   </Typography>
                   {diagnosis.actionableFixes.map((fix, idx) => (
                     <Alert key={idx} severity="info" sx={{ mb: 0.75 }}>
@@ -333,22 +333,33 @@ export default function PlatformPanel() {
 
               {diagnosis.vetoRisks.length === 0 && diagnosis.actionableFixes.length === 0 && (
                 <Alert severity="success">
-                  正文节奏与篇幅极佳，未发现明显编辑劝退项，保持当前水准即可投稿！
+                  {t('platform_diag_perfect_alert', '正文节奏与篇幅极佳，未发现明显编辑劝退项，保持当前水准即可投稿！')}
                 </Alert>
               )}
             </Paper>
           )}
 
           <Paper sx={{ p: 2 }}>
-            <Typography variant="subtitle2" gutterBottom>平台要求</Typography>
-            {platforms.map((p) => (
-              <Box key={p.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Typography variant="body2" sx={{ minWidth: 100 }}>{p.name}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {p.chapterMinChars}-{p.chapterMaxChars}字 | {p.supportsSerialization ? '连载' : '短篇'} | {p.genreCount} 题材
-                </Typography>
-              </Box>
-            ))}
+            <Typography variant="subtitle2" gutterBottom>{t('platform_requirements_title', '平台要求')}</Typography>
+            {platforms.map((p) => {
+              const pMin = p.chapterMinChars ?? p.chapter_min_chars ?? 0
+              const pMax = p.chapterMaxChars ?? p.chapter_max_chars ?? 0
+              const pSerial = p.supportsSerialization ?? p.supports_serialization ?? true
+              const modeStr = pSerial ? t('platform_mode_serial', '连载') : t('platform_mode_short', '短篇')
+              return (
+                <Box key={p.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Typography variant="body2" sx={{ minWidth: 100 }}>{p.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {t('platform_req_summary', `${pMin}-${pMax}字 | ${modeStr} | ${p.genreCount ?? 0} 题材`, {
+                      min: pMin,
+                      max: pMax,
+                      mode: modeStr,
+                      genreCount: p.genreCount ?? 0,
+                    })}
+                  </Typography>
+                </Box>
+              )
+            })}
           </Paper>
         </Box>
       )}
@@ -356,10 +367,10 @@ export default function PlatformPanel() {
       {panelTab === 1 && (
         <Box>
           <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <SportsEsportsIcon color="primary" /> LitRPG 属性面板与 Royal Road 格式化工坊
+            <SportsEsportsIcon color="primary" /> {t('platform_litrpg_workshop_title', 'LitRPG 属性面板与 Royal Road 格式化工坊')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            智能提取 LitRPG / Progression Fantasy 的状态面板（Status Box），自动将其封装为符合 Royal Road 规范的 BBCode [spoiler] 折叠标签，并插入作者说头尾注释。
+            {t('platform_litrpg_workshop_desc', '智能提取 LitRPG / Progression Fantasy 的状态面板（Status Box），自动将其封装为符合 Royal Road 规范的 BBCode [spoiler] 折叠标签，并插入作者说头尾注释。')}
           </Typography>
 
           {litrpgError && <Alert severity="error" sx={{ mb: 2 }}>{litrpgError}</Alert>}
@@ -370,12 +381,12 @@ export default function PlatformPanel() {
               size="small"
               onClick={handleLoadSample}
             >
-              📥 {t('platform_load_sample', '填入海外爆款示例')}
+              📥 {t('platform_litrpg_sample_btn', '填入海外爆款示例')}
             </Button>
           </Box>
 
           <TextField
-            label="章节标题（可选）"
+            label={t('platform_chap_title_optional', '章节标题（可选）')}
             fullWidth
             size="small"
             sx={{ mb: 1.5 }}
@@ -384,7 +395,7 @@ export default function PlatformPanel() {
           />
 
           <TextField
-            label="章节正文（含属性面板）"
+            label={t('platform_litrpg_text_label', '章节正文（含属性面板）')}
             multiline
             rows={8}
             fullWidth
@@ -392,33 +403,33 @@ export default function PlatformPanel() {
             sx={{ mb: 1.5 }}
             value={litrpgText}
             onChange={(e) => setLitrpgText(e.target.value)}
-            placeholder="在此输入包含属性面板的正文..."
+            placeholder={t('platform_litrpg_text_ph', '在此输入包含属性面板的正文...')}
           />
 
           <Paper sx={{ p: 1.5, mb: 2, bgcolor: 'action.hover' }}>
             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-              Royal Road 连载排版参数
+              {t('platform_rr_params_title', 'Royal Road 连载排版参数')}
             </Typography>
             <Stack spacing={1.5}>
               <TextField
-                label="顶部作者说 (Author's Note Top)"
+                label={t('platform_rr_note_head_label', "顶部作者说 (Author's Note Top)")}
                 multiline
                 rows={2}
                 fullWidth
                 size="small"
                 value={authorNoteHead}
                 onChange={(e) => setAuthorNoteHead(e.target.value)}
-                placeholder="例如：Thanks for reading! Updates every Monday and Thursday."
+                placeholder={t('platform_rr_note_head_ph', '例如：Thanks for reading! Updates every Monday and Thursday.')}
               />
               <TextField
-                label="底部作者说 / 呼吁投票 (Author's Note Bottom)"
+                label={t('platform_rr_note_foot_label', "底部作者说 / 呼吁投票 (Author's Note Bottom)")}
                 multiline
                 rows={2}
                 fullWidth
                 size="small"
                 value={authorNoteFoot}
                 onChange={(e) => setAuthorNoteFoot(e.target.value)}
-                placeholder="例如：Support the story on Patreon for advance chapters. Don't forget to rate!"
+                placeholder={t('platform_rr_note_foot_ph', "例如：Support the story on Patreon for advance chapters. Don't forget to rate!")}
               />
               <FormControlLabel
                 control={
@@ -428,7 +439,7 @@ export default function PlatformPanel() {
                     size="small"
                   />
                 }
-                label="自动将检测到的属性面板包裹为 [spoiler=&quot;...&quot;] 折叠块（推荐：防止手机端大面积刷屏，极大改善读者留存）"
+                label={t('platform_rr_wrap_label', '自动将检测到的属性面板包裹为 [spoiler="..."] 折叠块（推荐：防止手机端大面积刷屏，极大改善读者留存）')}
               />
             </Stack>
           </Paper>
@@ -457,17 +468,17 @@ export default function PlatformPanel() {
             <Paper sx={{ p: 2, mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  属性面板识别结果
+                  {t('platform_statbox_result_title', '属性面板识别结果')}
                 </Typography>
                 <Chip
-                  label={`共识别 ${parsedBoxes.length} 个面板`}
+                  label={t('platform_statbox_count_chip', `共识别 ${parsedBoxes.length} 个面板`, { count: parsedBoxes.length })}
                   color={parsedBoxes.length > 0 ? 'success' : 'default'}
                   size="small"
                 />
               </Box>
               {parsedBoxes.length === 0 ? (
                 <Alert severity="info">
-                  未在正文中检测到符合规范的属性面板。支持格式：[Status Window]、ASCII 边框框选、或 【属性面板】。
+                  {t('platform_statbox_empty_alert', '未在正文中检测到符合规范的属性面板。支持格式：[Status Window]、ASCII 边框框选、或 【属性面板】。')}
                 </Alert>
               ) : (
                 <Stack spacing={1.5}>
@@ -475,9 +486,13 @@ export default function PlatformPanel() {
                     <Paper key={i} variant="outlined" sx={{ p: 1.5, bgcolor: 'background.paper' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                         <Chip label={box.title || 'Status Window'} color="primary" size="small" />
-                        <Chip label={`类型: ${box.type}`} variant="outlined" size="small" />
+                        <Chip label={t('platform_statbox_type_label', `类型: ${box.type}`, { type: box.type })} variant="outlined" size="small" />
                         <Typography variant="caption" color="text.secondary">
-                          位置: 第 {box.start} - {box.end} 字符 ({box.char_count || box.raw_text?.length} 字)
+                          {t('platform_statbox_pos_label', `位置: 第 ${box.start} - ${box.end} 字符 (${box.char_count || box.raw_text?.length} 字)`, {
+                            start: box.start,
+                            end: box.end,
+                            count: box.char_count || box.raw_text?.length || 0,
+                          })}
                         </Typography>
                       </Box>
                       {box.fields && Object.keys(box.fields).length > 0 ? (
@@ -513,9 +528,9 @@ export default function PlatformPanel() {
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                    Royal Road BBCode 排版稿
+                    {t('platform_rr_bbcode_title', 'Royal Road BBCode 排版稿')}
                   </Typography>
-                  <Chip label="BBCode 格式" size="small" color="secondary" variant="outlined" />
+                  <Chip label={t('platform_rr_bbcode_badge', 'BBCode 格式')} size="small" color="secondary" variant="outlined" />
                 </Box>
                 <Button
                   variant="outlined"
@@ -528,7 +543,7 @@ export default function PlatformPanel() {
               </Box>
               {copied && (
                 <Alert severity="success" sx={{ mb: 1.5 }}>
-                  排版文本已成功复制到剪贴板，可直接粘贴发布至 Royal Road 章节编辑器！
+                  {t('platform_copied_alert', '排版文本已成功复制到剪贴板，可直接粘贴发布至 Royal Road 章节编辑器！')}
                 </Alert>
               )}
               <Typography

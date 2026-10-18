@@ -160,6 +160,55 @@ describe('PlatformPanel', () => {
       expect(screen.getByText('Check Compliance')).toBeDefined()
       expect(screen.getByText('🎯 Submission Readiness Audit')).toBeDefined()
       expect(screen.getByText('LitRPG Stat Box & Formatter')).toBeDefined()
+      expect(screen.getByLabelText('Target Platform')).toBeDefined()
+
+      // 验证英文合规性检查结果
+      const textareas = screen.getAllByRole('textbox')
+      fireEvent.change(textareas[1], { target: { value: 'Test chapter text in english mode.' } })
+      const checkBtn = screen.getByText('Check Compliance')
+      fireEvent.click(checkBtn)
+
+      await waitFor(() => {
+        expect(screen.getByText('Compliance Check Result')).toBeDefined()
+        expect(screen.getByText('Compliant')).toBeDefined()
+        expect(screen.getByText('2200 words')).toBeDefined()
+      })
+
+      // 验证英文签约过稿诊断
+      const diagnoseBtn = screen.getByText('🎯 Submission Readiness Audit')
+      fireEvent.click(diagnoseBtn)
+
+      await waitFor(() => {
+        expect(screen.getByText('Submission Readiness Report')).toBeDefined()
+        expect(screen.getByText(/Grade A · Acceptance: 极高/)).toBeDefined()
+        expect(screen.getByText(/Potential Score: 92 \/ 100/)).toBeDefined()
+      })
+
+      // 切换到 LitRPG 工坊验证全量英文输出
+      const litrpgTab = screen.getByText('LitRPG Stat Box & Formatter')
+      fireEvent.click(litrpgTab)
+
+      expect(screen.getByText('LitRPG Stat Box & Royal Road Formatter')).toBeDefined()
+      expect(screen.getByText(/Load Bestseller Sample/)).toBeDefined()
+      expect(screen.getByText('Royal Road Serialization Parameters')).toBeDefined()
+
+      const parseBtn = screen.getByText('Parse Stat Box')
+      fireEvent.click(parseBtn)
+
+      await waitFor(() => {
+        expect(screen.getByText('Stat Box Detection Results')).toBeDefined()
+        expect(screen.getByText('1 Stat Boxes Detected')).toBeDefined()
+        expect(screen.getByText('Type: bracket_window')).toBeDefined()
+      })
+
+      const formatBtn = screen.getByText('⚡ Format for Royal Road')
+      fireEvent.click(formatBtn)
+
+      await waitFor(() => {
+        expect(screen.getByText('Royal Road BBCode Formatted Manuscript')).toBeDefined()
+        expect(screen.getByText('BBCode Format')).toBeDefined()
+        expect(screen.getByText('Copy Formatted Code')).toBeDefined()
+      })
     } finally {
       removeStorage('novellab.locale')
     }

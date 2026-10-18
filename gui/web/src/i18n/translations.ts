@@ -320,6 +320,170 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '载入样例',
     'en-US': 'Load Sample',
   },
+  platform_load_err: {
+    'zh-CN': '加载平台列表失败: {error}',
+    'en-US': 'Failed to load platforms: {error}',
+  },
+  platform_target_label: {
+    'zh-CN': '目标平台',
+    'en-US': 'Target Platform',
+  },
+  platform_char_range_chip: {
+    'zh-CN': '{min}-{max}字/章',
+    'en-US': '{min}-{max} words/ch',
+  },
+  platform_climax_chip: {
+    'zh-CN': '爽点周期: {interval}',
+    'en-US': 'Payoff Pace: {interval}',
+  },
+  platform_chap_title_optional: {
+    'zh-CN': '章节标题（可选）',
+    'en-US': 'Chapter Title (Optional)',
+  },
+  platform_chap_text_label: {
+    'zh-CN': '章节正文',
+    'en-US': 'Chapter Text',
+  },
+  platform_suggest_chars: {
+    'zh-CN': '建议 {min}-{max} 字',
+    'en-US': 'Recommended {min}-{max} words',
+  },
+  platform_compliance_result: {
+    'zh-CN': '合规检查结果',
+    'en-US': 'Compliance Check Result',
+  },
+  platform_compliant_pass: {
+    'zh-CN': '合规',
+    'en-US': 'Compliant',
+  },
+  platform_compliant_fail: {
+    'zh-CN': '不合规',
+    'en-US': 'Non-compliant',
+  },
+  platform_char_count_suffix: {
+    'zh-CN': '{count} 字',
+    'en-US': '{count} words',
+  },
+  platform_diag_report_title: {
+    'zh-CN': '签约过稿诊断报告',
+    'en-US': 'Submission Readiness Report',
+  },
+  platform_diag_grade_chip: {
+    'zh-CN': '评级 {grade} · 签约概率: {prob}',
+    'en-US': 'Grade {grade} · Acceptance: {prob}',
+  },
+  platform_diag_score_chip: {
+    'zh-CN': '签约潜力分: {score} / 100',
+    'en-US': 'Potential Score: {score} / 100',
+  },
+  platform_diag_stats_summary: {
+    'zh-CN': '字数: {count} | 对话占比: {ratio}%',
+    'en-US': 'Words: {count} | Dialogue: {ratio}%',
+  },
+  platform_diag_veto_title: {
+    'zh-CN': '致命劝退点（直接影响编辑初筛签约）:',
+    'en-US': 'Fatal Dealbreakers (Affects editorial screening):',
+  },
+  platform_diag_fixes_title: {
+    'zh-CN': '针对性修改建议:',
+    'en-US': 'Actionable Suggestions:',
+  },
+  platform_diag_perfect_alert: {
+    'zh-CN': '正文节奏与篇幅极佳，未发现明显编辑劝退项，保持当前水准即可投稿！',
+    'en-US': 'Pacing and word count are optimal with no major editorial red flags. Ready for submission!',
+  },
+  platform_requirements_title: {
+    'zh-CN': '平台要求',
+    'en-US': 'Platform Requirements',
+  },
+  platform_mode_serial: {
+    'zh-CN': '连载',
+    'en-US': 'Serialized',
+  },
+  platform_mode_short: {
+    'zh-CN': '短篇',
+    'en-US': 'Short',
+  },
+  platform_req_summary: {
+    'zh-CN': '{min}-{max}字 | {mode} | {genreCount} 题材',
+    'en-US': '{min}-{max} words | {mode} | {genreCount} Genres',
+  },
+  platform_litrpg_workshop_title: {
+    'zh-CN': 'LitRPG 属性面板与 Royal Road 格式化工坊',
+    'en-US': 'LitRPG Stat Box & Royal Road Formatter',
+  },
+  platform_litrpg_workshop_desc: {
+    'zh-CN': '智能提取 LitRPG / Progression Fantasy 的状态面板（Status Box），自动将其封装为符合 Royal Road 规范的 BBCode [spoiler] 折叠标签，并插入作者说头尾注释。' ,
+    'en-US': 'Intelligently extracts LitRPG / Progression Fantasy Status Boxes, encapsulating them into Royal Road compliant BBCode [spoiler] tags with author notes.',
+  },
+  platform_litrpg_sample_btn: {
+    'zh-CN': '填入海外爆款示例',
+    'en-US': 'Load Bestseller Sample',
+  },
+  platform_litrpg_text_label: {
+    'zh-CN': '章节正文（含属性面板）',
+    'en-US': 'Chapter Draft (with Stat Boxes)',
+  },
+  platform_litrpg_text_ph: {
+    'zh-CN': '在此输入包含属性面板的正文...',
+    'en-US': 'Enter chapter text containing stat boxes...',
+  },
+  platform_rr_params_title: {
+    'zh-CN': 'Royal Road 连载排版参数',
+    'en-US': 'Royal Road Serialization Parameters',
+  },
+  platform_rr_note_head_label: {
+    'zh-CN': "顶部作者说 (Author's Note Top)",
+    'en-US': "Top Author's Note (Before Chapter)",
+  },
+  platform_rr_note_head_ph: {
+    'zh-CN': '例如：Thanks for reading! Updates every Monday and Thursday.',
+    'en-US': 'e.g. Thanks for reading! Updates every Monday and Thursday.',
+  },
+  platform_rr_note_foot_label: {
+    'zh-CN': "底部作者说 / 呼吁投票 (Author's Note Bottom)",
+    'en-US': "Bottom Author's Note / Call to Action",
+  },
+  platform_rr_note_foot_ph: {
+    'zh-CN': "例如：Support the story on Patreon for advance chapters. Don't forget to rate!",
+    'en-US': "e.g. Support the story on Patreon for advance chapters. Don't forget to rate!",
+  },
+  platform_rr_wrap_label: {
+    'zh-CN': '自动将检测到的属性面板包裹为 [spoiler="..."] 折叠块（推荐：防止手机端大面积刷屏，极大改善读者留存）',
+    'en-US': 'Wrap detected stat boxes into [spoiler="..."] tags (Recommended: prevents mobile text wall, improves retention)',
+  },
+  platform_statbox_result_title: {
+    'zh-CN': '属性面板识别结果',
+    'en-US': 'Stat Box Detection Results',
+  },
+  platform_statbox_count_chip: {
+    'zh-CN': '共识别 {count} 个面板',
+    'en-US': '{count} Stat Boxes Detected',
+  },
+  platform_statbox_empty_alert: {
+    'zh-CN': '未在正文中检测到符合规范的属性面板。支持格式：[Status Window]、ASCII 边框框选、或 【属性面板】。',
+    'en-US': 'No compliant stat boxes detected. Supported formats: [Status Window], ASCII borders, or 【Status Panel】.',
+  },
+  platform_statbox_type_label: {
+    'zh-CN': '类型: {type}',
+    'en-US': 'Type: {type}',
+  },
+  platform_statbox_pos_label: {
+    'zh-CN': '位置: 第 {start} - {end} 字符 ({count} 字)',
+    'en-US': 'Position: Chars {start} - {end} ({count} chars)',
+  },
+  platform_rr_bbcode_title: {
+    'zh-CN': 'Royal Road BBCode 排版稿',
+    'en-US': 'Royal Road BBCode Formatted Manuscript',
+  },
+  platform_rr_bbcode_badge: {
+    'zh-CN': 'BBCode 格式',
+    'en-US': 'BBCode Format',
+  },
+  platform_copied_alert: {
+    'zh-CN': '排版文本已成功复制到剪贴板，可直接粘贴发布至 Royal Road 章节编辑器！',
+    'en-US': 'Formatted text copied to clipboard. Ready to paste into Royal Road chapter editor!',
+  },
 
   // 毒点排查与弃坑避雷
   poison_tab_scanner: {
