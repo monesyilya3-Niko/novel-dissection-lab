@@ -60,7 +60,7 @@ def load_json(path: Path) -> dict:
     """读取 JSON 文件，编码容错（utf-8 优先，回退 utf-8-sig）。"""
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except UnicodeDecodeError:
+    except (UnicodeDecodeError, json.JSONDecodeError):
         return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
