@@ -67,4 +67,42 @@ describe('I18nContext', () => {
     expect(screen.getByTestId('locale').textContent).toBe('zh-CN')
     expect(screen.getByTestId('brand').textContent).toBe('暮冬念春')
   })
+
+  it('支持 t 函数动态参数插值替换', () => {
+    function ParamConsumer() {
+      const { t } = useI18n()
+      return (
+        <div>
+          <span data-testid="count">{t('trope_count', '{n} 条', { n: 42 })}</span>
+          <span data-testid="custom">{t('custom_tpl', '你好 {user}，剩余 {cnt} 次', { user: 'Alice', cnt: 3 })}</span>
+        </div>
+      )
+    }
+
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <ParamConsumer />
+      </I18nProvider>,
+    )
+    expect(screen.getByTestId('count').textContent).toBe('42 条')
+    expect(screen.getByTestId('custom').textContent).toBe('你好 Alice，剩余 3 次')
+  })
+
+  it('动态变更 initialLocale 时同步更新语言状态', () => {
+    const { rerender } = render(
+      <I18nProvider initialLocale="zh-CN">
+        <TestConsumer />
+      </I18nProvider>,
+    )
+    expect(screen.getByTestId('locale').textContent).toBe('zh-CN')
+    expect(screen.getByTestId('brand').textContent).toBe('暮冬念春')
+
+    rerender(
+      <I18nProvider initialLocale="en-US">
+        <TestConsumer />
+      </I18nProvider>,
+    )
+    expect(screen.getByTestId('locale').textContent).toBe('en-US')
+    expect(screen.getByTestId('brand').textContent).toBe('Exoscribe')
+  })
 })

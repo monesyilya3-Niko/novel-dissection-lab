@@ -8,8 +8,10 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useApp } from '../state/AppContext'
+import { useI18n } from '../state/I18nContext'
 
 export default function ReaderPanel() {
+  const { t } = useI18n()
   const { currentChapter, selectedChapter, book, selectChapter } = useApp()
   const parentRef = useRef<HTMLDivElement>(null)
 
@@ -32,7 +34,9 @@ export default function ReaderPanel() {
   if (!currentChapter) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Typography color="text.secondary">请在左侧选择章节开始阅读</Typography>
+        <Typography color="text.secondary">
+          {t('reader_empty', '请在左侧选择章节开始阅读')}
+        </Typography>
       </Box>
     )
   }
@@ -51,10 +55,11 @@ export default function ReaderPanel() {
           gap: 1,
         }}
       >
-        <Tooltip title="上一章">
+        <Tooltip title={t('reader_prev_chapter', '上一章')}>
           <span>
             <IconButton
               size="small"
+              aria-label={t('reader_prev_chapter', '上一章')}
               disabled={!book || (selectedChapter ?? 1) <= 1}
               onClick={() => selectChapter((selectedChapter ?? 1) - 1)}
             >
@@ -63,12 +68,16 @@ export default function ReaderPanel() {
           </span>
         </Tooltip>
         <Typography variant="subtitle1" sx={{ flex: 1, textAlign: 'center', fontWeight: 600 }}>
-          第{currentChapter.index}章 {currentChapter.title}
+          {t('reader_chapter_title', '第{index}章 {title}', {
+            index: currentChapter.index,
+            title: currentChapter.title,
+          })}
         </Typography>
-        <Tooltip title="下一章">
+        <Tooltip title={t('reader_next_chapter', '下一章')}>
           <span>
             <IconButton
               size="small"
+              aria-label={t('reader_next_chapter', '下一章')}
               disabled={!book || (selectedChapter ?? 1) >= (book?.totalChapters ?? 1)}
               onClick={() => selectChapter((selectedChapter ?? 1) + 1)}
             >

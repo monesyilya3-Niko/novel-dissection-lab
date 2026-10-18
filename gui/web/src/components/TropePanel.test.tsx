@@ -4,8 +4,9 @@
 // 「写入写作要点」把桥段骨架文本交给 onInsert。
 import { render, screen, fireEvent, within} from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach} from 'vitest'
-import TropePanel, { tropeToTaskText} from './TropePanel'
-import { tropeApi} from '../api/client'
+import TropePanel, { tropeToTaskText } from './TropePanel'
+import { tropeApi } from '../api/client'
+import { I18nProvider } from '../state/I18nContext'
 
 vi.mock('../api/client', () => ({
 tropeApi: { list: vi.fn()},
@@ -157,5 +158,40 @@ it('加载失败显示错误', async () => {
 listMock.mockRejectedValueOnce(new Error('nope'))
 render(<TropePanel onInsert={() => {}} />)
 expect(await screen.findByText(/nope/)).toBeTruthy()
+})
+
+it('en-US 语言环境下全量渲染英文面板与操作按钮', async () => {
+const onInsert = vi.fn()
+render(
+  <I18nProvider initialLocale="en-US">
+    <TropePanel onInsert={onInsert} currentGenre="xianxia" />
+  </I18nProvider>
+)
+
+// 标题与统计
+expect(await screen.findByText('Trope Library & Inspiration')).toBeInTheDocument()
+expect(screen.getByText('2 tropes')).toBeInTheDocument()
+expect(screen.getByText('Browse when stuck: select a trope and click to insert into writing prompt.')).toBeInTheDocument()
+
+// 英文表单项
+expect(screen.getByLabelText('Category')).toBeInTheDocument()
+expect(screen.getByLabelText('Search Tropes')).toBeInTheDocument()
+expect(screen.getByPlaceholderText('Keywords: name / skeleton / parameters')).toBeInTheDocument()
+expect(screen.getByLabelText('Only applicable to current genre (xianxia)')).toBeInTheDocument()
+
+// 选中桥段
+fireEvent.click(screen.getByText('公开打脸'))
+expect(await screen.findByText(/Setup:/)).toBeInTheDocument()
+expect(screen.getByText(/Escalation:/)).toBeInTheDocument()
+expect(screen.getByText(/Payoff:/)).toBeInTheDocument()
+expect(screen.getByText(/Aftermath:/)).toBeInTheDocument()
+expect(screen.getByText(/Parameters:/)).toBeInTheDocument()
+expect(screen.getByText(/Common Pitfalls:/)).toBeInTheDocument()
+
+// 写入按钮
+const insertBtn = screen.getByRole('button', { name: 'Insert into Prompt' })
+expect(insertBtn).toBeInTheDocument()
+fireEvent.click(insertBtn)
+expect(onInsert).toHaveBeenCalledTimes(1)
 })
 })

@@ -3,6 +3,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -11,14 +12,24 @@ import { readStorage, writeStorage } from '../safeStorage'
 import { TRANSLATIONS, type Locale } from '../i18n/translations'
 export type { Locale }
 
-
 const STORAGE_KEY = 'novellab.locale'
+
+export type TranslationParams = Record<string, string | number>
+
+function interpolateParams(text: string, params?: TranslationParams): string {
+  if (!params) return text
+  let res = text
+  for (const [k, v] of Object.entries(params)) {
+    res = res.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v))
+  }
+  return res
+}
 
 interface I18nState {
   locale: Locale
   setLocale: (l: Locale) => void
   toggleLocale: () => void
-  t: (key: string, fallback?: string) => string
+  t: (key: string, fallback?: string, params?: TranslationParams) => string
 }
 
 const I18nContext = createContext<I18nState | null>(null)
@@ -37,6 +48,12 @@ export function I18nProvider({
 }) {
   const [locale, setLocaleState] = useState<Locale>(() => initialLocale ?? readStoredLocale())
 
+  useEffect(() => {
+    if (initialLocale && initialLocale !== locale) {
+      setLocaleState(initialLocale)
+    }
+  }, [initialLocale, locale])
+
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l)
     writeStorage(STORAGE_KEY, l)
@@ -48,12 +65,10 @@ export function I18nProvider({
   }, [locale, setLocale])
 
   const t = useCallback(
-    (key: string, fallback?: string): string => {
+    (key: string, fallback?: string, params?: TranslationParams): string => {
       const entry = TRANSLATIONS[key]
-      if (entry && entry[locale]) {
-        return entry[locale]
-      }
-      return fallback ?? key
+      const raw = entry && entry[locale] ? entry[locale] : (fallback ?? key)
+      return interpolateParams(raw, params)
     },
     [locale],
   )
@@ -74,9 +89,10 @@ export function useI18n(): I18nState {
       locale: 'zh-CN',
       setLocale: () => {},
       toggleLocale: () => {},
-      t: (key: string, fallback?: string) => {
+      t: (key: string, fallback?: string, params?: TranslationParams) => {
         const entry = TRANSLATIONS[key]
-        return entry ? entry['zh-CN'] : (fallback ?? key)
+        const raw = entry ? entry['zh-CN'] : (fallback ?? key)
+        return interpolateParams(raw, params)
       },
     }
   }

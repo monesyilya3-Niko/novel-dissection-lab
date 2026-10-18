@@ -3653,6 +3653,274 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '示例',
     'en-US': 'Example',
   },
+
+  // ==========================================
+  // 桥段灵感面板 (TropePanel)
+  // ==========================================
+  trope_title: {
+    'zh-CN': '桥段库 · 找灵感',
+    'en-US': 'Trope Library & Inspiration',
+  },
+  trope_count: {
+    'zh-CN': '{n} 条',
+    'en-US': '{n} tropes',
+  },
+  trope_subtitle: {
+    'zh-CN': '灵感枯竭时翻一翻：选一条桥段，一键写入下面的「写作要点」。',
+    'en-US': 'Browse when stuck: select a trope and click to insert into writing prompt.',
+  },
+  trope_category: {
+    'zh-CN': '分类',
+    'en-US': 'Category',
+  },
+  trope_cat_all: {
+    'zh-CN': '全部',
+    'en-US': 'All',
+  },
+  trope_search: {
+    'zh-CN': '搜索桥段',
+    'en-US': 'Search Tropes',
+  },
+  trope_search_ph: {
+    'zh-CN': '关键词：名称 / 骨架 / 参数',
+    'en-US': 'Keywords: name / skeleton / parameters',
+  },
+  trope_applicable_only: {
+    'zh-CN': '只看当前题材适用（{g}）',
+    'en-US': 'Only applicable to current genre ({g})',
+  },
+  trope_applicable_unrecognized: {
+    'zh-CN': '只看当前题材适用（未识别到题材）',
+    'en-US': 'Only applicable to current genre (unrecognized)',
+  },
+  trope_stat_filtered: {
+    'zh-CN': '{filtered} / {total} 条',
+    'en-US': '{filtered} / {total} tropes',
+  },
+  trope_empty: {
+    'zh-CN': '没有符合筛选的桥段，换个分类或关键词试试。',
+    'en-US': 'No matching tropes. Try another category or keyword.',
+  },
+  trope_select_hint: {
+    'zh-CN': '点左侧任意桥段查看骨架（含铺垫→激化→引爆→余波四段式与可调参数）。',
+    'en-US': 'Select any trope on the left to view skeleton (4 beats: setup, escalation, payoff, aftermath & parameters).',
+  },
+  trope_setup: {
+    'zh-CN': '铺垫：',
+    'en-US': 'Setup: ',
+  },
+  trope_escalation: {
+    'zh-CN': '激化：',
+    'en-US': 'Escalation: ',
+  },
+  trope_payoff: {
+    'zh-CN': '引爆：',
+    'en-US': 'Payoff: ',
+  },
+  trope_aftermath: {
+    'zh-CN': '余波：',
+    'en-US': 'Aftermath: ',
+  },
+  trope_parameters: {
+    'zh-CN': '可调参数：',
+    'en-US': 'Parameters: ',
+  },
+  trope_failures: {
+    'zh-CN': '常见翻车：',
+    'en-US': 'Common Pitfalls: ',
+  },
+  trope_btn_insert: {
+    'zh-CN': '写入写作要点',
+    'en-US': 'Insert into Prompt',
+  },
+  trope_btn_already: {
+    'zh-CN': '已在写作要点中',
+    'en-US': 'Already in Prompt',
+  },
+  trope_already_hint: {
+    'zh-CN': '该桥段已写入写作要点，无需重复添加。',
+    'en-US': 'This trope has already been inserted into prompt.',
+  },
+
+  // ==========================================
+  // 文风面板 (StylePanel)
+  // ==========================================
+  style_tab_analyze: {
+    'zh-CN': '风格分析',
+    'en-US': 'Style Analysis',
+  },
+  style_tab_library: {
+    'zh-CN': '风格库',
+    'en-US': 'Style Library',
+  },
+  style_guide_what: {
+    'zh-CN': '从一段样本文本里提取可量化的风格指标（句长、对话占比、情绪密度等），保存成风格卡，方便以后对照和复用。',
+    'en-US': 'Extract quantifiable style metrics (sentence length, dialogue ratio, emotion density, etc.) from a text sample into a reusable style card.',
+  },
+  style_guide_s1: {
+    'zh-CN': '起一个风格名称，如：悬疑冷峻风。',
+    'en-US': 'Give it a style name, e.g. Suspenseful Gritty.',
+  },
+  style_guide_s2: {
+    'zh-CN': '粘贴至少 100 字的代表性文本（最好是你认可的成品段落）。',
+    'en-US': 'Paste at least 100 characters of representative text.',
+  },
+  style_guide_s3: {
+    'zh-CN': '点「分析风格」，看平均句长、对话占比等指标。',
+    'en-US': 'Click "Analyze Style" to inspect sentence length, dialogue ratio, and other metrics.',
+  },
+  style_guide_s4: {
+    'zh-CN': '确认指标符合预期后点「保存风格卡」，它会出现在「风格库」里。',
+    'en-US': 'Confirm metrics match expectations, then click "Save Style Card" to add to your library.',
+  },
+  style_guide_tip1: {
+    'zh-CN': '样本越有代表性，风格卡越准；拼凑的多段文字会拉平均值。',
+    'en-US': 'More representative samples yield sharper cards; stitched fragments dilute averages.',
+  },
+  style_name_label: {
+    'zh-CN': '风格名称',
+    'en-US': 'Style Name',
+  },
+  style_name_helper: {
+    'zh-CN': '保存时使用，如：悬疑冷峻风',
+    'en-US': 'Used for saving, e.g. Suspenseful Gritty',
+  },
+  style_text_label: {
+    'zh-CN': '文本样本',
+    'en-US': 'Text Sample',
+  },
+  style_text_helper: {
+    'zh-CN': '粘贴至少 100 字的代表性文本',
+    'en-US': 'Paste at least 100 characters of representative prose',
+  },
+  style_btn_analyze: {
+    'zh-CN': '分析风格',
+    'en-US': 'Analyze Style',
+  },
+  style_btn_analyzing: {
+    'zh-CN': '分析中…',
+    'en-US': 'Analyzing…',
+  },
+  style_metrics_title: {
+    'zh-CN': '风格指标',
+    'en-US': 'Style Metrics',
+  },
+  style_metric_avg_sentence: {
+    'zh-CN': '平均句长：',
+    'en-US': 'Avg Sentence Length: ',
+  },
+  style_metric_avg_sentence_unit: {
+    'zh-CN': ' 字',
+    'en-US': ' chars',
+  },
+  style_metric_dialogue_ratio: {
+    'zh-CN': '对话占比：',
+    'en-US': 'Dialogue Ratio: ',
+  },
+  style_metric_emotion_density: {
+    'zh-CN': '情绪密度：',
+    'en-US': 'Emotion Density: ',
+  },
+  style_metric_emotion_density_unit: {
+    'zh-CN': '/千字',
+    'en-US': ' /1k chars',
+  },
+  style_metric_avg_paragraph: {
+    'zh-CN': '段落均长：',
+    'en-US': 'Avg Paragraph Length: ',
+  },
+  style_metric_avg_paragraph_unit: {
+    'zh-CN': ' 字',
+    'en-US': ' chars',
+  },
+  style_metric_short_paragraph_ratio: {
+    'zh-CN': '短段占比：',
+    'en-US': 'Short Paragraph Ratio: ',
+  },
+  style_metric_total_chars: {
+    'zh-CN': '总字数：',
+    'en-US': 'Total Characters: ',
+  },
+  style_btn_save: {
+    'zh-CN': '保存风格卡',
+    'en-US': 'Save Style Card',
+  },
+  style_save_success: {
+    'zh-CN': '风格「{name}」已保存',
+    'en-US': 'Style "{name}" saved',
+  },
+  style_delete_confirm: {
+    'zh-CN': '确定删除风格「{name}」吗？此操作不可恢复。',
+    'en-US': 'Delete style "{name}"? This action cannot be undone.',
+  },
+  style_delete_success: {
+    'zh-CN': '风格「{name}」已删除',
+    'en-US': 'Style "{name}" deleted',
+  },
+  style_library_empty: {
+    'zh-CN': '暂无风格卡，请先在「风格分析」中创建',
+    'en-US': 'No style cards yet. Create one in "Style Analysis".',
+  },
+  style_lib_summary: {
+    'zh-CN': '句长 {s} 字 | 对话 {d}%',
+    'en-US': 'Sentence {s} chars | Dialogue {d}%',
+  },
+
+  // ==========================================
+  // 阅读器 (ReaderPanel)
+  // ==========================================
+  reader_empty: {
+    'zh-CN': '请在左侧选择章节开始阅读',
+    'en-US': 'Please select a chapter on the left to start reading',
+  },
+  reader_prev_chapter: {
+    'zh-CN': '上一章',
+    'en-US': 'Previous Chapter',
+  },
+  reader_next_chapter: {
+    'zh-CN': '下一章',
+    'en-US': 'Next Chapter',
+  },
+  reader_chapter_title: {
+    'zh-CN': '第{index}章 {title}',
+    'en-US': 'Chapter {index}: {title}',
+  },
+
+  // ==========================================
+  // 通用加载边界 (AsyncBoundary)
+  // ==========================================
+  async_empty_title: {
+    'zh-CN': '暂无数据',
+    'en-US': 'No Data Available',
+  },
+  async_retry_btn: {
+    'zh-CN': '重试',
+    'en-US': 'Retry',
+  },
+
+  // ==========================================
+  // 错误边界 (ErrorBoundary)
+  // ==========================================
+  error_boundary_title: {
+    'zh-CN': '组件加载失败',
+    'en-US': 'Component Failed to Load',
+  },
+  error_boundary_unknown: {
+    'zh-CN': '未知错误',
+    'en-US': 'Unknown Error',
+  },
+  error_boundary_retry: {
+    'zh-CN': '重试',
+    'en-US': 'Retry',
+  },
+
+  // ==========================================
+  // 通用操作 (Common Actions)
+  // ==========================================
+  action_delete: {
+    'zh-CN': '删除',
+    'en-US': 'Delete',
+  },
 }
 
 
