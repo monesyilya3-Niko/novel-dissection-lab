@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -47,12 +48,14 @@ export function I18nProvider({
   initialLocale?: Locale
 }) {
   const [locale, setLocaleState] = useState<Locale>(() => initialLocale ?? readStoredLocale())
+  const prevInitialLocaleRef = useRef(initialLocale)
 
   useEffect(() => {
-    if (initialLocale && initialLocale !== locale) {
+    if (initialLocale && initialLocale !== prevInitialLocaleRef.current) {
+      prevInitialLocaleRef.current = initialLocale
       setLocaleState(initialLocale)
     }
-  }, [initialLocale, locale])
+  }, [initialLocale])
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l)
