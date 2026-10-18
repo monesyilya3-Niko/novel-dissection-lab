@@ -1,6 +1,8 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import WritingWorkbench from './WritingWorkbench'
+import { I18nProvider } from '../state/I18nContext'
+import { writeStorage, removeStorage } from '../safeStorage'
 
 const mockProjects = vi.fn()
 const mockGetProjectMeta = vi.fn()
@@ -334,5 +336,47 @@ describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
     await waitFor(() => {
       expect(screen.getByText(/已成功将【神秘石珠身世】插入当前正文/)).toBeInTheDocument()
     })
+  })
+
+  it('在 en-US 语言环境下企划定位弹窗渲染英文', async () => {
+    writeStorage('novellab.locale', 'en-US')
+    try {
+      render(
+        <I18nProvider>
+          <WritingWorkbench />
+        </I18nProvider>
+      )
+      await waitFor(() => expect(screen.getByText('Project Plan')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByText('Project Plan'))
+      await waitFor(() => {
+        expect(screen.getByText('Project Planning & Platform Strategy')).toBeInTheDocument()
+        expect(screen.getByText('Save Project Plan')).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByText('Cancel'))
+    } finally {
+      removeStorage('novellab.locale')
+    }
+  })
+
+  it('在 en-US 语言环境下全书导出弹窗渲染英文', async () => {
+    writeStorage('novellab.locale', 'en-US')
+    try {
+      render(
+        <I18nProvider>
+          <WritingWorkbench />
+        </I18nProvider>
+      )
+      await waitFor(() => expect(screen.getByText('Full Book Export')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByText('Full Book Export'))
+      await waitFor(() => {
+        expect(screen.getByText('Full Novel One-Click Export & Formatting')).toBeInTheDocument()
+        expect(screen.getByText('Download Now')).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByText('Cancel'))
+    } finally {
+      removeStorage('novellab.locale')
+    }
   })
 })

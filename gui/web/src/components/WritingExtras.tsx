@@ -1133,18 +1133,18 @@ function DashboardPanel({ project }: { project: string }) {
 
       {/* 章节草稿张力测算弹窗 */}
       <Dialog open={showTensionDialog} onClose={() => setShowTensionDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>测算章节情绪张力波形</DialogTitle>
+        <DialogTitle>{t('extras_tension_dialog_title', '测算章节情绪张力波形')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
           <Typography variant="body2" color="text.secondary">
-            粘贴当前正在创作的章节草稿，系统将通过冲突关键词、标点短句节奏、人物对峙与感官微表情，计算整章情绪起伏波形并与标杆对齐。
+            {t('extras_tension_dialog_desc', '粘贴当前正在创作的章节草稿，系统将通过冲突关键词、标点短句节奏、人物对峙与感官微表情，计算整章情绪起伏波形并与标杆对齐。')}
           </Typography>
           <TextField
-            label="章节正文草稿"
+            label={t('extras_tension_draft_label', '章节正文草稿')}
             multiline
             rows={8}
             value={draftInput}
             onChange={(e) => setDraftInput(e.target.value)}
-            placeholder="粘贴本章草稿内容……（建议 1,000 字以上以获得更精准波形）"
+            placeholder={t('extras_tension_draft_ph', '粘贴本章草稿内容……（建议 1,000 字以上以获得更精准波形）')}
             fullWidth
           />
         </DialogContent>
@@ -1157,7 +1157,7 @@ function DashboardPanel({ project }: { project: string }) {
               runTensionAnalysis(sample)
             }}
           >
-            填入示范高潮草稿
+            {t('extras_tension_sample_btn', '填入示范高潮草稿')}
           </Button>
           <Button onClick={() => setShowTensionDialog(false)}>{t('action_cancel')}</Button>
           <Button
@@ -1165,7 +1165,7 @@ function DashboardPanel({ project }: { project: string }) {
             disabled={!draftInput.trim() || tensionLoading}
             onClick={() => runTensionAnalysis(draftInput)}
           >
-            {tensionLoading ? '分析中…' : '开始比对'}
+            {tensionLoading ? t('extras_tension_analyzing', '分析中…') : t('extras_tension_start_btn', '开始比对')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1209,9 +1209,9 @@ function ExportPanel({ project }: { project: string }) {
         const blob = new Blob([res.content || ''], { type: 'text/plain;charset=utf-8' })
         triggerDownload(blob, res.filename)
       }
-      setInfo(`成功导出 ${res.chapters} 章、约 ${res.words.toLocaleString()} 字：${res.filename}`)
+      setInfo(t('extras_export_success', '成功导出 {chapters} 章、约 {words} 字：{filename}', { chapters: res.chapters, words: res.words.toLocaleString(), filename: res.filename }))
     } catch (e) {
-      setError(`导出失败: ${friendlyError(e)}`)
+      setError(t('extras_export_error', '导出失败: {error}', { error: friendlyError(e) }))
     } finally {
       setExportingFormat(null)
     }
@@ -1262,7 +1262,7 @@ function ExportPanel({ project }: { project: string }) {
               onClick={() => handleExport('docx')}
               disabled={!!exportingFormat}
             >
-              {exportingFormat === 'docx' ? '生成 docx 中…' : t('extras_export_docx_btn')}
+              {exportingFormat === 'docx' ? t('extras_exporting_docx', '生成 docx 中…') : t('extras_export_docx_btn')}
             </Button>
           </Paper>
         </Grid>
@@ -1287,7 +1287,7 @@ function ExportPanel({ project }: { project: string }) {
               onClick={() => handleExport('epub')}
               disabled={!!exportingFormat}
             >
-              {exportingFormat === 'epub' ? '打包 epub 中…' : t('extras_export_epub_btn')}
+              {exportingFormat === 'epub' ? t('extras_exporting_epub', '打包 epub 中…') : t('extras_export_epub_btn')}
             </Button>
           </Paper>
         </Grid>
@@ -1312,7 +1312,7 @@ function ExportPanel({ project }: { project: string }) {
               onClick={() => handleExport('shunn')}
               disabled={!!exportingFormat}
             >
-              {exportingFormat === 'shunn' ? '生成文稿中…' : t('extras_export_shunn_btn')}
+              {exportingFormat === 'shunn' ? t('extras_exporting_shunn', '生成文稿中…') : t('extras_export_shunn_btn')}
             </Button>
           </Paper>
         </Grid>
@@ -1337,7 +1337,7 @@ function ExportPanel({ project }: { project: string }) {
               onClick={() => handleExport('md')}
               disabled={!!exportingFormat}
             >
-              {exportingFormat === 'md' ? '生成 md 中…' : t('extras_export_md_btn')}
+              {exportingFormat === 'md' ? t('extras_exporting_md', '生成 md 中…') : t('extras_export_md_btn')}
             </Button>
           </Paper>
         </Grid>
@@ -1362,7 +1362,7 @@ function ExportPanel({ project }: { project: string }) {
               onClick={() => handleExport('txt')}
               disabled={!!exportingFormat}
             >
-              {exportingFormat === 'txt' ? '拼接 txt 中…' : t('extras_export_txt_btn')}
+              {exportingFormat === 'txt' ? t('extras_exporting_txt', '拼接 txt 中…') : t('extras_export_txt_btn')}
             </Button>
           </Paper>
         </Grid>
@@ -1370,3 +1370,4 @@ function ExportPanel({ project }: { project: string }) {
     </Box>
   )
 }
+

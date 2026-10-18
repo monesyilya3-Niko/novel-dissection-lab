@@ -246,6 +246,14 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '取消',
     'en-US': 'Cancel',
   },
+  action_create: {
+    'zh-CN': '创建',
+    'en-US': 'Create',
+  },
+  action_creating: {
+    'zh-CN': '创建中…',
+    'en-US': 'Creating...',
+  },
   action_confirm: {
     'zh-CN': '确定',
     'en-US': 'Confirm',
@@ -1039,6 +1047,376 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   extras_export_txt_btn: {
     'zh-CN': '导出纯文本 (.txt)',
     'en-US': 'Export Plain Text (.txt)',
+  },
+  extras_tension_dialog_title: {
+    'zh-CN': '测算章节情绪张力波形',
+    'en-US': 'Calculate Chapter Tension Wave',
+  },
+  extras_tension_dialog_desc: {
+    'zh-CN': '粘贴当前正在创作的章节草稿，系统将通过冲突关键词、标点短句节奏、人物对峙与感官微表情，计算整章情绪起伏波形并与标杆对齐。',
+    'en-US': 'Paste draft text to compute sentence-level tension curves via conflict keywords, pacing rhythm, and character micro-expressions aligned with benchmark masterpieces.',
+  },
+  extras_tension_draft_label: {
+    'zh-CN': '章节正文草稿',
+    'en-US': 'Chapter Draft Content',
+  },
+  extras_tension_draft_ph: {
+    'zh-CN': '粘贴本章草稿内容……（建议 1,000 字以上以获得更精准波形）',
+    'en-US': 'Paste chapter draft here... (1,000+ words recommended for optimal waveform resolution)',
+  },
+  extras_tension_sample_btn: {
+    'zh-CN': '填入示范高潮草稿',
+    'en-US': 'Load Sample Climax Draft',
+  },
+  extras_tension_analyzing: {
+    'zh-CN': '分析中…',
+    'en-US': 'Analyzing...',
+  },
+  extras_tension_start_btn: {
+    'zh-CN': '开始比对',
+    'en-US': 'Start Comparison',
+  },
+  extras_export_success: {
+    'zh-CN': '成功导出 {chapters} 章、约 {words} 字：{filename}',
+    'en-US': 'Successfully exported {chapters} chapters, ~{words} words: {filename}',
+  },
+  extras_export_error: {
+    'zh-CN': '导出失败: {error}',
+    'en-US': 'Export failed: {error}',
+  },
+  extras_exporting_docx: {
+    'zh-CN': '生成 docx 中…',
+    'en-US': 'Generating docx...',
+  },
+  extras_exporting_epub: {
+    'zh-CN': '打包 epub 中…',
+    'en-US': 'Packaging epub...',
+  },
+  extras_exporting_shunn: {
+    'zh-CN': '生成文稿中…',
+    'en-US': 'Formatting manuscript...',
+  },
+  extras_exporting_md: {
+    'zh-CN': '生成 md 中…',
+    'en-US': 'Generating md...',
+  },
+  extras_exporting_txt: {
+    'zh-CN': '拼接 txt 中…',
+    'en-US': 'Concatenating txt...',
+  },
+
+  // 创作室与写作弹窗 (Writing Studio & Dialogs)
+  writing_new_project_title: {
+    'zh-CN': '新建写作项目',
+    'en-US': 'Create Writing Project',
+  },
+  writing_project_name_label: {
+    'zh-CN': '项目名',
+    'en-US': 'Project Name',
+  },
+  writing_project_name_helper: {
+    'zh-CN': '会作为目录名使用：不能包含 / \\，不能叫 default',
+    'en-US': 'Used as directory name: cannot contain / \\, cannot be default',
+  },
+  studio_btn_meta: {
+    'zh-CN': '企划定位',
+    'en-US': 'Project Plan',
+  },
+  studio_btn_export: {
+    'zh-CN': '全书导出',
+    'en-US': 'Full Book Export',
+  },
+  studio_btn_pipeline: {
+    'zh-CN': '工坊流水线',
+    'en-US': 'Craft Pipeline',
+  },
+  studio_btn_next_ch: {
+    'zh-CN': '下一章',
+    'en-US': 'Next Chapter',
+  },
+  studio_today_written: {
+    'zh-CN': '今日已写: {words} 字',
+    'en-US': "Today's Words: {words}",
+  },
+  studio_creation_progress: {
+    'zh-CN': '创作进度: {current} / {target} 字',
+    'en-US': 'Progress: {current} / {target} words',
+  },
+  studio_collapse_copilot: {
+    'zh-CN': '折叠右侧智能副驾',
+    'en-US': 'Collapse AI Copilot',
+  },
+  studio_expand_copilot: {
+    'zh-CN': '展开右侧智能副驾',
+    'en-US': 'Expand AI Copilot',
+  },
+  studio_meta_dialog_title: {
+    'zh-CN': '作品企划与多平台定位',
+    'en-US': 'Project Planning & Platform Strategy',
+  },
+  studio_meta_platform_label: {
+    'zh-CN': '目标签约平台',
+    'en-US': 'Target Platform',
+  },
+  platform_fanqie_desc: {
+    'zh-CN': '番茄小说 (30秒黄金钩/每章留扣/防虐主)',
+    'en-US': 'Fanqie Novel (30s hook / cliffhangers / anti-frustration)',
+  },
+  platform_qidian_desc: {
+    'zh-CN': '起点中文网 (大纵深世界观/严密升级/反圣母)',
+    'en-US': 'Qidian (Deep worldbuilding / rigorous leveling / anti-bleeding-heart)',
+  },
+  platform_jinjiang_desc: {
+    'zh-CN': '晋江文学城 (人设细腻反差/推拉克制/微表情)',
+    'en-US': 'Jinjiang (Subtle character contrasts / restrained tension / micro-expressions)',
+  },
+  platform_qimao_desc: {
+    'zh-CN': '七猫中文网 (开局强冲突受辱/底牌强反制)',
+    'en-US': 'Qimao (High-conflict humiliation opening / decisive counterstrike)',
+  },
+  platform_zhihu_desc: {
+    'zh-CN': '知乎盐选 (第一人称高反转/三幕式快节奏)',
+    'en-US': 'Zhihu Salt (1st person twists / 3-act fast pacing)',
+  },
+  platform_general_desc: {
+    'zh-CN': '通用网文平台',
+    'en-US': 'General Fiction Platform',
+  },
+  studio_meta_genre_label: {
+    'zh-CN': '小说题材',
+    'en-US': 'Genre',
+  },
+  studio_meta_genre_ph: {
+    'zh-CN': '例如：xianxia / dushi / xuanhuan',
+    'en-US': 'e.g. xianxia / litrpg / fantasy',
+  },
+  studio_meta_target_words_label: {
+    'zh-CN': '全书目标字数',
+    'en-US': 'Target Word Count',
+  },
+  studio_meta_summary_label: {
+    'zh-CN': '作品一句话卖点与核心主线',
+    'en-US': 'Logline & Main Plot Objective',
+  },
+  studio_meta_summary_ph: {
+    'zh-CN': '说明主角核心爽点、金手指与主线目标',
+    'en-US': 'Core payoff hook, power mechanic, and endgame goal',
+  },
+  studio_meta_save_btn: {
+    'zh-CN': '保存企划',
+    'en-US': 'Save Project Plan',
+  },
+  studio_new_proj_title: {
+    'zh-CN': '新建小说作品',
+    'en-US': 'Create New Novel',
+  },
+  studio_new_proj_name_label: {
+    'zh-CN': '小说作品名称',
+    'en-US': 'Novel Title',
+  },
+  studio_new_proj_name_ph: {
+    'zh-CN': '例如：万界仙途',
+    'en-US': 'e.g. The Astral Path',
+  },
+  studio_export_dialog_title: {
+    'zh-CN': '全书一键导出与排版生成',
+    'en-US': 'Full Novel One-Click Export & Formatting',
+  },
+  studio_export_summary: {
+    'zh-CN': '当前工程《{project}》已写 {chapters} 章，共 {words} 字。',
+    'en-US': 'Current project "{project}" contains {chapters} chapters, ~{words} words.',
+  },
+  studio_export_format_label: {
+    'zh-CN': '导出排版格式',
+    'en-US': 'Export Format',
+  },
+  studio_export_format_docx: {
+    'zh-CN': '📘 Word 文档 (.docx) — 官方标准排版稿（带标题封面）',
+    'en-US': '📘 Word Document (.docx) — Official standard manuscript with title cover',
+  },
+  studio_export_format_epub: {
+    'zh-CN': '📱 标准电子书 (.epub) — EPUB 3.0 出版容器（Kindle / Apple Books）',
+    'en-US': '📱 Standard E-Book (.epub) — EPUB 3.0 publication container (Kindle / Apple Books)',
+  },
+  studio_export_format_shunn: {
+    'zh-CN': '📑 国际投稿文稿 (.txt) — William Shunn 标准文稿格式（带字数估算）',
+    'en-US': '📑 Standard Submission (.txt) — William Shunn manuscript format with word estimate',
+  },
+  studio_export_format_md: {
+    'zh-CN': '📝 Markdown 结构稿 (.md) — 适合 Obsidian/知识库',
+    'en-US': '📝 Markdown (.md) — Structured format for Obsidian / PKM',
+  },
+  studio_export_format_txt: {
+    'zh-CN': '📄 纯文本 (.txt) — 干净无格式，直接复制粘贴',
+    'en-US': '📄 Plain Text (.txt) — Clean unformatted text for quick copy-paste',
+  },
+  studio_exporting: {
+    'zh-CN': '导出中...',
+    'en-US': 'Exporting...',
+  },
+  studio_export_download_btn: {
+    'zh-CN': '立即下载',
+    'en-US': 'Download Now',
+  },
+  studio_new_outline_title: {
+    'zh-CN': '规划新章节大纲',
+    'en-US': 'Plan New Chapter Outline',
+  },
+  studio_outline_title_label: {
+    'zh-CN': '章节标题',
+    'en-US': 'Chapter Title',
+  },
+  studio_outline_title_ph: {
+    'zh-CN': '例如：第2章 惊变',
+    'en-US': 'e.g. Chapter 2 The Turning Point',
+  },
+  studio_outline_summary_label: {
+    'zh-CN': '本章剧情细纲与冲突目标',
+    'en-US': 'Chapter Plot Beats & Conflict Goals',
+  },
+  studio_outline_summary_ph: {
+    'zh-CN': '说明本章主要发生什么事件、制造什么悬念或爽点',
+    'en-US': 'Describe primary events, cliffhanger, or payoff hook',
+  },
+  studio_outline_save_btn: {
+    'zh-CN': '保存大纲',
+    'en-US': 'Save Outline',
+  },
+  studio_new_char_title: {
+    'zh-CN': '新建核心人物设定卡',
+    'en-US': 'Create Character Persona Card',
+  },
+  studio_char_name_label: {
+    'zh-CN': '人物姓名',
+    'en-US': 'Character Name',
+  },
+  studio_char_name_ph: {
+    'zh-CN': '例如：白灵儿',
+    'en-US': 'e.g. Bai Linger',
+  },
+  studio_char_role_label: {
+    'zh-CN': '角色定位',
+    'en-US': 'Character Archetype',
+  },
+  studio_char_role_protagonist: {
+    'zh-CN': '主角 (主角光环/核心行动驱动)',
+    'en-US': 'Protagonist (Core Agency / Driving Force)',
+  },
+  studio_char_role_heroine: {
+    'zh-CN': '女主角 (羁绊/情感推拉)',
+    'en-US': 'Heroine (Emotional Bond / Dynamic Tension)',
+  },
+  studio_char_role_villain: {
+    'zh-CN': '反派 (压迫感/利益冲突)',
+    'en-US': 'Antagonist (Pressure / Core Conflict)',
+  },
+  studio_char_role_rival: {
+    'zh-CN': '宿敌 (镜像对照/势均力敌)',
+    'en-US': 'Rival (Mirror Contrast / Worthy Adversary)',
+  },
+  studio_char_role_mentor: {
+    'zh-CN': '导师 (传道/暗藏秘密)',
+    'en-US': 'Mentor (Guidance / Hidden Secrets)',
+  },
+  studio_char_role_supporting: {
+    'zh-CN': '配角 (插科打诨/辅助推进)',
+    'en-US': 'Supporting (Comic Relief / Narrative Propellant)',
+  },
+  studio_char_desc_label: {
+    'zh-CN': '人设反差与核心特质',
+    'en-US': 'Character Contrast & Core Traits',
+  },
+  studio_char_desc_ph: {
+    'zh-CN': '例如：表面清冷孤傲，实则内藏反差护短；具有关键血脉',
+    'en-US': 'e.g. Outwardly aloof, fiercely protective inside; hidden lineage',
+  },
+  studio_char_save_btn: {
+    'zh-CN': '保存人物',
+    'en-US': 'Save Character',
+  },
+  studio_new_note_title: {
+    'zh-CN': '随手记下灵感便签',
+    'en-US': 'Capture Quick Idea Note',
+  },
+  studio_note_title_label: {
+    'zh-CN': '便签标题',
+    'en-US': 'Note Title',
+  },
+  studio_note_title_ph: {
+    'zh-CN': '例如：万剑归宗的视觉描写',
+    'en-US': 'e.g. Visual description of blade storm',
+  },
+  studio_note_content_label: {
+    'zh-CN': '灵感详情',
+    'en-US': 'Note Details',
+  },
+  studio_note_content_ph: {
+    'zh-CN': '例如：剑气如雨倒卷长空，带出金石裂帛之音',
+    'en-US': 'e.g. Swirling sword aura tearing through the sky with metallic resonance',
+  },
+  studio_note_save_btn: {
+    'zh-CN': '保存便签',
+    'en-US': 'Save Note',
+  },
+  studio_new_chain_title: {
+    'zh-CN': '记录全书草蛇灰线（伏笔暗线）',
+    'en-US': 'Record Foreshadowing Clue & Arc',
+  },
+  studio_chain_title_label: {
+    'zh-CN': '伏笔线索名称',
+    'en-US': 'Clue / Arc Name',
+  },
+  studio_chain_title_ph: {
+    'zh-CN': '例如：林凡胸前神秘石珠的来历',
+    'en-US': 'e.g. Origin of the mysterious stone pendant',
+  },
+  studio_chain_type_label: {
+    'zh-CN': '伏笔类型',
+    'en-US': 'Clue Category',
+  },
+  studio_chain_type_identity: {
+    'zh-CN': '身份谜题 (主角或大反派隐匿身世)',
+    'en-US': 'Identity Mystery (Hidden lineage of protagonist or antagonist)',
+  },
+  studio_chain_type_power: {
+    'zh-CN': '力量伏笔 (神功残卷/异宝异动/底牌法则)',
+    'en-US': 'Power Foreshadowing (Fragmented technique / relic awakening)',
+  },
+  studio_chain_type_fate: {
+    'zh-CN': '恩怨宿命 (宗门灭顶旧案/复仇契机)',
+    'en-US': 'Karmic Nemesis (Fallen sect conspiracy / vendetta)',
+  },
+  studio_chain_type_truth: {
+    'zh-CN': '世界真相 (天地禁制/天道伪善/世界黑幕)',
+    'en-US': 'World Truth (Cosmic restriction / divine hypocrisy / conspiracy)',
+  },
+  studio_chain_type_emotion: {
+    'zh-CN': '情感暗涌 (红颜身份/背叛契机)',
+    'en-US': 'Emotional Undercurrent (Hidden identity / betrayal trigger)',
+  },
+  studio_chain_plant_label: {
+    'zh-CN': '埋设章号 (Plant)',
+    'en-US': 'Plant Chapter',
+  },
+  studio_chain_reveal_label: {
+    'zh-CN': '显露章号 (Reveal)',
+    'en-US': 'Reveal Chapter',
+  },
+  studio_chain_climax_label: {
+    'zh-CN': '回收章号 (Climax)',
+    'en-US': 'Payoff / Climax Chapter',
+  },
+  studio_chain_desc_label: {
+    'zh-CN': '暗线闭环规划与关键意象',
+    'en-US': 'Clue Resolution Plan & Key Imagery',
+  },
+  studio_chain_desc_ph: {
+    'zh-CN': '说明在埋设时给读者留下的微弱疑点，以及高潮时如何反转引爆',
+    'en-US': 'Describe the subtle reader hook at plant and the explosive twist at payoff',
+  },
+  studio_chain_start_btn: {
+    'zh-CN': '启动暗线追踪',
+    'en-US': 'Start Clue Tracking',
   },
 
   // 灵感工坊 (InspirationWorkbench) - 8大标签页与各子模块

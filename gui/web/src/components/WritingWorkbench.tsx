@@ -281,6 +281,7 @@ function InjectPanel({ sel }: { sel: WritingAssetSelection }) {
 function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
   // P1-F4：写书目标分来自系统设置，不再硬编码 90。
   const { consistencyTarget } = useApp()
+  const { t } = useI18n()
   const [projects, setProjects] = useState<WritingProject[]>([])
   const [project, setProject] = useState('')
   const [chapterNo, setChapterNo] = useState(1)
@@ -424,23 +425,23 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
           新建项目
         </Button>
         <Dialog open={newProjOpen} onClose={() => setNewProjOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle>新建写作项目</DialogTitle>
+          <DialogTitle>{t('writing_new_project_title', '新建写作项目')}</DialogTitle>
           <DialogContent>
             <TextField
               autoFocus
               fullWidth
-              label="项目名"
+              label={t('writing_project_name_label', '项目名')}
               value={newProjName}
               onChange={(e) => setNewProjName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') doCreateProject() }}
-              helperText="会作为目录名使用：不能包含 / \，不能叫 default"
+              helperText={t('writing_project_name_helper', '会作为目录名使用：不能包含 / \\，不能叫 default')}
               sx={{ mt: 1 }}
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setNewProjOpen(false)}>取消</Button>
+            <Button onClick={() => setNewProjOpen(false)}>{t('action_cancel', '取消')}</Button>
             <Button variant="contained" onClick={doCreateProject} disabled={!newProjName.trim() || creatingProj}>
-              {creatingProj ? '创建中…' : '创建'}
+              {creatingProj ? t('action_creating', '创建中…') : t('action_create', '创建')}
             </Button>
           </DialogActions>
         </Dialog>
@@ -706,6 +707,7 @@ interface StudioViewProps {
 }
 
 function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
+  const { t } = useI18n()
   const [projects, setProjects] = useState<WritingProject[]>([])
   const [currentProject, setCurrentProject] = useState<string>('')
   const [meta, setMeta] = useState<ProjectMeta | null>(null)
@@ -1236,7 +1238,10 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.2 }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>
-                  创作进度: {totalWords.toLocaleString()} / {targetWords.toLocaleString()} 字
+                  {t('studio_creation_progress', '创作进度: {current} / {target} 字', {
+                    current: totalWords.toLocaleString(),
+                    target: targetWords.toLocaleString(),
+                  })}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
                   {progressPct}%
@@ -1249,7 +1254,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
           <Chip
             size="small"
             icon={<TrendingUpIcon />}
-            label={`今日已写: ${stats?.todayWords || 0} 字`}
+            label={t('studio_today_written', '今日已写: {words} 字', { words: stats?.todayWords || 0 })}
             color="success"
             variant="outlined"
           />
@@ -1259,7 +1264,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             startIcon={<SettingsSuggestIcon />}
             onClick={() => setOpenMetaDialog(true)}
           >
-            企划定位
+            {t('studio_btn_meta', '企划定位')}
           </Button>
 
           <Button
@@ -1269,7 +1274,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             startIcon={<FileDownloadIcon />}
             onClick={() => setOpenExportDialog(true)}
           >
-            全书导出
+            {t('studio_btn_export', '全书导出')}
           </Button>
 
           <Button
@@ -1278,12 +1283,12 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             startIcon={<TuneIcon />}
             onClick={onSwitchPipeline}
           >
-            工坊流水线
+            {t('studio_btn_pipeline', '工坊流水线')}
           </Button>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Tooltip title={rightOpen ? '折叠右侧智能副驾' : '展开右侧智能副驾'}>
+          <Tooltip title={rightOpen ? t('studio_collapse_copilot', '折叠右侧智能副驾') : t('studio_expand_copilot', '展开右侧智能副驾')}>
             <IconButton size="small" onClick={() => setRightOpen(!rightOpen)} color={rightOpen ? 'primary' : 'default'}>
               <ViewSidebarIcon />
             </IconButton>
@@ -2034,38 +2039,38 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
 
       {/* 企划定位对话框 */}
       <Dialog open={openMetaDialog} onClose={() => setOpenMetaDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>作品企划与多平台定位</DialogTitle>
+        <DialogTitle>{t('studio_meta_dialog_title', '作品企划与多平台定位')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <TextField
             select
             fullWidth
             size="small"
-            label="目标签约平台"
+            label={t('studio_meta_platform_label', '目标签约平台')}
             value={metaPlatform}
             onChange={(e) => setMetaPlatform(e.target.value)}
           >
-            <MenuItem value="fanqie">番茄小说 (30秒黄金钩/每章留扣/防虐主)</MenuItem>
-            <MenuItem value="qidian">起点中文网 (大纵深世界观/严密升级/反圣母)</MenuItem>
-            <MenuItem value="jinjiang">晋江文学城 (人设细腻反差/推拉克制/微表情)</MenuItem>
-            <MenuItem value="qimao">七猫中文网 (开局强冲突受辱/底牌强反制)</MenuItem>
-            <MenuItem value="zhihu">知乎盐选 (第一人称高反转/三幕式快节奏)</MenuItem>
-            <MenuItem value="general">通用网文平台</MenuItem>
+            <MenuItem value="fanqie">{t('platform_fanqie_desc', '番茄小说 (30秒黄金钩/每章留扣/防虐主)')}</MenuItem>
+            <MenuItem value="qidian">{t('platform_qidian_desc', '起点中文网 (大纵深世界观/严密升级/反圣母)')}</MenuItem>
+            <MenuItem value="jinjiang">{t('platform_jinjiang_desc', '晋江文学城 (人设细腻反差/推拉克制/微表情)')}</MenuItem>
+            <MenuItem value="qimao">{t('platform_qimao_desc', '七猫中文网 (开局强冲突受辱/底牌强反制)')}</MenuItem>
+            <MenuItem value="zhihu">{t('platform_zhihu_desc', '知乎盐选 (第一人称高反转/三幕式快节奏)')}</MenuItem>
+            <MenuItem value="general">{t('platform_general_desc', '通用网文平台')}</MenuItem>
           </TextField>
 
           <TextField
             fullWidth
             size="small"
-            label="小说题材"
+            label={t('studio_meta_genre_label', '小说题材')}
             value={metaGenre}
             onChange={(e) => setMetaGenre(e.target.value)}
-            placeholder="例如：xianxia / dushi / xuanhuan"
+            placeholder={t('studio_meta_genre_ph', '例如：xianxia / dushi / xuanhuan')}
           />
 
           <TextField
             type="number"
             fullWidth
             size="small"
-            label="全书目标字数"
+            label={t('studio_meta_target_words_label', '全书目标字数')}
             value={metaTargetWords}
             onChange={(e) => setMetaTargetWords(Number(e.target.value))}
           />
@@ -2075,66 +2080,70 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             multiline
             rows={3}
             size="small"
-            label="作品一句话卖点与核心主线"
+            label={t('studio_meta_summary_label', '作品一句话卖点与核心主线')}
             value={metaSummary}
             onChange={(e) => setMetaSummary(e.target.value)}
-            placeholder="说明主角核心爽点、金手指与主线目标"
+            placeholder={t('studio_meta_summary_ph', '说明主角核心爽点、金手指与主线目标')}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenMetaDialog(false)}>取消</Button>
+          <Button onClick={() => setOpenMetaDialog(false)}>{t('action_cancel', '取消')}</Button>
           <Button variant="contained" onClick={handleSaveMeta}>
-            保存企划
+            {t('studio_meta_save_btn', '保存企划')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* 新建作品对话框 */}
       <Dialog open={openNewProj} onClose={() => setOpenNewProj(false)}>
-        <DialogTitle>新建小说作品</DialogTitle>
+        <DialogTitle>{t('studio_new_proj_title', '新建小说作品')}</DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
           <TextField
             autoFocus
             fullWidth
             size="small"
-            label="小说作品名称"
-            placeholder="例如：万界仙途"
+            label={t('studio_new_proj_name_label', '小说作品名称')}
+            placeholder={t('studio_new_proj_name_ph', '例如：万界仙途')}
             value={newProjName}
             onChange={(e) => setNewProjName(e.target.value)}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenNewProj(false)}>取消</Button>
+          <Button onClick={() => setOpenNewProj(false)}>{t('action_cancel', '取消')}</Button>
           <Button variant="contained" onClick={handleCreateProject}>
-            创建
+            {t('action_create', '创建')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* 全书导出对话框 */}
       <Dialog open={openExportDialog} onClose={() => setOpenExportDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>全书一键导出与排版生成</DialogTitle>
+        <DialogTitle>{t('studio_export_dialog_title', '全书一键导出与排版生成')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            当前工程《{currentProject}》已写 {stats?.totalChapters || 0} 章，共 {(stats?.totalWords || 0).toLocaleString()} 字。
+            {t('studio_export_summary', '当前工程《{project}》已写 {chapters} 章，共 {words} 字。', {
+              project: currentProject,
+              chapters: stats?.totalChapters || 0,
+              words: (stats?.totalWords || 0).toLocaleString(),
+            })}
           </Typography>
           <TextField
             select
             fullWidth
             size="small"
-            label="导出排版格式"
+            label={t('studio_export_format_label', '导出排版格式')}
             value={exportFormat}
             onChange={(e) => setExportFormat(e.target.value as 'docx' | 'epub' | 'shunn' | 'md' | 'txt')}
           >
-            <MenuItem value="docx">📘 Word 文档 (.docx) — 官方标准排版稿（带标题封面）</MenuItem>
-            <MenuItem value="epub">📱 标准电子书 (.epub) — EPUB 3.0 出版容器（Kindle / Apple Books）</MenuItem>
-            <MenuItem value="shunn">📑 国际投稿文稿 (.txt) — William Shunn 标准文稿格式（带字数估算）</MenuItem>
-            <MenuItem value="md">📝 Markdown 结构稿 (.md) — 适合 Obsidian/知识库</MenuItem>
-            <MenuItem value="txt">📄 纯文本 (.txt) — 干净无格式，直接复制粘贴</MenuItem>
+            <MenuItem value="docx">{t('studio_export_format_docx', '📘 Word 文档 (.docx) — 官方标准排版稿（带标题封面）')}</MenuItem>
+            <MenuItem value="epub">{t('studio_export_format_epub', '📱 标准电子书 (.epub) — EPUB 3.0 出版容器（Kindle / Apple Books）')}</MenuItem>
+            <MenuItem value="shunn">{t('studio_export_format_shunn', '📑 国际投稿文稿 (.txt) — William Shunn 标准文稿格式（带字数估算）')}</MenuItem>
+            <MenuItem value="md">{t('studio_export_format_md', '📝 Markdown 结构稿 (.md) — 适合 Obsidian/知识库')}</MenuItem>
+            <MenuItem value="txt">{t('studio_export_format_txt', '📄 纯文本 (.txt) — 干净无格式，直接复制粘贴')}</MenuItem>
           </TextField>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenExportDialog(false)}>取消</Button>
+          <Button onClick={() => setOpenExportDialog(false)}>{t('action_cancel', '取消')}</Button>
           <Button
             variant="contained"
             color="primary"
@@ -2142,21 +2151,21 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             onClick={() => handleExportProject(exportFormat)}
             disabled={exporting}
           >
-            {exporting ? '导出中...' : '立即下载'}
+            {exporting ? t('studio_exporting', '导出中...') : t('studio_export_download_btn', '立即下载')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* 新建章节大纲对话框 */}
       <Dialog open={openNewOutline} onClose={() => setOpenNewOutline(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>规划新章节大纲</DialogTitle>
+        <DialogTitle>{t('studio_new_outline_title', '规划新章节大纲')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <TextField
             autoFocus
             fullWidth
             size="small"
-            label="章节标题"
-            placeholder="例如：第2章 惊变"
+            label={t('studio_outline_title_label', '章节标题')}
+            placeholder={t('studio_outline_title_ph', '例如：第2章 惊变')}
             value={newOutlineTitle}
             onChange={(e) => setNewOutlineTitle(e.target.value)}
           />
@@ -2165,30 +2174,30 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             multiline
             rows={3}
             size="small"
-            label="本章剧情细纲与冲突目标"
-            placeholder="说明本章主要发生什么事件、制造什么悬念或爽点"
+            label={t('studio_outline_summary_label', '本章剧情细纲与冲突目标')}
+            placeholder={t('studio_outline_summary_ph', '说明本章主要发生什么事件、制造什么悬念或爽点')}
             value={newOutlineSummary}
             onChange={(e) => setNewOutlineSummary(e.target.value)}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenNewOutline(false)}>取消</Button>
+          <Button onClick={() => setOpenNewOutline(false)}>{t('action_cancel', '取消')}</Button>
           <Button variant="contained" onClick={handleCreateOutline}>
-            保存大纲
+            {t('studio_outline_save_btn', '保存大纲')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* 新建人物卡对话框 */}
       <Dialog open={openNewChar} onClose={() => setOpenNewChar(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>新建核心人物设定卡</DialogTitle>
+        <DialogTitle>{t('studio_new_char_title', '新建核心人物设定卡')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <TextField
             autoFocus
             fullWidth
             size="small"
-            label="人物姓名"
-            placeholder="例如：白灵儿"
+            label={t('studio_char_name_label', '人物姓名')}
+            placeholder={t('studio_char_name_ph', '例如：白灵儿')}
             value={newCharName}
             onChange={(e) => setNewCharName(e.target.value)}
           />
@@ -2196,46 +2205,46 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             select
             fullWidth
             size="small"
-            label="角色定位"
+            label={t('studio_char_role_label', '角色定位')}
             value={newCharRole}
             onChange={(e) => setNewCharRole(e.target.value)}
           >
-            <MenuItem value="主角">主角 (主角光环/核心行动驱动)</MenuItem>
-            <MenuItem value="女主角">女主角 (羁绊/情感推拉)</MenuItem>
-            <MenuItem value="反派">反派 (压迫感/利益冲突)</MenuItem>
-            <MenuItem value="宿敌">宿敌 (镜像对照/势均力敌)</MenuItem>
-            <MenuItem value="导师">导师 (传道/暗藏秘密)</MenuItem>
-            <MenuItem value="配角">配角 (插科打诨/辅助推进)</MenuItem>
+            <MenuItem value="主角">{t('studio_char_role_protagonist', '主角 (主角光环/核心行动驱动)')}</MenuItem>
+            <MenuItem value="女主角">{t('studio_char_role_heroine', '女主角 (羁绊/情感推拉)')}</MenuItem>
+            <MenuItem value="反派">{t('studio_char_role_villain', '反派 (压迫感/利益冲突)')}</MenuItem>
+            <MenuItem value="宿敌">{t('studio_char_role_rival', '宿敌 (镜像对照/势均力敌)')}</MenuItem>
+            <MenuItem value="导师">{t('studio_char_role_mentor', '导师 (传道/暗藏秘密)')}</MenuItem>
+            <MenuItem value="配角">{t('studio_char_role_supporting', '配角 (插科打诨/辅助推进)')}</MenuItem>
           </TextField>
           <TextField
             fullWidth
             multiline
             rows={3}
             size="small"
-            label="人设反差与核心特质"
-            placeholder="例如：表面清冷孤傲，实则内藏反差护短；具有关键血脉"
+            label={t('studio_char_desc_label', '人设反差与核心特质')}
+            placeholder={t('studio_char_desc_ph', '例如：表面清冷孤傲，实则内藏反差护短；具有关键血脉')}
             value={newCharDesc}
             onChange={(e) => setNewCharDesc(e.target.value)}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenNewChar(false)}>取消</Button>
+          <Button onClick={() => setOpenNewChar(false)}>{t('action_cancel', '取消')}</Button>
           <Button variant="contained" onClick={handleCreateCharacter}>
-            保存人物
+            {t('studio_char_save_btn', '保存人物')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* 新建灵感便签对话框 */}
       <Dialog open={openNewNote} onClose={() => setOpenNewNote(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>随手记下灵感便签</DialogTitle>
+        <DialogTitle>{t('studio_new_note_title', '随手记下灵感便签')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <TextField
             autoFocus
             fullWidth
             size="small"
-            label="便签标题"
-            placeholder="例如：万剑归宗的视觉描写"
+            label={t('studio_note_title_label', '便签标题')}
+            placeholder={t('studio_note_title_ph', '例如：万剑归宗的视觉描写')}
             value={newNoteTitle}
             onChange={(e) => setNewNoteTitle(e.target.value)}
           />
@@ -2244,30 +2253,30 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             multiline
             rows={3}
             size="small"
-            label="灵感详情"
-            placeholder="例如：剑气如雨倒卷长空，带出金石裂帛之音"
+            label={t('studio_note_content_label', '灵感详情')}
+            placeholder={t('studio_note_content_ph', '例如：剑气如雨倒卷长空，带出金石裂帛之音')}
             value={newNoteContent}
             onChange={(e) => setNewNoteContent(e.target.value)}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenNewNote(false)}>取消</Button>
+          <Button onClick={() => setOpenNewNote(false)}>{t('action_cancel', '取消')}</Button>
           <Button variant="contained" onClick={handleCreateNote}>
-            保存便签
+            {t('studio_note_save_btn', '保存便签')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* 新建伏笔暗线对话框 */}
       <Dialog open={openNewChain} onClose={() => setOpenNewChain(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>记录全书草蛇灰线（伏笔暗线）</DialogTitle>
+        <DialogTitle>{t('studio_new_chain_title', '记录全书草蛇灰线（伏笔暗线）')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <TextField
             autoFocus
             fullWidth
             size="small"
-            label="伏笔线索名称"
-            placeholder="例如：林凡胸前神秘石珠的来历"
+            label={t('studio_chain_title_label', '伏笔线索名称')}
+            placeholder={t('studio_chain_title_ph', '例如：林凡胸前神秘石珠的来历')}
             value={newChainTitle}
             onChange={(e) => setNewChainTitle(e.target.value)}
           />
@@ -2275,22 +2284,22 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             select
             fullWidth
             size="small"
-            label="伏笔类型"
+            label={t('studio_chain_type_label', '伏笔类型')}
             value={newChainCategory}
             onChange={(e) => setNewChainCategory(e.target.value)}
           >
-            <MenuItem value="identity">身份谜题 (主角或大反派隐匿身世)</MenuItem>
-            <MenuItem value="power">力量伏笔 (神功残卷/异宝异动/底牌法则)</MenuItem>
-            <MenuItem value="fate">恩怨宿命 (宗门灭顶旧案/复仇契机)</MenuItem>
-            <MenuItem value="truth">世界真相 (天地禁制/天道伪善/世界黑幕)</MenuItem>
-            <MenuItem value="emotion">情感暗涌 (红颜身份/背叛契机)</MenuItem>
+            <MenuItem value="identity">{t('studio_chain_type_identity', '身份谜题 (主角或大反派隐匿身世)')}</MenuItem>
+            <MenuItem value="power">{t('studio_chain_type_power', '力量伏笔 (神功残卷/异宝异动/底牌法则)')}</MenuItem>
+            <MenuItem value="fate">{t('studio_chain_type_fate', '恩怨宿命 (宗门灭顶旧案/复仇契机)')}</MenuItem>
+            <MenuItem value="truth">{t('studio_chain_type_truth', '世界真相 (天地禁制/天道伪善/世界黑幕)')}</MenuItem>
+            <MenuItem value="emotion">{t('studio_chain_type_emotion', '情感暗涌 (红颜身份/背叛契机)')}</MenuItem>
           </TextField>
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <TextField
               type="number"
               fullWidth
               size="small"
-              label="埋设章号 (Plant)"
+              label={t('studio_chain_plant_label', '埋设章号 (Plant)')}
               value={newChainPlant}
               onChange={(e) => setNewChainPlant(Math.max(1, Number(e.target.value)))}
             />
@@ -2298,7 +2307,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
               type="number"
               fullWidth
               size="small"
-              label="显露章号 (Reveal)"
+              label={t('studio_chain_reveal_label', '显露章号 (Reveal)')}
               value={newChainReveal}
               onChange={(e) => setNewChainReveal(Math.max(1, Number(e.target.value)))}
             />
@@ -2306,7 +2315,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
               type="number"
               fullWidth
               size="small"
-              label="回收章号 (Climax)"
+              label={t('studio_chain_climax_label', '回收章号 (Climax)')}
               value={newChainClimax}
               onChange={(e) => setNewChainClimax(Math.max(1, Number(e.target.value)))}
             />
@@ -2316,16 +2325,16 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             multiline
             rows={3}
             size="small"
-            label="暗线闭环规划与关键意象"
-            placeholder="说明在埋设时给读者留下的微弱疑点，以及高潮时如何反转引爆"
+            label={t('studio_chain_desc_label', '暗线闭环规划与关键意象')}
+            placeholder={t('studio_chain_desc_ph', '说明在埋设时给读者留下的微弱疑点，以及高潮时如何反转引爆')}
             value={newChainDesc}
             onChange={(e) => setNewChainDesc(e.target.value)}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenNewChain(false)}>取消</Button>
+          <Button onClick={() => setOpenNewChain(false)}>{t('action_cancel', '取消')}</Button>
           <Button variant="contained" onClick={handleCreateChain}>
-            启动暗线追踪
+            {t('studio_chain_start_btn', '启动暗线追踪')}
           </Button>
         </DialogActions>
       </Dialog>
