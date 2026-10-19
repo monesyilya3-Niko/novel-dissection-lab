@@ -97,14 +97,20 @@ class VerificationClient:
             return exc.code, raw.decode("utf-8", errors="replace"), resp_headers
 
 
-def run_e2e_verification() -> bool:
-    print("=" * 70)
-    print("🚀 [START] novel-lab 全端点自动化真机实测探测开始")
-    print("=" * 70)
+def run_e2e_verification(
+    port: int = 8100,
+    quiet: bool = False,
+    keep_sandbox: bool = False,
+) -> bool:
+    if not quiet:
+        print("=" * 70)
+        print("🚀 [START] novel-lab 全端点自动化真机实测探测开始")
+        print("=" * 70)
 
     # 1. 环境初始化与路径沙箱隔离
     tmp_dir = tempfile.mkdtemp(prefix="novel_lab_e2e_")
-    print(f"[*] 创建临时测试沙箱目录: {tmp_dir}")
+    if not quiet:
+        print(f"[*] 创建临时测试沙箱目录: {tmp_dir}")
 
     from gui import admin, config, db, engine_adapter, server, writing_extra
 
@@ -117,6 +123,7 @@ def run_e2e_verification() -> bool:
         "CORPUS_DIR": config.CORPUS_DIR,
         "PROMPTS_DIR": config.PROMPTS_DIR,
         "REPORTS_DIR": config.REPORTS_DIR,
+        "CONFIG_DIR": config.CONFIG_DIR,
         "DB_PATH": config.DB_PATH,
         "LOCK_PATH": config.LOCK_PATH,
     }
@@ -130,6 +137,7 @@ def run_e2e_verification() -> bool:
     config.CORPUS_DIR = sandbox_root / "corpus"
     config.PROMPTS_DIR = sandbox_root / "prompts"
     config.REPORTS_DIR = sandbox_root / "reports"
+    config.CONFIG_DIR = sandbox_root / "config"
     config.DB_PATH = config.STATE_ROOT / "novel_lab.db"
     config.LOCK_PATH = config.STATE_ROOT / ".lock"
 
@@ -141,6 +149,7 @@ def run_e2e_verification() -> bool:
         config.CORPUS_DIR,
         config.PROMPTS_DIR,
         config.REPORTS_DIR,
+        config.CONFIG_DIR,
     ):
         d.mkdir(parents=True, exist_ok=True)
 
@@ -153,11 +162,13 @@ def run_e2e_verification() -> bool:
             admin._sessions.clear()
 
         # 2. 真实启动本地测试服务
-        print("[*] 正在启动本地 GuiServer 服务 (127.0.0.1 动态端口)...")
-        gui_srv = server.GuiServer(preferred_port=8100)
-        host, port = gui_srv.start()
-        base_url = f"http://{host}:{port}"
-        print(f"[✔] GuiServer 成功监听并运行在: {base_url}")
+        if not quiet:
+            print("[*] 正在启动本地 GuiServer 服务 (127.0.0.1 动态端口)...")
+        gui_srv = server.GuiServer(preferred_port=port)
+        host, srv_port = gui_srv.start()
+        base_url = f"http://{host}:{srv_port}"
+        if not quiet:
+            print(f"[✔] GuiServer 成功监听并运行在: {base_url}")
 
         client = VerificationClient(base_url)
 
@@ -661,30 +672,53 @@ def run_e2e_verification() -> bool:
                 raise VerificationError("DOCX document.xml 中未找到章节文本内容！")
         print(f"[✔] Word (.docx) OpenXML 包结构与内容合规性全检通过: 大小={len(docx_bytes)} 字节")
 
-        print("\n" + "=" * 70)
-        print("🎉 [ALL PASSED] 全端点真机实测 100% 通过！所有 6 大核心模块全绿！")
-        print("=" * 70)
+        if not quiet:
+            print("\n" + "=" * 70)
+            print("🎉 [ALL PASSED] 全端点真机实测 100% 通过！所有 6 大核心模块全绿！")
+            print("=" * 70)
         return True
 
     finally:
         # 优雅停机并复原配置
         if gui_srv is not None:
-            print("\n[*] 正在优雅关闭测试服务...")
+            if not quiet:
+                print("\n[*] 正在优雅关闭测试服务...")
             try:
                 gui_srv.shutdown()
-                print("[✔] 测试服务已优雅关闭，单实例锁已释放")
+                if not quiet:
+                    print("[✔] 测试服务已优雅关闭，单实例锁已释放")
             except Exception as exc:
-                print(f"[!] 停机异常: {exc}")
+                if not quiet:
+                    print(f"[!] 停机异常: {exc}")
 
         db.close()
+        import gc
+        gc.collect()
 
         for k, v in orig_config.items():
             setattr(config, k, v)
 
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-        print(f"[*] 临时沙箱已清理完成: {tmp_dir}")
+        if not keep_sandbox:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            if not quiet:
+                print(f"[*] 临时沙箱已清理完成: {tmp_dir}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description="novel-lab 全链路真机实测自动化探测脚本")
+    parser.add_argument("--port", type=int, default=8100, help="首选服务端口 (默认 8100)")
+    parser.add_argument("-q", "--quiet", action="store_true", help="静默模式")
+    parser.add_argument("--keep-sandbox", action="store_true", help="保留测试沙箱用于调试")
+    args = parser.parse_args(argv)
+
+    success = run_e2e_verification(
+        port=args.port,
+        quiet=args.quiet,
+        keep_sandbox=args.keep_sandbox,
+    )
+    return 0 if success else 1
 
 
 if __name__ == "__main__":
-    success = run_e2e_verification()
-    sys.exit(0 if success else 1)
+    sys.exit(main())
