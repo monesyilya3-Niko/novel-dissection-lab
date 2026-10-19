@@ -14,10 +14,21 @@
 import argparse
 import json
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 
-import chapter_loader
+ROOT_DIR = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+try:
+    from scripts import chapter_loader
+except ImportError:
+    import chapter_loader
 
 CJK_RE = re.compile(r'[\u4e00-\u9fff]+')
 SENT_RE = re.compile(r'[。！？!?…;；\n]')
@@ -38,14 +49,20 @@ SENSORY = {
 
 
 def sentences(text):
+    if not isinstance(text, str):
+        return []
     return [s for s in SENT_RE.split(text) if s.strip()]
 
 
 def paragraphs(text):
+    if not isinstance(text, str):
+        return []
     return [p for p in re.split(r'\n\s*\n', text) if p.strip()]
 
 
 def cjk_runs(text):
+    if not isinstance(text, str):
+        return []
     return CJK_RE.findall(text)
 
 
@@ -56,6 +73,8 @@ def char_ttr(text):
     （旧实现 ``[c for run in ... for c in run]`` 在 100MB 文本下产生约
     3300 万元素的 list，峰值约 1.6GB，是 100MB 上传 RSS 冲高的主因之一。）
     """
+    if not isinstance(text, str):
+        return 0.0
     uniq: set[str] = set()
     total = 0
     for run in cjk_runs(text):
@@ -68,6 +87,8 @@ def char_ttr(text):
 
 def bigram_freq(text, top=30):
     """CJK 连续串的 2-gram 高频（近似词频）。"""
+    if not isinstance(text, str):
+        return []
     grams = Counter()
     for run in cjk_runs(text):
         # zip 配对代替 run[i:i+2] 切片：避免逐 bigram 分配 2-char 切片，
@@ -96,6 +117,8 @@ def dialogue_char_count(text):
     Returns:
         int: 引号内字符总数（开闭引号本身不计）。
     """
+    if not isinstance(text, str):
+        return 0
     count = 0
     close_char = None  # 当前打开引号对应的闭引号；None 表示不在对白中
     for ch in text:
@@ -125,12 +148,16 @@ def dialogue_ratio(text):
     分子统一走 :func:`dialogue_char_count`（四类引号同一口径）；
     分母保持既有口径：去空白后的总字符数。
     """
+    if not isinstance(text, str):
+        return 0.0
     total_chars = len(re.sub(r'\s', '', text))
     count = dialogue_char_count(text)
     return round(count / total_chars, 4) if total_chars else 0.0
 
 
 def sensory_counts(text):
+    if not isinstance(text, str):
+        return dict.fromkeys(SENSORY, 0)
     return {sense: sum(text.count(w) for w in words) for sense, words in SENSORY.items()}
 
 
@@ -146,7 +173,7 @@ def sentence_length_profile(sent_lens: list) -> dict:
     voice-card 的 sentence_rhythm.short_ratio / long_ratio 依赖这两个值，
     此前 metrics 只算 avg/max/min，导致该三字段恒为 0（数据断流）。
     """
-    if not sent_lens:
+    if not isinstance(sent_lens, (list, tuple)) or not sent_lens:
         return {"short_ratio": 0.0, "long_ratio": 0.0}
     n = len(sent_lens)
     short_n = sum(1 for L in sent_lens if L <= SHORT_SENT_MAX)
@@ -164,6 +191,8 @@ def _sentence_len_stats(text):
     但不物化句子列表。旧实现先 ``SENT_RE.split`` 出全量句子 list
     （100MB 文本下约 310 万元素 + 逐句 strip 拷贝），是上传 RSS 冲高的主因之一。
     """
+    if not isinstance(text, str):
+        return 0, 0, 0, 0, 0, 0
     n = 0
     total = 0
     max_len = 0
@@ -205,10 +234,14 @@ def _sentence_len_stats(text):
 
 def _paragraph_count(text):
     """段落数（流式计数，不物化段落列表）。"""
+    if not isinstance(text, str):
+        return 0
     return sum(1 for p in re.split(r'\n\s*\n', text) if p.strip())
 
 
 def compute(text):
+    if not isinstance(text, str):
+        text = ""
     n, total_len, max_len, min_len, short_n, long_n = _sentence_len_stats(text)
     total_chars = len(re.sub(r'\s', '', text))
     return {
@@ -228,24 +261,32 @@ def compute(text):
     }
 
 
-def main():
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="量化指标（句长/对话占比/TTR/高频2-gram/五感词）")
     ap.add_argument("book", help="TXT 路径，或目录（遍历 .txt）")
     ap.add_argument("--out", help="输出 JSON 路径")
-    args = ap.parse_args()
+    ap.add_argument("-q", "--quiet", action="store_true", help="静默模式")
+    args = ap.parse_args(argv)
 
     p = Path(args.book)
-    files = list(p.glob("*.txt")) if p.is_dir() else [p]
+    if not p.exists():
+        if not args.quiet:
+            print(f"[Error] 路径不存在: {p}", file=sys.stderr)
+        return 1
+
+    files = sorted(p.glob("*.txt")) if p.is_dir() else [p]
     all_metrics = {}
     for f in files:
         all_metrics[f.stem] = compute(chapter_loader.read_text_file(f))
 
     out = args.out or (p.parent / f"{p.stem}_metrics.json" if not p.is_dir() else "metrics.json")
     Path(out).write_text(json.dumps(all_metrics, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[OK] 指标已写入 {out}")
-    for name, m in all_metrics.items():
-        print(f"  {name}: {m['total_chars']}字, 均句长{m['avg_sentence_len']}, "
-              f"对话占比{m['dialogue_ratio']}, TTR{m['char_ttr']}")
+    if not args.quiet:
+        print(f"[OK] 指标已写入 {out}")
+        for name, m in all_metrics.items():
+            print(f"  {name}: {m['total_chars']}字, 均句长{m['avg_sentence_len']}, "
+                  f"对话占比{m['dialogue_ratio']}, TTR{m['char_ttr']}")
+    return 0
 
 
 if __name__ == "__main__":
