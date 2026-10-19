@@ -178,8 +178,18 @@ def _format_chain_dict(r: db.RowLike) -> dict[str, Any]:
     """格式化暗链字典，注入前端图谱 camelCase 契约字段。"""
     d = dict(r)
     b_id = d.get("book_id", "")
-    hook_ch = d.get("hook_chapter") or 1
-    payoff_ch = d.get("payoff_chapter") or 1
+    hook_raw = d.get("hook_chapter")
+    payoff_raw = d.get("payoff_chapter")
+    try:
+        hook_digits = re.sub(r"\D", "", str(hook_raw)) if hook_raw is not None else ""
+        hook_ch = int(hook_digits) if hook_digits else 1
+    except (ValueError, TypeError):
+        hook_ch = 1
+    try:
+        payoff_digits = re.sub(r"\D", "", str(payoff_raw)) if payoff_raw is not None else ""
+        payoff_ch = int(payoff_digits) if payoff_digits else 1
+    except (ValueError, TypeError):
+        payoff_ch = 1
     clue = d.get("clue_name", "核心主线暗链")
     hook_txt = d.get("hook_text", "")
     analysis = d.get("analysis", "")
