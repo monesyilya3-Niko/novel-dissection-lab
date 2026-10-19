@@ -743,7 +743,11 @@ def adopt_asset_to_project(
 
         elif target_kind == "character":
             # 导入到 writing_characters
-            extra_meta = {"from_essence_id": asset_id, "category": asset["category"], "genre": asset["genre"]}
+            extra_meta = {
+                "from_essence_id": asset_id,
+                "category": asset.get("category", ""),
+                "genre": asset.get("genre", "general"),
+            }
             cur = conn.execute(
                 """
                 INSERT INTO writing_characters (project, name, role, description, extra, created_at, updated_at)
