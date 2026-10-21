@@ -177,16 +177,16 @@ def render_craft_report(craft: dict) -> str:
     return "\n".join(lines)
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="craft-card → 可交付 Markdown 报告")
     parser.add_argument("craft_card", help="craft-card JSON 文件路径")
     parser.add_argument("--out", help="输出 Markdown 文件路径（默认 reports/<书名>-笔法分析.md）")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     craft_path = Path(args.craft_card)
     if not craft_path.exists():
         print(f"✗ 文件不存在: {craft_path}", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
     craft = json.loads(craft_path.read_text(encoding="utf-8"))
     report = render_craft_report(craft)
@@ -205,6 +205,8 @@ def main():
     if len(report) < MIN_REPORT_CHARS:
         print(f"⚠ 笔法分析单份字数 {len(report)} < {MIN_REPORT_CHARS}，"
               f"合计硬校验在 novel.py 分析（check_combined_report_length）")
+
+    return 0
 
 
 if __name__ == "__main__":

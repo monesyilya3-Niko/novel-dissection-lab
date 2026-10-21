@@ -179,9 +179,8 @@ class TestReportCraftCli(unittest.TestCase):
         non_existent = self.dir_path / "not_found.json"
         test_args = ["report_craft.py", str(non_existent)]
         with mock.patch("sys.argv", test_args), mock.patch("sys.stderr", new_callable=io.StringIO):
-            with self.assertRaises(SystemExit) as cm:
-                report_craft.main()
-            self.assertEqual(cm.exception.code, 1)
+            exit_code = report_craft.main()
+            self.assertEqual(exit_code, 1)
 
     def test_main_cli_generates_markdown_report(self):
         craft_data = {
@@ -204,13 +203,29 @@ class TestReportCraftCli(unittest.TestCase):
         out_file = self.dir_path / "custom_report.md"
         test_args = ["report_craft.py", str(craft_file), "--out", str(out_file)]
         with mock.patch("sys.argv", test_args), mock.patch("sys.stdout", new_callable=io.StringIO) as out:
-            report_craft.main()
+            exit_code = report_craft.main()
+            self.assertEqual(exit_code, 0)
             output = out.getvalue()
             self.assertIn("报告已生成", output)
 
         self.assertTrue(out_file.exists())
         content = out_file.read_text(encoding="utf-8")
         self.assertIn("# 《测试作品》写作技法深度拆解报告", content)
+
+    def test_main_cli_with_explicit_argv(self):
+        craft_data = {
+            "meta": {"source_title": "显式作品", "sample_chapters": [1]},
+            "craft_summary": {"top_3_strengths": ["结构紧凑"]},
+            "craft_analysis": {},
+        }
+        craft_file = self.dir_path / "explicit_craft.json"
+        craft_file.write_text(json.dumps(craft_data, ensure_ascii=False), encoding="utf-8")
+        out_file = self.dir_path / "explicit_report.md"
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+            code = report_craft.main([str(craft_file), "--out", str(out_file)])
+            self.assertEqual(code, 0)
+            self.assertIn("报告已生成", out.getvalue())
+        self.assertTrue(out_file.exists())
 
 
 if __name__ == "__main__":

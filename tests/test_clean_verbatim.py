@@ -122,13 +122,26 @@ class TestCleanVerbatimCli(unittest.TestCase):
 
         test_args = ["clean_verbatim.py", str(asset_file), str(self.book_path), "--apply"]
         with mock.patch("sys.argv", test_args), mock.patch("sys.stdout", new_callable=io.StringIO) as out:
-            clean_verbatim.main()
+            ret = clean_verbatim.main()
+            self.assertEqual(ret, 0)
             output = out.getvalue()
             self.assertIn("已清洗 1 处并保存", output)
 
         # 磁盘文件内容已改写
         content = json.loads(asset_file.read_text(encoding="utf-8"))
         self.assertNotIn("这是一个非常神秘的修仙古老宗门", content["techniques"][0]["example"])
+
+    def test_cli_with_explicit_argv(self):
+        asset_data = {
+            "name": "显式传参资产",
+            "desc": "原创内容，无引用",
+        }
+        asset_file = self.dir_path / "explicit_asset.json"
+        asset_file.write_text(json.dumps(asset_data, ensure_ascii=False), encoding="utf-8")
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+            ret = clean_verbatim.main([str(asset_file), str(self.book_path)])
+            self.assertEqual(ret, 0)
+            self.assertIn("发现 0 处原文引用待清洗", out.getvalue())
 
 
 if __name__ == "__main__":

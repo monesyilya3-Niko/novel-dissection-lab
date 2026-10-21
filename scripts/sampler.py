@@ -176,11 +176,11 @@ def build_slices(chapters, sel):
     return slices
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="分层采样：整本 TXT → 带标记分片")
     ap.add_argument("book", help="整本小说 TXT 路径")
     ap.add_argument("--out", help="输出目录，默认 corpus/sampled/<书名>")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     src = Path(args.book)
     text = chapter_loader.read_text_file(src)
@@ -226,6 +226,7 @@ def main():
     print(f"[OK] {name}: 共 {len(chapters)} 章，采样 {len(indices)} 章")
     print(f"  pass2 抽取对话 {len(dlg)} 条")
     print(f"  输出目录: {out}")
+    return 0
 
 
 if __name__ == "__main__":

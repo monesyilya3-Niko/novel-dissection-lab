@@ -53,12 +53,12 @@ def clean_string(s: str, ngram: set, path: str) -> tuple:
     return s, s != orig
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="原文引用清洗器")
     ap.add_argument("asset", help="资产 JSON")
     ap.add_argument("book", help="原文 TXT")
     ap.add_argument("--apply", action="store_true", help="原地修改（缺省只报告）")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     asset_path = Path(args.asset)
     asset = json.loads(asset_path.read_text(encoding="utf-8"))
@@ -118,6 +118,8 @@ def main():
     print(f"\n复扫: {len(errs)} 硬错误, {len(warns)} 警告")
     for e in errs[:5]:
         print(f"  ✗ {e}")
+
+    return 1 if errs else 0
 
 
 if __name__ == "__main__":

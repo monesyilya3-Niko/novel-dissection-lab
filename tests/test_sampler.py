@@ -240,6 +240,15 @@ class TestSamplerBuildSlicesAndCli(unittest.TestCase):
         self.assertEqual(manifest["total_chapters"], 14)
         self.assertGreater(manifest["selected_count"], 0)
 
+    def test_main_cli_with_explicit_argv(self):
+        book_txt = self.tmp / "test_novel_explicit.txt"
+        book_content = [f"第{i}章 章节标题{i}\n正文内容\n" for i in range(1, 15)]
+        book_txt.write_text("\n".join(book_content), encoding="utf-8")
+        out_dir = self.tmp / "output_sampled_explicit"
+        code = sampler.main([str(book_txt), "--out", str(out_dir)])
+        self.assertEqual(code, 0)
+        self.assertTrue((out_dir / "manifest.json").is_file())
+
 
 if __name__ == "__main__":
     sys.exit(unittest.main())
