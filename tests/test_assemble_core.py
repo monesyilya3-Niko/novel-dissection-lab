@@ -352,7 +352,7 @@ class TestAssembleCLIWorkflow(unittest.TestCase):
              mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
 
             exit_code = assemble.main()
-            self.assertIsNone(exit_code)  # 成功落盘走完无显式 return 即隐式返回 None
+            self.assertEqual(exit_code, 0)  # 成功落盘走完显式返回 0
             self.assertIn("组装完成：四类资产全部通过 schema 校验并已落盘", mock_out.getvalue())
 
             # 检查4类资产是否真实落盘
@@ -364,6 +364,25 @@ class TestAssembleCLIWorkflow(unittest.TestCase):
             # 检查来源指纹是否注入
             data = json.loads((self.assets_dir / "testbook-voice-card.json").read_text(encoding="utf-8"))
             self.assertIn("source_fingerprint", data["meta"])
+
+    def test_main_with_explicit_argv_and_skip_craft(self):
+        with mock.patch("assemble.ROOT", Path(self.temp_dir)), \
+             mock.patch("assemble.RAW_DIR", Path(self.temp_dir) / "corpus" / "raw"), \
+             mock.patch("assemble.SAMPLED_DIR", Path(self.temp_dir) / "corpus" / "sampled"), \
+             mock.patch("assemble.METRICS_DIR", Path(self.temp_dir) / "corpus" / "metrics"), \
+             mock.patch("assemble.ASSETS_DIR", self.assets_dir), \
+             mock.patch("assemble.validate_mod.validate_asset_data", return_value=([], [])), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+
+            # 删除已有的 craft-card
+            craft_file = self.assets_dir / "testbook-craft-card.json"
+            if craft_file.exists():
+                craft_file.unlink()
+
+            exit_code = assemble.main(["testbook", "--genre", "fantasy", "--skip-craft"])
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((self.assets_dir / "testbook-voice-card.json").exists())
+            self.assertFalse(craft_file.exists())
 
 
 if __name__ == "__main__":

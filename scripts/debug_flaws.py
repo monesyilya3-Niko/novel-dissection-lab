@@ -11,6 +11,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT_DIR), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 AD_PATTERNS = ("防盗章", "点击下一页继续阅读", "请到.*首发", "本章未完", "小说网.*免费阅读")
 
 

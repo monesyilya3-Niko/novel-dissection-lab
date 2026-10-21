@@ -11,6 +11,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT_DIR), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 SUSPICIOUS_TITLE_PATTERNS = (
     "第一天",
     "第二天",

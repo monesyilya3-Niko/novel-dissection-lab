@@ -27,12 +27,22 @@ import sys
 from datetime import date
 from pathlib import Path
 
-import chapter_loader
-import compliance as comp
-import normalize as norm
-import validate as validate_mod
-
 ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+try:
+    from scripts import chapter_loader
+    from scripts import compliance as comp
+    from scripts import normalize as norm
+    from scripts import validate as validate_mod
+except ImportError:
+    import chapter_loader
+    import compliance as comp
+    import normalize as norm
+    import validate as validate_mod
 ASSETS_DIR = ROOT / "assets"
 RAW_DIR = ROOT / "corpus" / "raw"
 SAMPLED_DIR = ROOT / "corpus" / "sampled"
@@ -336,12 +346,12 @@ def _read_pass(name: str, pass_file: str) -> dict:
     return load_json(p)
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="组装 AI 产出的 pass1-5 JSON 为可入库资产")
     ap.add_argument("name", help="书名（corpus/raw/ 下的目录名，如 chireng_chosen）")
     ap.add_argument("--genre", default="unknown", help="题材 id，如 campus-redemption")
     ap.add_argument("--skip-craft", action="store_true", help="跳过 craft-card（pass5 缺失时用）")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     name = args.name
 
@@ -448,6 +458,7 @@ def main():
     print("\n组装完成：四类资产全部通过 schema 校验并已落盘。")
     print("下一步（可选）：")
     print(f"  novel.py 合规 assets/{name}-voice-card.json corpus/<书>.txt")
+    return 0
 
 
 if __name__ == "__main__":

@@ -548,6 +548,13 @@ class TestTestModelAndCLI(unittest.TestCase):
         code = llm_client.main([])
         self.assertEqual(code, 2)
 
+    def test_main_cli_help(self):
+        buf = io.StringIO()
+        with mock.patch("sys.stdout", buf):
+            code = llm_client.main(["--help"])
+        self.assertEqual(code, 0)
+        self.assertIn("用法", buf.getvalue())
+
     @mock.patch.object(llm_client, "test_model")
     def test_main_cli_success(self, mock_test):
         mock_test.return_value = {"ok": True, "reply": "正常"}

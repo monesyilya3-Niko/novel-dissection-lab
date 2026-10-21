@@ -700,6 +700,66 @@ class TestAncillaryInspectionScripts(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("荒岛记", out.getvalue())
 
+    def test_debug_flaws_missing_db_and_path_string(self):
+        """测试 debug_flaws 处理不存在数据库与字符串路径。"""
+        missing_db = self.tmp_path / "nonexistent_flaws.db"
+        err = io.StringIO()
+        with mock.patch("sys.stderr", err):
+            code = cdf.main(["--db", str(missing_db)])
+        self.assertEqual(code, 0)
+        self.assertIn("语料库数据库不存在", err.getvalue())
+
+        # quiet mode
+        code_quiet = cdf.main(["--db", str(missing_db), "--quiet"])
+        self.assertEqual(code_quiet, 0)
+
+    def test_inspect_issue_books_edge_cases(self):
+        """测试 inspect_issue_books 未匹配书名与文件缺失分支。"""
+        db_file, conn = self._create_sample_db()
+        try:
+            # 1. 查不存在的书
+            res_none = cib.inspect_book_chapter_patterns(conn, title="未入库的书")
+            self.assertIsNone(res_none)
+
+            # 2. 查物理文件缺失的书
+            conn.execute("INSERT INTO essence_books VALUES (2, '孤儿书', '/path/to/missing.txt')")
+            conn.commit()
+            res_missing = cib.inspect_book_chapter_patterns(conn, title="孤儿书")
+            self.assertIsNone(res_missing)
+        finally:
+            conn.close()
+
+        # 3. CLI 查不存在书的提示
+        err = io.StringIO()
+        with mock.patch("sys.stderr", err):
+            code = cib.main(["--db", str(db_file), "--title", "未入库的书"])
+        self.assertEqual(code, 0)
+        self.assertIn("未找到书籍或物理文件不可读", err.getvalue())
+
+    def test_scan_crawler_artifacts_missing_files_and_quiet(self):
+        """测试 scan_all_books_crawler_artifacts 处理文件缺失书籍与 quiet 模式。"""
+        db_file = self.tmp_path / "scan_missing.db"
+        conn = sqlite3.connect(str(db_file))
+        conn.row_factory = sqlite3.Row
+        try:
+            conn.execute(
+                "CREATE TABLE essence_books ("
+                "id INTEGER PRIMARY KEY, book_id TEXT, title TEXT, genre TEXT, "
+                "total_chapters INTEGER, total_chars INTEGER, source_path TEXT)"
+            )
+            conn.execute("INSERT INTO essence_books VALUES (1, 'b1', '丢件书', '科幻', 10, 1000, '/nonexistent.txt')")
+            conn.commit()
+
+            results = csa.scan_crawler_artifacts(conn)
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0]["reason"], "文件不存在")
+        finally:
+            conn.close()
+
+        # CLI quiet 模式
+        code = csa.main(["--db", str(db_file), "--quiet"])
+        self.assertEqual(code, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

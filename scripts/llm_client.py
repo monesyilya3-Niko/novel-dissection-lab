@@ -550,6 +550,9 @@ def main(argv: list[str] | None = None) -> int:
     if not argv:
         print("用法: python llm_client.py <model_id>   # 连通性测试")
         return 2
+    if argv[0] in ("-h", "--help"):
+        print("用法: python llm_client.py <model_id>   # 连通性测试")
+        return 0
     _result = test_model(argv[0])
     print(json.dumps(_result, ensure_ascii=False, indent=2))
     return 0 if _result.get("ok") else 1
