@@ -438,5 +438,29 @@ class TestPipelineMainCLI(unittest.TestCase):
             self.assertTrue(metrics.is_file())
 
 
+    def test_main_with_explicit_argv_and_dry_run(self):
+        book = self._make_book("valid_argv.txt", chapters=6)
+        argv = [str(book), "--genre", "urban", "--dry-run"]
+        with mock.patch.object(pipeline_mod, "ROOT", self.root_dir), \
+             mock.patch.object(pipeline_mod, "ASSETS_DIR", self.root_dir / "assets"), \
+             mock.patch.object(pipeline_mod.llm_client, "any_model_configured", return_value=True):
+            rc = pipeline_mod.main(argv)
+            self.assertEqual(rc, 0)
+
+    def test_main_llm_error_degradation_generates_guide_and_returns_1(self):
+        book = self._make_book("valid_err.txt", chapters=6)
+        argv = [str(book), "--genre", "urban"]
+        with mock.patch.object(pipeline_mod, "ROOT", self.root_dir), \
+             mock.patch.object(pipeline_mod, "ASSETS_DIR", self.root_dir / "assets"), \
+             mock.patch.object(pipeline_mod.llm_client, "any_model_configured", return_value=True), \
+             mock.patch.object(pipeline_mod, "run_pass", side_effect=pipeline_mod.llm_client.LLMError("模型 'test' 调用失败: 403 Forbidden")):
+            rc = pipeline_mod.main(argv)
+            self.assertEqual(rc, 1)
+            raw_dir = self.root_dir / "corpus" / "raw" / "valid_err"
+            guide = raw_dir / "AI接管任务.md"
+            self.assertTrue(guide.is_file())
+            self.assertIn("外部模型调用失败", guide.read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

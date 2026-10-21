@@ -24,7 +24,11 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts"))
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 import chapter_loader
 import llm_client
 
@@ -150,7 +154,7 @@ def run_conflict_check(novel_dir: Path, content: str) -> None:
         print(f"  [跳过] 冲突检测异常: {e}")
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="M2.2 章节生成 + 入库（资产驱动）")
     ap.add_argument("--prompt", required=True, help="注入的写作 prompt（inject.py 产物）")
     ap.add_argument("--chapter", type=int, required=True, help="章节号（≥1）")
@@ -163,7 +167,7 @@ def main():
     ap.add_argument("--target-score", type=int, default=90, help="一致性目标分（默认 90，未达标自动改写）")
     ap.add_argument("--quality-target", type=int, default=None, help="章节质量目标分（可选；缺省时按题材包 quality_thresholds 回退，再回退 75）")
     ap.add_argument("--dry-run", action="store_true", help="只打印将调用的内容，不调 LLM")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     # ── 章号下限校验（2026-10-13 审计修复 CLI-15）──────────────────────
     # 原实现无下限：--chapter -1 会静默写出 chapters/arc-0/chapter--01.txt
@@ -237,7 +241,7 @@ def main():
     print(f"[1/4] 准备: {prompt_path.name} → 第{args.chapter}章 ({args.words}字)")
     if args.dry_run:
         print(f"  [dry-run] system {len(system)} 字, user {len(user)} 字，跳过 LLM")
-        return
+        return 0
 
     # 2026-09-01 起：无外部模型模式——生成本地 AI 接管写作任务清单后优雅退出，
     # 正文生成与改写由 WorkBuddy 内置智能在会话内完成（与 pipeline.py 拆书降级对称）。
@@ -408,6 +412,7 @@ def main():
         print(f"  [跳过] 全书 QA 异常: {e}")
 
     print(f"\n✅ 完成: 第{args.chapter}章已写入 {ch_file}")
+    return 0
 
 
 if __name__ == "__main__":

@@ -245,7 +245,7 @@ class TestWriteMainLLMExecutionAndRewrite(unittest.TestCase):
              mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
 
             exit_code = write.main()
-            self.assertIsNone(exit_code)  # 成功完成隐式返回 None
+            self.assertEqual(exit_code, 0)  # 成功完成显式返回 0
             out = mock_out.getvalue()
             self.assertIn("未达标，携带扣分明细改写（第2轮）", out)
             self.assertIn("双维度达标，无需改写", out)
@@ -289,6 +289,31 @@ class TestWriteMainLLMExecutionAndRewrite(unittest.TestCase):
             first_user_prompt = mock_chat.call_args_list[0][1]["user"]
             self.assertIn("【已有大纲】", first_user_prompt)
             self.assertIn("第1章大纲：宗门大比开始", first_user_prompt)
+
+
+    def test_main_with_explicit_argv_and_dry_run(self):
+        argv = [
+            "--prompt", str(self.prompt_file),
+            "--chapter", "1",
+            "--task", "测试任务",
+            "--novel-dir", str(self.novel_dir),
+            "--dry-run",
+        ]
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            code = write.main(argv)
+            self.assertEqual(code, 0)
+            self.assertIn("[dry-run]", mock_out.getvalue())
+
+    def test_main_oversized_chapter_number_error(self):
+        argv = [
+            "--prompt", str(self.prompt_file),
+            "--chapter", "100001",
+            "--task", "测试任务",
+            "--novel-dir", str(self.novel_dir),
+        ]
+        with self.assertRaises(SystemExit) as cm:
+            write.main(argv)
+        self.assertIn("章节号过大", str(cm.exception))
 
 
 if __name__ == "__main__":

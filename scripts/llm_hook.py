@@ -31,7 +31,15 @@ LLM 因果合理性二次判定 Hook — 纯标准库，零第三方依赖
 """
 import json
 import re
+import sys
 from collections.abc import Callable
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 # 仅 import 项目内 `llm_client`（本身是纯标准库 urllib 实现，不违反铁律三）
 import llm_client

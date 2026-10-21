@@ -68,5 +68,46 @@ class DirectRunConventionTest(unittest.TestCase):
         )
 
 
+    def test_every_script_module_imports_cleanly(self):
+        scripts_dir = TESTS_DIR.parent / "scripts"
+        targets = [f for f in sorted(scripts_dir.glob("*.py"))
+                   if not f.name.startswith("__")]
+        env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+        tmpdir = tempfile.gettempdir()
+
+        def _check_script(f: Path) -> str | None:
+            code = (
+                "import sys; "
+                f"sys.path.insert(0, {str(TESTS_DIR.parent)!r}); "
+                f"from scripts import {f.stem}"
+            )
+            try:
+                r = subprocess.run(
+                    [sys.executable, "-c", code],
+                    capture_output=True, text=True, timeout=60,
+                    cwd=tmpdir, env=env,
+                )
+            except Exception as exc:
+                return f"{f.name}: subprocess failed: {type(exc).__name__}: {exc}"[:160]
+            err = r.stderr or ""
+            if r.returncode != 0 or "ModuleNotFoundError" in err or "ImportError" in err:
+                last = err.strip().splitlines()
+                return (f"{f.name}: exit={r.returncode} :: "
+                        f"{(last[-1] if last else '')[:120]}")
+            return None
+
+        failures = []
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            for bad in pool.map(_check_script, targets):
+                if bad:
+                    failures.append(bad)
+        failures.sort()
+        self.assertEqual(
+            failures, [],
+            "以下 scripts 脚本在独立子进程导入时失败（存在兄弟模块导入缺陷）：\n"
+            + "\n".join(failures),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

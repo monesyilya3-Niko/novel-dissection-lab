@@ -12,7 +12,14 @@
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 import chapter_loader
 

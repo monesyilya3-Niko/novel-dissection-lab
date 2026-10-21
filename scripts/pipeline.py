@@ -27,6 +27,12 @@ import re
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 import chapter_loader
 import compliance as compliance_mod
 import llm_client
@@ -35,7 +41,6 @@ import normalize as normalize_mod
 import sampler
 import validate as validate_mod
 
-ROOT = Path(__file__).resolve().parent.parent
 PROMPTS_DIR = ROOT / "prompts"
 ASSETS_DIR = ROOT / "assets"
 # 注：pipeline **不写** reports/（2026-10-13 审计修复 CLI-16）——
@@ -328,13 +333,13 @@ def assemble_voice_card_v2(name: str, genre: str, manifest: dict,
 
 # --------------------------------------------------------------------------
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="拆书流水线（采样→量化→四遍扫描→资产→校验→合规）")
     ap.add_argument("book", help="整本小说 TXT")
     ap.add_argument("--genre", default="unknown", help="题材 id，如 campus-redemption")
     ap.add_argument("--model-id", help="显式指定模型，缺省按任务路由")
     ap.add_argument("--dry-run", action="store_true", help="只走采样+量化+Pass 准备，不调 LLM")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     src = Path(args.book)
     if not src.exists():
@@ -696,6 +701,7 @@ def main():
     _run_distill_hook(args.genre)
 
     print("\n完成。下一步: 人工校验资产（M1.6），或提供更多同题材书跑聚合。")
+    return 0
 
 
 def _run_distill_hook(genre: str) -> None:
