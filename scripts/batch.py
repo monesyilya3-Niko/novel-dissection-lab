@@ -14,18 +14,33 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts"))
-import chapter_loader
-import compliance as compliance_mod
-import metrics as metrics_mod
-import normalize as norm
-import pipeline
-import sampler
-import validate as validate_mod
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+try:
+    from scripts import chapter_loader, pipeline, sampler
+    from scripts import compliance as compliance_mod
+    from scripts import metrics as metrics_mod
+    from scripts import normalize as norm
+    from scripts import validate as validate_mod
+except ImportError:
+    import chapter_loader
+    import compliance as compliance_mod
+    import metrics as metrics_mod
+    import normalize as norm
+    import pipeline
+    import sampler
+    import validate as validate_mod
 
 
-def run_book(src: Path, genre: str, model_id: str | None, dry_run: bool) -> dict:
+def run_book(src: Path | str, genre: str, model_id: str | None = None, dry_run: bool = False) -> dict | None:
     """单本拆书（复用 pipeline 逻辑），返回 (voice_card, struct_obs, comm_obs)。"""
+    src = Path(src)
+    if not src.is_file():
+        print(f"  ✗ 文件不存在（{src}），跳过")
+        return None
     name = src.stem
     print(f"\n{'='*56}\n▶ 拆书: {name}（{genre}）\n{'='*56}")
 
@@ -116,12 +131,16 @@ def run_book(src: Path, genre: str, model_id: str | None, dry_run: bool) -> dict
     return {"voice": vc, "structure": so, "commercial": co, "name": name}
 
 
-def generate_reports(results: list, out_dir: Path) -> None:
+def generate_reports(results: list, out_dir: Path | str) -> None:
     """为每本生成拆书报告。"""
-    import report as report_mod
+    try:
+        from scripts import report as report_mod
+    except ImportError:
+        import report as report_mod
+    out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     for r in results:
-        if not r:
+        if not r or not isinstance(r, dict):
             continue
         md = report_mod.build_report(r["voice"], r["structure"], r["commercial"], r["name"])
         p = out_dir / f"{r['name']}-拆书报告.md"
@@ -129,14 +148,14 @@ def generate_reports(results: list, out_dir: Path) -> None:
         print(f"  ✓ 报告: {p.name}")
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="批量拆书：目录多本 TXT → 逐本拆解")
     ap.add_argument("corpus", help="包含多本 TXT 的目录")
     ap.add_argument("--genre", required=True, help="题材 id，如 campus-redemption")
     ap.add_argument("--model-id", help="显式指定模型")
     ap.add_argument("--dry-run", action="store_true", help="只走采样+量化，不调 LLM")
     ap.add_argument("--report", action="store_true", help="每本生成拆书报告")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     corpus_dir = Path(args.corpus)
     if not corpus_dir.is_dir():
@@ -162,6 +181,7 @@ def main():
         print("→ 已满足 Pass5 聚合条件（≥3 本），可运行 pass5_aggregate 生成题材包")
     elif len(results) > 0:
         print(f"→ 还需 {3 - len(results)} 本即可跑 Pass5 聚合题材包")
+    return 0
 
 
 if __name__ == "__main__":

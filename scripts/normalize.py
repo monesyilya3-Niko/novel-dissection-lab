@@ -20,6 +20,8 @@ from pathlib import Path
 
 def first(d: dict, *keys):
     """按多个候选键取第一个非空值。支持嵌套：键的值若是 dict，递归取第一个非空叶子。"""
+    if not isinstance(d, dict):
+        return None
     for k in keys:
         if k in d and d[k] not in (None, "", [], {}):
             v = d[k]
@@ -160,7 +162,8 @@ PASS2_KEYS = {
 
 def _role_for(name: str, spec: dict, position: int = 99) -> str:
     """判断角色身份：优先 spec 声明 → 名字关键词 → 位置兜底（第一个=主角，第二个=女主）。"""
-    declared = as_str(spec.get("角色") or spec.get("role") or "")
+    spec_dict = spec if isinstance(spec, dict) else {}
+    declared = as_str(spec_dict.get("角色") or spec_dict.get("role") or "")
     if declared:
         for r in ("主角", "女主", "男主", "反派", "导师", "配角"):
             if r in declared:
@@ -188,6 +191,8 @@ def _extract_signature(spec: dict) -> dict:
     - tics: 说话特征 / 口头禅 / verbal_tics
     - key_rules: key_rules / 行为规则（新 pass2 格式，合并到 refusal_pattern）
     """
+    if not isinstance(spec, dict):
+        return {}
     refusal = as_str(first(spec, *PASS2_KEYS["refusal"]) or "")
     # 如果 refusal 为空但有 key_rules，用 key_rules 的第一条作为拒绝方式补充
     key_rules = first(spec, *PASS2_KEYS["key_rules"])
@@ -219,6 +224,8 @@ def _extract_signature(spec: dict) -> dict:
 
 def _extract_arc(spec: dict) -> dict:
     """从角色 spec 中提取成长弧光。"""
+    if not isinstance(spec, dict):
+        return {}
     arc = {
         "start_state": as_str(first(spec, *PASS2_KEYS["start"]) or ""),
         "end_state": as_str(first(spec, *PASS2_KEYS["end"]) or ""),
@@ -248,7 +255,8 @@ def normalize_pass2(pass2: dict) -> list:
             if not isinstance(item, dict):
                 continue
             # 兼容 speech_signature / speech_style / 直接字段
-            spec = item.get("speech_signature") or item.get("speech_style") or item
+            raw_sig = item.get("speech_signature") or item.get("speech_style")
+            spec = raw_sig if isinstance(raw_sig, dict) else item
             name = item.get("角色") or item.get("name") or item.get("角色名") or ""
             if not name:
                 continue
@@ -282,7 +290,8 @@ def normalize_pass2(pass2: dict) -> list:
         for item in raw:
             if not isinstance(item, dict):
                 continue
-            spec = item.get("speech_signature", item)
+            raw_sig = item.get("speech_signature") or item.get("speech_style")
+            spec = raw_sig if isinstance(raw_sig, dict) else item
             name = item.get("name") or item.get("角色名") or item.get("角色") or ""
             if not name:
                 continue
