@@ -129,11 +129,11 @@ def scan_asset(asset: dict, ngram: set) -> tuple:
     return errors, warns
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="拆书输出版权合规扫描")
     ap.add_argument("asset", help="资产 JSON（voice-card / genre-pack / trope-library）")
     ap.add_argument("book", help="原文整本 TXT（用于 12 字连续匹配检测）")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     asset = load_json(Path(args.asset))
     book_text = chapter_loader.read_text_file(Path(args.book))
@@ -150,12 +150,12 @@ def main():
 
     if errors:
         print("\n结论: REJECT（含版权风险，禁止入库）")
-        sys.exit(1)
+        return 1
     if warns:
         print("\n结论: WARN（无硬错误，建议人工复核后入库）")
-        sys.exit(2)
+        return 2
     print("\n结论: PASS（合规）")
-    sys.exit(0)
+    return 0
 
 
 if __name__ == "__main__":

@@ -736,12 +736,12 @@ def format_truncation_hint(total: int, rendered: int) -> str:
     return f"⚠ 共 {total} 条，仅显示前 {rendered} 条"
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="全书内容质检")
     ap.add_argument("chapter_dir", help="章节目录或单章txt文件路径")
     ap.add_argument("--voice", help="voice-card JSON（可选，用于风格一致性检查）")
     ap.add_argument("--json", action="store_true", help="输出JSON格式")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     
     result = book_quality_check(args.chapter_dir, args.voice)
 
@@ -751,7 +751,7 @@ def main():
             print(json.dumps(result, ensure_ascii=False, indent=2))
         else:
             print(f"[X] {result['error']}")
-        sys.exit(1)
+        return 1
 
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -782,7 +782,7 @@ def main():
                           if result.get("issues_truncated") else "")
             print(f"  {hint}{limit_note}")
     
-    sys.exit(0 if result['verdict'] == "PASS" else 1)
+    return 0 if result['verdict'] == "PASS" else 1
 
 
 if __name__ == "__main__":

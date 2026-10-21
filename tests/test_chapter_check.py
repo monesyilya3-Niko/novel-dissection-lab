@@ -385,9 +385,9 @@ class TestChapterCheckCLI(unittest.TestCase):
         f = io.StringIO()
         with patch("sys.stderr", f):
             with patch("sys.argv", ["chapter_check.py", str(self._tmp / "nonexistent.txt")]):
-                with self.assertRaises(SystemExit) as cm:
-                    cc.main()
-                self.assertIn("文件不存在", str(cm.exception))
+                exit_code = cc.main()
+                self.assertEqual(exit_code, 1)
+                self.assertIn("文件不存在", f.getvalue())
 
     def test_cli_text_and_json_output(self):
         # 准备一个标准章节文件
@@ -404,11 +404,8 @@ class TestChapterCheckCLI(unittest.TestCase):
         f_out = io.StringIO()
         with patch("sys.stdout", f_out):
             with patch("sys.argv", ["chapter_check.py", str(ch_file)]):
-                try:
-                    cc.main()
-                except SystemExit as e:
-                    # 退出码取决于分数 (PASS 为 0，WARN/FAIL 为 1)
-                    self.assertIn(e.code, (0, 1))
+                exit_code = cc.main()
+                self.assertIn(exit_code, (0, 1))
         text_res = f_out.getvalue()
         self.assertIn("章节质量检查: test_chapter.txt", text_res)
         self.assertIn("总分:", text_res)
@@ -417,14 +414,22 @@ class TestChapterCheckCLI(unittest.TestCase):
         f_json = io.StringIO()
         with patch("sys.stdout", f_json):
             with patch("sys.argv", ["chapter_check.py", str(ch_file), "--json"]):
-                try:
-                    cc.main()
-                except SystemExit:
-                    pass
+                exit_code = cc.main()
+                self.assertIn(exit_code, (0, 1))
         parsed = json.loads(f_json.getvalue())
         self.assertIn("score", parsed)
         self.assertIn("verdict", parsed)
         self.assertIn("details", parsed)
+
+    def test_cli_with_explicit_argv(self):
+        ch_file = self._tmp / "explicit_chapter.txt"
+        ch_file.write_text("“开门！”他大步向前，心跳如鼓。夜色深沉。", encoding="utf-8")
+        f_json = io.StringIO()
+        with patch("sys.stdout", f_json):
+            exit_code = cc.main([str(ch_file), "--json"])
+            self.assertIn(exit_code, (0, 1))
+        parsed = json.loads(f_json.getvalue())
+        self.assertIn("score", parsed)
 
 
 if __name__ == "__main__":

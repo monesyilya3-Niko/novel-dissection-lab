@@ -463,18 +463,16 @@ class TestBookQualityCheckAndMain(unittest.TestCase):
     def test_main_cli_error_flow(self):
         # CLI 遇到不存在的路径时返回非零退出码
         with mock.patch("sys.argv", ["book_quality.py", "non_existent_path"]), \
-             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out, \
-             self.assertRaises(SystemExit) as cm:
-            book_quality.main()
-        self.assertEqual(cm.exception.code, 1)
+             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            exit_code = book_quality.main()
+        self.assertEqual(exit_code, 1)
         self.assertIn("[X]", mock_out.getvalue())
 
         # CLI 带 --json 遇到错误时输出 JSON 并返回非零
         with mock.patch("sys.argv", ["book_quality.py", "non_existent_path", "--json"]), \
-             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out, \
-             self.assertRaises(SystemExit) as cm:
-            book_quality.main()
-        self.assertEqual(cm.exception.code, 1)
+             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            exit_code = book_quality.main()
+        self.assertEqual(exit_code, 1)
         data = json.loads(mock_out.getvalue())
         self.assertIn("error", data)
 
@@ -484,23 +482,31 @@ class TestBookQualityCheckAndMain(unittest.TestCase):
 
         # 1. 纯文本模式运行且通过
         with mock.patch("sys.argv", ["book_quality.py", str(self.temp_dir)]), \
-             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out, \
-             self.assertRaises(SystemExit) as cm:
-            book_quality.main()
-        self.assertEqual(cm.exception.code, 0)
+             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            exit_code = book_quality.main()
+        self.assertEqual(exit_code, 0)
         out = mock_out.getvalue()
         self.assertIn("全书内容质检", out)
         self.assertIn("判定: PASS", out)
 
         # 2. JSON 模式运行
         with mock.patch("sys.argv", ["book_quality.py", str(self.temp_dir), "--json"]), \
-             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out, \
-             self.assertRaises(SystemExit) as cm:
-            book_quality.main()
-        self.assertEqual(cm.exception.code, 0)
+             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            exit_code = book_quality.main()
+        self.assertEqual(exit_code, 0)
         data = json.loads(mock_out.getvalue())
         self.assertEqual(data["verdict"], "PASS")
         self.assertEqual(data["total_chapters"], 1)
+
+    def test_main_cli_with_explicit_argv(self):
+        ch1 = Path(self.temp_dir) / "chapter-001.txt"
+        if not ch1.exists():
+            ch1.write_text("清风徐来，水波不兴。这是完美纯净的一章作品。", encoding="utf-8")
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            exit_code = book_quality.main([str(self.temp_dir), "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(mock_out.getvalue())
+        self.assertEqual(data["verdict"], "PASS")
 
 
 if __name__ == "__main__":

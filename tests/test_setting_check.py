@@ -253,9 +253,8 @@ class TestCheckSettingAndCLI(unittest.TestCase):
         f = io.StringIO()
         with patch("sys.stderr", f):
             with patch("sys.argv", ["setting_check.py", str(self._tmp / "empty_dir")]):
-                with self.assertRaises(SystemExit) as cm:
-                    sc.main()
-                self.assertEqual(cm.exception.code, 1)
+                exit_code = sc.main()
+                self.assertEqual(exit_code, 1)
         self.assertIn("未找到章节文件", f.getvalue())
 
     def test_cli_execution_with_issues_and_json(self):
@@ -274,9 +273,8 @@ class TestCheckSettingAndCLI(unittest.TestCase):
         f_txt = io.StringIO()
         with patch("sys.stdout", f_txt):
             with patch("sys.argv", ["setting_check.py", str(self._chapters_dir)]):
-                with self.assertRaises(SystemExit) as cm:
-                    sc.main()
-                self.assertEqual(cm.exception.code, 1)
+                exit_code = sc.main()
+                self.assertEqual(exit_code, 1)
         out_txt = f_txt.getvalue()
         self.assertIn("设定一致性检测:", out_txt)
         self.assertIn("Ch1:", out_txt)
@@ -285,13 +283,23 @@ class TestCheckSettingAndCLI(unittest.TestCase):
         f_json = io.StringIO()
         with patch("sys.stdout", f_json):
             with patch("sys.argv", ["setting_check.py", str(self._chapters_dir), "--json"]):
-                with self.assertRaises(SystemExit) as cm:
-                    sc.main()
-                self.assertEqual(cm.exception.code, 1)
+                exit_code = sc.main()
+                self.assertEqual(exit_code, 1)
         parsed = json.loads(f_json.getvalue())
         self.assertEqual(parsed["total_chapters"], 1)
         self.assertGreaterEqual(parsed["total_issues"], 1)
         self.assertIn("coverage", parsed)
+
+    def test_cli_with_explicit_argv(self):
+        ch1 = self._chapters_dir / "chapter-001.txt"
+        if not ch1.exists():
+            ch1.write_text("清风徐来，水波不兴。", encoding="utf-8")
+        f_json = io.StringIO()
+        with patch("sys.stdout", f_json):
+            exit_code = sc.main([str(self._chapters_dir), "--json"])
+            self.assertIn(exit_code, (0, 1))
+        parsed = json.loads(f_json.getvalue())
+        self.assertEqual(parsed["total_chapters"], 1)
 
 
 if __name__ == "__main__":

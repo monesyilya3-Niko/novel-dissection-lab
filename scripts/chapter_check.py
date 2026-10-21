@@ -692,16 +692,17 @@ def chapter_check(text: str, genre_pack: dict = None) -> dict:
     }
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="章节质量自检（100 分制）")
     ap.add_argument("chapter", help="章节文件路径")
     ap.add_argument("--genre-pack", help="题材包 JSON（可选，用于附加检查）")
     ap.add_argument("--json", action="store_true", help="输出 JSON 格式")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     ch_path = Path(args.chapter)
     if not ch_path.exists():
-        sys.exit(f"文件不存在: {ch_path}")
+        print(f"文件不存在: {ch_path}", file=sys.stderr)
+        return 1
 
     text = chapter_loader.read_text_file(ch_path)
     gp = None
@@ -725,7 +726,7 @@ def main():
             for i in result['issues']:
                 print(f"  ⚠ {i}")
 
-    sys.exit(0 if result['verdict'] == "PASS" else 1)
+    return 0 if result['verdict'] == "PASS" else 1
 
 
 if __name__ == "__main__":

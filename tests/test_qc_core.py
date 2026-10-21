@@ -287,10 +287,9 @@ class TestQCReportSerializationAndCLI(unittest.TestCase):
         reports_dir = Path(self.temp_dir) / "reports" / "qc"
         with mock.patch("qc.ROOT", Path(self.temp_dir)), \
              mock.patch("sys.argv", ["qc.py", str(self.chapter_dir)]), \
-             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out, \
-             self.assertRaises(SystemExit) as cm:
-            qc.main()
-        self.assertEqual(cm.exception.code, 0)
+             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            exit_code = qc.main()
+        self.assertEqual(exit_code, 0)
         self.assertIn("QC 质检报告", mock_out.getvalue())
         # 验证落盘文件生成
         self.assertTrue((reports_dir / "chapters-qc.json").exists())
@@ -299,12 +298,18 @@ class TestQCReportSerializationAndCLI(unittest.TestCase):
         # 2. 带 --no-save 与 --json
         with mock.patch("qc.ROOT", Path(self.temp_dir)), \
              mock.patch("sys.argv", ["qc.py", str(self.chapter_dir), "--no-save", "--json"]), \
-             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out_json, \
-             self.assertRaises(SystemExit) as cm:
-            qc.main()
-        self.assertEqual(cm.exception.code, 0)
+             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out_json:
+            exit_code = qc.main()
+        self.assertEqual(exit_code, 0)
         out_json = json.loads(mock_out_json.getvalue())
         self.assertIn("total_score", out_json)
+
+    def test_main_cli_execution_with_explicit_argv(self):
+        with mock.patch("qc.ROOT", Path(self.temp_dir)), \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            exit_code = qc.main([str(self.chapter_dir), "--no-save"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("QC 质检报告", mock_out.getvalue())
 
 
 if __name__ == "__main__":

@@ -228,8 +228,10 @@ class TestTruncationHintInCli(unittest.TestCase):
         sys.argv = argv
         try:
             with contextlib.redirect_stdout(buf):
-                with self.assertRaises(SystemExit) as _ctx:
+                try:
                     module.main()
+                except SystemExit:
+                    pass
         finally:
             sys.argv = old_argv
         return buf.getvalue()

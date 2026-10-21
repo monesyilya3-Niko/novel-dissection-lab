@@ -245,9 +245,8 @@ class TestComplianceMainCli(unittest.TestCase):
 
         test_args = ["compliance.py", str(asset_file), str(self.book_file)]
         with mock.patch("sys.argv", test_args), mock.patch("sys.stdout", new_callable=io.StringIO):
-            with self.assertRaises(SystemExit) as cm:
-                compliance.main()
-            self.assertEqual(cm.exception.code, 0)
+            exit_code = compliance.main()
+            self.assertEqual(exit_code, 0)
 
     def test_main_cli_reject_exit_1(self):
         asset_file = Path(self.temp_dir) / "bad.json"
@@ -255,9 +254,8 @@ class TestComplianceMainCli(unittest.TestCase):
 
         test_args = ["compliance.py", str(asset_file), str(self.book_file)]
         with mock.patch("sys.argv", test_args), mock.patch("sys.stdout", new_callable=io.StringIO):
-            with self.assertRaises(SystemExit) as cm:
-                compliance.main()
-            self.assertEqual(cm.exception.code, 1)
+            exit_code = compliance.main()
+            self.assertEqual(exit_code, 1)
 
     def test_main_cli_warn_exit_2(self):
         long_q = "「这是一段超过二十个字的长篇摘录，用于检验合规引擎是否能够敏锐触发人工复核警告提示」"
@@ -266,9 +264,15 @@ class TestComplianceMainCli(unittest.TestCase):
 
         test_args = ["compliance.py", str(asset_file), str(self.book_file)]
         with mock.patch("sys.argv", test_args), mock.patch("sys.stdout", new_callable=io.StringIO):
-            with self.assertRaises(SystemExit) as cm:
-                compliance.main()
-            self.assertEqual(cm.exception.code, 2)
+            exit_code = compliance.main()
+            self.assertEqual(exit_code, 2)
+
+    def test_main_cli_with_explicit_argv(self):
+        asset_file = Path(self.temp_dir) / "clean_explicit.json"
+        asset_file.write_text(json.dumps({"analysis": "显式传参解析"}), encoding="utf-8")
+        with mock.patch("sys.stdout", new_callable=io.StringIO):
+            exit_code = compliance.main([str(asset_file), str(self.book_file)])
+            self.assertEqual(exit_code, 0)
 
 
 if __name__ == "__main__":
