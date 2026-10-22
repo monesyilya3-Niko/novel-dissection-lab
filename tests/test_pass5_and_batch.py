@@ -243,10 +243,21 @@ class TestPass5AggregateMainCLI(unittest.TestCase):
         with mock.patch("sys.argv", test_argv), \
              mock.patch.object(p5_mod, "ASSETS", self.assets_dir), \
              mock.patch("sys.stdout", new_callable=io.StringIO) as fake_out:
-            p5_mod.main()
+            code = p5_mod.main()
+            self.assertEqual(code, 0)
             output = fake_out.getvalue()
             self.assertIn("[dry-run] 跳过 LLM 聚合", output)
             self.assertIn("聚合样本: 1 本", output)
+
+    def test_main_with_explicit_argv(self):
+        (self.assets_dir / "explicit_book-voice-card.json").write_text(
+            json.dumps({"meta": {"genre": "urban"}}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        with mock.patch.object(p5_mod, "ASSETS", self.assets_dir), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            code = p5_mod.main(["--genre", "urban", "--dry-run"])
+            self.assertEqual(code, 0)
 
     def test_main_verbatim_rejection(self):
         (self.assets_dir / "book1-voice-card.json").write_text(

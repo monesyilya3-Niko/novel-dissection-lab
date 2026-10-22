@@ -265,7 +265,7 @@ class TestBatch100BooksDatabaseOperations(unittest.TestCase):
         with patch.object(b100, "WORK_LOG_FILE", dummy_log):
             f = io.StringIO()
             with patch("sys.stdout", f):
-                ret = req.main()
+                ret = req.main([])
 
             self.assertEqual(ret, 0)
             output = f.getvalue()
@@ -277,6 +277,17 @@ class TestBatch100BooksDatabaseOperations(unittest.TestCase):
 
             chains = self.conn.execute("SELECT count(*) FROM essence_chains WHERE book_id = 'book_refresh_01'").fetchone()[0]
             self.assertEqual(chains, 1)
+
+    def test_batch_100_books_main_test_one(self):
+        dummy_log = self._tmp / "WORK_LOG_TEST_BATCH.md"
+        with patch.object(b100, "WORK_LOG_FILE", dummy_log), \
+             patch.object(b100, "init_db_connection", return_value=self.conn), \
+             patch.object(b100, "check_book_exists", return_value=True):
+            f = io.StringIO()
+            with patch("sys.stdout", f):
+                ret = b100.main(["--dry-run", "--test-one"])
+            self.assertEqual(ret, 0)
+            self.assertIn("单本测试模式结束", f.getvalue())
 
 
 if __name__ == "__main__":

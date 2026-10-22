@@ -404,7 +404,7 @@ class TestAggregateScopeEnforcement(unittest.TestCase):
         mismatches = [("lotm", "xuanhuan"), ("暮冬念春", "realistic-romance")]
         rc, out = self._run_main(["--genre", "campus-redemption", "--dry-run"],
                                  books, mismatches)
-        self.assertIsNone(rc, f"不限定书目时不应阻断（返回 {rc}）")
+        self.assertIn(rc, (0, None), f"不限定书目时不应阻断（返回 {rc}）")
         self.assertIn("范围", out, "未列出范围外的异题材书（等于静默跳过）")
         self.assertIn("xuanhuan", out)
         self.assertIn("realistic-romance", out)
@@ -415,7 +415,7 @@ class TestAggregateScopeEnforcement(unittest.TestCase):
         rc, out = self._run_main(
             ["--genre", "campus-redemption", "--books", "a,b", "--dry-run"],
             books, [("lotm", "xuanhuan")])
-        self.assertIsNone(rc, "显式指定的书全部合法时不应阻断")
+        self.assertIn(rc, (0, None), "显式指定的书全部合法时不应阻断")
         self.assertIn("聚合样本: 2 本", out)
 
     def test_explicit_books_with_other_genre_fails(self):

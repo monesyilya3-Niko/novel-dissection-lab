@@ -240,7 +240,7 @@ def registry_snapshot() -> dict:
     }
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     snap = registry_snapshot()
     print(f"题材注册表（派生自磁盘 {ASSETS_DIR}）")
     print(f"  完整链题材 {len(snap['core_genres'])}: {', '.join(snap['core_genres'])}")

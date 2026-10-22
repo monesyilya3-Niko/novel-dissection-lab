@@ -368,5 +368,34 @@ class TestMetaCacheInvalidation(unittest.TestCase):
             os.environ["NOVEL_LAB_GENRE_TTL"] = "0"
 
 
+class TestGenreRegistryMain(unittest.TestCase):
+    """测试 genre_registry.main CLI 入口契约。"""
+
+    def test_main_cli_success(self):
+        import io
+        from unittest import mock
+        f = io.StringIO()
+        with mock.patch("sys.stdout", f):
+            rc = REGISTRY.main([])
+        self.assertEqual(rc, 0)
+        self.assertIn("题材注册表", f.getvalue())
+
+    def test_main_cli_malformed_returns_one(self):
+        import io
+        from unittest import mock
+        fake_snap = {
+            "core_genres": ["urban"],
+            "prose_genres": ["urban"],
+            "prose_card_count": 1,
+            "known_genre_count": 1,
+            "malformed_prose_ids": [("bad_card", "bad_id")],
+            "duplicate_prose_genres": {},
+        }
+        with mock.patch.object(REGISTRY, "registry_snapshot", return_value=fake_snap):
+            with mock.patch("sys.stdout", new_callable=io.StringIO):
+                rc = REGISTRY.main(["--dummy"])
+        self.assertEqual(rc, 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

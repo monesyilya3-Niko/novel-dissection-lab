@@ -238,17 +238,20 @@ def _extract_arc(spec: dict) -> dict:
 def normalize_pass2(pass2: dict) -> list:
     """把角色名为键的 dict 转成 character_voices 数组。"""
     voices = []
+    if not isinstance(pass2, (dict, list)):
+        return voices
     # 兼容三种形态：
     # 1. {"唐雨": {...}, "边炀": {...}}          —— 角色名为键
     # 2. {"character_voices": [...]}             —— 已是数组
     # 3. {"name": "桑幼", "说话风格": [...], ...} —— 单角色扁平结构（模型偷懒只输出一个）
-    raw = pass2.get("character_voices", pass2)
-    # 形态 4：{"角色列表": [...], "角色声线分析": [{角色/name: ..., 拒绝方式: ...}]}
-    voice_list = None
-    for k in ("角色声线分析", "角色分析", "characters", "voices"):
-        if k in pass2 and isinstance(pass2[k], list):
-            voice_list = pass2[k]
-            break
+    # 4. [{"name": "李云", ...}]                 —— 顶层数组直接返回角色列表
+    raw = pass2.get("character_voices", pass2) if isinstance(pass2, dict) else pass2
+    voice_list = pass2 if isinstance(pass2, list) else None
+    if isinstance(pass2, dict):
+        for k in ("角色声线分析", "角色分析", "characters", "voices"):
+            if k in pass2 and isinstance(pass2[k], list):
+                voice_list = pass2[k]
+                break
     if voice_list is not None:
         # 形态 4：角色声线分析数组（每项含 角色/name + 声线字段）
         for item in voice_list:
@@ -825,11 +828,11 @@ def apply_metrics(narration: dict, dialogue: dict, metrics: dict) -> tuple:
 
 # --------------------------------------------------------------------------
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="LLM 输出归一化（中文键 → schema 结构）")
     ap.add_argument("pass2", help="pass2 原始输出 JSON")
     ap.add_argument("pass3", help="pass3 原始输出 JSON")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     p2 = json.loads(Path(args.pass2).read_text(encoding="utf-8"))
     p3 = json.loads(Path(args.pass3).read_text(encoding="utf-8"))
@@ -843,6 +846,7 @@ def main():
         "imagery": imagery,
         "banned": banned,
     }, ensure_ascii=False, indent=2)[:1200])
+    return 0
 
 
 if __name__ == "__main__":

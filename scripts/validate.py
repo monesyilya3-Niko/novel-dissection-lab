@@ -878,18 +878,20 @@ def auto_kind(d: dict, filename: str | None = None) -> str:
     return "voice-card"
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
+    ERRORS.clear()
+    WARNS.clear()
     ap = argparse.ArgumentParser(description="校验拆书输出是否符合 schema")
     ap.add_argument("asset", help="待校验的 JSON 资产文件")
     ap.add_argument("--kind", choices=list(DISPATCH), help="资产类型，缺省自动推断")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     path = Path(args.asset)
     try:
         d = json.loads(path.read_text(encoding="utf-8"))
     except Exception as e:
         print(f"JSON 解析失败: {e}")
-        sys.exit(1)
+        return 1
 
     kind = args.kind or auto_kind(d, path.name)
     DISPATCH[kind](d)
@@ -913,12 +915,12 @@ def main():
 
     if ERRORS:
         print("结论: REJECT（不符合 schema，禁止入库）")
-        sys.exit(1)
+        return 1
     if WARNS:
         print("结论: WARN（可入库，建议人工复核）")
-        sys.exit(2)
+        return 2
     print("结论: PASS")
-    sys.exit(0)
+    return 0
 
 
 if __name__ == "__main__":

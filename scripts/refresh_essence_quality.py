@@ -15,7 +15,7 @@ from gui import config, essence_service
 from scripts.batch_100_books import sync_full_work_log
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     conn = sqlite3.connect(str(config.DB_PATH))
     conn.row_factory = sqlite3.Row
     

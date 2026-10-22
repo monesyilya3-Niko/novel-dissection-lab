@@ -383,12 +383,12 @@ def sync_full_work_log(conn: sqlite3.Connection) -> None:
     WORK_LOG_FILE.write_text("".join(lines), encoding="utf-8")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="100 本主流长篇网文严选建库与精华萃取批处理工具")
     parser.add_argument("--limit", type=int, default=100, help="目标建库数量（默认 100）")
     parser.add_argument("--dry-run", action="store_true", help="演练模式（不写磁盘与数据库）")
     parser.add_argument("--test-one", action="store_true", help="单本联调测试模式")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     print("=" * 65)
     print("【100 本长篇主流网文语料库 & 精华库】严选建库批处理器")

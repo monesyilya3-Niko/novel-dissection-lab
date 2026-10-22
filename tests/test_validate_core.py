@@ -536,30 +536,27 @@ class TestValidateCLIAndDataInterface(unittest.TestCase):
         }), encoding="utf-8")
 
         with mock.patch("sys.argv", ["validate.py", str(pass_file)]), \
-             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out, \
-             self.assertRaises(SystemExit) as cm:
-            validate.main()
-        self.assertEqual(cm.exception.code, 0)
+             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            code = validate.main()
+        self.assertEqual(code, 0)
         self.assertIn("结论: PASS", mock_out.getvalue())
 
         # 2. 准备 REJECT 文件（空对象判为 voice-card 并产生硬错误）
         reject_file = Path(self.temp_dir) / "bad.json"
         reject_file.write_text("{}", encoding="utf-8")
         with mock.patch("sys.argv", ["validate.py", str(reject_file)]), \
-             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out, \
-             self.assertRaises(SystemExit) as cm:
-            validate.main()
-        self.assertEqual(cm.exception.code, 1)
+             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            code = validate.main()
+        self.assertEqual(code, 1)
         self.assertIn("结论: REJECT", mock_out.getvalue())
 
         # 3. 损坏的 JSON 格式
         corrupt_file = Path(self.temp_dir) / "corrupt.json"
         corrupt_file.write_text("{not valid json", encoding="utf-8")
         with mock.patch("sys.argv", ["validate.py", str(corrupt_file)]), \
-             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out, \
-             self.assertRaises(SystemExit) as cm:
-            validate.main()
-        self.assertEqual(cm.exception.code, 1)
+             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            code = validate.main()
+        self.assertEqual(code, 1)
         self.assertIn("JSON 解析失败", mock_out.getvalue())
 
     def test_main_cli_genre_prose_card_filename_mismatch(self):
@@ -580,11 +577,21 @@ class TestValidateCLIAndDataInterface(unittest.TestCase):
         }), encoding="utf-8")
 
         with mock.patch("sys.argv", ["validate.py", str(card_file)]), \
-             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out, \
-             self.assertRaises(SystemExit) as cm:
-            validate.main()
-        self.assertEqual(cm.exception.code, 1)
+             mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            code = validate.main()
+        self.assertEqual(code, 1)
         self.assertIn("题材隔离失败", mock_out.getvalue())
+
+    def test_main_cli_with_explicit_argv(self):
+        pass_file = Path(self.temp_dir) / "explicit_pass.json"
+        pass_file.write_text(json.dumps({
+            "meta": {"kind": "tool-library", "name": "显式测试工具库"},
+            "goldfingers": [{"name": "随身空间"}]
+        }), encoding="utf-8")
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            code = validate.main([str(pass_file)])
+        self.assertEqual(code, 0)
+        self.assertIn("结论: PASS", mock_out.getvalue())
 
 
 if __name__ == "__main__":

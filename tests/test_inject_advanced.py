@@ -389,8 +389,9 @@ class TestMainCLI(unittest.TestCase):
 
         with mock.patch("sys.argv", args), \
              mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
-            inject.main()
+            rc = inject.main()
 
+        self.assertEqual(rc, 0)
         out_text = mock_out.getvalue()
         self.assertIn("✓ 注入完成", out_text)
         self.assertIn("genre-pack: 已注入", out_text)
@@ -400,6 +401,27 @@ class TestMainCLI(unittest.TestCase):
         content = out_path.read_text(encoding="utf-8")
         self.assertIn("# 写作风格注入 · 来自《测试小说》的拆书资产", content)
         self.assertIn("测试禁语", content)
+
+    def test_main_cli_explicit_argv(self):
+        voice_path = Path(self.temp_dir) / "demo-voice-card.json"
+        voice_path.write_text(json.dumps({
+            "meta": {"source_title": "显式参数小说"},
+            "narration": {"pov": "第三人称"},
+        }, ensure_ascii=False), encoding="utf-8")
+        out_path = Path(self.temp_dir) / "explicit-prompt.md"
+
+        f = io.StringIO()
+        with mock.patch("sys.stdout", f):
+            rc = inject.main([str(voice_path), "--out", str(out_path)])
+        self.assertEqual(rc, 0)
+        self.assertTrue(out_path.exists())
+
+    def test_main_cli_missing_voice_returns_nonzero(self):
+        f = io.StringIO()
+        with mock.patch("sys.stderr", f):
+            rc = inject.main([str(Path(self.temp_dir) / "not-found.json")])
+        self.assertEqual(rc, 1)
+        self.assertIn("voice-card 文件不存在", f.getvalue())
 
 
 if __name__ == "__main__":

@@ -4,9 +4,13 @@
 目标：把 normalize（48%）、clean_verbatim（29%）的关键纯函数拉到高覆盖，
 这些是拆书资产规范化的核心逻辑，不依赖 LLM，可完全离线测试。
 """
+import io
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -145,6 +149,19 @@ class TestCleanString(unittest.TestCase):
         r = clean_string("x", set(), "p")
         self.assertIsInstance(r, tuple)
         self.assertEqual(len(r), 2)
+
+
+class TestNormalizeMainCLI(unittest.TestCase):
+    def test_main_cli_execution_with_explicit_argv(self):
+        with tempfile.TemporaryDirectory() as td:
+            p2_file = Path(td) / "pass2.json"
+            p3_file = Path(td) / "pass3.json"
+            p2_file.write_text(json.dumps([{"角色": "李云", "台词特征": "冷静"}]), encoding="utf-8")
+            p3_file.write_text(json.dumps({"叙述视角": "第三人称", "对话密度": "适中"}), encoding="utf-8")
+            with mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+                code = norm.main([str(p2_file), str(p3_file)])
+            self.assertEqual(code, 0)
+            self.assertIn("character_voices", mock_out.getvalue())
 
 
 if __name__ == "__main__":
