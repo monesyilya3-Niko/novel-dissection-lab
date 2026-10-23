@@ -27,6 +27,13 @@ import re
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+import chapter_loader
 import compliance as compliance_mod
 import llm_client
 import metrics as metrics_mod
@@ -34,10 +41,11 @@ import normalize as normalize_mod
 import sampler
 import validate as validate_mod
 
-ROOT = Path(__file__).resolve().parent.parent
 PROMPTS_DIR = ROOT / "prompts"
 ASSETS_DIR = ROOT / "assets"
-REPORTS_DIR = ROOT / "reports"
+# 注：pipeline **不写** reports/（2026-10-13 审计修复 CLI-16）——
+# 报告交付由 `novel 分析`（staging + 原子发布 + 铁律二闸门）与 `novel 拆书`
+# 命令负责。此前 pipeline 直写 reports/ 会让未经验收的次品报告留在交付目录。
 
 PASS_FILES = {
     "pass1_structure": "pass1_structure.md",
@@ -325,13 +333,13 @@ def assemble_voice_card_v2(name: str, genre: str, manifest: dict,
 
 # --------------------------------------------------------------------------
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="拆书流水线（采样→量化→四遍扫描→资产→校验→合规）")
     ap.add_argument("book", help="整本小说 TXT")
     ap.add_argument("--genre", default="unknown", help="题材 id，如 campus-redemption")
     ap.add_argument("--model-id", help="显式指定模型，缺省按任务路由")
     ap.add_argument("--dry-run", action="store_true", help="只走采样+量化+Pass 准备，不调 LLM")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     src = Path(args.book)
     if not src.exists():
@@ -340,7 +348,7 @@ def main():
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 
     # 1. 采样
-    text = src.read_text(encoding="utf-8")
+    text = chapter_loader.read_text_file(src)
     chapters = sampler.split_chapters(text)
     if len(chapters) < 5:
         sys.exit(f"章节过少（{len(chapters)}），无法有效拆解")
@@ -611,18 +619,28 @@ def main():
             cc_path.write_text(json.dumps(craft_card, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"      {cc_path.name} ({len(json.dumps(craft_card, ensure_ascii=False))//1024}K)")
 
-            # 生成笔法报告
+            # 生成笔法报告内容 + 单份字数提示（**不落盘**）
+            #
+            # ⚠️ 不再直接写 reports/（2026-10-13 审计修复 CLI-16）：
+            # 原实现把笔法分析直写 REPORTS_DIR，而「分析」命令随后会**重新生成**
+            # 一份（novel.py 用 report_craft.py 写入 staging 再原子发布）——
+            # 于是 reports/ 里先躺着一份未经验收的次品：若合计不足 10000，
+            # 「分析」的闸门正确判失败并 EXIT=1、输出明说"交付阻断（不产出
+            # 半成品）"，但用户打开 reports/ 会发现那份不达标的报告好端端
+            # 躺在交付目录里，且没有任何提示说明它未经验收。
+            #
+            # 职责划分：pipeline 是拆书引擎（产 assets/），报告交付由
+            # 「分析」（staging + 原子发布 + 铁律二闸门）与「拆书」命令负责。
+            # GUI 只调 pipeline 的函数（load_prompt/run_pass/assemble_*），
+            # 从不走 main()，故本改动不影响 GUI。
             try:
                 import report_craft as rc_mod
                 report = rc_mod.render_craft_report(craft_card)
-                report_path = REPORTS_DIR / f"{name}-笔法分析.md"
-                report_path.parent.mkdir(parents=True, exist_ok=True)
-                report_path.write_text(report, encoding="utf-8")
-                print(f"      {report_path.name}（可交付报告）")
-
-                # 铁律二：笔法分析单份字数提示（合计校验由 novel.py「分析」命令在
-                # 拆书报告 + 笔法报告都生成后统一执行）
                 report_len = len(report)
+                print(f"      笔法报告已就绪（{report_len} 字符，未落盘——"
+                      f"由 `novel 分析` 统一交付）")
+                # 铁律二：单份字数提示（合计校验由 novel.py「分析」在
+                # 拆书报告 + 笔法报告都生成后统一执行）。
                 if report_len < 10000:
                     print(f"  ⚠ 笔法分析单份 {report_len} 字符 < 10000，"
                           f"合计校验以 novel.py「分析」命令为准")
@@ -683,6 +701,7 @@ def main():
     _run_distill_hook(args.genre)
 
     print("\n完成。下一步: 人工校验资产（M1.6），或提供更多同题材书跑聚合。")
+    return 0
 
 
 def _run_distill_hook(genre: str) -> None:
@@ -717,7 +736,7 @@ def _run_distill_hook(genre: str) -> None:
 def run_compliance(asset_path: Path, book_path: Path) -> int:
     """合规扫描封装：返回退出码（0 通过 / 1 拒绝 / 2 警告）。"""
     asset = json.loads(asset_path.read_text(encoding="utf-8"))
-    book_text = book_path.read_text(encoding="utf-8")
+    book_text = chapter_loader.read_text_file(book_path)
     ngram = compliance_mod.build_ngram_index(book_text)
     errs, warns = compliance_mod.scan_asset(asset, ngram)
     print(f"      {asset_path.name}: 硬错误 {len(errs)} / 警告 {len(warns)}")

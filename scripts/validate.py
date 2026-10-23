@@ -797,6 +797,17 @@ def validate_asset_data(kind: str, data: dict):
 
 # --------------------------------------------------------------------------
 
+def validate_tool_library(d):
+    reset()
+    if not check_obj(d, "tool-library"):
+        return
+    if "meta" not in d:
+        err("缺少必填字段 'meta'", "tool-library")
+    has_items = any(k in d for k in ("goldfingers", "hooks", "taboos", "shuangdians", "worlds", "dialogues", "characters", "emotions"))
+    if not has_items:
+        err("缺少有效实操库条目列表（应包含 goldfingers / hooks / taboos / shuangdians / worlds / dialogues / characters / emotions）", "tool-library")
+
+
 DISPATCH = {
     "voice-card": validate_voice_card,
     "genre-pack": validate_genre_pack,
@@ -808,6 +819,8 @@ DISPATCH = {
     # 2026-09-16 新增：此前二者无专用校验器，被兜底误判为 voice-card（大量硬错误 REJECT）
     "distilled": validate_distilled,
     "genre-prose-card-index": validate_genre_prose_card_index,
+    # 2026-10-10 新增：实操工具库（金手指/黄金三章/避雷红线/名场面台词/人物反差/情绪通感）
+    "tool-library": validate_tool_library,
 }
 
 AUTO_HINTS = {
@@ -850,6 +863,9 @@ def auto_kind(d: dict, filename: str | None = None) -> str:
         return "distilled"
     if all(k in d for k in ("rules", "blindspots", "stats")):
         return "distilled"
+    # 2026-10-10：实操工具库（金手指/开篇钩子/避雷红线/爽点打脸/世界观体系/名场面台词/人物反差/情绪通感）
+    if any(k in d for k in ("goldfingers", "hooks", "taboos", "shuangdians", "worlds", "dialogues", "characters", "emotions")):
+        return "tool-library"
     keys = set(d.keys())
     for kind, hints in AUTO_HINTS.items():
         if kind == "genre-pack":
@@ -862,18 +878,20 @@ def auto_kind(d: dict, filename: str | None = None) -> str:
     return "voice-card"
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
+    ERRORS.clear()
+    WARNS.clear()
     ap = argparse.ArgumentParser(description="校验拆书输出是否符合 schema")
     ap.add_argument("asset", help="待校验的 JSON 资产文件")
     ap.add_argument("--kind", choices=list(DISPATCH), help="资产类型，缺省自动推断")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     path = Path(args.asset)
     try:
         d = json.loads(path.read_text(encoding="utf-8"))
     except Exception as e:
         print(f"JSON 解析失败: {e}")
-        sys.exit(1)
+        return 1
 
     kind = args.kind or auto_kind(d, path.name)
     DISPATCH[kind](d)
@@ -897,12 +915,12 @@ def main():
 
     if ERRORS:
         print("结论: REJECT（不符合 schema，禁止入库）")
-        sys.exit(1)
+        return 1
     if WARNS:
         print("结论: WARN（可入库，建议人工复核）")
-        sys.exit(2)
+        return 2
     print("结论: PASS")
-    sys.exit(0)
+    return 0
 
 
 if __name__ == "__main__":

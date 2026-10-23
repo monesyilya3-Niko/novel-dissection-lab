@@ -74,7 +74,7 @@ def load_manifest() -> dict[str, Any] | None:
     files = data.get("files")
     if not isinstance(files, dict):
         return None
-    for name, entry in files.items():
+    for _name, entry in files.items():
         if not isinstance(entry, dict) or not isinstance(entry.get("sha256"), str):
             return None
         prev = entry.get("previous_hashes", [])
@@ -88,8 +88,8 @@ def write_manifest() -> dict[str, Any]:
 
     扫描 ``assets/*.json``：新文件直接登记；已登记文件的 hash 若变化，
     把旧 current 追加进 ``previous_hashes``（官方旧版 hash 就此累积，
-    供 ``diff()`` 识别「官方旧版」）。幂等：无变化时重跑内容不变
-    （除 ``generated_at`` 外）。
+    供 ``diff()`` 识别「官方旧版」）。幂等：无变化时重跑**不写文件**，
+    直接返回现有 manifest（连 ``generated_at`` 都不变，避免假脏）。
     """
     src = shipped_dir()
     if src is None:
@@ -111,6 +111,11 @@ def write_manifest() -> dict[str, Any]:
                     and old_current not in prev):
                 prev.append(old_current)
         files[p.name] = {"sha256": new_hash, "previous_hashes": prev}
+    if old.get("version") == __version__ and old_files == files:
+        _log.info("manifest 无变化，跳过写入")
+        return {"version": __version__,
+                "generated_at": old.get("generated_at", ""),
+                "files": files}
     manifest = {
         "version": __version__,
         "generated_at": datetime.now().astimezone().isoformat(),
@@ -194,10 +199,34 @@ def _reindex_copied(dst: Path, copied: list[str]) -> list[str]:
         return reindexed
     for name in copied:
         try:
-            migrate.sync_asset(dst / name)
-            reindexed.append(name)
+            # sync_asset 返回是否真的入库（2026-10-14 审计修复 D12）：
+            # 它对「文件不存在 / JSON 损坏 / 非 dict」静默返回 False——
+            # 原先无论成败都计入 reindexed，报告数字虚高。
+            if migrate.sync_asset(dst / name):
+                reindexed.append(name)
         except Exception as exc:  # noqa: BLE001 — 单文件失败不影响其余。
             _log.warning("内置资产重索引失败 %s: %s", name, exc)
+    return reindexed
+
+
+def _reindex_missing_in_db(dst: Path) -> list[str]:
+    """检查并入库存在于磁盘但尚未在 SQLite assets 登记的资产（消除库与磁盘漂移）。"""
+    reindexed: list[str] = []
+    try:
+        from gui import db as _db
+        from gui import migrate
+        conn = _db.get_conn()
+        existing_paths = {r[0] for r in conn.execute("SELECT path FROM assets").fetchall()}
+        for p in dst.glob("*.json"):
+            rel_p = f"assets/{p.name}"
+            if rel_p not in existing_paths and p.name != MANIFEST_NAME:
+                try:
+                    migrate.sync_asset(p)
+                    reindexed.append(p.name)
+                except Exception as exc:  # noqa: BLE001
+                    _log.warning("资产补漏重索引失败 %s: %s", p.name, exc)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("资产对账补漏异常: %s", exc)
     return reindexed
 
 
@@ -223,7 +252,8 @@ def sync() -> dict[str, Any]:
         except OSError as exc:
             _log.warning("内置资产同步失败 %s: %s", name, exc)
     report["copied"] = copied
-    report["reindexed"] = _reindex_copied(dst, copied) if copied else []
+    reindexed = _reindex_copied(dst, copied) if copied else []
+    report["reindexed"] = reindexed
     if copied:
         _log.info("内置资产同步：补齐 %d 个缺失文件：%s", len(copied), copied)
     if report["modified"]:
@@ -239,6 +269,9 @@ def sync_at_startup() -> None:
     """供 ``GuiServer._start_inner`` 调用：失败只记日志，永不阻断启动。"""
     try:
         sync()
+        missing_indexed = _reindex_missing_in_db(config.ASSETS_ROOT)
+        if missing_indexed:
+            _log.info("内置资产对账：补漏入库 %d 个未索引资产：%s", len(missing_indexed), missing_indexed)
     except Exception as exc:  # noqa: BLE001 — 同步失败不阻断服务。
         _log.warning("内置资产同步异常（已跳过）: %s", exc)
 

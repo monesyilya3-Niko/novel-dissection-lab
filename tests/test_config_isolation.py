@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import sys
 import tempfile
 import unittest
@@ -167,6 +168,116 @@ class TestRuntimePathFollowsConfig(unittest.TestCase):
             before,
             _file_fingerprint(real_settings),
             "隔离态下 reset_settings 误删/改动了**真实** gui_state/settings.json",
+        )
+
+
+class TestTempTreeRemoval(unittest.TestCase):
+    """临时目录回收守卫（2026-10-08）。
+
+    背景：`isolate_paths()` 与十余个测试模块建完 `mkdtemp` 就再不管，实测旧代码每跑
+    一轮全量在 %TEMP% 留 **72** 个目录，累计已堆到 3400+。现在回收由
+    ``_isolation.remove_tree`` 统一负责，这三条用例钉住它的核心承诺。
+    """
+
+    def test_isolate_paths_removes_its_tmp_root(self):
+        root = Path(tempfile.mkdtemp(prefix="guard_iso_"))
+        with _isolation.isolate_paths(root):
+            deep = root / "state_root" / "nested"
+            deep.mkdir(parents=True, exist_ok=True)
+            (deep / "y.txt").write_text("内容", encoding="utf-8")
+        self.assertFalse(root.exists(), "isolate_paths 退出后临时根必须整棵回收")
+
+    def test_remove_tree_releases_open_sqlite_handle(self):
+        """Windows 上没释放的 SQLite 句柄会让 rmtree 整棵失败——必须先按路径关连接。"""
+        root = Path(tempfile.mkdtemp(prefix="guard_db_"))
+        saved_root, saved_db = config.STATE_ROOT, config.DB_PATH
+        try:
+            config.STATE_ROOT = root / "state_root"
+            config.DB_PATH = config.STATE_ROOT / "index.db"
+            config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
+            db.init_schema()
+            self.assertTrue(config.DB_PATH.is_file(), "夹具应已在临时根里建库")
+            _isolation.remove_tree(root)
+        finally:
+            config.STATE_ROOT, config.DB_PATH = saved_root, saved_db
+            db._reset_conn()
+        self.assertFalse(root.exists(), "带着打开连接的临时目录也必须删得掉")
+
+    def test_remove_tree_is_nested_safe_and_idempotent(self):
+        root = Path(tempfile.mkdtemp(prefix="guard_nest_"))
+        deep = root / "a" / "b" / "c"
+        deep.mkdir(parents=True)
+        (deep / "f.txt").write_text("x", encoding="utf-8")
+        _isolation.remove_tree(root)
+        self.assertFalse(root.exists())
+        _isolation.remove_tree(root)  # 目录已不存在：静默返回，不抛
+
+
+class TestHandPatchedDataPaths(unittest.TestCase):
+    """手工 patch ``config.STATE_ROOT`` 的测试模块，必须把派生常量一起 patch。
+
+    ``DB_PATH`` / ``LOCK_PATH`` 在 config.py 里是 ``STATE_ROOT`` 的**导入期快照**
+    （`gui/config.py:150,152`），只 patch STATE_ROOT 带不动它们，读这两个常量的代码
+    会指向真实用户数据目录。今天已被咬两次：``migrate._server_is_running()`` 读真实
+    ``.lock`` 让全量门禁在桌面版开着时误红；``system_service`` 读真实 ``DB_PATH`` 报库大小。
+    走 ``_isolation.isolate_paths()`` 的模块按登记表自动覆盖，故豁免。
+    """
+
+    DERIVED = ("DB_PATH", "LOCK_PATH")
+    # 守卫/泄漏检测模块本身不是"依赖隔离的用例"，它们读登记表与真实目录正是职责所在。
+    EXEMPT_WITH_REASON = {
+        "test_module_config_snapshot.py": "AST 扫描导入期快照的守卫，提到常量名即其职责",
+        "test_zz_state_dir_leak_guard.py": "真实目录泄漏守卫，要读真实路径才能判断有没有被写",
+    }
+    WINDOW = 8  # 同一 patch 点上下 8 行内必须出现派生常量的 patch
+    # 存量债登记（2026-10-08 立规时 10 个文件共 31 处违规）。
+    # 当日已全部还清 → 现在是**零容忍**：任何新 patch 点都必须同步重定向派生常量。
+    # 数量只许降不许升；除非出现有明确理由的新债，否则这里应保持为空。
+    KNOWN_DEBT: dict[str, int] = {}
+
+    def _is_patch_line(self, line: str) -> bool:
+        return bool(re.search(r"config\.STATE_ROOT\s*=", line)) or '"STATE_ROOT"' in line
+
+    def test_state_root_patch_sites_cover_derived_constants(self):
+        """每一处改 STATE_ROOT 的地方，邻近必须一起改 DB_PATH / LOCK_PATH。
+
+        按"每一处"而不是"每个文件"判定：一个文件里多个测试类各 patch 各的，
+        文件级粒度会放过漏掉的那几个类。存量违规进 KNOWN_DEBT 记账，
+        数量只许降不许升（升了就红，等于新增违规）。
+        """
+        offenders: dict[str, int] = {}
+        details = []
+        for fp in sorted(_TESTS_DIR.glob("test_*.py")):
+            if fp.name in self.EXEMPT_WITH_REASON:
+                continue
+            text = fp.read_text(encoding="utf-8")
+            if "isolate_paths" in text:
+                continue
+            lines = text.splitlines()
+            for n, line in enumerate(lines, start=1):
+                if not self._is_patch_line(line):
+                    continue
+                window = "\n".join(lines[max(0, n - 1 - self.WINDOW):n - 1 + self.WINDOW])
+                missing = [name for name in self.DERIVED
+                           if not (re.search(rf"config\.{name}\s*=", window)
+                                   or f'"{name}"' in window)]
+                if missing:
+                    offenders[fp.name] = offenders.get(fp.name, 0) + 1
+                    details.append(f"{fp.name}:{n} 缺 {missing}")
+        grown = {f: c for f, c in offenders.items() if c > self.KNOWN_DEBT.get(f, 0)}
+        self.assertEqual(
+            grown, {},
+            "新增违规：以下 patch 点改了 config.STATE_ROOT 却没在附近一起改派生常量"
+            "（DB_PATH / LOCK_PATH 是 STATE_ROOT 的导入期快照，带不动它，读侧会指向真实"
+            "用户数据目录）。补法：紧跟一行 "
+            "`config.DB_PATH = config.STATE_ROOT / \"index.db\"` 与 "
+            "`config.LOCK_PATH = config.STATE_ROOT / \".lock\"`（还原侧同步），"
+            "或整体改用 _isolation.isolate_paths()。明细：" + "; ".join(details),
+        )
+        paid_down = {f: n for f, n in self.KNOWN_DEBT.items() if offenders.get(f, 0) < n}
+        self.assertEqual(
+            paid_down, {},
+            f"存量债已减少，请同步调小 KNOWN_DEBT（鼓励顺手清掉）：{paid_down}",
         )
 
 

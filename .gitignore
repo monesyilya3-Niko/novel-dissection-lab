@@ -20,6 +20,8 @@ __pycache__/
 # 故此处只忽略依赖与增量构建缓存，不忽略 dist。
 node_modules/
 *.tsbuildinfo
+gui/web/pnpm-workspace.yaml
+gui/web/pnpm-lock.yaml
 
 # 检索倒排索引缓存（可重建，非资产）
 index/
@@ -79,4 +81,9 @@ desktop/build/python-embed.zip
 desktop/build/python-win/
 desktop/node_modules/
 desktop/release/
-desktop/package-lock.json
+# desktop/package-lock.json 改为入库：它不是可再生产物，而是"这次装了哪些版本依赖"的唯一凭据
+uv.lock
+
+# 本地下载与安装包制品
+dist-installer/
+*.exe

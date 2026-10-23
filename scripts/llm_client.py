@@ -14,12 +14,19 @@
 """
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+ROOT_DIR = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT_DIR), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+CONFIG_DIR = ROOT_DIR / "config"
 MODELS_FILE = CONFIG_DIR / "models.json"
 SECRETS_FILE = CONFIG_DIR / ".secrets.json"
 
@@ -158,7 +165,12 @@ def _post_json(url: str, payload: dict, headers: dict, timeout: int = 180) -> di
         req.add_header(k, v)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            raw_bytes = resp.read()
+            try:
+                return json.loads(raw_bytes.decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+                preview = raw_bytes[:400].decode("utf-8", errors="replace")
+                raise LLMError(f"响应非合法 JSON: {preview}") from exc
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")[:600]
         raise LLMError(f"HTTP {e.code}: {body}") from None
@@ -194,10 +206,23 @@ def _call_openai_compatible(model: dict, api_key: str, system: str,
 
     raw = _post_json(url, payload, headers, model.get("timeout", 180))
     try:
-        text = raw["choices"][0]["message"]["content"]
-    except (KeyError, IndexError) as exc:
+        choices = raw["choices"]
+        if not isinstance(choices, list) or not choices:
+            raise IndexError("choices 必须是非空列表")
+        choice = choices[0]
+        if not isinstance(choice, dict):
+            raise TypeError("choice 必须是字典")
+        msg = choice["message"]
+        if not isinstance(msg, dict):
+            raise TypeError("message 必须是字典")
+        text = msg.get("content")
+        if text is None:
+            text = ""
+    except (KeyError, IndexError, TypeError, AttributeError) as exc:
         raise LLMError(f"响应格式异常: {json.dumps(raw, ensure_ascii=False)[:400]}") from exc
-    usage = raw.get("usage") or {}
+    usage = raw.get("usage") if isinstance(raw, dict) else {}
+    if not isinstance(usage, dict):
+        usage = {}
     return {
         "text": text,
         "prompt_tokens": usage.get("prompt_tokens", 0),
@@ -226,10 +251,20 @@ def _call_anthropic(model: dict, api_key: str, system: str,
 
     raw = _post_json(url, payload, headers, model.get("timeout", 180))
     try:
-        text = "".join(b.get("text", "") for b in raw["content"])
-    except (KeyError, TypeError) as exc:
+        content = raw["content"]
+        if not isinstance(content, list) or not content:
+            raise TypeError("content 必须是非空列表")
+        text_blocks = []
+        for b in content:
+            if not isinstance(b, dict) or "text" not in b:
+                raise TypeError(f"content block 格式异常: {b}")
+            text_blocks.append(str(b.get("text", "")))
+        text = "".join(text_blocks)
+    except (KeyError, TypeError, IndexError, AttributeError) as exc:
         raise LLMError(f"响应格式异常: {json.dumps(raw, ensure_ascii=False)[:400]}") from exc
-    usage = raw.get("usage") or {}
+    usage = raw.get("usage") if isinstance(raw, dict) else {}
+    if not isinstance(usage, dict):
+        usage = {}
     return {
         "text": text,
         "prompt_tokens": usage.get("input_tokens", 0),
@@ -258,13 +293,22 @@ def _call_ollama(model: dict, api_key: str, system: str,
     }
     raw = _post_json(url, payload, {}, model.get("timeout", 600))
     try:
-        text = raw["message"]["content"]
-    except KeyError as exc:
+        if not isinstance(raw, dict):
+            raise TypeError("响应必须是字典")
+        msg = raw["message"]
+        if not isinstance(msg, dict):
+            raise TypeError("message 必须是字典")
+        text = msg.get("content")
+        if text is None:
+            text = ""
+    except (KeyError, TypeError, IndexError, AttributeError) as exc:
         raise LLMError(f"响应格式异常: {json.dumps(raw, ensure_ascii=False)[:400]}") from exc
+    prompt_tokens = raw.get("prompt_eval_count", 0) if isinstance(raw, dict) else 0
+    completion_tokens = raw.get("eval_count", 0) if isinstance(raw, dict) else 0
     return {
         "text": text,
-        "prompt_tokens": raw.get("prompt_eval_count", 0),
-        "completion_tokens": raw.get("eval_count", 0),
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
     }
 
 
@@ -455,11 +499,21 @@ def chat(user: str, system: str = "", task: str | None = None,
 
 def _estimate_cost(model: dict, result: dict) -> float:
     """按配置的价格估算本次花费（元）。本地模型为 0"""
-    pin = model.get("price_in_per_1m", 0)
-    pout = model.get("price_out_per_1m", 0)
+    try:
+        pin = float(model.get("price_in_per_1m", 0) or 0)
+    except (ValueError, TypeError):
+        pin = 0.0
+    try:
+        pout = float(model.get("price_out_per_1m", 0) or 0)
+    except (ValueError, TypeError):
+        pout = 0.0
+    try:
+        pt = float(result.get("prompt_tokens", 0) or 0)
+        ct = float(result.get("completion_tokens", 0) or 0)
+    except (ValueError, TypeError):
+        return 0.0
     return round(
-        result["prompt_tokens"] / 1_000_000 * pin
-        + result["completion_tokens"] / 1_000_000 * pout,
+        pt / 1_000_000 * pin + ct / 1_000_000 * pout,
         4,
     )
 
@@ -490,9 +544,19 @@ def test_model(model_id: str) -> dict:
         return {"ok": False, "error": str(e)}
 
 
-if __name__ == "__main__":
-    import sys
-    if len(sys.argv) > 1:
-        print(json.dumps(test_model(sys.argv[1]), ensure_ascii=False, indent=2))
-    else:
+def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    if not argv:
         print("用法: python llm_client.py <model_id>   # 连通性测试")
+        return 2
+    if argv[0] in ("-h", "--help"):
+        print("用法: python llm_client.py <model_id>   # 连通性测试")
+        return 0
+    _result = test_model(argv[0])
+    print(json.dumps(_result, ensure_ascii=False, indent=2))
+    return 0 if _result.get("ok") else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

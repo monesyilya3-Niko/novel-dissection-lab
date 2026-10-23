@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import time
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
@@ -41,12 +42,12 @@ def _h_import(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     path = (body or {}).get("path", "")
     if not path:
         raise ServiceError("缺少 path 参数", 400)
-    # M8：API 层限制导入路径在项目根内，防止任意文件读取（纵深防御）。
-    from gui import config as _config
-    resolved = Path(path).resolve()
-    root = _config.ROOT_DIR.resolve()
-    if not resolved.is_relative_to(root):
-        raise ServiceError("导入路径必须在项目目录内", 403)
+    if not isinstance(path, str):
+        raise ServiceError("path 必须为字符串", 400)
+    # M8 在这里加过"导入路径必须在项目目录内"的墙（防任意文件读取）。2026-10-08 撤掉：
+    # 用户要拆的书本来就放在项目外，那句 403 和质检的"路径放不进去"是同一句话。
+    # 任意文件读取的防线改落在内容上——services.import_book 走 _secure_read_text：
+    # 只收 .txt、不跟随符号链接、非常规文件拒绝、100MB 封顶。
     batch_size = _safe_batch_size((body or {}).get("batch_size"))
     return ok(services.import_book(path, batch_size))
 
@@ -313,6 +314,20 @@ def _safe_int(value: Any, default: int, field: str) -> int:
         raise ServiceError(f"{field} 必须为整数", 400) from exc
 
 
+def _safe_chapter_no(value: Any, field: str) -> int:
+    """章节序号必须是**精确整数**。
+
+    `_safe_int` 会把 2.5 静默截断成 2——而章节号是要落盘成 `chapter-002.txt`
+    并参与字数记账的，静默截断等于让用户第 2 章的内容被"第 2.5 章"覆盖掉。
+    bool 同理：`true` 不该变成第 1 章。
+    """
+    if isinstance(value, bool):
+        raise ServiceError(f"{field} 必须为整数", 400)
+    if isinstance(value, float) and not value.is_integer():
+        raise ServiceError(f"{field} 必须为整数", 400)
+    return _safe_int(value, 0, field)
+
+
 def _safe_batch_size(value: Any) -> int | None:
     """P2-B6：batch_size 非法值返回 400 而非透传导致 500。"""
     if value is None:
@@ -328,7 +343,8 @@ def _h_writing_generate(_params: dict[str, Any], body: dict[str, Any]) -> dict[s
     b = body or {}
     return ok(writing_service.generate(
         voice=b.get("voice", ""), project=b.get("project", ""),
-        chapter_no=_safe_int(b.get("chapter_no"), 0, "chapter_no"), task=b.get("task", ""),
+        chapter_no=_safe_chapter_no(b.get("chapter_no"), "chapter_no"),
+        task=b.get("task", ""),
         novel_name=b.get("novel_name"), prompt=b.get("prompt"),
         genre_pack=b.get("genre_pack"), words=_safe_int(b.get("words"), 2400, "words"),
         target_score=_safe_int(b.get("target_score"), 90, "target_score"),
@@ -345,7 +361,8 @@ def _h_writing_import_chapter(_params: dict[str, Any], body: dict[str, Any]) -> 
     from gui import writing_service
     b = body or {}
     return ok(writing_service.import_chapter(
-        project=b.get("project", ""), chapter_no=_safe_int(b.get("chapter_no"), 0, "chapter_no"),
+        project=b.get("project", ""),
+        chapter_no=_safe_chapter_no(b.get("chapter_no"), "chapter_no"),
         content=b.get("content", ""), novel_name=b.get("novel_name"),
         voice=b.get("voice"), genre_pack=b.get("genre_pack")))
 
@@ -385,18 +402,32 @@ def _h_writing_outline_create(_params: dict[str, Any], body: dict[str, Any]) -> 
         b.get("project") or "", kind=b.get("kind") or "chapter",
         title=b.get("title") or "", summary=b.get("summary") or "",
         status=b.get("status") or "planned",
-        sort_order=int(b.get("sort_order") or 0)))
+        sort_order=_safe_int(b.get("sort_order"), 0, "sort_order")))
 
 
 def _h_writing_outline_update(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
-    return ok(writing_extra.update_outline(int(params["oid"]), **(body or {})))
+    oid = _safe_int(params.get("oid"), 0, "oid")
+    return ok(writing_extra.update_outline(oid, **(body or {})))
 
 
 def _h_writing_outline_delete(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
-    writing_extra.delete_outline(int(params["oid"]))
+    oid = _safe_int(params.get("oid"), 0, "oid")
+    writing_extra.delete_outline(oid)
     return ok({"deleted": True})
+
+
+def _h_writing_outlines_reorder(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import writing_extra
+    b = body or {}
+    project = b.get("project")
+    order_ids = b.get("order_ids")
+    if not isinstance(project, str) or not project:
+        raise ServiceError("project 必须为非空字符串", 400)
+    if not isinstance(order_ids, list):
+        raise ServiceError("order_ids 必须为列表", 400)
+    return ok(writing_extra.reorder_outlines(project, order_ids))
 
 
 def _h_writing_characters_list(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
@@ -415,12 +446,14 @@ def _h_writing_character_create(_params: dict[str, Any], body: dict[str, Any]) -
 
 def _h_writing_character_update(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
-    return ok(writing_extra.update_character(int(params["cid"]), **(body or {})))
+    cid = _safe_int(params.get("cid"), 0, "cid")
+    return ok(writing_extra.update_character(cid, **(body or {})))
 
 
 def _h_writing_character_delete(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
-    writing_extra.delete_character(int(params["cid"]))
+    cid = _safe_int(params.get("cid"), 0, "cid")
+    writing_extra.delete_character(cid)
     return ok({"deleted": True})
 
 
@@ -439,12 +472,14 @@ def _h_writing_note_create(_params: dict[str, Any], body: dict[str, Any]) -> dic
 
 def _h_writing_note_update(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
-    return ok(writing_extra.update_note(int(params["nid"]), **(body or {})))
+    nid = _safe_int(params.get("nid"), 0, "nid")
+    return ok(writing_extra.update_note(nid, **(body or {})))
 
 
 def _h_writing_note_delete(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
-    writing_extra.delete_note(int(params["nid"]))
+    nid = _safe_int(params.get("nid"), 0, "nid")
+    writing_extra.delete_note(nid)
     return ok({"deleted": True})
 
 
@@ -459,7 +494,45 @@ def _h_writing_stats(params: dict[str, Any], _body: dict[str, Any]) -> dict[str,
 
 def _h_writing_export(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
-    return ok(writing_extra.export_project_txt(params.get("project") or ""))
+    fmt = params.get("format") or params.get("fmt") or "txt"
+    return ok(writing_extra.export_project(params.get("project") or "", fmt=fmt))
+
+
+def _h_writing_deslop(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import deslop_service
+    b = body or {}
+    text = b.get("text")
+    if not isinstance(text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    lang = b.get("lang", "auto")
+    return ok(deslop_service.analyze_deslop(text, lang=lang))
+
+
+def _h_writing_count_words(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import writing_extra
+    b = body or {}
+    text = b.get("text")
+    if not isinstance(text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    mode = b.get("mode", "auto")
+    if not isinstance(mode, str):
+        raise ServiceError("mode 必须为字符串", 400)
+    return ok(writing_extra.count_words_i18n(text, mode=mode))
+
+
+def _h_writing_tension_analysis(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import writing_extra
+    b = body or {}
+    text = b.get("text")
+    if not isinstance(text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    benchmark = b.get("benchmark", "classic")
+    if not isinstance(benchmark, str):
+        raise ServiceError("benchmark 必须为字符串", 400)
+    segments_count = b.get("segments_count", 10)
+    if not isinstance(segments_count, int) or isinstance(segments_count, bool):
+        raise ServiceError("segments_count 必须为整数", 400)
+    return ok(writing_extra.analyze_tension_curve(text, benchmark=benchmark, segments_count=segments_count))
 
 
 def _h_quality_check(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
@@ -631,7 +704,8 @@ def _h_format_chapter(_params: dict[str, Any], body: dict[str, Any]) -> dict[str
     from gui import platform_service
     b = body or {}
     return ok(platform_service.format_chapter(
-        b.get("platform_id", ""), _safe_int(b.get("chapter_num"), 1, "chapter_num"),
+        b.get("platform_id", ""),
+        _safe_chapter_no(b.get("chapter_num"), "chapter_num"),
         b.get("title", ""), b.get("content", "")))
 
 
@@ -640,6 +714,44 @@ def _h_export_book(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, A
     b = body or {}
     return ok(platform_service.export_book_for_platform(
         b.get("platform_id", ""), b.get("book_dir", "")))
+
+
+def _h_diagnose_chapter(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import platform_service
+    b = body or {}
+    return ok(platform_service.diagnose_chapter(
+        b.get("platform_id", ""),
+        b.get("chapter_text", ""),
+        b.get("chapter_title", ""),
+        b.get("chapter_num", 1),
+    ))
+
+
+def _h_litrpg_stat_box(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import platform_service
+    b = body or {}
+    text = b.get("text", "")
+    if not isinstance(text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    return ok({"stat_boxes": platform_service.parse_stat_box(text)})
+
+
+def _h_royalroad_format(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import platform_service
+    b = body or {}
+    title = b.get("title", "")
+    text = b.get("text", "")
+    head = b.get("author_note_head", "")
+    foot = b.get("author_note_foot", "")
+    wrap = b.get("wrap_stat_boxes", True)
+    if not isinstance(text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    return ok({
+        "formatted": platform_service.format_royalroad_chapter(
+            title, text, head, foot, wrap_stat_boxes=bool(wrap)
+        )
+    })
+
 
 
 # --- M1 高级分析 handlers ---
@@ -788,6 +900,271 @@ def _h_admin_session_revoke(params: dict[str, Any], _body: dict[str, Any]) -> di
 
 
 # ---------------------------------------------------------------------------
+# 创作增值工具与实操库处理器
+# ---------------------------------------------------------------------------
+
+def _h_tools_names(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    kind = str(params.get("kind", "character"))
+    style = str(params.get("style", "xianxia"))
+    gender = str(params.get("gender", "all"))
+    try:
+        count = int(params.get("count", 10))
+    except (TypeError, ValueError):
+        count = 10
+    return ok(services.generate_names(kind=kind, style=style, gender=gender, count=count))
+
+
+def _h_tools_poison_check(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    b = body or {}
+    text = b.get("text", "")
+    if not isinstance(text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    return ok(services.scan_poison(text))
+
+
+def _h_tools_goldfingers(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    return ok(services.get_goldfingers())
+
+
+def _h_tools_hooks(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    return ok(services.get_hooks())
+
+
+def _h_tools_taboos(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    return ok(services.get_taboos())
+
+
+def _h_tools_shuangdians(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    return ok(services.get_shuangdians())
+
+
+def _h_tools_worlds(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    return ok(services.get_worlds())
+
+
+def _h_tools_dialogues(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    return ok(services.get_dialogues())
+
+
+def _h_tools_characters(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    return ok(services.get_characters())
+
+
+def _h_tools_emotions(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    return ok(services.get_emotions())
+
+
+# ---------------------------------------------------------------------------
+# 小说精华数据库处理器
+# ---------------------------------------------------------------------------
+
+def _h_essence_stats(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    return ok(essence_service.get_overall_stats())
+
+
+def _h_essence_books_list(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    return ok({"books": essence_service.list_books(genre=params.get("genre"), platform=params.get("platform"))})
+
+
+def _h_essence_book_get(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    return ok(essence_service.get_book(params["book_id"]))
+
+
+def _h_essence_book_delete(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    return ok(essence_service.delete_book(params["book_id"]))
+
+
+def _h_essence_analyze_macro(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    b = body or {}
+    text = b.get("text")
+    title = b.get("title")
+    if not isinstance(text, str) or not text.strip():
+        raise ServiceError("text 必须为非空字符串", 400)
+    if not isinstance(title, str) or not title.strip():
+        raise ServiceError("title 必须为非空字符串", 400)
+    genre = b.get("genre") or "general"
+    platform = b.get("platform") or "general"
+    res = essence_service.extract_macro_essence(text, title, genre=genre, platform=platform)
+    book_id = b.get("book_id") or f"essence_{int(time.time())}"
+    essence_service.create_or_update_book(
+        book_id=book_id,
+        title=title,
+        genre=genre,
+        platform=platform,
+        total_chapters=res["total_chapters"],
+        total_chars=res["total_chars"],
+        meta=res,
+    )
+    if b.get("auto_save_assets", True):
+        for sa in res.get("suggestedAssets", []):
+            try:
+                essence_service.create_asset(
+                    book_id=book_id,
+                    category=sa.get("category", "style"),
+                    title=sa.get("title", f"《{title}》精华资产"),
+                    summary=sa.get("summary", ""),
+                    content=sa.get("content", ""),
+                    tags=f"{genre},{platform}",
+                    genre=genre,
+                    platform=platform,
+                )
+            except Exception:
+                pass
+    return ok({"book_id": book_id, **res})
+
+
+def _h_essence_assets_list(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    return ok({"assets": essence_service.list_assets(
+        book_id=params.get("book_id"),
+        category=params.get("category"),
+        tag=params.get("tag"),
+        genre=params.get("genre"),
+        platform=params.get("platform"),
+        query=params.get("query") or params.get("q"),
+    )})
+
+
+def _h_essence_asset_create(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    b = body or {}
+    return ok(essence_service.create_asset(
+        book_id=b.get("book_id") or b.get("bookId") or "",
+        category=b.get("category", ""),
+        title=b.get("title", ""),
+        content=b.get("content", ""),
+        summary=b.get("summary", ""),
+        tags=b.get("tags", ""),
+        genre=b.get("genre", "general"),
+        platform=b.get("platform", "general"),
+        rating=_safe_int(b.get("rating"), 5, "rating"),
+        user_note=b.get("user_note") or b.get("userNote") or "",
+    ))
+
+
+def _h_essence_asset_delete(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    asset_id = _safe_int(params.get("asset_id"), 0, "asset_id")
+    return ok(essence_service.delete_asset(asset_id))
+
+
+def _h_essence_adopt(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    b = body or {}
+    asset_id_raw = b.get("asset_id") if b.get("asset_id") is not None else b.get("assetId")
+    project = b.get("project")
+    target_kind = b.get("target_kind") or b.get("targetKind") or "outline"
+    if asset_id_raw is None:
+        raise ServiceError("缺少 asset_id", 400)
+    asset_id = _safe_int(asset_id_raw, 0, "asset_id")
+    return ok(essence_service.adopt_asset_to_project(asset_id, project, target_kind=target_kind))
+
+
+def _h_essence_book_adopt_all(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    book_id = params["book_id"]
+    b = body or {}
+    project = b.get("project") or "default"
+    return ok(essence_service.adopt_book_to_project(book_id, project))
+
+
+def _h_writing_project_meta_get(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from gui import writing_extra
+    return ok(writing_extra.get_project_meta(params["project"]))
+
+
+def _h_writing_project_meta_update(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import writing_extra
+    b = body or {}
+    return ok(writing_extra.update_project_meta(
+        project=params["project"],
+        platform=b.get("platform"),
+        genre=b.get("genre"),
+        target_words=b.get("target_words"),
+        summary=b.get("summary"),
+        meta=b.get("meta"),
+    ))
+
+
+def _h_essence_chains_list(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    book_id = params.get("book_id") or params.get("bookId") or None
+    return ok({"chains": essence_service.list_chains(book_id)})
+
+
+def _h_essence_chain_create(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    b = body or {}
+    clue = b.get("clue_name") or b.get("title") or ""
+    cat = b.get("category", "")
+    # 类型校验（2026-10-12 补）：cat 非字符串时 `cat not in clue` 抛
+    # "argument of type 'int' is not iterable" 变 500。
+    # 这里选择**报错**而非静默降级为 ""：category 是调用方显式传入的业务字段，
+    # 静默忽略会让"传了但没生效"无处可查，与本项目「400 时指名出错参数」的口径一致。
+    if not isinstance(cat, str):
+        raise ServiceError("category 必须为字符串", 400)
+    if cat and cat not in clue:
+        clue_full = f"{clue}·{cat}"
+    else:
+        clue_full = clue
+
+    hook_ch = b.get("hook_chapter") or b.get("plant_chapter") or 1
+    payoff_ch = b.get("payoff_chapter") or b.get("climax_chapter") or 1
+    desc = b.get("description", "")
+    hook_txt = b.get("hook_text") or desc
+    analysis_txt = b.get("analysis") or desc
+
+    return ok(essence_service.create_chain(
+        book_id=b.get("book_id") or b.get("bookId") or "",
+        clue_name=clue_full,
+        hook_chapter=_safe_int(hook_ch, 1, "hook_chapter"),
+        payoff_chapter=_safe_int(payoff_ch, 1, "payoff_chapter"),
+        hook_text=hook_txt,
+        payoff_text=b.get("payoff_text", ""),
+        status=b.get("status", "planted"),
+        analysis=analysis_txt,
+    ))
+
+
+def _h_essence_chain_delete(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    chain_id = _safe_int(params.get("chain_id"), 0, "chain_id")
+    return ok(essence_service.delete_chain(chain_id))
+
+
+def _h_essence_export_outline(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    book_id = params.get("book_id", "")
+    content = essence_service.export_book_outline_markdown(book_id)
+    return ok({"book_id": book_id, "bookId": book_id, "markdown": content})
+
+
+def _h_essence_export_beats(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    book_id = params.get("book_id", "")
+    content = essence_service.export_chapter_beats_markdown(book_id)
+    return ok({"book_id": book_id, "bookId": book_id, "markdown": content})
+
+
+def _h_essence_constitution_check(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import essence_service
+    b = body or {}
+    text = b.get("text") or b.get("content") or ""
+    rules = b.get("rules")
+    characters_forbidden = b.get("characters_forbidden") or b.get("charactersForbidden")
+    return ok(essence_service.check_constitution_compliance(
+        text=text, rules=rules, characters_forbidden=characters_forbidden
+    ))
+
+
+
+
+# ---------------------------------------------------------------------------
 # 路由表
 # ---------------------------------------------------------------------------
 
@@ -830,6 +1207,7 @@ ROUTES: list[tuple[str, re.Pattern, Callable[[dict, dict], dict]]] = [
     ("GET", re.compile(r"^/api/writing/assemble-candidates$"), _h_writing_assemble_candidates),
     ("GET", re.compile(r"^/api/writing/outlines$"), _h_writing_outlines_list),
     ("POST", re.compile(r"^/api/writing/outlines$"), _h_writing_outline_create),
+    ("POST", re.compile(r"^/api/writing/outlines/reorder$"), _h_writing_outlines_reorder),
     ("PUT", re.compile(r"^/api/writing/outlines/(?P<oid>\d+)$"), _h_writing_outline_update),
     ("DELETE", re.compile(r"^/api/writing/outlines/(?P<oid>\d+)$"), _h_writing_outline_delete),
     ("GET", re.compile(r"^/api/writing/characters$"), _h_writing_characters_list),
@@ -842,6 +1220,9 @@ ROUTES: list[tuple[str, re.Pattern, Callable[[dict, dict], dict]]] = [
     ("DELETE", re.compile(r"^/api/writing/notes/(?P<nid>\d+)$"), _h_writing_note_delete),
     ("GET", re.compile(r"^/api/writing/stats$"), _h_writing_stats),
     ("GET", re.compile(r"^/api/writing/export$"), _h_writing_export),
+    ("POST", re.compile(r"^/api/writing/deslop$"), _h_writing_deslop),
+    ("POST", re.compile(r"^/api/writing/count-words$"), _h_writing_count_words),
+    ("POST", re.compile(r"^/api/writing/tension-analysis$"), _h_writing_tension_analysis),
     # W15 阶段二：质检（M3）
     ("POST", re.compile(r"^/api/quality/check$"), _h_quality_check),
     ("POST", re.compile(r"^/api/quality/book$"), _h_quality_book),
@@ -884,8 +1265,11 @@ ROUTES: list[tuple[str, re.Pattern, Callable[[dict, dict], dict]]] = [
     ("GET", re.compile(r"^/api/platform/list$"), _h_list_platforms),
     ("GET", re.compile(r"^/api/platform/(?P<platform_id>[^/]+)$"), _h_get_platform),
     ("POST", re.compile(r"^/api/platform/check$"), _h_check_compliance),
+    ("POST", re.compile(r"^/api/platform/diagnose$"), _h_diagnose_chapter),
     ("POST", re.compile(r"^/api/platform/format$"), _h_format_chapter),
     ("POST", re.compile(r"^/api/platform/export$"), _h_export_book),
+    ("POST", re.compile(r"^/api/platform/litrpg/stat-box$"), _h_litrpg_stat_box),
+    ("POST", re.compile(r"^/api/platform/royalroad/format$"), _h_royalroad_format),
     # 管理员系统（会话鉴权由 server 层 _check_auth 完成；login 由 server 直接处理）
     ("GET", re.compile(r"^/api/admin/me$"), _h_admin_me),
     ("GET", re.compile(r"^/api/admin/dashboard$"), _h_admin_dashboard),
@@ -898,6 +1282,36 @@ ROUTES: list[tuple[str, re.Pattern, Callable[[dict, dict], dict]]] = [
     ("POST", re.compile(r"^/api/admin/change-password$"), _h_admin_change_password),
     ("GET", re.compile(r"^/api/admin/sessions$"), _h_admin_sessions),
     ("DELETE", re.compile(r"^/api/admin/sessions/(?P<sid>[^/]+)$"), _h_admin_session_revoke),
+    # 创作增值工具与实操库
+    ("GET", re.compile(r"^/api/tools/names$"), _h_tools_names),
+    ("POST", re.compile(r"^/api/tools/poison-check$"), _h_tools_poison_check),
+    ("GET", re.compile(r"^/api/tools/goldfingers$"), _h_tools_goldfingers),
+    ("GET", re.compile(r"^/api/tools/hooks$"), _h_tools_hooks),
+    ("GET", re.compile(r"^/api/tools/taboos$"), _h_tools_taboos),
+    ("GET", re.compile(r"^/api/tools/shuangdians$"), _h_tools_shuangdians),
+    ("GET", re.compile(r"^/api/tools/worlds$"), _h_tools_worlds),
+    ("GET", re.compile(r"^/api/tools/dialogues$"), _h_tools_dialogues),
+    ("GET", re.compile(r"^/api/tools/characters$"), _h_tools_characters),
+    ("GET", re.compile(r"^/api/tools/emotions$"), _h_tools_emotions),
+    # 小说精华数据库
+    ("GET", re.compile(r"^/api/essence/stats$"), _h_essence_stats),
+    ("GET", re.compile(r"^/api/essence/books$"), _h_essence_books_list),
+    ("GET", re.compile(r"^/api/essence/books/(?P<book_id>[^/]+)$"), _h_essence_book_get),
+    ("DELETE", re.compile(r"^/api/essence/books/(?P<book_id>[^/]+)$"), _h_essence_book_delete),
+    ("POST", re.compile(r"^/api/essence/analyze$"), _h_essence_analyze_macro),
+    ("GET", re.compile(r"^/api/essence/assets$"), _h_essence_assets_list),
+    ("POST", re.compile(r"^/api/essence/assets$"), _h_essence_asset_create),
+    ("DELETE", re.compile(r"^/api/essence/assets/(?P<asset_id>[^/]+)$"), _h_essence_asset_delete),
+    ("POST", re.compile(r"^/api/essence/adopt$"), _h_essence_adopt),
+    ("GET", re.compile(r"^/api/writing/projects/(?P<project>[^/]+)/meta$"), _h_writing_project_meta_get),
+    ("POST", re.compile(r"^/api/writing/projects/(?P<project>[^/]+)/meta$"), _h_writing_project_meta_update),
+    ("GET", re.compile(r"^/api/essence/chains$"), _h_essence_chains_list),
+    ("POST", re.compile(r"^/api/essence/chains$"), _h_essence_chain_create),
+    ("DELETE", re.compile(r"^/api/essence/chains/(?P<chain_id>[^/]+)$"), _h_essence_chain_delete),
+    ("GET", re.compile(r"^/api/essence/books/(?P<book_id>[^/]+)/export-outline$"), _h_essence_export_outline),
+    ("GET", re.compile(r"^/api/essence/books/(?P<book_id>[^/]+)/export-beats$"), _h_essence_export_beats),
+    ("POST", re.compile(r"^/api/essence/books/(?P<book_id>[^/]+)/adopt-all$"), _h_essence_book_adopt_all),
+    ("POST", re.compile(r"^/api/essence/constitution/check$"), _h_essence_constitution_check),
 ]
 
 

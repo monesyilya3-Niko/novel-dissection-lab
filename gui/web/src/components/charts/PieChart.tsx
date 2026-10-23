@@ -5,6 +5,7 @@ import type { EChartsOption } from 'echarts'
 import BaseChart from './BaseChart'
 import { getInkPalette, inkTextStyle, inkTooltip } from '../../charts/inkPalette'
 import { useThemeMode } from '../../state/ThemeModeContext'
+import { useI18n } from '../../state/I18nContext'
 
 export interface PieSlice {
   name: string
@@ -19,12 +20,14 @@ export interface PieChartProps {
   /** 高度（px）。 */
   height?: number
   optionOverride?: EChartsOption
+  ariaLabel?: string
 }
 
 /** 饼图：切片 → ECharts pie option。 */
-export default function PieChart({ data, donut = true, height = 280, optionOverride }: PieChartProps) {
+export default function PieChart({ data, donut = true, height = 280, optionOverride, ariaLabel }: PieChartProps) {
   const theme = useTheme()
   const { isDark } = useThemeMode()
+  const { t } = useI18n()
   const option = useMemo<EChartsOption>(() => {
     const base: EChartsOption = {
       color: [...getInkPalette(isDark)],
@@ -66,5 +69,5 @@ export default function PieChart({ data, donut = true, height = 280, optionOverr
     return { ...base, ...optionOverride }
   }, [data, donut, optionOverride, theme, isDark])
 
-  return <BaseChart option={option} height={height} ariaLabel="饼图" />
+  return <BaseChart option={option} height={height} ariaLabel={ariaLabel ?? t('chart_aria_pie', '饼图')} />
 }

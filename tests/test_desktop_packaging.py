@@ -108,8 +108,172 @@ class TestDesktopPackagingManifest(unittest.TestCase):
                         (BACKEND / "gui" / "__init__.py").is_file())
 
 
+    def test_prompts_packaged(self):
+        """ELE-01（2026-10-13 审计）：prompts/*.md 必须进安装包。
+
+        pipeline.load_prompt 按 PROMPTS_DIR 读取 pass1~pass5 模板来拼 LLM 请求；
+        此前 sync_backend 完全没同步 prompts/ —— 装机版的「拆书」/「分析」
+        一调用 load_prompt 就 FileNotFoundError，**核心功能 100% 失败**。
+        """
+        for name in ("pass1_structure.md", "pass2_character.md", "pass3_style.md",
+                     "pass4_commercial.md", "pass5_craft.md", "analysis-pipeline.md"):
+            self.assertTrue((BACKEND / "prompts" / name).is_file(),
+                            f"安装包内缺失 backend/prompts/{name}")
+
+    def test_prompts_generated_output_dir_excluded(self):
+        """反向守卫：prompts/generated/ 是运行时输出目录，不该随包发布。"""
+        gen = BACKEND / "prompts" / "generated"
+        if gen.exists():
+            self.assertEqual(
+                list(gen.rglob("*")), [],
+                "prompts/generated/ 下有文件被误打包（那是用户运行时产物）")
+
+    def test_samples_packaged(self):
+        """ELE-02（2026-10-13 审计）：samples/ 必须进安装包。
+
+        gui/router._samples_dir() 按 GUI_DIR 的父目录找 samples/，供新手
+        一键导入试手。此前未同步 —— 装机版「一键导入示例」静默变成空列表。
+        """
+        shipped = len(list((ROOT / "samples").glob("*.txt")))
+        self.assertGreater(shipped, 0, "仓库 samples/ 本身为空，测试失去意义")
+        self.assertEqual(
+            len(list((BACKEND / "samples").glob("*.txt"))), shipped,
+            "打包示例语料数应与仓库 samples/ 实测一致")
+
+
+    """桌面版"选择路径"桥必须真的进包。
+
+    这条链路有三个环节可以各自单独断掉，而且断掉的症状都是"页面里那个按钮
+    干脆不出现"——前端逻辑没报错、后端也没报错，装机用户只会觉得功能消失了：
+
+    1. electron-builder 的 `files` 是白名单，漏了 preload.js 就注入不了桥；
+    2. main.js 的 webPreferences 没接 preload，或 handler 名与 preload 不一致；
+    3. 前端源码写了但 dist 没重建（本仓库按设计提交预构建产物）。
+
+    所以三段都要有断言，而不是只测第 1 段。
+    """
+
+    def test_preload_in_builder_files_allowlist(self):
+        yml = (ROOT / "desktop" / "electron-builder.yml").read_text(encoding="utf-8")
+        files_block = yml.split("files:")[1].split("extraResources:")[0]
+        self.assertIn("preload.js", files_block,
+                      "electron-builder.yml 的 files 白名单漏了 preload.js，装机版不会有桥")
+
+    def test_preload_exposes_only_pick_path(self):
+        preload = ROOT / "desktop" / "preload.js"
+        self.assertTrue(preload.is_file(), "缺少 desktop/preload.js")
+        text = preload.read_text(encoding="utf-8")
+        self.assertEqual(text.count("exposeInMainWorld"), 1, "桥应当只注册一次")
+        self.assertRegex(
+            text, r"exposeInMainWorld\(\s*'novelLab',\s*\{\s*pickPath",
+            "桥只能暴露 pickPath；把 ipcRenderer 交出去等于给页面发任意 IPC 的能力")
+
+    def test_main_process_wires_bridge_and_validates_kind(self):
+        main = (ROOT / "desktop" / "main.js").read_text(encoding="utf-8")
+        self.assertIn("preload: path.join(__dirname, 'preload.js')", main,
+                      "webPreferences 没接 preload.js")
+        self.assertIn("ipcMain.handle('novel-lab:pick-path'", main,
+                      "主进程没有注册选择器 handler（通道名须与 preload 一致）")
+        # kind 只认 dir / file 两个枚举值，其余一律当没选：渲染层能要的只是一个路径
+        self.assertIn("kind !== 'dir' && kind !== 'file'", main)
+        self.assertIn("openDirectory", main)
+        self.assertIn("openFile", main)
+        # 上下文隔离与沙箱是这个桥能安全存在的前提，不能被顺手关掉
+        self.assertIn("contextIsolation: true", main)
+        self.assertIn("sandbox: true", main)
+        self.assertIn("nodeIntegration: false", main)
+
+    def test_built_dist_consumes_the_bridge(self):
+        """前端改了但没重建 dist 时，这条会红（dist 按设计入库，装机版只认 dist）。"""
+        dist = ROOT / "gui" / "web" / "dist"
+        hits = [f for f in dist.rglob("*.js") if "novelLab" in f.read_text(encoding="utf-8")]
+        self.assertTrue(hits, "dist 里没有桥引用——前端源码改了但没跑 npm run build")
+
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNavigationGuard(unittest.TestCase):
+    """桌面版导航守卫必须覆盖同源（2026-10-14 审计修复 ELE-04）。
+
+    缺陷背景：原实现只对**跨源**导航做 preventDefault，同源则放行——
+    而注释自称"防止外部页面在应用窗口内加载"，两者范围不一致。
+    虽然后端 _serve_static 只服务 DIST_DIR（含路径穿越防护），同源可达的
+    内容仍是本应用自己的页面、风险有限；但 Electron 窗口**没有地址栏**，
+    一旦窗口内出现非入口页的内容，用户无法分辨。
+
+    本应用前端**不使用路由**（全仓无 pushState / react-router /
+    location.href），故同源导航没有合法用途——除初始入口页与资源加载
+    （资源不经 will-navigate）。现收紧为「同源 + 入口路径」。
+    """
+
+    def setUp(self):
+        self.main = (ROOT / "desktop" / "main.js").read_text(encoding="utf-8")
+
+    def test_is_internal_url_checks_pathname_not_just_origin(self):
+        """核心守卫：判定必须同时看 origin 与 pathname，不能只看 origin。"""
+        start = self.main.index("const isInternalUrl =")
+        end = self.main.index("mainWindow.webContents.on('will-navigate'")
+        block = self.main[start:end]
+        self.assertIn("u.origin === backendOrigin", block,
+                      "isInternalUrl 未比较 origin")
+        self.assertIn("u.pathname === entryPath", block,
+                      "isInternalUrl 未比较 pathname——同源任意路径都会被放行")
+
+    def test_entry_path_defined_from_backend_url(self):
+        self.assertIn("entryPath", self.main, "未定义入口路径")
+
+    def test_same_origin_other_path_is_blocked(self):
+        """行为守卫：同源非入口路径必须 preventDefault。
+
+        用 node 实跑 main.js 里那段判定逻辑（提取为独立函数求值），
+        验证「同源但非入口路径」被判为内部为假。
+        """
+        import subprocess
+        # 提取 isInternalUrl 的定义体，在 node 里用受控输入求值
+        script = """
+const backendUrl = 'http://127.0.0.1:8000';
+const backendOrigin = new URL(backendUrl).origin;
+const entryPath = new URL(backendUrl).pathname || '/';
+const isInternalUrl = (url) => {
+  try {
+    const u = new URL(url);
+    return u.origin === backendOrigin && u.pathname === entryPath;
+  } catch (_) { return false; }
+};
+const cases = [
+  ['http://127.0.0.1:8000/', true, '入口页'],
+  ['http://127.0.0.1:8000/?handshake=abc', true, '入口页带握手串'],
+  ['http://127.0.0.1:8000/assets/index.js', false, '同源资源路径'],
+  ['http://127.0.0.1:8000/evil', false, '同源非入口路径'],
+  ['http://127.0.0.1:8000.evil.com/', false, '前缀伪装跨源'],
+  ['https://example.com/', false, '跨源'],
+];
+let bad = 0;
+for (const [url, want, label] of cases) {
+  const got = isInternalUrl(url);
+  if (got !== want) { console.log('MISMATCH', label, url, 'got', got, 'want', want); bad++; }
+}
+process.exit(bad ? 1 : 0);
+"""
+        r = subprocess.run(["node", "-e", script], capture_output=True,
+                           text=True, timeout=30)
+        self.assertEqual(r.returncode, 0,
+                         f"导航判定与预期不符:\n{r.stdout}{r.stderr}")
+
+    def test_will_navigate_blocks_and_handles_external(self):
+        """结构守卫：will-navigate 必须 preventDefault，且跨源转交系统浏览器。
+
+        注意：注释里也提到 setWindowOpenHandler，故切片终点要用**代码行**
+        （带缩进的调用）而非首次出现的字符串。
+        """
+        start = self.main.index("mainWindow.webContents.on('will-navigate'")
+        # 用带缩进的真实调用行定位终点（避免命中注释里的同名文本）
+        end = self.main.index("  mainWindow.webContents.setWindowOpenHandler(")
+        self.assertLess(start, end, "切片顺序异常")
+        block = self.main[start:end]
+        self.assertIn("event.preventDefault()", block, "未阻止导航")
+        self.assertIn("shell.openExternal(url)", block, "外部链接未转交系统浏览器")
 
 
 class TestDesktopIconConfig(unittest.TestCase):

@@ -20,6 +20,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import _isolation  # noqa: E402
 
 from gui import asset_index, config, state_store  # noqa: E402
 
@@ -37,6 +40,9 @@ class TestAssetIndex(unittest.TestCase):
             "CORPUS_DIR": config.CORPUS_DIR,
             "CONFIG_DIR": config.CONFIG_DIR,
             "STATE_ROOT": config.STATE_ROOT,
+            # 派生常量是 STATE_ROOT 的导入期快照，一起保存才能成对还原。
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
             # R1：STATE_JSON_DIR 与 STATE_ROOT 必须成对隔离，避免夹具落到真实 gui/state/。
             "STATE_JSON_DIR": config.STATE_JSON_DIR,
         }
@@ -45,6 +51,8 @@ class TestAssetIndex(unittest.TestCase):
         config.CORPUS_DIR = cls._tmp / "corpus"
         config.CONFIG_DIR = cls._tmp / "config"
         config.STATE_ROOT = cls._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_JSON_DIR = cls._tmp / "gui_state"
 
         # 造数据。
@@ -89,6 +97,7 @@ class TestAssetIndex(unittest.TestCase):
     def tearDownClass(cls):
         for k, v in cls._orig.items():
             setattr(config, k, v)
+        _isolation.remove_tree(cls._tmp)
 
     def test_scan_counts(self):
         data = self.idx.scan(force=True)
@@ -211,15 +220,21 @@ class TestListBooksSummary(unittest.TestCase):
         # list_books_summary 同时扫两者；漏 patch 会把夹具写进真实 gui/state/ 并跨轮累积。
         cls._orig = {
             "STATE_ROOT": config.STATE_ROOT,
+            # 派生常量是 STATE_ROOT 的导入期快照，一起保存才能成对还原。
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
             "STATE_JSON_DIR": config.STATE_JSON_DIR,
         }
         config.STATE_ROOT = cls._tmp
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_JSON_DIR = cls._tmp
 
     @classmethod
     def tearDownClass(cls):
         for k, v in cls._orig.items():
             setattr(config, k, v)
+        _isolation.remove_tree(cls._tmp)
 
     def setUp(self):
         # 造两个状态文件。
@@ -269,6 +284,9 @@ class TestAssetSummary(unittest.TestCase):
             "CORPUS_DIR": config.CORPUS_DIR,
             "CONFIG_DIR": config.CONFIG_DIR,
             "STATE_ROOT": config.STATE_ROOT,
+            # 派生常量是 STATE_ROOT 的导入期快照，一起保存才能成对还原。
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
             "STATE_JSON_DIR": config.STATE_JSON_DIR,
         }
         config.ASSETS_ROOT = cls._tmp / "assets"
@@ -276,6 +294,8 @@ class TestAssetSummary(unittest.TestCase):
         config.CORPUS_DIR = cls._tmp / "corpus"
         config.CONFIG_DIR = cls._tmp / "config"
         config.STATE_ROOT = cls._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_JSON_DIR = cls._tmp / "gui_state"
         for d in ("ASSETS_ROOT", "REPORTS_DIR", "CORPUS_DIR", "CONFIG_DIR",
                   "STATE_ROOT"):

@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { useTheme } from '@mui/material/styles'
 import type { EChartsOption } from 'echarts'
 import BaseChart from './BaseChart'
+import { useI18n } from '../../state/I18nContext'
 
 export interface GaugeChartProps {
   /** 当前值（0-100 或按 max 缩放）。 */
@@ -16,6 +17,7 @@ export interface GaugeChartProps {
   /** 高度（px）。 */
   height?: number
   optionOverride?: EChartsOption
+  ariaLabel?: string
 }
 
 /** 仪表盘：单值 → ECharts gauge option。 */
@@ -26,8 +28,10 @@ export default function GaugeChart({
   unit = '',
   height = 240,
   optionOverride,
+  ariaLabel,
 }: GaugeChartProps) {
   const theme = useTheme()
+  const { t } = useI18n()
   const option = useMemo<EChartsOption>(() => {
     const base: EChartsOption = {
       series: [
@@ -60,5 +64,5 @@ export default function GaugeChart({
     return { ...base, ...optionOverride }
   }, [value, max, title, unit, optionOverride, theme])
 
-  return <BaseChart option={option} height={height} ariaLabel="仪表盘" />
+  return <BaseChart option={option} height={height} ariaLabel={ariaLabel ?? t('chart_aria_gauge', '仪表盘')} />
 }

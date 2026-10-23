@@ -19,6 +19,7 @@ novel-lab CLI 统一入口 — 一条命令覆盖全部工作流
 """
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -31,6 +32,57 @@ sys.path.insert(0, str(SCRIPTS))  # 使 scripts/ 下的模块可直接 import
 PY = sys.executable
 
 
+def _configure_console_encoding() -> None:
+    """让 stdout/stderr 在 GBK 控制台下不因特殊符号崩栈（2026-10-12 审计修复 CLI-05）。
+
+    背景：CLI 大量使用 ✓ / ✗ / ⚠ / 🔴 等符号，而 Windows 中文控制台默认
+    GBK 编码——实测 `PYTHONIOENCODING=gbk` 下 `print('✓')` 直接抛
+    ``UnicodeEncodeError: 'gbk' codec can't encode character '\\u2713'``。
+    最讽刺的是这发生在**报错路径**上：本想告诉用户"质检失败"，
+    结果先崩在打印失败信息的那一行。
+
+    修法：把 stdout/stderr 的错误处理器改为 ``backslashreplace``——
+    不可编码的字符降级为 ``\\u2713`` 这类转义而非抛异常。
+    内容仍是可读的，且不会中断输出。
+
+    只在需要时改（已是 utf-8 的环境不动，避免影响重定向/管道行为）。
+    铁律三：纯标准库。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            enc = (stream.encoding or "").lower()
+            # utf-8 环境无需处理；errors 已是容错模式也跳过
+            if "utf" in enc or getattr(stream, "errors", "") == "backslashreplace":
+                continue
+            stream.reconfigure(errors="backslashreplace")
+        except (AttributeError, ValueError, OSError):
+            # reconfigure 在部分流上不可用（如已被包装的管道）；失败不影响主流程
+            continue
+
+
+def _validate_dispatch_keys() -> list[str]:
+    """返回 scripts/validate.py::DISPATCH 支持的全部资产类型键。
+
+    「校验」子命令的 --kind choices 由此派生，而非手写列表——
+    单一来源，新增校验器时 CLI 自动跟上（2026-10-12 审计修复 CLI-06：
+    原手写列表落后于 DISPATCH，distilled / genre-prose-card-index /
+    tool-library 三类资产无法通过 CLI 校验）。
+
+    导入失败时回退到历史 7 项，保证 CLI 仍可用。
+    """
+    try:
+        import validate as validate_mod
+        keys = sorted(validate_mod.DISPATCH.keys())
+        return keys or _FALLBACK_KINDS
+    except Exception:  # noqa: BLE001 — 校验器加载失败不应让 CLI 起不来
+        return _FALLBACK_KINDS
+
+
+# 历史 7 项（validate 不可用时的兜底）
+_FALLBACK_KINDS = ["voice-card", "genre-pack", "trope-library", "craft-card",
+                   "structure-obs", "commercial-obs", "genre-prose-card"]
+
+
 def run_script(name: str, args: list) -> int:
     """运行 scripts/ 下的脚本，透传参数。"""
     script = SCRIPTS / name
@@ -38,7 +90,11 @@ def run_script(name: str, args: list) -> int:
         print(f"✗ 脚本不存在: {script}")
         return 1
     cmd = [PY, str(script)] + [str(a) for a in args]
-    return subprocess.call(cmd)
+    # 子进程同样可能打印 ✓/✗ 等符号：GBK 控制台下需相同的容错设置，
+    # 否则 novel.py 自己活下来了、被调用的脚本却崩在输出上（CLI-05）。
+    env = dict(os.environ)
+    env.setdefault("PYTHONIOENCODING", "utf-8:backslashreplace")
+    return subprocess.call(cmd, env=env)
 
 
 def publish_reports_atomically(srcs, reports_dir) -> list:
@@ -125,7 +181,17 @@ def resolve_book_src(book: str) -> Path:
 
 def cmd_reset_admin_password() -> int:
     """本地重置管理员密码：生成随机新密码，输出到终端一次。"""
-    sys.path.insert(0, str(ROOT / "gui"))
+    # 2026-10-12 审计修复 CLI-11：删除原先的
+    #   sys.path.insert(0, str(ROOT / "gui"))
+    # 那行有两个问题：
+    #   a) **完全多余** —— 实测不加也能 `from gui import admin`
+    #      （ROOT 已在 sys.path，gui/ 是可导入包）。
+    #   b) 把 gui/ 塞进顶层模块搜索路径，会让 gui/config.py、gui/db.py
+    #      以**顶层模块名** config / db 暴露。scripts/ 也在 sys.path 里，
+    #      两者同名就会按插入顺序互相遮蔽（实测 insert(0) 后顶层 config
+    #      指向 gui/config.py）。这与 AGENTS.md §2 的依赖方向约定相悖，
+    #      且冲突是隐式的——将来谁在 scripts/ 加个 config.py 就会踩坑。
+    # 统一用包路径 `from gui import admin` 导入即可。
     from gui import admin
     try:
         new_pw = admin.reset_password()
@@ -139,10 +205,17 @@ def cmd_reset_admin_password() -> int:
 
 
 def cmd_status():
-    """项目概览：资产/章节/报告状态。"""
+    """项目概览：资产/章节/报告状态。
+
+    ⚠️ 退出码反映健康度（2026-10-12 审计修复 CLI-09）：
+    原实现对损坏的资产/项目文件只打印"（损坏，跳过）"却**仍 return 0**，
+    于是 `novel 状态` 无法用作门禁——CI 里"有损坏也报成功"。
+    现在只要有任一文件损坏就返回 1（内容照常打印，信息不丢）。
+    """
     print("=" * 50)
     print("novel-lab 项目状态")
     print("=" * 50)
+    damaged: list[str] = []
     assets = sorted((ROOT / "assets").glob("*-voice-card.json"))
     assets = [a for a in assets if not a.name.startswith("synthetic_")]
     print(f"\n[资产] {len(assets)} 本已拆:")
@@ -151,6 +224,7 @@ def cmd_status():
             vc = json.loads(a.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             print(f"  - {a.name}: （损坏，跳过）")
+            damaged.append(a.name)
             continue
         meta = vc.get("meta", {})
         conf = meta.get("confidence", 0)
@@ -174,6 +248,7 @@ def cmd_status():
                 state = json.loads(s.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 print(f"  - {s.parent.name}: （损坏，跳过）")
+                damaged.append(str(s))
                 continue
             print(f"  - {state.get('name','?')}: 第{state.get('current_chapter',1)}章/"
                   f"第{state.get('current_arc',1)}卷, 今日{state.get('word_count_today',0)}字")
@@ -187,10 +262,15 @@ def cmd_status():
             print(f"\n[模型] {list(models.get('models', {}).keys())}")
         except (json.JSONDecodeError, OSError):
             print("\n[模型] 配置文件损坏")
+            damaged.append(str(models_path))
     else:
         print("\n[模型] 未配置外部模型 —— LLM 层由 WorkBuddy 内置智能承担"
               "（pass1-5 分析与写作改写由 AI 直接读文本完成，无 API 依赖）")
     print("\n提示: 'novel 拆书 --help' 查看各子命令详细用法")
+    if damaged:
+        print(f"\n✗ 状态检查发现 {len(damaged)} 处损坏文件（上述已标注），"
+              f"退出码为非零以便门禁使用。")
+        return 1
     return 0
 
 
@@ -300,7 +380,11 @@ def main():
 
     p8 = sub.add_parser("校验", help="schema 校验")
     p8.add_argument("asset")
-    p8.add_argument("--kind", choices=["voice-card", "genre-pack", "trope-library", "craft-card", "structure-obs", "commercial-obs", "genre-prose-card"])
+    # choices 从 validate.DISPATCH 派生（2026-10-12 审计修复 CLI-06）：
+    # 原先是手写的 7 项硬编码列表，而 DISPATCH 已有 10 个校验器——
+    # distilled / genre-prose-card-index / tool-library 三类资产用户
+    # 根本无法通过 CLI 校验（choices 直接拒绝）。派生自单一来源即可永不漂移。
+    p8.add_argument("--kind", choices=sorted(_validate_dispatch_keys()))
 
     p12 = sub.add_parser("笔法报告", help="craft-card → 笔法深度分析报告")
     p12.add_argument("craft_card", help="craft-card JSON 文件路径")
@@ -380,6 +464,13 @@ def main():
             _chk = check_combined_report_length(staging, name)
             _book_len, _craft_len, _total = _chk["book_chars"], _chk["craft_chars"], _chk["total"]
             print(f"\n[铁律二] 拆书报告 {_book_len} 字 + 笔法分析 {_craft_len} 字 = 合计 {_total} 字")
+            # 用上 report.py 的 missing 字段：两份里有空的那份要明确点名，
+            # 否则用户只看到"合计不足"却不知道是哪一份没生成
+            # （2026-10-12 审计 CLI-02 引入该字段，此处是其真实消费点）。
+            if _chk.get("missing"):
+                _cn = {"book": "拆书报告", "craft": "笔法分析"}
+                _gap = "、".join(_cn.get(m, m) for m in _chk["missing"])
+                print(f"  ⚠ 其中 {_gap} 为空（0 字）")
             if not _chk["ok"]:
                 print(f"  ✗ 合计 {_total} 字 < 硬门槛 {_chk['min_chars']} 字，交付阻断（不产出半成品）")
                 sys.exit(1)
@@ -390,40 +481,89 @@ def main():
         finally:
             shutil.rmtree(staging, ignore_errors=True)
         # 3. 自动质检 Hook（借鉴 oh-story：拆书完成后自动检查）
+        #
+        # 两处修复（2026-10-12 审计 CLI-08）：
+        #   a) 原先 `if corpus_file.exists():` 无 else —— 语料不在 corpus/ 时
+        #      **什么都不打印**，用户看到"[Hook] 自动质检:" 后是空的，
+        #      以为质检跑过了。补 else 明确说明"未执行"。
+        #   b) 整段质检无 try 包裹 —— Hook 崩溃会冒泡中断「分析」命令，
+        #      而此时报告**已发布**，用户以为整个分析失败。
+        #      Hook 是辅助信息，不该拖垮主流程；改为捕获后降级为提示。
         print("\n[Hook] 自动质检:")
         corpus_file = ROOT / "corpus" / f"{name}.txt"
-        if corpus_file.exists():
-            import book_quality
-            qa = book_quality.book_quality_check(str(corpus_file), str(vc) if vc.exists() else None)
-            sev = qa.get("severity", {})
-            if qa["total_issues"] == 0:
-                print(f"  ✅ 质检通过（{qa['total_chapters']}章 0问题）")
-            else:
-                print(f"  ⚠ 质检 {qa['total_issues']} 个问题（{sev.get('critical',0)}严重/{sev.get('high',0)}高/{sev.get('medium',0)}中）")
-                # 本 Hook 实际渲染的问题行数：切片与下方提示共用，避免两处各写一份字面量。
-                hook_issue_rows = 5
-                shown_issues = qa["issues"][:hook_issue_rows]
-                for issue in shown_issues:
-                    print(f"    · {issue['detail'][:60]}")
-                # 2026-09-17（第二轮收口）：只要实际渲染条数少于总数就必须说明（不只是
-                # 超过 5 条时），否则读者会以为问题只有列出来的这几条。提示中的条数取
-                # 实际渲染行数，不写字面量；未砍短时不新增任何输出。
-                hint = book_quality.format_truncation_hint(qa["total_issues"], len(shown_issues))
-                if hint:
-                    print(f"    {hint}")
+        if not corpus_file.exists():
+            print(f"  ⚠ 未执行：corpus/{name}.txt 不存在（质检需要语料原文）")
+            print("    如需质检，请把语料放到 corpus/ 后单独跑 `novel 质检 <目录>`")
+        else:
+            try:
+                import book_quality
+                qa = book_quality.book_quality_check(
+                    str(corpus_file), str(vc) if vc.exists() else None)
+                sev = qa.get("severity", {})
+                if qa["total_issues"] == 0:
+                    print(f"  ✅ 质检通过（{qa['total_chapters']}章 0问题）")
+                else:
+                    print(f"  ⚠ 质检 {qa['total_issues']} 个问题"
+                          f"（{sev.get('critical',0)}严重/{sev.get('high',0)}高/"
+                          f"{sev.get('medium',0)}中）")
+                    # 本 Hook 实际渲染的问题行数：切片与下方提示共用，
+                    # 避免两处各写一份字面量。
+                    hook_issue_rows = 5
+                    shown_issues = qa["issues"][:hook_issue_rows]
+                    for issue in shown_issues:
+                        print(f"    · {issue['detail'][:60]}")
+                    # 2026-09-17（第二轮收口）：只要实际渲染条数少于总数就必须
+                    # 说明（不只是超过 5 条时），否则读者会以为问题只有列出来的
+                    # 这几条。提示中的条数取实际渲染行数，不写字面量。
+                    hint = book_quality.format_truncation_hint(
+                        qa["total_issues"], len(shown_issues))
+                    if hint:
+                        print(f"    {hint}")
+            except Exception as exc:  # noqa: BLE001 — Hook 是辅助信息，不得拖垮主流程
+                print(f"  ⚠ 质检 Hook 执行失败（不影响已发布的报告）: "
+                      f"{type(exc).__name__}: {exc}")
+                print("    如需质检，请单独跑 `novel 质检 <目录>`")
 
         print("\n分析完成。资产目录: assets/ | 报告目录: reports/")
         return 0
 
     if args.cmd == "拆书":
-        return run_script("pipeline.py",
-                          [str(resolve_book_src(args.book)), "--genre", args.genre] +
-                          (["--model-id", args.model_id] if args.model_id else []) +
-                          (["--dry-run"] if args.dry_run else []))
+        rc = run_script("pipeline.py",
+                        [str(resolve_book_src(args.book)), "--genre", args.genre] +
+                        (["--model-id", args.model_id] if args.model_id else []) +
+                        (["--dry-run"] if args.dry_run else []))
+        if rc != 0 or args.dry_run:
+            return rc
+        # 铁律二**不在此校验**（2026-10-13 修正）。
+        #
+        # 首版（2026-10-12 修 CLI-01 时）给拆书加了 enforce_iron_rule_2，
+        # 但那是语义错配：铁律二口径是「拆书报告 + 笔法分析**合计** ≥ 10000」，
+        # 而 pipeline.py 只产笔法分析一份。实测仓库真实笔法分析的字数分布
+        # 为 [22128, 5163, 15887, 6845, 20625, 20273]——**2/6 单份不足 10000**，
+        # 套用后拆书命令会对正常产出误报失败（比原缺陷更糟）。
+        #
+        # 铁律二由「分析」命令收口（它跑完整链路，两份报告都产，
+        # 在 staging 上做合计校验后再原子发布——见上方 3.5 节）。
+        # 拆书/批量的单份报告字数提示由 report.py 自己的 soft warning 承担。
+        return rc
     if args.cmd == "批量":
-        return run_script("batch.py", [args.corpus, "--genre", args.genre] +
-                          (["--report"] if args.report else []) +
-                          (["--dry-run"] if args.dry_run else []))
+        rc = run_script("batch.py", [args.corpus, "--genre", args.genre] +
+                        (["--report"] if args.report else []) +
+                        (["--dry-run"] if args.dry_run else []))
+        if rc != 0 or args.dry_run:
+            return rc
+        # 批量：**不做铁律二校验**（2026-10-13 修正，见下）。
+        #
+        # 首版（2026-10-12）给批量加了 enforce_iron_rule_2，但那是语义错配：
+        # 铁律二的口径是「拆书报告 + 笔法分析**合计** ≥ 10000」——实测仓库
+        # 真实报告的**单份拆书报告从未达到 10000**（4719~7204 字），必须两份
+        # 相加才够。而 batch.py 只产拆书报告一份（batch.py:127），结构上
+        # 不可能满足合计门槛，套用后批量命令**永远失败**。
+        #
+        # 批量的定位是**批量产出拆书报告**（中间产物），不是最终交付；
+        # 单份报告的字数提示由 report.py 自己的 soft warning 承担。
+        # 铁律二仍由「分析」（全链）与「拆书」（产笔法分析）收口。
+        return rc
     if args.cmd == "检查":
         # 双维度检查：章节质量 + 一致性
         import json as _json
@@ -431,8 +571,10 @@ def main():
         if not ch_path.exists():
             sys.exit(f"文件不存在: {ch_path}")
         try:
-            text = ch_path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError) as exc:
+            import chapter_loader
+
+            text = chapter_loader.read_text_file(ch_path)
+        except (UnicodeError, OSError) as exc:
             sys.exit(f"读取章节失败: {exc}")
 
         # 1. 章节质量
@@ -476,7 +618,21 @@ def main():
                 print("\n需改进:")
                 for i in qc['issues']:
                     print(f"  ⚠ {i}")
-        return 0
+        # 退出码反映**双维度**判定（2026-10-12 修 CLI-03；2026-10-13 修 CLI-14）：
+        # CLI-03 让质量维度的 verdict 参与退出码；但同一命令还算了**一致性**
+        # 评分（vc_score），它当时被忽略——实测：一致性 56 分（远低于 75 线）
+        # 赫然打印在输出里，命令却 EXIT=0，CI/脚本编排据此放行声线走样的章节。
+        # 用户改用直连 consistency.py 会得到相反结论——两条路径语义分裂。
+        #
+        # 现要求两个维度都达标才返回 0。一致性 PASS 线取 75，与直连脚本
+        # （scripts/consistency.py --threshold 默认 75）及项目其它维度一致。
+        # 未传 --voice 时 vc_score 为 None，只按质量维度判（保持原行为）。
+        CONSISTENCY_PASS_LINE = 75.0
+        quality_ok = qc.get("verdict") == "PASS"
+        consistency_ok = vc_score is None or vc_score >= CONSISTENCY_PASS_LINE
+        if not consistency_ok:
+            print(f"\n✗ 一致性评分 {vc_score:.1f} < {CONSISTENCY_PASS_LINE:.0f}，判定不通过")
+        return 0 if (quality_ok and consistency_ok) else 1
 
     if args.cmd == "质检":
         import book_quality
@@ -522,7 +678,11 @@ def main():
                 limit_note = (f"（--json 输出最多 {result['issues_limit']} 条）"
                               if result.get("issues_truncated") else "")
                 print(f"  {hint}{limit_note}")
-        return 0
+        # 退出码反映判定（2026-10-12 审计修复 CLI-04）：
+        # 原实现只在 result.get("error") 时 return 1，判定 FAIL（含 critical 级
+        # 问题）仍裸 return 0——与直连脚本语义相反
+        # （scripts/book_quality.py:760 是 `sys.exit(0 if verdict == "PASS" else 1)`）。
+        return 0 if result.get("verdict") == "PASS" else 1
 
     if args.cmd == "聚合":
         return run_script("pass5_aggregate.py", ["--genre", args.genre] +
@@ -630,4 +790,5 @@ def main():
 
 
 if __name__ == "__main__":
+    _configure_console_encoding()
     sys.exit(main())

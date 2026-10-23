@@ -4,9 +4,47 @@
 //   1) 外部非空 value 变化必须回同步到编辑器（受控契约）；
 //   2) 空段落 / 换行在“纯文本 → HTML → 纯文本”往返中保真。
 // 外加：HTML 转义（value 里的 <>& 不得被当成标签解析）、字数统计显示。
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import ChapterEditor from './ChapterEditor'
+import { I18nProvider } from '../state/I18nContext'
+import { writeStorage, removeStorage } from '../safeStorage'
+
+vi.mock('../api/client', () => ({
+  toolsApi: {
+    checkPoison: vi.fn().mockResolvedValue({
+      score: 0,
+      verdict: '安全：未发现明显弃坑毒点，行文节奏舒畅',
+      totalIssues: 0,
+      findings: [],
+    }),
+  },
+  writingApi: {
+    deslop: vi.fn().mockResolvedValue({
+      aiScore: 0,
+      verdict: 'NATURAL',
+      verdictCn: '行文自然',
+      stats: {
+        wordCount: 100,
+        sentenceCount: 5,
+        issuesCount: 0,
+        rangDensity: 0,
+      },
+      issues: [],
+      suggestions: [],
+    }),
+  },
+  essenceApi: {
+    checkConstitution: vi.fn().mockResolvedValue({
+      compliance_score: 100,
+      is_compliant: true,
+      violations: [],
+      character_voice_alerts: [],
+      summary: '全章设定完美合规',
+    }),
+  },
+  friendlyError: (e: unknown) => String(e),
+}))
 
 const noop = vi.fn()
 
@@ -71,5 +109,141 @@ describe('ChapterEditor', () => {
   it('达到目标字数显示达标提示', async () => {
     render(<ChapterEditor value="你好世界" onChange={noop} targetChars={4} />)
     await screen.findByText('已达目标 4 字')
+  })
+
+  it('点击毒点避雷排查按钮弹出诊断弹窗', async () => {
+    render(<ChapterEditor value="主角一剑横扫八荒，斩灭妖邪。" onChange={noop} />)
+    const btn = await screen.findByText('🛡️ 毒点避雷排查')
+    fireEvent.click(btn)
+
+    await waitFor(() => {
+      expect(screen.getByText('🛡️ 章节毒点排查诊断')).toBeDefined()
+      expect(screen.getByText(/未命中任何已知的过度憋屈/)).toBeDefined()
+    })
+
+    const closeBtn = screen.getByText('关闭并返回写作')
+    fireEvent.click(closeBtn)
+  })
+
+  it('点击去AI味体检按钮弹出诊断弹窗', async () => {
+    render(<ChapterEditor value="主角一剑横扫八荒，斩灭妖邪。" onChange={noop} />)
+    const btn = await screen.findByText('✨ 去AI味体检')
+    fireEvent.click(btn)
+
+    await waitFor(() => {
+      expect(screen.getByText('✨ 章节去 AI 味诊断')).toBeDefined()
+      expect(screen.getByText(/未检测到任何程式化套路/)).toBeDefined()
+    })
+
+    const closeBtn = screen.getByText('关闭并返回写作')
+    fireEvent.click(closeBtn)
+  })
+
+  it('点击设定宪法审查按钮弹出诊断弹窗', async () => {
+    render(<ChapterEditor value="主角推开房门，点燃烛火。" onChange={noop} />)
+    const btn = await screen.findByText('📜 设定宪法审查')
+    fireEvent.click(btn)
+
+    await waitFor(() => {
+      expect(screen.getByText('📜 章节设定与世界观宪法审查')).toBeDefined()
+      expect(screen.getByText(/全章设定完美合规/)).toBeDefined()
+    })
+
+    const closeBtn = screen.getByText('关闭并返回写作')
+    fireEvent.click(closeBtn)
+  })
+
+  it('在 en-US 语言环境下渲染英文动作按钮与单位', async () => {
+    writeStorage('novellab.locale', 'en-US')
+    try {
+      render(
+        <I18nProvider>
+          <ChapterEditor value="A cold wind howled across the frozen wasteland." onChange={noop} />
+        </I18nProvider>,
+      )
+      await screen.findByText('🛡️ Anti-Poison Check')
+      expect(screen.getByText('✨ Anti-Slop Audit')).toBeDefined()
+      expect(screen.getByText('📜 Novel Constitution')).toBeDefined()
+      expect(screen.getByText(/words/)).toBeDefined()
+    } finally {
+      removeStorage('novellab.locale')
+    }
+  })
+
+  it('在 en-US 语言环境下打开毒点排查弹窗渲染英文标题与警报', async () => {
+    writeStorage('novellab.locale', 'en-US')
+    try {
+      render(
+        <I18nProvider>
+          <ChapterEditor value="A cold wind howled across the frozen wasteland." onChange={noop} />
+        </I18nProvider>,
+      )
+      const poisonBtn = await screen.findByText('🛡️ Anti-Poison Check')
+      fireEvent.click(poisonBtn)
+      await waitFor(() => {
+        expect(screen.getByText('🛡️ Chapter Anti-Poison Audit')).toBeDefined()
+        expect(screen.getByText(/Smooth narrative flow!/)).toBeDefined()
+        expect(screen.getByText('Close & Return')).toBeDefined()
+      })
+    } finally {
+      removeStorage('novellab.locale')
+    }
+  })
+
+  it('在 en-US 语言环境下打开去AI味体检弹窗渲染英文标题与警报', async () => {
+    writeStorage('novellab.locale', 'en-US')
+    try {
+      render(
+        <I18nProvider>
+          <ChapterEditor value="A cold wind howled across the frozen wasteland." onChange={noop} />
+        </I18nProvider>,
+      )
+      const deslopBtn = await screen.findByText('✨ Anti-Slop Audit')
+      fireEvent.click(deslopBtn)
+      await waitFor(() => {
+        expect(screen.getByText('✨ Chapter Anti-Slop Audit')).toBeDefined()
+        expect(screen.getByText(/Prose flows naturally/)).toBeDefined()
+        expect(screen.getByText('Close & Return')).toBeDefined()
+      })
+    } finally {
+      removeStorage('novellab.locale')
+    }
+  })
+
+  it('在 en-US 语言环境下打开设定宪法审查弹窗渲染英文标题与关闭按钮', async () => {
+    writeStorage('novellab.locale', 'en-US')
+    try {
+      render(
+        <I18nProvider>
+          <ChapterEditor value="A cold wind howled across the frozen wasteland." onChange={noop} />
+        </I18nProvider>,
+      )
+      const constBtn = await screen.findByText('📜 Novel Constitution')
+      fireEvent.click(constBtn)
+      await waitFor(() => {
+        expect(screen.getByText('📜 Novel Constitution & Canon Audit')).toBeDefined()
+        expect(screen.getByText('Close & Return')).toBeDefined()
+      })
+    } finally {
+      removeStorage('novellab.locale')
+    }
+  })
+
+  it('在 en-US 语言环境下正文为空点击排查给出英文提示', async () => {
+    writeStorage('novellab.locale', 'en-US')
+    try {
+      render(
+        <I18nProvider>
+          <ChapterEditor value="" onChange={noop} />
+        </I18nProvider>,
+      )
+      const poisonBtn = await screen.findByText('🛡️ Anti-Poison Check')
+      fireEvent.click(poisonBtn)
+      await waitFor(() => {
+        expect(screen.getByText('Draft is empty. Please enter chapter text first.')).toBeDefined()
+      })
+    } finally {
+      removeStorage('novellab.locale')
+    }
   })
 })

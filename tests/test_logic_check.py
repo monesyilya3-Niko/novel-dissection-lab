@@ -21,9 +21,14 @@ logic_check 数字/时间线检测 + qc 空声线卡兜底 测试
   python run_tests.py
 """
 import importlib.util
+import io
+import json
+import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
@@ -208,6 +213,39 @@ class TestQcEmptyVoiceCard(unittest.TestCase):
     def test_no_card_still_skipped(self):
         self.assertEqual(qc._dim_character_arc({1: "文本"}, None).score, 100.0)
         self.assertEqual(qc._dim_craft({1: "文本"}, None).score, 100.0)
+
+
+class TestLogicCheckCLI(unittest.TestCase):
+    """CLI 入口与退出码测试。"""
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="logic_cli_test_"))
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def test_main_nonexistent_source_returns_1(self):
+        with patch("sys.stderr", new_callable=io.StringIO):
+            code = logic_check.main([str(self._tmp / "nonexistent")])
+        self.assertEqual(code, 1)
+
+    def test_main_clean_chapter_returns_0(self):
+        ch1 = self._tmp / "chapter-001.txt"
+        ch1.write_text("清风徐来，水波不兴。一切都很平静自然。", encoding="utf-8")
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            code = logic_check.main([str(self._tmp)])
+        self.assertEqual(code, 0)
+        self.assertIn("逻辑合理性检测: 1 章 / 0 问题", mock_out.getvalue())
+
+    def test_main_with_json_and_explicit_argv(self):
+        ch1 = self._tmp / "chapter-001.txt"
+        ch1.write_text("清风徐来，水波不兴。一切都很平静自然。", encoding="utf-8")
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+            code = logic_check.main([str(self._tmp), "--json"])
+        self.assertEqual(code, 0)
+        data = json.loads(mock_out.getvalue())
+        self.assertEqual(data["total_chapters"], 1)
+        self.assertEqual(data["total_issues"], 0)
 
 
 if __name__ == "__main__":

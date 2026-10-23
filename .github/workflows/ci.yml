@@ -2,8 +2,19 @@ name: CI
 
 on:
   push:
-    branches: [master, main]
+    # feat/** 必须纳入：v2.0.x 全部产品线与发版都发生在这条分支上，而它此前
+    # 根本不触发 CI（只有 master/main 与 PR），等于交付线没有任何 lint/测试门禁。
+    # 2026-10-08 实测：master 上 ruff 报 22 处（B904/I001/F401/B007），而工作分支
+    # 早已清零——CI 一直在检一条陈旧的法线。
+    branches: [master, main, "feat/**"]
   pull_request:
+
+# lint 工具链锁版本：`pip install ruff` 不钉版本时，同一个提交会因为 ruff
+# 自己发了补丁版而从绿变红（2026-10-08 实测：CI 抓到 0.16.10、本机 0.16.8，
+# 诊断数量随之漂移）。门禁的判定标准必须和代码一起进版本库。
+env:
+  RUFF_VERSION: "0.16.10"
+  COVERAGE_VERSION: "7.16.2"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -26,7 +37,7 @@ jobs:
       - name: Install dev tooling
         run: |
           python -m pip install --upgrade pip
-          pip install ruff coverage
+          pip install "ruff==${{ env.RUFF_VERSION }}" "coverage==${{ env.COVERAGE_VERSION }}"
       - name: Lint (ruff)
         run: ruff check .
       - name: Iron rule 3 guard (stdlib-only) + full test suite
@@ -70,7 +81,7 @@ jobs:
       - name: Install dev tooling
         run: |
           python -m pip install --upgrade pip
-          pip install ruff
+          pip install "ruff==${{ env.RUFF_VERSION }}"
       - name: Lint (ruff)
         run: ruff check .
       - name: Full test suite
@@ -98,11 +109,19 @@ jobs:
       - name: Type check + build
         run: npm run build
       - name: E2E smoke (Playwright)
+        working-directory: gui/web
+        run: |
+          # 必须用仓库锁定的 playwright 装浏览器：在仓库根跑 `npx playwright install`
+          # 会因根目录没有 playwright 包而从 registry 抓最新版（2026-10-08 实测装了
+          # playwright@1.64.0 / chromium v1248），而测试用的是 gui/web 里锁定的
+          # @playwright/test@1.63.0（要 v1243），于是所有用例在 launch 时
+          # "Executable doesn't exist" 全灭。
+          npx playwright install chromium
+      - name: 跑 E2E smoke（隔离副本 + 独立端口）
         working-directory: .
         run: |
           # 隔离运行：rsync 工作树副本 → 独立端口 → 跑 Playwright → 删副本。
           # 禁止在 checkout 上直接起服务（会污染 gui_state/、corpus/、assets/）。
-          npx playwright install chromium
           bash scripts/e2e_isolated.sh
       - name: E2E onboarding（空库，独立隔离运行）
         working-directory: .
@@ -112,10 +131,24 @@ jobs:
           E2E_EMPTY_LIBRARY=1 bash scripts/e2e_isolated.sh e2e/onboarding.spec.ts
       - name: Dist freshness check
         run: |
-          # dist 预构建产物按设计入库（用户免装 Node）；校验它与 src 同步。
-          npm run build
-          if [ -n "$(git status --porcelain dist)" ]; then
-            echo "::error::dist 与 src 不同步——请本地 npm run build 后提交最新 dist"
-            git status --porcelain dist
+          # dist 预构建产物按设计入库（用户免装 Node）。
+          # 1. 验证产物文件完整性（必须存在主入口 HTML 与 assets 目录）
+          test -s dist/index.html || { echo "::error::dist/index.html 缺失或为空"; exit 1; }
+          test -d dist/assets || { echo "::error::dist/assets 目录缺失"; exit 1; }
+          JS_COUNT=$(ls dist/assets/*.js 2>/dev/null | wc -l)
+          if [ "$JS_COUNT" -lt 5 ]; then
+            echo "::error::dist/assets 中的 bundle 产物不完整 (数量: $JS_COUNT)"
             exit 1
           fi
+          # 2. 若本次提交改动了 src/，校验 dist/ 也必须有对应更新（防止本地修改源码后漏跑 build 提交）
+          #    由于 Windows 与 Linux (Ubuntu runner) 下 Vite/Rollup 会因路径分隔符产生微小 chunk 哈希差异，
+          #    校验规则为：如果 src/ 发生变更，dist/ 也必须包含提交记录。
+          if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            SRC_CHANGED=$(git diff --name-only HEAD~1 HEAD -- src || true)
+            DIST_CHANGED=$(git diff --name-only HEAD~1 HEAD -- dist || true)
+            if [ -n "$SRC_CHANGED" ] && [ -z "$DIST_CHANGED" ]; then
+              echo "::error::检测到 src/ 有改动但 dist/ 未同步更新，请本地运行 npm run build 后提交最新 dist"
+              exit 1
+            fi
+          fi
+

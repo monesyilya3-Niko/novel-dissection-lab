@@ -14,7 +14,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from gui import config, engine_adapter, migrate
+from gui import config, engine_adapter, migrate, text_access
 from gui.logging_setup import get_logger
 from gui.services import ServiceError, assert_asset_kind
 
@@ -27,6 +27,10 @@ _WRITING_TASKS: dict[str, dict[str, Any]] = {}
 # RLock：generate() 提交路径在外层持锁后还会调 _active_writing_count()（同样拿锁），
 # 非重入 Lock 会自死锁（与 quality_service._QUALITY_LOCK 同一事故口径）。
 _WRITING_LOCK = threading.RLock()
+
+# 章节落盘锁：import_chapter / _run_generate 的"快照旧章节→落盘→记账"三步必须原子化，
+# 否则并发重复入库同一章节时两个线程都快照到 old=None，字数与章节数重复累加。
+_CHAPTER_WRITE_LOCK = threading.RLock()
 
 _ACTIVE_STATUSES = frozenset({"pending", "running", "scoring", "rewriting"})
 _MAX_CONCURRENT_WRITING = 2
@@ -54,7 +58,11 @@ def _active_writing_count() -> int:
 
 
 def _sanitize_project(project: str) -> str:
-    """校验项目名：非空、无 / \\ .. 与控制字符；非法 → ServiceError(400)。"""
+    """校验项目名：必须是字符串、非空、无 / \\ .. 与控制字符；非法 → ServiceError(400)。"""
+    if not isinstance(project, str):
+        # /api/writing/* 的 project 来自请求体；传数字时下面 .strip() 会抛
+        # AttributeError，用户端只收到一句"内部错误"，看不出是哪个参数错了。
+        raise ServiceError("project 必须为字符串", 400)
     if not project or not project.strip():
         raise ServiceError("project 不能为空", 400)
     p = project.strip()
@@ -67,6 +75,10 @@ def _sanitize_project(project: str) -> str:
 
 def _load_asset_json(ref: str) -> dict[str, Any]:
     """把 '<kind>:<id>' 资产引用解析为 JSON dict。CRITICAL：防路径穿越。"""
+    # 类型校验（2026-10-12 补）：请求体传 {"voice": 12345} 时下面
+    # `":" not in ref` 抛 "argument of type 'int' is not iterable" 变 500。
+    if not isinstance(ref, str):
+        raise ServiceError(f"资产引用必须为字符串: {ref!r}", 400)
     if not ref or ":" not in ref:
         raise ServiceError(f"非法资产引用: {ref!r}", 400)
     kind, _, asset_id = ref.partition(":")
@@ -180,6 +192,31 @@ def list_projects() -> list[dict[str, Any]]:
                 projects.append({"id": child.name, "name": name, "read_only": False})
     # CLI 只读 default 项目：无论 novel/ 是否为空都必须出现
     projects.append({"id": "default", "name": "default（CLI 只读）", "read_only": True})
+
+    meta_map = {}
+    try:
+        from gui import db
+        rows = db.get_conn().execute(
+            "SELECT project, platform, genre, target_words, summary FROM writing_projects_meta"
+        ).fetchall()
+        for r in rows:
+            meta_map[r["project"]] = dict(r)
+    except Exception:
+        pass
+
+    for p in projects:
+        m = meta_map.get(p["id"])
+        if m:
+            p["platform"] = m["platform"]
+            p["genre"] = m["genre"]
+            p["target_words"] = m["target_words"]
+            p["summary"] = m["summary"]
+        else:
+            p["platform"] = "fanqie"
+            p["genre"] = "general"
+            p["target_words"] = 1000000
+            p["summary"] = ""
+
     return projects
 
 
@@ -196,11 +233,19 @@ def create_project(name: str) -> dict[str, Any]:
     - 同名目录已存在 → 409（不覆盖已有项目数据）。
     - ``state.json`` 经 ``_atomic_write_json`` 原子写入。
     """
+    if not isinstance(name, str):
+        # 请求体里 name 传成数字时，下面 (name or "").strip() 会 AttributeError
+        # 冒到路由层变成没有信息量的 500。
+        raise ServiceError("项目名必须为字符串", 400)
     clean = (name or "").strip()
     if not clean:
         raise ServiceError("项目名不能为空", 400)
     if len(clean) > 60:
         raise ServiceError("项目名过长（最多 60 个字符）", 400)
+    # 控制字符校验（2026-10-12 补）：原正则 [^\s/\\]+ 只挡空白与斜杠，
+    # "\x00" 能通过，然后 mkdir 抛 "embedded null character in path" 变 500。
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in clean):
+        raise ServiceError("项目名不能包含控制字符", 400)
     if clean in (".", "..") or not _PROJECT_ID_RE.match(clean):
         raise ServiceError("项目名不能包含 / 或 \\", 400)
     if clean == "default":
@@ -304,19 +349,19 @@ def inject(voice: str, structure: str | None = None, commercial: str | None = No
 def score(voice: str, text: str | None = None, chapter_path: str | None = None,
           label: str = "", genre_pack: str | None = None) -> dict[str, Any]:
     """双维度打分：一致性五维 + 章节质量十二维。"""
+    # 类型校验（2026-10-12 补）：text 非字符串时一路传到 engine_adapter.score_text
+    # 内部才崩，变 500；label 非字符串同理。与 quality_service 三个质检入口
+    # 保持同一措辞与状态码。
+    if text is not None and not isinstance(text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    if not isinstance(label, str):
+        raise ServiceError("label 必须为字符串", 400)
     if not text and not chapter_path:
         raise ServiceError("需要 text 或 chapter_path", 400)
     if chapter_path:
-        # HIGH：路径必须在 NOVEL_DIR 内
-        fp = Path(chapter_path).resolve()
-        if not fp.is_relative_to(config.NOVEL_DIR.resolve()):
-            raise ServiceError("chapter_path 必须在 novel/ 目录内", 400)
-        if not fp.is_file():
-            raise ServiceError(f"章节文件不存在: {chapter_path}", 404)
-        try:
-            text = fp.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError) as exc:
-            raise ServiceError(f"读取章节失败: {exc}", 400) from exc
+        # HIGH：目录边界不限（2026-10-08，用户稿子常在 novel/ 之外），
+        # 由 text_access 保证只读得到正文文件本身。
+        text = text_access.read_text(chapter_path, field="chapter_path")
 
     voice_data = _load_asset_of_kind(voice, "voice")
     cons = engine_adapter.score_text(voice_data, text, label=label)
@@ -357,6 +402,13 @@ def score(voice: str, text: str | None = None, chapter_path: str | None = None,
 
 def assemble(name: str, genre: str, skip_craft: bool = False) -> dict[str, Any]:
     """组装 pass1-5 → 4 类资产入库。genre 必填（D7）。"""
+    # 类型校验（2026-10-12 补）：请求体塞 {"genre": 123} 时 `not genre` 为 False
+    # （数字非空），下一句 genre.strip() 直接 AttributeError → 500。
+    # name 同理：非字符串会在下面的 `ch in name` 处 TypeError。
+    if not isinstance(genre, str):
+        raise ServiceError("genre 必须为字符串", 400)
+    if not isinstance(name, str):
+        raise ServiceError("name 必须为字符串", 400)
     if not genre or not genre.strip():
         raise ServiceError("genre 不能为空（铁律一：题材隔离）", 400)
     genre = genre.strip()
@@ -461,6 +513,10 @@ def generate(voice: str, project: str, chapter_no: int, task: str,
     project = _sanitize_project(project)
     if chapter_no < 1:
         raise ServiceError("chapter_no 必须 ≥ 1", 400)
+    if chapter_no > _MAX_CHAPTER_NO:
+        # 章节号会直接拼成 chapter-%03d.txt 并成为记账/导出的排序键；
+        # 10^20 这种值写得进去，但之后列目录、导出、统计都会被它拖乱。
+        raise ServiceError(f"chapter_no 过大（最多 {_MAX_CHAPTER_NO}）", 400)
 
     voice_data = _load_asset_of_kind(voice, "voice")
     novel_dir = config.NOVEL_DIR / project
@@ -550,6 +606,9 @@ def task_state(task_id: str) -> dict[str, Any]:
         return copy.deepcopy(t)
 
 
+_MAX_CHAPTER_NO = 100_000
+
+
 def import_chapter(project: str, chapter_no: int, content: str,
                    novel_name: str | None = None, voice: str | None = None,
                    genre_pack: str | None = None) -> dict[str, Any]:
@@ -557,6 +616,10 @@ def import_chapter(project: str, chapter_no: int, content: str,
     project = _sanitize_project(project)
     if chapter_no < 1:
         raise ServiceError("chapter_no 必须 ≥ 1", 400)
+    if chapter_no > _MAX_CHAPTER_NO:
+        # 章节号会直接拼成 chapter-%03d.txt 并成为记账/导出的排序键；
+        # 10^20 这种值写得进去，但之后列目录、导出、统计都会被它拖乱。
+        raise ServiceError(f"chapter_no 过大（最多 {_MAX_CHAPTER_NO}）", 400)
     if not content or not content.strip():
         raise ServiceError("content 不能为空", 400)
 
@@ -566,12 +629,26 @@ def import_chapter(project: str, chapter_no: int, content: str,
     # state.json 的 current_chapter/word_count_today 已被推进——修正后重试还会重复累加字数。
     voice_data = _load_asset_of_kind(voice, "voice") if voice else None
 
-    engine_adapter.ensure_novel_structure(str(novel_dir), novel_name or project)
-    chapter_path = engine_adapter.save_chapter(str(novel_dir), chapter_no, content)
+    # 入库幂等：确保目录→快照→落盘→记账四步全在 _CHAPTER_WRITE_LOCK 内，防并发重复入库与 state.json 争用竞态；
+    # 重复入库只记字数增量（改短则扣减），不重复累加章节数
+    from gui import writing_extra
+    with _CHAPTER_WRITE_LOCK:
+        engine_adapter.ensure_novel_structure(str(novel_dir), novel_name or project)
+        old_words = writing_extra.get_chapter_words(project, chapter_no)
+        is_new = old_words is None
+        chapter_path = engine_adapter.save_chapter(str(novel_dir), chapter_no, content)
+        new_words = writing_extra.count_words(content)
+        # v2.0.2：码字统计（失败不阻断写作主流程）
+        try:
+            writing_extra.record_words(project, new_words - (old_words or 0),
+                                       chapters=1 if is_new else 0)
+        except Exception:
+            pass
 
     result: dict[str, Any] = {
         "chapter_path": migrate.rel_path(chapter_path),
         "chapter_no": chapter_no, "char_count": len(content),
+        "overwrote": not is_new,
     }
 
     if voice_data is not None:
@@ -583,13 +660,6 @@ def import_chapter(project: str, chapter_no: int, content: str,
         result["quality_score"] = qc.get("score", 0)
         result["quality_verdict"] = qc.get("verdict", "?")
         result["pass_line"] = pass_line
-
-    # v2.0.2：码字统计（失败不阻断写作主流程）
-    try:
-        from gui import writing_extra
-        writing_extra.record_words(project, writing_extra.count_words(content), chapters=1)
-    except Exception:
-        pass
 
     return result
 
@@ -673,11 +743,22 @@ def _run_generate(task_id: str, voice_data: dict, system: str, req: dict) -> Non
                                        cons.get("details", []), qc.get("issues", []),
                                        voice_data, content)
 
-        # 落盘最佳稿
-        chapter_path = engine_adapter.save_chapter(str(novel_dir), chapter_no, best_content or "")
-        # v2.0.2：码字统计（失败不阻断）
+        # 落盘最佳稿：快照→落盘→记账三步原子化（_CHAPTER_WRITE_LOCK），防并发竞态
         from gui import writing_extra
-        writing_extra.record_words(project, writing_extra.count_words(best_content or ""), chapters=1)
+        with _CHAPTER_WRITE_LOCK:
+            old_words = writing_extra.get_chapter_words(project, chapter_no)
+            is_new = old_words is None
+            chapter_path = engine_adapter.save_chapter(str(novel_dir), chapter_no, best_content or "")
+            # v2.0.2：码字统计（失败不阻断：统计表异常不得让已落盘的章节任务卡住）；
+            # 重复生成同一章节记增量，不重复累加章节数
+            try:
+                writing_extra.record_words(
+                    project,
+                    writing_extra.count_words(best_content or "") - (old_words or 0),
+                    chapters=1 if is_new else 0,
+                )
+            except Exception:
+                pass
         with _WRITING_LOCK:
             _WRITING_TASKS[task_id]["status"] = "done"
             _WRITING_TASKS[task_id]["chapter_path"] = migrate.rel_path(chapter_path)

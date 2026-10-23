@@ -50,19 +50,25 @@ def combined_report_ok(book_chars: int, craft_chars: int) -> dict[str, Any]:
     Args:
         book_chars: 拆书报告字符数
         craft_chars: 笔法分析字符数
-
     Returns:
-        dict: {book_chars, craft_chars, total, ok, min_chars}
+        dict: {book_chars, craft_chars, total, ok, min_chars, missing}
     """
     book = int(book_chars or 0)
     craft = int(craft_chars or 0)
     total = book + craft
+    missing = []
+    if book <= 0:
+        missing.append("book")
+    if craft <= 0:
+        missing.append("craft")
+    ok = total >= MIN_REPORT_CHARS
     return {
         "book_chars": book,
         "craft_chars": craft,
         "total": total,
-        "ok": total >= MIN_REPORT_CHARS,
+        "ok": ok,
         "min_chars": MIN_REPORT_CHARS,
+        "missing": missing,
     }
 
 
@@ -83,7 +89,8 @@ def check_combined_report_length(reports_dir, name: str) -> dict[str, Any]:
             "book_chars": 拆书报告字符数,
             "craft_chars": 笔法分析字符数,
             "total": 合计字符数,
-            "ok": 是否 ≥ MIN_REPORT_CHARS,
+            "ok": 是否达标,
+            "missing": 缺失的报告名列表,
             "book_path": ..., "craft_path": ...
         }
     """
@@ -91,7 +98,8 @@ def check_combined_report_length(reports_dir, name: str) -> dict[str, Any]:
     book_path = base / REPORT_NAME_BOOK.format(name=name)
     craft_path = base / REPORT_NAME_CRAFT.format(name=name)
     # 判定口径统一走 combined_report_ok（单一来源），本函数只负责「读盘 + 附加路径」。
-    result = combined_report_ok(_report_char_len(book_path), _report_char_len(craft_path))
+    result = combined_report_ok(
+        _report_char_len(book_path), _report_char_len(craft_path))
     result["book_path"] = str(book_path)
     result["craft_path"] = str(craft_path)
     return result
@@ -338,14 +346,14 @@ def build_report(voice, structure, commercial, title_override=None) -> str:
     return "\n".join(sections)
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="拆书报告渲染器：资产 → 可交付 Markdown 报告")
     ap.add_argument("voice", help="voice-card JSON 路径")
     ap.add_argument("--structure", help="structure-obs JSON（可选）")
     ap.add_argument("--commercial", help="commercial-obs JSON（可选）")
     ap.add_argument("--title", help="报告标题（默认用资产 source_title）")
     ap.add_argument("--out", help="输出路径，默认 reports/<名>-拆书报告.md")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     voice = json.loads(Path(args.voice).read_text(encoding="utf-8"))
     structure = json.loads(Path(args.structure).read_text(encoding="utf-8")) if args.structure else None
@@ -365,6 +373,8 @@ def main():
     if len(report) < MIN_REPORT_CHARS:
         print(f"⚠ 拆书报告单份字数 {len(report)} < {MIN_REPORT_CHARS}，请确认笔法分析部分补足，"
               f"合计硬校验在 novel.py 分析（check_combined_report_length）")
+
+    return 0
 
 
 if __name__ == "__main__":

@@ -201,6 +201,27 @@ def compute_metrics(text: str) -> dict[str, Any]:
     return _get_metrics().compute(text)
 
 
+def split_sentences(text: str) -> list[str]:
+    """按引擎口径切句：``metrics.SENT_RE``（。！？!?…;； 与换行都算句边界）。
+
+    gui 层不要自己写 ``[。！？!?]``：那样会漏掉省略号、分号和换行，同一篇稿子
+    在文风卡和引擎报告里得到两个不同的句数/句长（style_service 就因此把
+    140 句读成 100 句，平均句长 5.6 读成 8.4）。
+    """
+    parts = _get_metrics().SENT_RE.split(text)
+    return [s.strip() for s in parts if s.strip()]
+
+
+def dialogue_char_count(text: str) -> int:
+    """引号内字符数（近似对白字数），口径唯一来源是 ``scripts/metrics``。
+
+    支持 ASCII ``"..."``、中文弯引号 ``“...”``、直角引号 ``「...」``/``『...』`` 与
+    ``‘...’``。gui 层不要自己写引号正则：本仓库绝大多数正文用弯引号，
+    自己写的那一版会整段漏计（style_service 就因此把 17% 对白读成 4%）。
+    """
+    return _get_metrics().dialogue_char_count(text)
+
+
 # ---------------------------------------------------------------------------
 # 单批分析（核心难点 A2 的解法：切片缩小到单批）
 # ---------------------------------------------------------------------------
@@ -573,6 +594,31 @@ def chapter_check(text: str, genre_pack: dict | None = None) -> dict[str, Any]:
 def resolve_thresholds(genre_pack: dict | None = None) -> tuple[int, int]:
     """解析质量阈值 (pass_line, warn_line)（chapter_check.resolve_thresholds）。"""
     return _get_chapter_check().resolve_thresholds(genre_pack)
+
+
+# --- 章节扫描口径（单一来源：scripts/chapter_loader）---
+
+def chapter_scan_rules() -> tuple[str, frozenset[str]]:
+    """返回 (章节文件通配符, 排除目录名集合)。
+
+    给需要"按章节加载器的规则挑文件"的调用方用（目前是质检的外部目录隔离复制），
+    避免在 gui 层复制一份 ``*.txt`` 与排除名单造成口径漂移——铁律要求 scripts/
+    只能经本模块触碰，所以规则也从这里出口。
+    """
+    from scripts.chapter_loader import EXCLUDED_DIR_NAMES
+    return "*.txt", frozenset(EXCLUDED_DIR_NAMES)
+
+
+def read_chapter_text(path: str | Path) -> str:
+    """读正文文件，编码按 UTF-8 → GBK 两段解（口径在 scripts/chapter_loader）。
+
+    GUI 不该自己 ``Path.read_text(encoding="utf-8")``：用户的 `.txt` 相当一部分是
+    GBK/GB2312，只认 UTF-8 会让质检在真稿上报"读取章节失败"，看上去像路径被禁。
+    解码规则只有一份，按铁律从本模块出口。
+    """
+    from scripts.chapter_loader import read_text_file
+
+    return read_text_file(Path(path))
 
 
 # --- 全书质检（book_quality.py）---

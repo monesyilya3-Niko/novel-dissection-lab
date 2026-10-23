@@ -10,6 +10,7 @@ M2.2 章节生成时，这个 prompt 作为 system 消息喂给 LLM。
 """
 import argparse
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -585,7 +586,7 @@ def build_prompt(voice: dict, structure: dict | None, commercial: dict | None, g
     return "\n\n---\n\n".join(sections)
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="资产注入器：voice-card → 写作 system prompt")
     ap.add_argument("voice", help="voice-card JSON 路径")
     ap.add_argument("--structure", help="structure-obs JSON（可选）")
@@ -596,9 +597,14 @@ def main():
     ap.add_argument("--distilled", help="蒸馏规则 JSON（可选，注入跨书聚合规则）")
     ap.add_argument("--tracking-state", help="追踪状态 JSON（可选，注入长文本连续性上下文）")
     ap.add_argument("--out", help="输出路径，默认 prompts/generated/<名>-writing-prompt.md")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
-    voice = json.loads(Path(args.voice).read_text(encoding="utf-8"))
+    vpath = Path(args.voice)
+    if not vpath.is_file():
+        print(f"错误: voice-card 文件不存在: {vpath}", file=sys.stderr)
+        return 1
+
+    voice = json.loads(vpath.read_text(encoding="utf-8"))
     structure = json.loads(Path(args.structure).read_text(encoding="utf-8")) if args.structure else None
     commercial = json.loads(Path(args.commercial).read_text(encoding="utf-8")) if args.commercial else None
     genre_pack = json.loads(Path(args.genre_pack).read_text(encoding="utf-8")) if args.genre_pack else None
@@ -609,7 +615,7 @@ def main():
 
     prompt = build_prompt(voice, structure, commercial, genre_pack, craft_card, distilled, tracking_state=tracking_state, genre_prose_card=genre_prose_card)
 
-    name = Path(args.voice).stem.replace("-voice-card", "")
+    name = vpath.stem.replace("-voice-card", "")
     out = Path(args.out) if args.out else PROMPTS_DIR / f"{name}-writing-prompt.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(prompt, encoding="utf-8")
@@ -621,6 +627,7 @@ def main():
     print(f"  craft-card: {'已注入' if craft_card else '未注入'}")
     print(f"  distilled: {'已注入' if distilled else '未注入'}")
     print("  （直接作为 system 消息喂给写作 LLM）")
+    return 0
 
 
 if __name__ == "__main__":

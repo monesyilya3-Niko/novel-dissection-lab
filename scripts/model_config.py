@@ -20,7 +20,11 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+ROOT_DIR = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT_DIR), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 import secret_store  # noqa: E402  （独立模块，llm_client 内部为延迟 import，不能从它转出）
 from llm_client import (  # noqa: E402
     DEFAULT_ROUTES,
@@ -173,6 +177,8 @@ TASK_LABELS = {
 def _mask(key: str) -> str:
     if not key:
         return "(未设置)"
+    if not isinstance(key, str):
+        key = str(key)
     if len(key) <= 10:
         return key[:2] + "***"
     return f"{key[:6]}...{key[-4:]}"
@@ -204,7 +210,15 @@ def cmd_list(_):
         roles_rev.setdefault(mid, []).append(role)
     for mid, m in models.items():
         tags = f"  [{', '.join(roles_rev[mid])}]" if mid in roles_rev else ""
-        key_state = "本地无需" if m.get("protocol") == "ollama" or not m.get("api_key_env", "x") else _mask(secrets.get(mid, ""))
+        sec_val = secrets.get(mid, "")
+        if m.get("protocol") == "ollama":
+            key_state = "本地无需"
+        elif sec_val:
+            key_state = _mask(sec_val)
+        elif not m.get("api_key_env"):
+            key_state = "本地无需"
+        else:
+            key_state = _mask(sec_val)
         env = m.get("api_key_env")
         if env:
             import os
@@ -236,7 +250,13 @@ def cmd_add(args):
     preset_id = args.preset
     if not preset_id:
         print("\n可用预设:", ", ".join(PRESETS))
-        preset_id = input("选择预设 (回车=custom): ").strip() or "custom"
+        if not args.interactive and not sys.stdin.isatty():
+            preset_id = "custom"
+        else:
+            try:
+                preset_id = input("选择预设 (回车=custom): ").strip() or "custom"
+            except (EOFError, OSError):
+                preset_id = "custom"
     if preset_id not in PRESETS:
         print(f"[X] 未知预设 '{preset_id}'。可用: {', '.join(PRESETS)}")
         return 1
@@ -246,23 +266,37 @@ def cmd_add(args):
     p.pop("note", None)
     print(f"\n配置 {label}")
 
-    mid = args.id or input(f"模型标识 id (默认 {preset_id}): ").strip() or preset_id
+    if args.id:
+        mid = args.id
+    elif not args.interactive and not sys.stdin.isatty():
+        mid = preset_id
+    else:
+        try:
+            mid = input(f"模型标识 id (默认 {preset_id}): ").strip() or preset_id
+        except (EOFError, OSError):
+            mid = preset_id
+
     if mid in cfg["models"] and not args.force:
         print(f"[X] '{mid}' 已存在，用 --force 覆盖")
         return 1
 
     def _fill(field, cli_value, label):
         """CLI 参数 > 交互输入 > 预设默认"""
-        if cli_value:
+        if cli_value is not None:
             p[field] = cli_value
             return
         current = p.get(field, "")
         if current and not args.interactive:
             return
+        if not args.interactive and not sys.stdin.isatty():
+            return
         hint = f" (默认 {current})" if current else ""
-        v = input(f"{label}{hint}: ").strip()
-        if v:
-            p[field] = v
+        try:
+            v = input(f"{label}{hint}: ").strip()
+            if v:
+                p[field] = v
+        except (EOFError, OSError):
+            return
 
     _fill("base_url", args.base_url, "接口地址 base_url")
     if not p["base_url"]:
@@ -285,10 +319,14 @@ def cmd_add(args):
     if p.get("protocol") != "ollama" and p.get("api_key_env") != "":
         key = args.key
         if not key and not args.no_key:
-            print("\n密钥可用两种方式（任选其一）：")
-            print(f"  A. 环境变量 {p.get('api_key_env') or '(自定义)'}  — 更安全，推荐")
-            print("  B. 存入本地加密密钥库              — Windows DPAPI 加密（.secrets.bin），已自动 gitignore")
-            key = input("现在输入 API Key (直接回车跳过): ").strip()
+            if args.interactive or sys.stdin.isatty():
+                print("\n密钥可用两种方式（任选其一）：")
+                print(f"  A. 环境变量 {p.get('api_key_env') or '(自定义)'}  — 更安全，推荐")
+                print("  B. 存入本地加密密钥库              — Windows DPAPI 加密（.secrets.bin），已自动 gitignore")
+                try:
+                    key = input("现在输入 API Key (直接回车跳过): ").strip()
+                except (EOFError, OSError):
+                    key = ""
         if key:
             s = load_secrets()
             s[mid] = key
@@ -304,7 +342,13 @@ def cmd_key(args):
     if args.model_id not in cfg["models"]:
         print(f"[X] 模型 '{args.model_id}' 不存在")
         return 1
-    key = args.value or input(f"输入 {args.model_id} 的 API Key: ").strip()
+    if args.value is not None:
+        key = args.value
+    else:
+        try:
+            key = input(f"输入 {args.model_id} 的 API Key: ").strip()
+        except (EOFError, OSError):
+            key = ""
     if not key:
         print("[X] 密钥为空，未修改")
         return 1
@@ -399,7 +443,7 @@ def cmd_remove(args):
     return 0
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="model_config", description="拆书系统模型配置管理")
     sub = ap.add_subparsers(dest="cmd")
 
@@ -439,16 +483,21 @@ def main():
     fb.add_argument("model_id")
     fb.add_argument("fallback_models", nargs="*", help="备用模型 id（留空=清空）")
 
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     if not args.cmd:
         ap.print_help()
         return 0
-    return {
+    handlers = {
         "list": cmd_list, "presets": cmd_presets, "routes": cmd_routes,
         "add": cmd_add, "key": cmd_key, "test": cmd_test,
         "role": cmd_role, "route": cmd_route, "remove": cmd_remove,
         "fallback": cmd_fallback,
-    }[args.cmd](args) or 0
+    }
+    handler = handlers.get(args.cmd)
+    if not handler:
+        ap.print_help()
+        return 2
+    return handler(args) or 0
 
 
 if __name__ == "__main__":

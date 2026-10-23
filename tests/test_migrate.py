@@ -27,6 +27,15 @@ if str(ROOT) not in sys.path:
 
 from gui import asset_index, config, db, migrate  # noqa: E402
 
+_TESTS_DIR = ROOT / "tests"
+if str(_TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TESTS_DIR))
+
+# 临时目录回收统一走 _isolation.remove_tree（Windows 安全：句柄未释放时逐文件兜底）。
+# 本模块的 4 个 mkdtemp 以前**从来没被删过**——2026-10-08 实测 %TEMP% 里攒了
+# 576 个 migrate_bak_/migrate_upgrade_/migrate_sync_/migrate_qa_ 目录。
+from _isolation import remove_tree as _rm_tmp  # noqa: E402
+
 
 class TestMigrateInfer(unittest.TestCase):
     """推断规则单元测试（无需建目录）。"""
@@ -150,6 +159,12 @@ class TestMigrateFlow(unittest.TestCase):
             "REPORTS_DIR": config.REPORTS_DIR,
             "CORPUS_DIR": config.CORPUS_DIR,
             "STATE_ROOT": config.STATE_ROOT,
+            # R2：DB_PATH / LOCK_PATH 由 STATE_ROOT 在导入期派生，patch STATE_ROOT 带不动
+            # 它们；不一起隔离时 migrate._server_is_running() 会去读真实用户数据目录的
+            # .lock——桌面版「暮冬念春」一开着，rollback 就误判"服务运行中"而拒绝执行
+            # （2026-10-08 实机踩到：全量门禁因此变红）。
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
             # R1：STATE_JSON_DIR 与 STATE_ROOT 必须成对隔离，避免夹具落到真实 gui/state/。
             "STATE_JSON_DIR": config.STATE_JSON_DIR,
         }
@@ -157,6 +172,8 @@ class TestMigrateFlow(unittest.TestCase):
         config.REPORTS_DIR = cls._tmp / "reports"
         config.CORPUS_DIR = cls._tmp / "corpus"
         config.STATE_ROOT = cls._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_JSON_DIR = cls._tmp / "gui_state"
         for d in (config.ASSETS_ROOT, config.REPORTS_DIR, config.CORPUS_DIR,
                   config.STATE_ROOT, config.STATE_JSON_DIR):
@@ -201,6 +218,7 @@ class TestMigrateFlow(unittest.TestCase):
         for k, v in cls._orig.items():
             setattr(config, k, v)
         db._reset_conn()
+        _rm_tmp(cls._tmp)
 
     def _n(self, table: str) -> int:
         return db.get_conn().execute(f"SELECT COUNT(*) AS n FROM {table}").fetchone()["n"]
@@ -451,6 +469,8 @@ class TestBackupRetention(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="migrate_bak_"))
         self._orig_state = config.STATE_ROOT
         config.STATE_ROOT = self._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
         db._reset_conn()
 
@@ -458,6 +478,7 @@ class TestBackupRetention(unittest.TestCase):
         db.close()
         config.STATE_ROOT = self._orig_state
         db._reset_conn()
+        _rm_tmp(self._tmp)
 
     def _make_baks(self, stamps) -> None:
         for ts in stamps:
@@ -522,6 +543,9 @@ class TestMigrateLegacyKindUpgrade(unittest.TestCase):
             "CORPUS_DIR": config.CORPUS_DIR,
             "CONFIG_DIR": config.CONFIG_DIR,
             "STATE_ROOT": config.STATE_ROOT,
+            # 派生常量是 STATE_ROOT 的导入期快照，一起保存才能成对还原。
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
             # STATE_JSON_DIR 与 STATE_ROOT 成对隔离，避免夹具落到真实 gui/state/。
             "STATE_JSON_DIR": config.STATE_JSON_DIR,
         }
@@ -530,6 +554,8 @@ class TestMigrateLegacyKindUpgrade(unittest.TestCase):
         config.CORPUS_DIR = self._tmp / "corpus"
         config.CONFIG_DIR = self._tmp / "config"
         config.STATE_ROOT = self._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_JSON_DIR = self._tmp / "gui_state"
         for d in (config.ASSETS_ROOT, config.REPORTS_DIR, config.CORPUS_DIR,
                   config.CONFIG_DIR, config.STATE_ROOT, config.STATE_JSON_DIR):
@@ -541,6 +567,7 @@ class TestMigrateLegacyKindUpgrade(unittest.TestCase):
         for k, v in self._orig.items():
             setattr(config, k, v)
         db._reset_conn()
+        _rm_tmp(self._tmp)
 
     def _n(self, table: str) -> int:
         return db.get_conn().execute(f"SELECT COUNT(*) AS n FROM {table}").fetchone()["n"]
@@ -627,6 +654,9 @@ class TestSyncAssetKeyConvention(unittest.TestCase):
             "CORPUS_DIR": config.CORPUS_DIR,
             "CONFIG_DIR": config.CONFIG_DIR,
             "STATE_ROOT": config.STATE_ROOT,
+            # 派生常量是 STATE_ROOT 的导入期快照，一起保存才能成对还原。
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
             "STATE_JSON_DIR": config.STATE_JSON_DIR,
         }
         config.ASSETS_ROOT = self._tmp / "assets"
@@ -634,6 +664,8 @@ class TestSyncAssetKeyConvention(unittest.TestCase):
         config.CORPUS_DIR = self._tmp / "corpus"
         config.CONFIG_DIR = self._tmp / "config"
         config.STATE_ROOT = self._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_JSON_DIR = self._tmp / "gui_state"
         for d in (config.ASSETS_ROOT, config.REPORTS_DIR, config.CORPUS_DIR,
                   config.CONFIG_DIR, config.STATE_ROOT, config.STATE_JSON_DIR):
@@ -645,6 +677,7 @@ class TestSyncAssetKeyConvention(unittest.TestCase):
         for k, v in self._orig.items():
             setattr(config, k, v)
         db._reset_conn()
+        _rm_tmp(self._tmp)
 
     def _seed(self) -> None:
         for fname, content in self._FILES:
@@ -694,6 +727,593 @@ class TestSyncAssetKeyConvention(unittest.TestCase):
             "SELECT COUNT(*) AS n FROM assets").fetchone()["n"]
         self.assertEqual(n_before, n_after, "重索引不得插入重复行")
         self.assertTrue(migrate.check()["ok"], "重索引后库与磁盘应对账一致")
+
+
+class TestUpsertAssetDualConflict(unittest.TestCase):
+    """_upsert_asset 的双唯一约束消解（2026-10-12 审计修复 D2）。
+
+    缺陷背景：原实现用链式 ``ON CONFLICT(asset_key) ... ON CONFLICT(path) ...``，
+    但 SQLite 的链式冲突子句**只处理第一个命中的目标**。当 asset_key 撞行 A、
+    path 撞行 B（两行不同）时，第一子句更新完行 A 后其 path 落到行 B 已有的
+    值上，第二子句不再介入 → ``UNIQUE constraint failed: assets.path``，
+    被 db.tx() 整体回滚 → **迁移永久失败**。
+
+    实测复现（修复前）：
+        库中 ('K1','P1') 与 ('K2','P2')，插入 ('K1', ..., 'P2') → IntegrityError
+
+    修法：先显式消解 path 冲突，再走常规 upsert。区分两种情况：
+      - 仅 path 冲突 -> UPDATE 原地改写（保留 id/created_at）
+      - 双冲突       -> 删被取代的行（path 行）后 INSERT
+    """
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="dual_conflict_"))
+        self._orig = {
+            "STATE_ROOT": config.STATE_ROOT,
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
+            "STATE_JSON_DIR": config.STATE_JSON_DIR,
+        }
+        config.STATE_ROOT = self._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
+        config.STATE_JSON_DIR = self._tmp / "gui_state_json"
+        config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
+        db._reset_conn()
+        db.init_schema()
+
+    def tearDown(self):
+        db.close()
+        for k, v in self._orig.items():
+            setattr(config, k, v)
+        db._reset_conn()
+        _rm_tmp(self._tmp)
+
+    def _upsert(self, key, kind, name, path):
+        migrate._upsert_asset(db.get_conn(), key, kind, name, path,
+                              None, None, None, None, "{}")
+
+    def test_dual_conflict_does_not_raise(self):
+        """核心守卫：key 撞 A、path 撞 B 时不得抛 IntegrityError。"""
+        self._upsert("K1", "voice", "A", "P1")
+        self._upsert("K2", "voice", "B", "P2")
+        self._upsert("K1", "trope", "X", "P2")   # 修复前在此抛异常
+
+        rows = {r["path"]: (r["asset_key"], r["kind"]) for r in
+                db.get_conn().execute("SELECT asset_key, kind, path FROM assets")}
+        self.assertEqual(len(rows), 1, f"应只剩 1 行，实际 {rows}")
+        self.assertEqual(rows["P2"], ("K1", "trope"))
+
+    def test_path_only_conflict_updates_in_place(self):
+        """仅 path 冲突：原地改写，id 必须保留（不得删旧插新）。"""
+        self._upsert("trope:idx", "trope", "idx", "P3")
+        id_before = db.get_conn().execute(
+            "SELECT id FROM assets WHERE path='P3'").fetchone()[0]
+
+        self._upsert("genre-prose-card-index:idx", "genre-prose-card-index", "idx", "P3")
+
+        row = db.get_conn().execute(
+            "SELECT asset_key, kind, id FROM assets WHERE path='P3'").fetchone()
+        self.assertEqual(row["asset_key"], "genre-prose-card-index:idx")
+        self.assertEqual(row["kind"], "genre-prose-card-index")
+        self.assertEqual(row["id"], id_before, "id 变了——应为原地更新")
+
+    def test_same_key_is_idempotent(self):
+        """同 key 重复 upsert 必须幂等（更新非键列，不插新行）。"""
+        self._upsert("K", "voice", "v1", "P")
+        self._upsert("K", "voice", "v2", "P")
+        rows = db.get_conn().execute("SELECT asset_key, name FROM assets").fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "v2")
+
+
+class TestPruneSafetyGate(unittest.TestCase):
+    """prune 的安全闸（2026-10-12 审计修复 D7）。
+
+    缺陷背景：prune 是**破坏性**操作，唯一判据是"磁盘扫描不到"。若源目录
+    临时不可见（网络盘断开、权限变更、杀软隔离、配置错误），scan_assets()
+    返回空 → 库中每一行都被判为 extra → **整表清空**。
+
+    实测复现：assets/ 不存在时，3 行全部进 assets_pruned。
+
+    修法：磁盘侧扫到 0 个文件、而库里有行时拒绝执行（dry_run 仍可查看）。
+    """
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="prune_gate_"))
+        self._orig = {
+            "ASSETS_ROOT": config.ASSETS_ROOT,
+            "REPORTS_DIR": config.REPORTS_DIR,
+            "STATE_ROOT": config.STATE_ROOT,
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
+            "STATE_JSON_DIR": config.STATE_JSON_DIR,
+        }
+        config.ASSETS_ROOT = self._tmp / "assets"
+        config.REPORTS_DIR = self._tmp / "reports"
+        config.STATE_ROOT = self._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
+        config.STATE_JSON_DIR = self._tmp / "gui_state_json"
+        config.ASSETS_ROOT.mkdir(parents=True, exist_ok=True)
+        config.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        db._reset_conn()
+        db.init_schema()
+
+    def tearDown(self):
+        db.close()
+        for k, v in self._orig.items():
+            setattr(config, k, v)
+        db._reset_conn()
+        _rm_tmp(self._tmp)
+
+    def _seed(self, n=3):
+        """造 n 个真实文件 + 对应库行（路径用 _rel_path 口径，避免夹具失真）。"""
+        conn = db.get_conn()
+        for i in range(n):
+            fp = config.ASSETS_ROOT / f"f{i}.json"
+            fp.write_text("{}", encoding="utf-8")
+            conn.execute(
+                "INSERT INTO assets (asset_key,kind,name,path) VALUES (?,?,?,?)",
+                (f"k{i}", "voice", f"n{i}", migrate._rel_path(fp)))
+        conn.commit()
+
+    def test_invisible_dir_is_blocked(self):
+        """核心守卫：目录不可见时必须拒绝执行，不得清空索引表。"""
+        self._seed(3)
+        orig = config.ASSETS_ROOT
+        config.ASSETS_ROOT = self._tmp / "根本不存在的目录"
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                migrate.prune(dry_run=False)
+            self.assertIn("疑似不可见", str(cm.exception))
+        finally:
+            config.ASSETS_ROOT = orig
+        # 表必须完好
+        self.assertEqual(
+            db.get_conn().execute("SELECT COUNT(*) FROM assets").fetchone()[0], 3,
+            "被阻断的 prune 竟然改了库")
+
+    def test_dry_run_still_allowed_when_invisible(self):
+        """dry_run 只读，不该被安全闸拦——用户需要能看到待删清单。"""
+        self._seed(3)
+        orig = config.ASSETS_ROOT
+        config.ASSETS_ROOT = self._tmp / "不存在"
+        try:
+            r = migrate.prune(dry_run=True)
+            self.assertEqual(len(r["assets_pruned"]), 3)
+        finally:
+            config.ASSETS_ROOT = orig
+
+    def test_normal_prune_still_works(self):
+        """反向守卫：磁盘真少了文件时，prune 必须正常工作。"""
+        self._seed(2)
+        (config.ASSETS_ROOT / "f0.json").unlink()   # 用户删了 1 个
+        r = migrate.prune(dry_run=False)
+        self.assertEqual(len(r["assets_pruned"]), 1, "正常 prune 被误拦或漏删")
+        self.assertEqual(
+            db.get_conn().execute("SELECT COUNT(*) FROM assets").fetchone()[0], 1)
+
+
+class TestUpsertBookStatus(unittest.TestCase):
+    """_upsert_book 的 status 更新（2026-10-12 审计修复 D4）。
+
+    缺陷背景：原实现的 ON CONFLICT DO UPDATE **不含 status**，于是
+    books.status 永远卡在首次写入的值。实测：先 idle 登记一本仅导入未拆的
+    书，拆完后再传 done —— status 仍是 idle。
+    后果：「已拆书」统计永久失真（拆完的书一直算未拆）。
+
+    修法：status 参与更新，但只允许 idle -> done 单向推进（防止将来调用
+    顺序变化造成 done 被改回 idle 的降级）。
+    """
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="book_status_"))
+        self._orig = {
+            "STATE_ROOT": config.STATE_ROOT,
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
+            "STATE_JSON_DIR": config.STATE_JSON_DIR,
+        }
+        config.STATE_ROOT = self._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
+        config.STATE_JSON_DIR = self._tmp / "gui_state_json"
+        config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
+        db._reset_conn()
+        db.init_schema()
+
+    def tearDown(self):
+        db.close()
+        for k, v in self._orig.items():
+            setattr(config, k, v)
+        db._reset_conn()
+        _rm_tmp(self._tmp)
+
+    def _status(self, bid="bk"):
+        return db.get_conn().execute(
+            "SELECT status FROM books WHERE book_id=?", (bid,)).fetchone()["status"]
+
+    def _upsert(self, status, bid="bk"):
+        migrate._upsert_book(db.get_conn(), bid, bid, None, None, status)
+
+    def test_status_updates_idle_to_done(self):
+        """核心守卫：拆完书后 status 必须推进到 done。"""
+        self._upsert("idle")
+        self.assertEqual(self._status(), "idle")
+        self._upsert("done")
+        self.assertEqual(self._status(), "done",
+                         "status 卡在 idle——「已拆书」统计失真")
+
+    def test_done_is_not_downgraded(self):
+        """反向守卫：已 done 的书不得因后续 idle 调用被降级。"""
+        self._upsert("done")
+        self._upsert("idle")
+        self.assertEqual(self._status(), "done", "done 被降级回 idle")
+
+    def test_new_book_uses_given_status(self):
+        self._upsert("done", "bk2")
+        self.assertEqual(
+            db.get_conn().execute(
+                "SELECT status FROM books WHERE book_id='bk2'").fetchone()["status"],
+            "done")
+
+    def test_repeated_upsert_is_idempotent(self):
+        for _ in range(3):
+            self._upsert("done")
+        rows = db.get_conn().execute("SELECT COUNT(*) FROM books").fetchall()
+        self.assertEqual(rows[0][0], 1)
+        self.assertEqual(self._status(), "done")
+
+
+class TestRollbackResyncsJsonCopies(unittest.TestCase):
+    """rollback 必须同步 JSON 派生副本（2026-10-13 审计修复 D11）。
+
+    缺陷背景：rollback 只恢复 index.db，**不碰** STATE_JSON_DIR 下的派生副本。
+    而 state_store.load_state() **只读 JSON**（不读 SQLite）——实测回滚后
+    SQLite 是 idle/rev=1、JSON 仍是 done/rev=5，**双源分裂**：服务层按 JSON
+    认为任务已完成，库却是回滚前的旧状态。
+
+    修法：回滚后以 SQLite（权威）为准重建 JSON 副本。
+    """
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="d11_"))
+        self._orig = {
+            "STATE_ROOT": config.STATE_ROOT,
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
+            "STATE_JSON_DIR": config.STATE_JSON_DIR,
+        }
+        config.STATE_ROOT = self._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
+        config.STATE_JSON_DIR = self._tmp / "gui_state_json"
+        config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
+        db._reset_conn()
+        db.init_schema()
+        db.apply_migrations()
+
+    def tearDown(self):
+        db.close()
+        for k, v in self._orig.items():
+            setattr(config, k, v)
+        db._reset_conn()
+        _rm_tmp(self._tmp)
+
+    def test_rollback_resyncs_json_copy(self):
+        """核心守卫：回滚后 JSON 副本必须与 SQLite 一致。"""
+        from gui import state_store
+
+        state_store.save_state({"book_id": "b", "status": "idle", "state_revision": 1})
+        migrate.backup()
+        # 推进到回滚点之后
+        state_store.save_state({"book_id": "b", "status": "done", "state_revision": 5})
+
+        migrate.rollback()
+
+        st = state_store.load_state("b")
+        row = db.get_conn().execute(
+            "SELECT status, state_revision FROM analysis_tasks WHERE book_id='b'").fetchone()
+        self.assertIsNotNone(row, "回滚后库中应有该 task")
+        self.assertEqual(st.get("status"), row["status"],
+                         "回滚后 JSON 与 SQLite 状态不一致（双源分裂）")
+        self.assertEqual(st.get("state_revision"), row["state_revision"],
+                         "回滚后 JSON 与 SQLite revision 不一致")
+
+    def test_rollback_keeps_json_for_tasks_absent_from_db(self):
+        """反向守卫：库中无对应行的 JSON 不得被删（可能是未落库的进行中状态）。"""
+        from gui import state_store
+
+        # 只写 JSON、不落库（模拟"尚未 upsert 的进行中状态"）
+        state_store._save_state_json(
+            {"book_id": "json-only", "status": "running", "state_revision": 9})
+        migrate.backup()
+        migrate.rollback()
+
+        st = state_store.load_state("json-only")
+        self.assertEqual(st.get("state_revision"), 9,
+                         "库中无对应行的 JSON 副本被误删/覆盖")
+
+
+class TestPruneBackupsNeverWipesAll(unittest.TestCase):
+    """备份保留策略不得删光全部备份（2026-10-14 审计修复 D21 第 1 点）。
+
+    缺陷背景：prune_backups 原实现 keep <= 0 时 `stale = backups`
+    → **删光全部备份**。实测：keep=0 删 3/3、keep=-5 删 2/2。
+    若调用方把配置项（如环境变量未设时的空串）转成 0，数据安全网会被
+    静默清空——而备份是 rollback 的唯一依托，删光等于失去最后一道恢复手段。
+
+    修法：keep < 1 一律按 1 处理（至少留一个）。
+    """
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="pruneg_"))
+        self._orig = {
+            "STATE_ROOT": config.STATE_ROOT,
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
+        }
+        config.STATE_ROOT = self._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
+        config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
+        db._reset_conn()
+
+    def tearDown(self):
+        db.close()
+        for k, v in self._orig.items():
+            setattr(config, k, v)
+        db._reset_conn()
+        _rm_tmp(self._tmp)
+
+    def _seed(self, n=3):
+        for i in range(n):
+            (config.STATE_ROOT / f"index.db.bak-2026010{i+1}-000000").write_bytes(b"x")
+
+    def _count(self):
+        return len(list(config.STATE_ROOT.glob("*.bak-*")))
+
+    def test_keep_zero_keeps_at_least_one(self):
+        self._seed(3)
+        migrate.prune_backups(keep=0)
+        self.assertEqual(self._count(), 1, "keep=0 删光了全部备份（失去恢复手段）")
+
+    def test_keep_negative_keeps_at_least_one(self):
+        self._seed(3)
+        migrate.prune_backups(keep=-5)
+        self.assertEqual(self._count(), 1, "keep=-5 删光了全部备份")
+
+    def test_normal_keep_still_works(self):
+        """反向守卫：正常 keep 值仍按预期保留 N 个。"""
+        self._seed(5)
+        migrate.prune_backups(keep=2)
+        self.assertEqual(self._count(), 2)
+
+
+class TestRollbackPicksTimestampedBackup(unittest.TestCase):
+    """rollback 必须按时间戳选备份，不受非本函数产物干扰（D21 第 2 点）。
+
+    缺陷背景：原实现 sorted(glob("index.db.bak-*"))[-1] 取"最新"。
+    glob 会一并匹配非本函数产物（如手工放的 index.db.bak-manual），
+    而 'm' > '2' 使其在字符串序中排到最后 → rollback 会去恢复那个手工文件
+    而非真正最新的备份。实测：存在 index.db.bak-manual 时 latest 指向它。
+
+    修法：正则白名单（^index\.db\.bak-\d{8}-\d{6}$）+ 按内嵌时间戳排序。
+    """
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="rbpick_"))
+        self._orig = {
+            "STATE_ROOT": config.STATE_ROOT,
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
+        }
+        config.STATE_ROOT = self._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
+        config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
+        db._reset_conn()
+
+    def tearDown(self):
+        db.close()
+        for k, v in self._orig.items():
+            setattr(config, k, v)
+        db._reset_conn()
+        _rm_tmp(self._tmp)
+
+    def test_rollback_selects_newest_timestamped_backup(self):
+        """核心守卫：真实调用 rollback，验证它选中的是时间戳最新的备份。
+
+        用真实备份（经 db.backup_to 生成，内容合法可过 _verify_backup），
+        再混入一个字符串序更大的手工文件（index.db.bak-manual）。
+        修复前 sorted()[-1] 会选中手工文件（'m' > '2'），修复后应选
+        20260102 那个。
+        """
+        import sqlite3
+        d = config.STATE_ROOT
+        # 造两个内容合法的真备份（_verify_backup 要求关键表存在）
+        for stamp, marker in (("20260101-000000", "old"), ("20260102-000000", "new")):
+            bak = d / f"index.db.bak-{stamp}"
+            con = sqlite3.connect(str(bak))
+            con.executescript(
+                "CREATE TABLE books (book_id TEXT);"
+                "CREATE TABLE assets (asset_key TEXT);"
+                "CREATE TABLE reports (report_key TEXT);")
+            con.execute("INSERT INTO books VALUES (?)", (marker,))
+            con.commit()
+            con.close()
+        # 手工文件：字符串序 'm' > '2'，修复前会被误选
+        (d / "index.db.bak-manual").write_bytes(b"not-a-backup")
+
+        chosen = migrate.rollback()
+        self.assertIsNotNone(chosen, "rollback 未选中任何备份")
+        self.assertEqual(
+            chosen.name, "index.db.bak-20260102-000000",
+            f"选错了备份（可能是被手工文件干扰）: {chosen.name}")
+        # 恢复的库应含 new 标记（证明恢复的是 20260102 那份）
+        con = sqlite3.connect(str(config.DB_PATH))
+        row = con.execute("SELECT book_id FROM books").fetchone()
+        con.close()
+        self.assertEqual(row[0], "new", "恢复的内容不是最新备份的")
+
+
+class TestUpsertGenreDisplayName(unittest.TestCase):
+    """_upsert_genre 的 display_name 必须能补写（2026-10-14 审计修复 D15）。
+
+    缺陷背景：原实现把 display_name 与 kind 写在**同一条** DO UPDATE 里，
+    并带 `WHERE excluded.kind IS NOT NULL` —— 于是当新值的 kind 为 None
+    （典型场景：只想补一个 display_name）时整条 UPDATE 被跳过，
+    display_name 永远补不上。
+    实测：先 _upsert_genre('g', None, None) 再 _upsert_genre('g', '显示名', None)，
+    display_name 仍是 NULL。
+
+    修法：拆两步——display_name 只要非空就补（COALESCE 不覆盖已有值），
+    kind 仍按优先级严格高于才覆盖（保持原防后写覆盖策略）。
+    """
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="genreup_"))
+        self._orig = {
+            "STATE_ROOT": config.STATE_ROOT,
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
+        }
+        config.STATE_ROOT = self._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
+        config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
+        db._reset_conn()
+        db.init_schema()
+        db.apply_migrations()
+
+    def tearDown(self):
+        db.close()
+        for k, v in self._orig.items():
+            setattr(config, k, v)
+        db._reset_conn()
+        _rm_tmp(self._tmp)
+
+    def _row(self, name="g"):
+        r = db.get_conn().execute(
+            "SELECT display_name, kind FROM genres WHERE name=?", (name,)).fetchone()
+        return (r["display_name"], r["kind"]) if r else None
+
+    def test_display_name_backfilled_when_kind_is_none(self):
+        """核心守卫：kind 为 None 时仍应补上 display_name。"""
+        with db.tx() as c:
+            migrate._upsert_genre(c, "g", None, None)
+        with db.tx() as c:
+            migrate._upsert_genre(c, "g", "显示名", None)
+        self.assertEqual(self._row()[0], "显示名",
+                         "kind 为 None 时 display_name 未补写")
+
+    def test_display_name_not_overwritten_by_empty(self):
+        """反向守卫：已有 display_name 不被空值覆盖。"""
+        with db.tx() as c:
+            migrate._upsert_genre(c, "g", "原名", None)
+        with db.tx() as c:
+            migrate._upsert_genre(c, "g", None, "genre_pack")
+        self.assertEqual(self._row()[0], "原名", "display_name 被空值覆盖了")
+
+    def test_kind_priority_still_enforced(self):
+        """反向守卫：kind 优先级裁决未被破坏（低优先级不得覆盖高优先级）。"""
+        with db.tx() as c:
+            migrate._upsert_genre(c, "g", None, "genre_pack")
+        with db.tx() as c:
+            migrate._upsert_genre(c, "g", None, "book")   # 更低优先级
+        self.assertEqual(self._row()[1], "genre_pack",
+                         "kind 被低优先级值覆盖（防后写覆盖策略失效）")
+
+
+class TestSyncAssetReportsSuccess(unittest.TestCase):
+    """sync_asset 必须报告是否真的入库（2026-10-14 审计修复 D12）。
+
+    缺陷背景：sync_asset 原返回 None，且对「文件不存在 / JSON 解析失败 /
+    非 dict」三类情况**静默 return**。调用方 builtin_sync._reindex_copied
+    无法区分"成功入库"与"静默跳过"，把两者一并计入 reindexed——报告数字
+    虚高（用户看到"已重索引 5 个"，实际可能只有 2 个真进了库）。
+
+    修法：返回 bool。其余调用方（advanced_service / writing_service）
+    忽略返回值，改动向后兼容。
+    """
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="syncok_"))
+        self._orig = {
+            "ASSETS_ROOT": config.ASSETS_ROOT,
+            "STATE_ROOT": config.STATE_ROOT,
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
+            "STATE_JSON_DIR": config.STATE_JSON_DIR,
+        }
+        config.ASSETS_ROOT = self._tmp / "assets"
+        config.STATE_ROOT = self._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
+        config.STATE_JSON_DIR = self._tmp / "gui_state_json"
+        config.ASSETS_ROOT.mkdir(parents=True, exist_ok=True)
+        config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
+        db._reset_conn()
+        db.init_schema()
+        db.apply_migrations()
+
+    def tearDown(self):
+        db.close()
+        for k, v in self._orig.items():
+            setattr(config, k, v)
+        db._reset_conn()
+        _rm_tmp(self._tmp)
+
+    def test_returns_true_on_success(self):
+        fp = config.ASSETS_ROOT / "good-voice-card.json"
+        fp.write_text(json.dumps({"meta": {"genre": "xuanhuan"}}), encoding="utf-8")
+        self.assertTrue(migrate.sync_asset(fp), "成功入库却返回假值")
+
+    def test_returns_false_on_corrupt_json(self):
+        fp = config.ASSETS_ROOT / "bad-voice-card.json"
+        fp.write_text("{ 坏 json", encoding="utf-8")
+        self.assertFalse(migrate.sync_asset(fp), "损坏 JSON 却报告成功")
+
+    def test_returns_false_on_non_dict(self):
+        fp = config.ASSETS_ROOT / "arr-voice-card.json"
+        fp.write_text("[1, 2, 3]", encoding="utf-8")
+        self.assertFalse(migrate.sync_asset(fp), "非 dict 却报告成功")
+
+    def test_returns_false_on_missing_file(self):
+        self.assertFalse(migrate.sync_asset(config.ASSETS_ROOT / "nope.json"))
+
+    def test_name_uses_meta_name_like_run_migrate(self):
+        """D14：sync_asset 的显示名口径必须与 run_migrate 一致。
+
+        缺陷背景：run_migrate 用 `meta.name or stem`，而 sync_asset 原先
+        写死 `stem`——同一文件经两条路径入库会得到**不同的 name**
+        （GUI 资产库显示名随入库路径而变）。
+        """
+        fp = config.ASSETS_ROOT / "mybook-voice-card.json"
+        fp.write_text(json.dumps({"meta": {"name": "真实书名", "genre": "xuanhuan"}}),
+                      encoding="utf-8")
+        migrate.sync_asset(fp)
+        row = db.get_conn().execute(
+            "SELECT name FROM assets WHERE asset_key LIKE 'voice:mybook-voice-card%'"
+        ).fetchone()
+        self.assertIsNotNone(row, "资产未入库")
+        self.assertEqual(row["name"], "真实书名",
+                         "sync_asset 未采用 meta.name（与 run_migrate 口径漂移）")
+
+    def test_reindex_count_excludes_failures(self):
+        """端到端：损坏文件不得计入 reindexed 计数。"""
+        from gui import builtin_sync
+        for name in ("g1-voice-card.json", "g2-voice-card.json"):
+            (config.ASSETS_ROOT / name).write_text(
+                json.dumps({"meta": {"genre": "xuanhuan"}}), encoding="utf-8")
+        (config.ASSETS_ROOT / "bad-voice-card.json").write_text(
+            "{ 坏", encoding="utf-8")
+
+        got = builtin_sync._reindex_copied(
+            config.ASSETS_ROOT,
+            ["g1-voice-card.json", "g2-voice-card.json", "bad-voice-card.json"])
+        self.assertEqual(len(got), 2, f"计数虚高（含损坏文件）: {got}")
 
 
 if __name__ == "__main__":

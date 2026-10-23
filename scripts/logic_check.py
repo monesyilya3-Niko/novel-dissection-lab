@@ -30,6 +30,12 @@ import re
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 import chapter_loader
 
 # 闪回/回忆/梦境标记——出现在这些语境里的状态不作为硬矛盾（宽容处理）
@@ -586,11 +592,11 @@ def check_logic(texts: dict, entities: dict = None, llm_hook=None) -> list:
     return issues
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="逻辑合理性纯算法检测")
     ap.add_argument("source", help="novel_dir 或章节目录或单章 txt")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     source = Path(args.source)
     try:
@@ -598,10 +604,10 @@ def main():
     except (OSError, UnicodeError, chapter_loader.ChapterLoadError) as exc:
         # 章节加载失败（同章号冲突/读取失败）：输出错误并非零退出，不静默产出空结果
         print(f"[X] {exc}", file=sys.stderr)
-        sys.exit(1)
+        return 1
     if not texts:
         print("[X] 未找到章节文件", file=sys.stderr)
-        sys.exit(1)
+        return 1
     entities = load_entities(source)
     issues = check_logic(texts, entities)
     coverage = logic_coverage(texts, entities)
@@ -619,7 +625,7 @@ def main():
         warning = _format_coverage_warning(coverage)
         if warning:
             print(warning)
-    sys.exit(0 if not issues else 1)
+    return 0 if not issues else 1
 
 
 if __name__ == "__main__":

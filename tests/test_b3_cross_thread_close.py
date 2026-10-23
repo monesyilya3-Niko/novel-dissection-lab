@@ -13,7 +13,11 @@ import time
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_TESTS_DIR = Path(__file__).resolve().parent
+_ROOT = _TESTS_DIR.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_TESTS_DIR))
 import _isolation  # noqa: E402
 
 from gui import db  # noqa: E402
@@ -65,14 +69,21 @@ class CrossThreadCloseTest(unittest.TestCase):
         with db._conns_lock:
             self.assertIn(worker_tid, db._conns)
 
-        # FD 应处于打开状态
-        fds_before = _open_fds_for(db_path)
-        self.assertTrue(fds_before, "工作线程的 DB 连接 FD 应已打开")
+        # FD 必须在 prune **之前**采样：这条断言要证明的是"释放前 FD 确实存在"，
+        # 等连接被关掉再采样，POSIX 上必然采到空集（Ubuntu 上就是这里稳定失败）。
+        # 观测手段只有 /proc/self/fd，所以按"能不能观测"判定，不按平台名猜。
+        observe_fd = Path("/proc/self/fd").is_dir()
+        fds_before = _open_fds_for(db_path) if observe_fd else set()
+        if observe_fd:
+            self.assertTrue(fds_before, "工作线程的 DB 连接 FD 应已打开")
 
         # 主线程执行 prune（跨线程 close）
         with db._conns_lock:
             db._prune_dead_threads_locked()
             self.assertNotIn(worker_tid, db._conns)
+
+        if not observe_fd:
+            return
 
         # 给内核一点时间回收（通常是同步的）
         time.sleep(0.1)

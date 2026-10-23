@@ -57,17 +57,40 @@ def _prune_terminal_tasks() -> None:
 
 
 _EXTERNAL_SCRATCH_PREFIX = "qc-external-"
+# 外部路径隔离复制的三道上限：单个文件、单目录内的章节文件数、累计字节。
+# 目录可以无限大（用户语料盘动辄几十 GB），而 scratch 落在用户数据目录里，
+# 不设限就等于让一次质检把自己磁盘写满。
+_EXTERNAL_MAX_FILE_BYTES = 50 * 1024 * 1024
+_EXTERNAL_MAX_FILES = 2000
+_EXTERNAL_MAX_BYTES = 200 * 1024 * 1024
+#: 外部目录允许遍历的子目录数上限（防 target 填错成整盘/系统目录）。
+_EXTERNAL_MAX_DIRS = 2000
+
+
+def _external_scratch_task_dir(p: Path) -> Path | None:
+    """p 若位于 ``scratch/qc-external-*/`` 隔离副本内，返回那个任务目录；否则 None。"""
+    scratch_root = config.STATE_ROOT / "scratch"
+    try:
+        rel = p.relative_to(scratch_root)
+    except ValueError:
+        return None
+    if not rel.parts or not rel.parts[0].startswith(_EXTERNAL_SCRATCH_PREFIX):
+        return None
+    return scratch_root / rel.parts[0]
 
 
 def _is_external_scratch_copy(p: Path) -> bool:
-    """判断是否为 resolve_chapter_target 产生的外部隔离副本。"""
+    """判断是否为 resolve_chapter_target 产生的外部隔离副本（文件/目录副本都算）。
+
+    目录副本会嵌套（``<id>/<书名>/子目录/章.txt``），所以按"是否在 qc-external-* 之下"
+    判定，不能只看直接父目录名——否则副本认不出来，scratch 永久泄漏。
+    """
     d = p if p.is_dir() else p.parent
-    return (d.name.startswith(_EXTERNAL_SCRATCH_PREFIX)
-            and d.parent == (config.STATE_ROOT / "scratch"))
+    return _external_scratch_task_dir(d) is not None
 
 
 def _cleanup_external_copy(p: Path | str | None) -> None:
-    """删除外部隔离副本。
+    """删除整个外部隔离任务目录。
 
     P1-5 修复：旧实现只在启动时清 scratch，桌面端常驻会话中多次外部文件
     质检（单文件上限 50MB）可累积至 GB 级磁盘占用，会话内无回收。
@@ -76,10 +99,10 @@ def _cleanup_external_copy(p: Path | str | None) -> None:
         return
     import shutil
     d = Path(p)
-    if not _is_external_scratch_copy(d):
+    task_dir = _external_scratch_task_dir(d if d.is_dir() else d.parent)
+    if task_dir is None:
         return
-    target_dir = d if d.is_dir() else d.parent
-    shutil.rmtree(target_dir, ignore_errors=True)
+    shutil.rmtree(task_dir, ignore_errors=True)
 
 
 def _active_quality_count() -> int:
@@ -95,12 +118,18 @@ def resolve_chapter_target(target: str, *, novel_dir: str | None = None) -> Path
     """把前端 target 解析为磁盘上真实存在的章节文件/目录（防路径穿越）。
 
     - 相对路径：在 NOVEL_DIR / CORPUS_DIR 内查找。
-    - 绝对路径在 novel/corpus 内：直接使用。
-    - 绝对路径在外但文件存在：复制到 scratch 隔离目录后使用
-      （桌面端用户指定任意位置文件的场景；复制隔离防 TOCTOU）。
+    - 绝对路径在 novel/corpus 内：就地使用，不复制。
+    - 绝对路径在 novel/corpus 外：**复制进 scratch 隔离目录**后使用，单文件和整个
+      目录都支持（桌面端用户的书稿常在任意位置；复制隔离防 TOCTOU，用完由
+      ``_cleanup_external_copy`` 回收）。目录只按章节加载器规则复制 ``*.txt``，
+      并受 50MB/单章、2000 文件、200MB 累计三道上限约束。
     """
     import shutil
     import uuid
+    # 类型校验（2026-10-12 补）：Path(12345) 抛 TypeError 变 500。
+    # target 是 check/book/qc 三个质检入口的公共参数，在此收口。
+    if not isinstance(target, str):
+        raise ServiceError("target 必须为字符串", 400)
     if not target:
         raise ServiceError("target 不能为空", 400)
     p = Path(target)
@@ -121,18 +150,97 @@ def resolve_chapter_target(target: str, *, novel_dir: str | None = None) -> Path
             raise ServiceError(f"target 不存在: {target}", 404)
         return resolved
 
-    # 绝对路径但不在 novel/corpus 内：复制到 scratch 隔离目录
+    # 绝对路径但不在 novel/corpus 内：复制到 scratch 隔离目录后使用
     if not resolved.exists():
         raise ServiceError(f"target 不存在: {target}", 404)
-    if not resolved.is_file():
-        raise ServiceError("外部路径仅支持单文件（目录请先放入 novel/ 或 corpus/）", 400)
-    if resolved.stat().st_size > 50 * 1024 * 1024:
-        raise ServiceError("文件超过 50MB 上限", 400)
     scratch_dir = config.STATE_ROOT / "scratch" / f"qc-external-{uuid.uuid4().hex[:8]}"
-    scratch_dir.mkdir(parents=True, exist_ok=True)
-    dest = scratch_dir / resolved.name
-    shutil.copy2(resolved, dest)
-    return dest
+    if resolved.is_file():
+        if resolved.stat().st_size > _EXTERNAL_MAX_FILE_BYTES:
+            raise ServiceError("文件超过 50MB 上限", 400)
+        scratch_dir.mkdir(parents=True, exist_ok=True)
+        dest = scratch_dir / resolved.name
+        shutil.copy2(resolved, dest)
+        return dest
+    if resolved.is_dir():
+        return _copy_external_chapter_dir(resolved, scratch_dir)
+    raise ServiceError("target 既不是文件也不是目录", 400)
+
+
+def _copy_external_chapter_dir(root: Path, scratch_dir: Path) -> Path:
+    """把外部的章节目录按**章节加载器的规则**复制进隔离目录，返回副本根目录。
+
+    为什么要复制而不是就地读：scratch 是稳定快照，避免"质检跑一半用户改文件"的
+    TOCTOU，也让副本可被 `_cleanup_external_copy` 精确回收。
+    只复制加载器真正会读的 ``*.txt``，并跳过它同样跳过的排除目录，因此质检结果
+    与就地读等价；非 ``.txt``（设定笔记、图片、备份）本就不进质检，不复制。
+
+    信任边界没有扩大：旧实现早已允许任意本机绝对路径的单文件进质检，这里只是把
+    同一能力对齐到"整本书在一个目录里、且不在 novel/corpus 下"的真实场景。
+    """
+    import fnmatch
+    import os
+    import shutil
+
+    pattern, excluded = engine_adapter.chapter_scan_rules()
+    dest_root = scratch_dir / root.name
+    copied = 0
+    total_bytes = 0
+    skipped_links = 0
+
+    def _abort(msg: str) -> None:
+        """超限/出错时把已经复制了一半的 scratch 副本删掉，别留垃圾。"""
+        shutil.rmtree(scratch_dir, ignore_errors=True)
+        raise ServiceError(msg, 400)
+
+    walked_dirs = 0
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+        walked_dirs += 1
+        if walked_dirs > _EXTERNAL_MAX_DIRS:
+            # target 被填成 C:\Windows 或整个用户目录时，光走盘就要几十分钟，
+            # 还会在深层子目录上撞 MAX_PATH。书稿目录不会有几千个子目录。
+            _abort(f"目录子项过多（超过 {_EXTERNAL_MAX_DIRS} 个目录），"
+                   f"请把 target 指向书稿目录而不是整个磁盘：{root}")
+        rel_dir = Path(dirpath).relative_to(root)
+        if any(part.casefold() in excluded for part in rel_dir.parts):
+            dirnames[:] = []
+            continue
+        # 不进入符号链接目录（followlinks=False 已保证），顺手剪掉，避免绕出 root。
+        dirnames[:] = [d for d in dirnames if not (Path(dirpath) / d).is_symlink()]
+        for name in sorted(filenames):
+            if not fnmatch.fnmatch(name, pattern):
+                continue
+            src = Path(dirpath) / name
+            if src.is_symlink():
+                skipped_links += 1
+                continue
+            rel = src.relative_to(root)
+            try:
+                size = src.stat().st_size
+            except OSError as exc:
+                _abort(f"读取章节失败: {rel}（{exc}）")
+            if size > _EXTERNAL_MAX_FILE_BYTES:
+                _abort(f"单章文件超过 50MB 上限：{rel}")
+            if copied + 1 > _EXTERNAL_MAX_FILES or total_bytes + size > _EXTERNAL_MAX_BYTES:
+                _abort(
+                    f"外部目录超出上限（最多 {_EXTERNAL_MAX_FILES} 个章节文件、"
+                    f"{_EXTERNAL_MAX_BYTES // 1048576}MB）：{root}")
+            dest = dest_root / rel
+            try:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dest)
+            except OSError as exc:
+                # 深层路径撞 MAX_PATH / 目标盘满 / 源文件被占用：都得变成
+                # 400 并清掉半份副本，而不是 FileNotFoundError 冒到路由层变 500。
+                _abort(f"复制章节失败: {rel}（{exc}）")
+            copied += 1
+            total_bytes += size
+
+    if copied == 0:
+        raise ServiceError(
+            f"目录里没有可质检的章节文件（{pattern}）：{root}；"
+            "确认章节是 .txt，且不在备份/build 这类被排除的子目录里", 400)
+    _log.info(f"外部目录已隔离复制 {root} → {dest_root}（{copied} 章，{total_bytes} 字节）")
+    return dest_root
 
 
 def _materialize_text(text: str, task_id: str) -> Path:
@@ -173,6 +281,10 @@ def clean_stale_scratch() -> int:
 
 def _safe_asset_path(ref: str) -> Path | None:
     """安全解析资产引用路径（防路径穿越）。"""
+    # 类型校验（2026-10-12 补）：ref 非字符串时 .split() 抛 AttributeError 变 500。
+    # 本函数语义是"非法引用返回 None"，故非字符串同样返回 None。
+    if not isinstance(ref, str):
+        return None
     name = ref.split(":")[-1]
     if not name or any(ch in name for ch in ("/", "\\", "..", "\x00", "\n", "\r")):
         return None
@@ -207,6 +319,10 @@ def check(target: str | None = None, text: str | None = None,
     """单章双维度检查：质量 12 维 + 一致性 5 维。"""
     if not target and not text:
         raise ServiceError("需要 target 或 text", 400)
+    if text is not None and not isinstance(text, str):
+        # 再往下第一句就要遍历 text；请求体里塞个数字会变成 500，
+        # 用户只看到"内部错误"，不知道是 text 这个参数错了。
+        raise ServiceError("text 必须为字符串", 400)
     if target:
         fp = resolve_chapter_target(target)
         if fp.is_dir():
@@ -219,8 +335,9 @@ def check(target: str | None = None, text: str | None = None,
         except OSError as exc:
             raise ServiceError(f"读取章节失败: {exc}", 400) from exc
         try:
-            text = fp.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError) as exc:
+            # 走引擎侧的统一解码（UTF-8 → GBK）：只认 UTF-8 会把大量真稿判成"读不了"
+            text = engine_adapter.read_chapter_text(fp)
+        except (UnicodeError, OSError) as exc:
             raise ServiceError(f"读取章节失败: {exc}", 400) from exc
         finally:
             _cleanup_external_copy(fp)  # P1-5：外部隔离副本用后即删
@@ -262,6 +379,10 @@ def book(target: str | None = None, text: str | None = None,
     """全书质检（重复/连贯/凑字数/乱编/AI味）。"""
     if not target and not text:
         raise ServiceError("需要 target 或 text", 400)
+    if text is not None and not isinstance(text, str):
+        # 再往下第一句就要遍历 text；请求体里塞个数字会变成 500，
+        # 用户只看到"内部错误"，不知道是 text 这个参数错了。
+        raise ServiceError("text 必须为字符串", 400)
 
     # 资产内容契约：voice 只接受 voice 卡。校验必须在 _materialize_text 建 scratch
     # **之前**完成——否则校验抛 400 时清理用的 try/finally 尚未进入，每次调用都会
@@ -333,6 +454,22 @@ def qc(target: str | None = None, text: str | None = None,
        novel_dir: str | None = None, llm_hook: bool = False) -> dict[str, Any]:
     """启动 qc 长任务（四层十二维）。并发上限 2（D6）。"""
     task_id = f"q-{uuid.uuid4().hex[:12]}"
+
+    # text 类型校验（2026-10-12 补）。check() / book() 早有此校验，qc() 漏了：
+    # 请求体塞 {"text": 12345} 会一路走到 _materialize_text 的 write_text(12345)，
+    # 抛 TypeError 变成 500「内部错误」，用户不知道是哪个参数错了。
+    # 与另两个入口保持同一措辞与状态码。
+    if text is not None and not isinstance(text, str):
+        raise ServiceError("text 必须为字符串", 400)
+
+    # 资产引用类型校验（2026-10-12 补）。注意与「资产不存在」的区别：
+    # _checked_asset_path 对非法/缺失引用一律返回 None（调用方"跳过该资产"的语义），
+    # 那对「用户没传这个可选资产」是对的；但「传了个数字」是**参数用错**，
+    # 静默跳过会让调用方以为生效了。故此处只拦类型错误，不改变缺失即跳过的行为。
+    for _field, _val in (("voice", voice), ("genre_pack", genre_pack),
+                         ("asset", asset), ("book", book), ("novel_dir", novel_dir)):
+        if _val is not None and not isinstance(_val, str):
+            raise ServiceError(f"{_field} 必须为字符串", 400)
 
     # 资产内容契约：voice 只接受 voice 卡。校验必须在建 scratch / 登记任务 / 启动后台
     # 线程**之前**完成——否则错误会被吞进任务注册表，前端只能轮询到 error，而非同步 400。
@@ -470,16 +607,10 @@ def _run_qc_task(task_id: str, chapter_dir: str, voice_path: str | None,
         })
 
     finally:
-        # D3：任务结束即删 scratch 子目录
+        # D3：任务结束即删 scratch 子目录。必须整棵删——逐层 unlink 只能清一层，
+        # 带子目录的副本会让 rmdir 失败并被吞掉，形成永久残留（同 P2-9 的教训）。
+        import shutil
         task_scratch = config.STATE_ROOT / "scratch" / task_id
         if task_scratch.is_dir():
-            for fp in task_scratch.iterdir():
-                try:
-                    fp.unlink()
-                except OSError:
-                    pass
-            try:
-                task_scratch.rmdir()
-            except OSError:
-                pass
+            shutil.rmtree(task_scratch, ignore_errors=True)
         _cleanup_external_copy(external_copy)  # P1-5：外部隔离副本用后即删

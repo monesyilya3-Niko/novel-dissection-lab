@@ -123,6 +123,7 @@ async function typedRequest<T>(
   path: string,
   body?: unknown,
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  retryCount: number = 0,
 ): Promise<T> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
@@ -137,6 +138,13 @@ async function typedRequest<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: ctrl.signal,
     })
+  } catch (err) {
+    // 幂等 GET 请求遇到瞬时网络异常（如服务短暂重启），重试一次
+    if (method === 'GET' && retryCount < 1 && err instanceof TypeError) {
+      await new Promise((r) => setTimeout(r, 200))
+      return typedRequest<T>(method, path, body, timeoutMs, retryCount + 1)
+    }
+    throw err
   } finally {
     clearTimeout(timer)
   }
@@ -450,7 +458,7 @@ export const writingApi = {
   inject: (body: Record<string, unknown>) => post<import('../types').InjectResult>('/writing/inject', body),
   generate: (body: Record<string, unknown>) => post<import('../types').WritingTaskState>('/writing/generate', body),
   taskState: (taskId: string) => get<import('../types').WritingTaskState>(`/writing/tasks/${taskId}`),
-  importChapter: (body: Record<string, unknown>) => post<Record<string, unknown>>('/writing/chapters', body),
+  importChapter: (body: Record<string, unknown>) => post<import('../types').ImportChapterResult>('/writing/chapters', body),
   score: (body: Record<string, unknown>) => post<import('../types').ScoreResult>('/writing/score', body),
   assemble: (body: Record<string, unknown>) => post<Record<string, unknown>>('/writing/assemble', body),
   assembleCandidates: () => get<Record<string, unknown>[]>('/writing/assemble-candidates'),
@@ -459,6 +467,8 @@ export const writingApi = {
   createOutline: (body: Record<string, unknown>) => post<OutlineItem>('/writing/outlines', body),
   updateOutline: (id: number, body: Record<string, unknown>) => put<OutlineItem>(`/writing/outlines/${id}`, body),
   deleteOutline: (id: number) => del<{ deleted: boolean }>(`/writing/outlines/${id}`),
+  reorderOutlines: (project: string, orderIds: number[]) =>
+    post<OutlineItem[]>('/writing/outlines/reorder', { project, order_ids: orderIds }),
   characters: (project: string) => get<CharacterCard[]>(`/writing/characters?project=${encodeURIComponent(project)}`),
   createCharacter: (body: Record<string, unknown>) => post<CharacterCard>('/writing/characters', body),
   updateCharacter: (id: number, body: Record<string, unknown>) => put<CharacterCard>(`/writing/characters/${id}`, body),
@@ -470,8 +480,101 @@ export const writingApi = {
   stats: (project: string, days = 30) =>
     get<WritingStats>(`/writing/stats?project=${encodeURIComponent(project)}&days=${days}`),
   exportTxt: (project: string) =>
-    get<{ filename: string; content: string; chapters: number; words: number }>(
-      `/writing/export?project=${encodeURIComponent(project)}`),
+    get<ExportResult>(`/writing/export?project=${encodeURIComponent(project)}`),
+  export: (project: string, format: 'txt' | 'md' | 'docx' | 'epub' | 'shunn' = 'txt') =>
+    get<ExportResult>(`/writing/export?project=${encodeURIComponent(project)}&format=${format}`),
+  deslop: (text: string, lang: 'auto' | 'zh' | 'en' = 'auto') =>
+    post<DeslopResult>('/writing/deslop', { text, lang }),
+  countWords: (text: string, mode: 'auto' | 'zh' | 'cjk' | 'en' = 'auto') =>
+    post<WordCountResult>('/writing/count-words', { text, mode }),
+  analyzeTension: (body: {
+    text: string
+    benchmark?: 'classic' | 'fast_hook' | 'steady' | 'face_slap'
+    segments_count?: number
+  }) => post<TensionAnalysisResult>('/writing/tension-analysis', body),
+  getProjectMeta: (project: string) =>
+    get<ProjectMeta>(`/writing/projects/${encodeURIComponent(project)}/meta`),
+  updateProjectMeta: (
+    project: string,
+    body: {
+      platform?: string
+      genre?: string
+      target_words?: number
+      summary?: string
+      meta?: Record<string, unknown>
+    }
+  ) => post<ProjectMeta>(`/writing/projects/${encodeURIComponent(project)}/meta`, body),
+}
+
+export interface TensionAnalysisResult {
+  segments: string[]
+  tensionCurve: number[]
+  benchmarkCurve: number[]
+  benchmarkName: string
+  climaxIndex: number
+  climaxSegment: string
+  maxTension: number
+  avgTension: number
+  tensionVariance: number
+  benchmarkAlignmentScore: number
+  flatZones: Array<{
+    segmentIndex: number
+    label: string
+    tension: number
+  }>
+  pacingFeedback: string[]
+}
+
+export interface ProjectMeta {
+  project: string
+  platform: string
+  genre: string
+  targetWords: number
+  summary: string
+  meta: Record<string, unknown>
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ExportResult {
+  filename: string
+  content?: string
+  contentBase64?: string
+  format: 'txt' | 'md' | 'docx'
+  chapters: number
+  words: number
+}
+
+export interface DeslopIssue {
+  type: string
+  label: string
+  snippet: string
+  index: number
+  weight: number
+  suggestion: string
+}
+
+export interface DeslopResult {
+  aiScore: number
+  verdict: 'NATURAL' | 'MILD' | 'NOTICEABLE' | 'SEVERE'
+  verdictCn: string
+  stats: {
+    wordCount: number
+    sentenceCount: number
+    issuesCount: number
+    rangDensity: number
+    adverbDensity?: number
+  }
+  issues: DeslopIssue[]
+  suggestions: string[]
+}
+
+export interface WordCountResult {
+  total: number
+  cjkChars: number
+  enWords: number
+  readingTimeMinutes: number
+  primaryLanguage: 'zh' | 'en' | 'unknown'
 }
 
 export interface OutlineItem {
@@ -551,7 +654,7 @@ export const assetApi = {
     del<Record<string, unknown>>(`/assets/${kind}/${encodeURIComponent(id)}`),
 }
 
-// 桥段库：只读，直读后端 assets/trope-library.json（32 条，见 /api/tropes）。
+// 桥段库：只读，直读后端 assets/trope-library.json（见 /api/tropes，返回 total_count）。
 export const tropeApi = {
   list: () => get<import('../types').TropeListResult>('/tropes'),
 }
@@ -586,16 +689,40 @@ export const styleApi = {
   apply: (body: { style_name: string; base_prompt: string }) => post<Record<string, unknown>>('/style/apply', body),
 }
 
+export interface SubmissionDiagnosisResult {
+  platform: string
+  platformId: string
+  chapterNum: number
+  charCount: number
+  score: number
+  grade: string
+  signingProb: string
+  dialogueRatio: number
+  vetoRisks: string[]
+  actionableFixes: string[]
+}
+
 // 多平台适配
 export const platformApi = {
   list: () => get<Record<string, unknown>>('/platform/list'),
   get: (id: string) => get<Record<string, unknown>>(`/platform/${encodeURIComponent(id)}`),
   check: (body: { platform_id: string; chapter_text: string; chapter_title?: string }) =>
     post<Record<string, unknown>>('/platform/check', body),
+  diagnose: (body: { platform_id: string; chapter_text: string; chapter_title?: string; chapter_num?: number }) =>
+    post<SubmissionDiagnosisResult>('/platform/diagnose', body),
   format: (body: { platform_id: string; chapter_num: number; title: string; content: string }) =>
     post<Record<string, unknown>>('/platform/format', body),
   export: (body: { platform_id: string; book_dir: string }) =>
     post<Record<string, unknown>>('/platform/export', body),
+  parseStatBox: (text: string) =>
+    post<{ stat_boxes: Array<Record<string, unknown>>; count: number }>('/platform/litrpg/stat-box', { text }),
+  formatRoyalRoad: (body: {
+    title: string
+    text: string
+    author_note_head?: string
+    author_note_foot?: string
+    wrap_stat_boxes?: boolean
+  }) => post<{ formatted: string; stat_boxes_found: number }>('/platform/royalroad/format', body),
 }
 
 // 管理员系统
@@ -669,3 +796,350 @@ export const adminApi = {
   sessions: () => get<AdminSession[]>('/admin/sessions'),
   revokeSession: (id: string) => del<{ revoked: boolean }>(`/admin/sessions/${encodeURIComponent(id)}`),
 }
+
+export interface NameGenerateParams {
+  kind?: string
+  style?: string
+  gender?: string
+  count?: number
+}
+
+export interface NameGenerateResult {
+  kind: string
+  style: string
+  gender: string
+  count: number
+  names: string[]
+}
+
+export interface PoisonFinding {
+  line: number
+  type: string
+  typeName: string
+  severity: string
+  snippet: string
+  matched: string
+  reason: string
+  suggestion: string
+}
+
+export interface PoisonCheckResult {
+  score: number
+  verdict: string
+  totalIssues: number
+  findings: PoisonFinding[]
+}
+
+export interface GoldfingerItem {
+  id: string
+  name: string
+  category: string
+  triggerMechanism: string
+  costAndLimits: string[]
+  progressionCurve: string
+  antiCollapseRule: string
+}
+
+export interface HookItem {
+  id: string
+  name: string
+  genre: string
+  first300Words: string
+  chapter1Beat: string
+  chapter2Beat: string
+  chapter3Beat: string
+}
+
+export interface TabooItem {
+  id: string
+  name: string
+  severity: string
+  description: string
+  readerReaction: string
+  fixSuggestion: string
+}
+
+export interface ShuangdianItem {
+  id: string
+  name: string
+  category: string
+  suppression: string
+  buildUp: string
+  mockery: string
+  silence: string
+  crush: string
+  spectators: string
+  upgradePath: string
+  antiFatigueTip: string
+}
+
+export interface WorldTierItem {
+  tier: string
+  powerDesc: string
+  breakthroughCost: string
+}
+
+export interface WorldSystemItem {
+  id: string
+  name: string
+  genre: string
+  tierLadder: WorldTierItem[]
+  ironRules: string[]
+  currencyAndResources: string
+  powerCollapseWarning: string
+}
+
+export interface DialogueItem {
+  id: string
+  name: string
+  category: string
+  aiSlopBad: string
+  humanGood: string
+  subtext: string
+  actionBeats: string
+  speechProfileTip: string
+}
+
+export interface CharacterPersonaItem {
+  id: string
+  name: string
+  roleType: string
+  genre: string
+  surfaceMask: string
+  hiddenContrast: string
+  coreMotivation: string
+  fatalFlaw: string
+  antiCollapseRule: string
+  catchphrase: string
+  arcProgression: string
+}
+
+export interface SensoryBreakdown {
+  vision: string
+  physiology: string
+  touchAndTemp: string
+  soundAndSilence: string
+}
+
+export interface EmotionItem {
+  id: string
+  emotionScene: string
+  category: string
+  aiClicheExample: string
+  sensoryBreakdown: SensoryBreakdown
+  environmentalResonance: string
+  masterProseSample: string
+  writingRhythmTip: string
+}
+
+export const toolsApi = {
+  generateNames: (params?: NameGenerateParams) => {
+    const q = new URLSearchParams()
+    if (params?.kind) q.set('kind', params.kind)
+    if (params?.style) q.set('style', params.style)
+    if (params?.gender) q.set('gender', params.gender)
+    if (params?.count) q.set('count', String(params.count))
+    return get<NameGenerateResult>(`/tools/names?${q}`)
+  },
+  checkPoison: (text: string) => post<PoisonCheckResult>('/tools/poison-check', { text }),
+  getGoldfingers: () => get<{ totalCount: number; goldfingers: GoldfingerItem[] }>('/tools/goldfingers'),
+  getHooks: () => get<{ totalCount: number; hooks: HookItem[] }>('/tools/hooks'),
+  getTaboos: () => get<{ totalCount: number; taboos: TabooItem[] }>('/tools/taboos'),
+  getShuangdians: () => get<{ totalCount: number; shuangdians: ShuangdianItem[] }>('/tools/shuangdians'),
+  getWorlds: () => get<{ totalCount: number; worlds: WorldSystemItem[] }>('/tools/worlds'),
+  getDialogues: () => get<{ totalCount: number; dialogues: DialogueItem[] }>('/tools/dialogues'),
+  getCharacters: () => get<{ totalCount: number; characters: CharacterPersonaItem[] }>('/tools/characters'),
+  getEmotions: () => get<{ totalCount: number; emotions: EmotionItem[] }>('/tools/emotions'),
+}
+
+export interface EssenceBook {
+  bookId: string
+  title: string
+  genre: string
+  platform: string
+  totalChapters: number
+  totalChars: number
+  avgChapterLen: number
+  dialogueRatio: number
+  rhythmClimaxInterval: number
+  aiSlopScore: number
+  summary: string
+  meta: Record<string, unknown>
+  createdAt: number
+  updatedAt: number
+}
+
+export interface EssenceAsset {
+  id: number
+  bookId: string
+  category: 'outline' | 'hook' | 'opening' | 'character' | 'persona' | 'trope' | 'style' | string
+  title: string
+  content: string
+  summary: string
+  tags: string
+  genre: string
+  platform: string
+  rating: number
+  userNote: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface EssenceMacroAnalysisResult {
+  bookId: string
+  title: string
+  genre: string
+  platform: string
+  totalChapters: number
+  totalChars: number
+  avgChapterLen: number
+  dialogueRatio: number
+  rhythmClimaxInterval: number
+  aiSlopScore: number
+  openingThreeChapters: Array<{
+    chapterIndex: number
+    title: string
+    charCount: number
+    hookType: string
+    hasPayoffOrAnticipation: boolean
+    dialogueRatio: number
+    excerpt: string
+  }>
+  highFrequencySpeechPatterns: Array<{
+    phrase: string
+    count: number
+  }>
+  suggestedAssets: Array<{
+    category: string
+    title: string
+    summary: string
+    content: string
+  }>
+}
+
+export const essenceApi = {
+  listBooks: (params?: { genre?: string; platform?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.genre) q.set('genre', params.genre)
+    if (params?.platform) q.set('platform', params.platform)
+    const qs = q.toString()
+    return get<{ books: EssenceBook[] }>(`/essence/books${qs ? `?${qs}` : ''}`)
+  },
+  getBook: (bookId: string) => get<EssenceBook>(`/essence/books/${encodeURIComponent(bookId)}`),
+  deleteBook: (bookId: string) => del<{ deleted: boolean; bookId: string }>(`/essence/books/${encodeURIComponent(bookId)}`),
+  getStats: () => get<EssenceStats>('/essence/stats'),
+  analyzeMacro: (body: {
+    title: string
+    text: string
+    genre?: string
+    platform?: string
+    book_id?: string
+  }) => post<EssenceMacroAnalysisResult>('/essence/analyze', body),
+  listAssets: (params?: { book_id?: string; category?: string; tag?: string; genre?: string; platform?: string; query?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.book_id) q.set('book_id', params.book_id)
+    if (params?.category) q.set('category', params.category)
+    if (params?.tag) q.set('tag', params.tag)
+    if (params?.genre) q.set('genre', params.genre)
+    if (params?.platform) q.set('platform', params.platform)
+    if (params?.query) q.set('query', params.query)
+    const qs = q.toString()
+    return get<{ assets: EssenceAsset[] }>(`/essence/assets${qs ? `?${qs}` : ''}`)
+  },
+  createAsset: (body: {
+    book_id: string
+    category: string
+    title: string
+    content: string
+    summary?: string
+    tags?: string
+    genre?: string
+    platform?: string
+    rating?: number
+    user_note?: string
+  }) => post<EssenceAsset>('/essence/assets', body),
+  deleteAsset: (assetId: number) => del<{ deleted: boolean; assetId: number }>(`/essence/assets/${assetId}`),
+  adoptAsset: (body: { asset_id: number; project: string; target_kind?: string }) =>
+    post<{ adopted: boolean; targetKind: string; recordId: number }>('/essence/adopt', body),
+  adoptBook: (bookId: string, project: string) =>
+    post<{ adopted: boolean; bookId: string; totalAdopted: number }>(`/essence/books/${encodeURIComponent(bookId)}/adopt-all`, { project }),
+  listChains: (bookId?: string) => {
+    const q = bookId ? `?book_id=${encodeURIComponent(bookId)}` : ''
+    return get<{ chains: EssenceChain[] }>(`/essence/chains${q}`)
+  },
+  createChain: (body: {
+    book_id: string
+    title: string
+    category?: string
+    plant_chapter?: number
+    reveal_chapter?: number
+    climax_chapter?: number
+    description?: string
+    status?: string
+  }) => post<EssenceChain>('/essence/chains', body),
+  deleteChain: (chainId: number) => del<{ deleted: boolean; chainId: number }>(`/essence/chains/${chainId}`),
+
+  /** 导出全书五维大纲 Markdown */
+  exportOutline: (bookId: string) =>
+    get<{ bookId: string; markdown: string }>(`/essence/books/${encodeURIComponent(bookId)}/export-outline`),
+
+  /** 导出分章节拍轻提纲 Markdown */
+  exportBeats: (bookId: string) =>
+    get<{ bookId: string; markdown: string }>(`/essence/books/${encodeURIComponent(bookId)}/export-beats`),
+
+  /** 宪法正典审查（返回合规分数与违禁列表） */
+  checkConstitution: (body: {
+    text: string
+    rules?: any[]
+    characters_forbidden?: Record<string, string[]>
+  }) => post<ConstitutionCheckResult>('/essence/constitution/check', body),
+}
+
+export interface ConstitutionViolation {
+  rule_id: string
+  rule_name: string
+  matched_term: string
+  line_no: number
+  snippet: string
+  severity: string
+}
+
+export interface CharacterVoiceAlert {
+  character: string
+  forbidden_phrase: string
+  line_no: number
+  snippet: string
+}
+
+export interface ConstitutionCheckResult {
+  compliance_score: number
+  is_compliant: boolean
+  violations: ConstitutionViolation[]
+  character_voice_alerts: CharacterVoiceAlert[]
+  summary: string
+}
+
+export interface EssenceStats {
+  totalBooks: number
+  totalChars: number
+  totalChapters: number
+  totalAssets: number
+  totalChains: number
+  genreDistribution: Record<string, number>
+  categoryDistribution: Record<string, number>
+}
+
+export interface EssenceChain {
+  id: number
+  bookId: string
+  title: string
+  category: string
+  plantChapter: number
+  revealChapter: number
+  climaxChapter: number
+  description: string
+  status: 'planted' | 'developing' | 'revealed' | 'recycled'
+  createdAt: number
+  updatedAt: number
+}
+

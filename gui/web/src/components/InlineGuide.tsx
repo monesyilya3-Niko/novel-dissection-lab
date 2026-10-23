@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { ink } from '../ink'
+import { useI18n } from '../state/I18nContext'
 
 interface InlineGuideProps {
   /** 一句话：这个功能是做什么的 */
@@ -23,6 +24,7 @@ interface InlineGuideProps {
 }
 
 export default function InlineGuide({ what, steps, tips, example, defaultOpen = false }: InlineGuideProps) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(defaultOpen)
   const hasDetail = (steps?.length ?? 0) > 0 || (tips?.length ?? 0) > 0 || !!example
   return (
@@ -43,7 +45,7 @@ export default function InlineGuide({ what, steps, tips, example, defaultOpen = 
           <IconButton
             size="small"
             onClick={() => setOpen((o) => !o)}
-            aria-label={open ? '收起说明' : '展开说明'}
+            aria-label={open ? t('inline_guide_collapse', '收起说明') : t('inline_guide_expand', '展开说明')}
             sx={{
               transform: open ? 'rotate(180deg)' : 'none',
               transition: 'transform 0.2s',
@@ -69,7 +71,7 @@ export default function InlineGuide({ what, steps, tips, example, defaultOpen = 
             {example && (
               <Box sx={{ mt: 1, p: 1.2, borderRadius: 1.5, backgroundColor: ink.surface, border: `1px solid ${ink.hairline}` }}>
                 <Typography variant="caption" sx={{ color: ink.textTertiary, display: 'block', mb: 0.5 }}>
-                  示例
+                  {t('inline_guide_example', '示例')}
                 </Typography>
                 <Typography variant="body2" sx={{ color: ink.text, whiteSpace: 'pre-wrap' }}>
                   {example}

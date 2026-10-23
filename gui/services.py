@@ -242,74 +242,47 @@ def unique_corpus_path(name: str) -> Path:
 # 导入
 # ---------------------------------------------------------------------------
 
+_IMPORT_SUFFIXES = frozenset({".txt"})
+_IMPORT_MAX_BYTES = 100 * 1024 * 1024
+# 拆书导入的对外措辞与状态码是既有契约（tests/test_deepwater_regressions.py 认它），
+# 实现换成 text_access 后逐条显式覆盖，不让"重构"顺手改掉用户看到的错误信息。
+_IMPORT_MESSAGES = {
+    "suffix": ("首版仅支持 .txt 导入", 400),
+    "symlink": ("不允许导入符号链接", 403),
+    "irregular": ("只能导入常规文件", 400),
+    "oversize": ("文件超过 100MB 上限", 400),
+    "missing": ("文件无法打开: {path}", 404),
+    "unreadable": ("文件读取失败: {path}", 500),
+    "decode": ("文件编码无法识别（仅支持 UTF-8 / GBK）", 400),
+}
+
+
 def _secure_read_text(path: str) -> str:
-    """TOCTOU 安全读取文本文件。
+    """TOCTOU 安全读取文本文件（实现见 ``gui/text_access.py``，策略在此声明）。
 
-    - O_NOFOLLOW：符号链接直接拒绝（errno.ELOOP），不跟随；
-    - fstat 验证为常规文件（防 FIFO/设备文件）；
-    - 打开后所有检查基于 fd，不再重解析路径，消除检查-使用竞态。
-    - Windows 无 O_NOFOLLOW/O_NONBLOCK：降级为打开后 islink 尽力检查
-      （Windows 建符号链接需提权，实际风险低；不崩溃优先）。
+    与打分 / 合规 / 投稿导出共用同一条读取通道：`os.open` 时带 O_NOFOLLOW，
+    随后用 `fstat` 在同一 fd 上判常规文件与体积，全程不重解析路径；
+    Windows 没有 O_NOFOLLOW，退化为打开后 `islink` 尽力检查。
+    拆书只收 `.txt`、上限 100MB，与正文打分（`.txt`/`.md`、8MB）不同。
     """
-    import errno
-    import os
-    import stat
+    from gui import text_access
 
-    if Path(path).suffix.lower() != ".txt":
-        raise ServiceError("首版仅支持 .txt 导入", 400)
-    flags = os.O_RDONLY
-    has_nofollow = hasattr(os, "O_NOFOLLOW")
-    if has_nofollow:
-        flags |= os.O_NOFOLLOW
-    if hasattr(os, "O_NONBLOCK"):
-        # O_NONBLOCK：防 FIFO 打开时阻塞；后续 fstat 会拒绝非常规文件
-        flags |= os.O_NONBLOCK
-    try:
-        fd = os.open(path, flags)
-    except OSError as exc:
-        if exc.errno == errno.ELOOP:
-            raise ServiceError("不允许导入符号链接", 403) from exc
-        raise ServiceError(f"文件无法打开: {path}", 404) from exc
-    # 无 O_NOFOLLOW 平台（Windows）的尽力而为检查：打开后仍是链接则拒绝。
-    # 有 TOCTOU 窗口，但在该平台上无更好原语；建链接需提权，风险可接受。
-    if not has_nofollow:
-        try:
-            if os.path.islink(path):
-                os.close(fd)
-                raise ServiceError("不允许导入符号链接", 403)
-        except ServiceError:
-            raise
-        except OSError:
-            pass
-    try:
-        st = os.fstat(fd)
-        if not stat.S_ISREG(st.st_mode):
-            raise ServiceError("只能导入常规文件", 400)
-        if st.st_size > 100 * 1024 * 1024:
-            raise ServiceError("文件超过 100MB 上限", 400)
-    except ServiceError:
-        os.close(fd)
-        raise
-    try:
-        with os.fdopen(fd, "rb") as f:
-            data = f.read()
-        # fd 已由 fdopen 接管关闭
-    except OSError as exc:
-        raise ServiceError(f"文件读取失败: {path}", 500) from exc
-    try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError:
-        try:
-            return data.decode("gbk")
-        except UnicodeDecodeError as exc:
-            raise ServiceError("文件编码无法识别（仅支持 UTF-8 / GBK）", 400) from exc
+    return text_access.read_text(
+        path,
+        field="导入文件",
+        suffixes=_IMPORT_SUFFIXES,
+        max_bytes=_IMPORT_MAX_BYTES,
+        messages=_IMPORT_MESSAGES,
+    )
 
 
 def import_book(path: str, batch_size: int | None = None) -> dict[str, Any]:
     """读 txt → 切章 → 切批 → 生成 book_id → 建状态文件 → 返回 Book。
 
     返回的 Book 章节列表只含批次元信息（不含正文），正文按需由 chapter 接口返回。
-    路径安全校验由路由层（router._h_import）负责，本函数保持对内部调用友好。
+    读取与准入都由 :func:`_secure_read_text` 负责（后缀 / 符号链接 / 常规文件 /
+    体积），路由层不再判目录（2026-10-08：用户要拆的书本来就在项目外）。
+    导入是**就地引用** ``path``，不复制进 corpus/——原文件被移走后透明重载会 404。
     """
     src = Path(path)
     text = _secure_read_text(path)
@@ -419,6 +392,11 @@ def split_chapter_batches(book_id: str, idx: int, batch_size: int | None = None)
 
 
 def _get_book_or_raise(book_id: str) -> dict[str, Any]:
+    # 类型校验（2026-10-12 补）：book_id 在下面被用作 dict key，
+    # 请求体传 {"book_id": ["a"]} 会以 "unhashable type: 'list'" 变 500。
+    # 这里是 9 个调用点的共同入口，在此收口一处即可全覆盖。
+    if not isinstance(book_id, str):
+        raise ServiceError("book_id 必须为字符串", 400)
     book = _books_get(book_id)
     if book is None:
         raise ServiceError(f"书籍 {book_id} 未导入（请先 import）", 404)
@@ -630,6 +608,10 @@ def _count_total_batches(chapters: list[Any], batch_size: int) -> int:
 
 def pause(book_id: str) -> dict[str, Any]:
     """暂停（当前批完成后停）。"""
+    # 与 _get_book_or_raise 同口径：本函数不走那个入口（直接查 _runtime），
+    # 故单独校验，否则 {"book_id": ["a"]} 会以 unhashable 变 500。
+    if not isinstance(book_id, str):
+        raise ServiceError("book_id 必须为字符串", 400)
     ctx = _runtime.get(book_id)
     if ctx is None:
         raise ServiceError("没有运行中的分析任务", 404)
@@ -771,14 +753,14 @@ def list_tropes() -> dict[str, Any]:
     不走 ``/api/assets?kind=trope`` 通道：该文件在目录扫描中不被归类为
     trope kind（见 ``_SUFFIX_KIND``），且 SQLite 迁移状态因环境而异；
     桥段库是内置只读数据，直读文件最可靠。
+
+    2026-10-12：改走 ``_load_library`` 的指纹缓存。该文件 411KB、解析 3.07ms，
+    是其余内置库的 20 倍——每次请求重解析是 /api/tropes 的主要开销。
     """
     fp = config.ASSETS_ROOT / "trope-library.json"
     if not fp.is_file():
         raise ServiceError("桥段库文件不存在（assets/trope-library.json）", 404)
-    try:
-        data = json.loads(fp.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise ServiceError(f"桥段库文件损坏: {exc}", 500) from exc
+    data = _load_library("trope-library.json")
     tropes = data.get("tropes") if isinstance(data, dict) else None
     if not isinstance(tropes, list):
         raise ServiceError("桥段库格式错误：缺少 tropes 数组", 500)
@@ -1126,3 +1108,135 @@ def _generate_reports_inner(book_id: str, book: dict[str, Any]) -> None:
         "report_ids": report_ids,
         "report_chars": chk.get("total", 0),
     })
+
+
+# ---------------------------------------------------------------------------
+# 创作增值工具服务（起名 / 毒点扫描 / 实操资产库）
+# ---------------------------------------------------------------------------
+
+def generate_names(kind: str = "character", style: str = "xianxia",
+                   gender: str = "all", count: int = 10) -> dict[str, Any]:
+    from gui import name_generator
+    return name_generator.generate(kind=kind, style=style, gender=gender, count=count)
+
+
+def scan_poison(text: str) -> dict[str, Any]:
+    from gui import poison_checker
+    return poison_checker.check_poison(text)
+
+
+# ---------------------------------------------------------------------------
+# 内置库文件加载器（2026-10-12 性能优化）
+#
+# 背景：``get_goldfingers`` / ``get_hooks`` / ``get_taboos`` / ``get_shuangdians``
+# / ``get_worlds`` / ``get_dialogues`` / ``get_characters`` / ``get_emotions``
+# 与 ``list_tropes`` 共 9 个函数结构完全一致（定位文件 → 读盘 → JSON 解析），
+# 每次调用都重新读盘解析。实测 trope-library.json 411KB、解析 3.07ms，
+# 是其余库（5-21KB，0.1-0.2ms）的 20 倍——/api/tropes 因此达 24.5ms。
+#
+# 这些库是**内置只读数据**：全仓库 grep 确认没有任何写路径
+# （无 write_text / json.dump / open(..., "w") 触碰这些文件名）。
+#
+# 缓存键 = (文件名, 大小, mtime_ns)：用户手工替换库文件时立即感知，
+# 不引入 TTL 的滞后。相比 TTL 方案，这里的指纹只 stat 单个文件（~0.01ms），
+# 成本可忽略，故不必用 TTL 换实时性。
+#
+# 铁律三：纯标准库。
+# ---------------------------------------------------------------------------
+_LIB_CACHE: dict[str, tuple[tuple, Any]] = {}   # filename -> (fingerprint, data)
+
+
+def _load_library(filename: str) -> Any:
+    """读内置库 JSON，带指纹缓存；文件不存在返回 None。
+
+    解析失败抛 ServiceError(500)——与各 get_* 原行为一致（库文件损坏是
+    部署问题，不是调用方错误）。
+    """
+    fp = config.ASSETS_ROOT / filename
+    if not fp.is_file():
+        fp = config.ROOT_DIR / "assets" / filename
+    if not fp.is_file():
+        return None
+
+    try:
+        st = fp.stat()
+        fingerprint = (st.st_size, st.st_mtime_ns)
+    except OSError:
+        fingerprint = None
+
+    if fingerprint is not None:
+        cached = _LIB_CACHE.get(filename)
+        if cached is not None and cached[0] == fingerprint:
+            return cached[1]
+
+    try:
+        data = json.loads(fp.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 —— 与原各 get_* 的宽泛捕获一致
+        raise ServiceError(f"{filename} 损坏: {exc}", 500) from exc
+
+    if fingerprint is not None:
+        _LIB_CACHE[filename] = (fingerprint, data)
+    return data
+
+
+def invalidate_library_cache() -> None:
+    """清空内置库缓存（测试隔离环境切换时调用）。"""
+    _LIB_CACHE.clear()
+
+
+def get_goldfingers() -> dict[str, Any]:
+    data = _load_library("goldfinger-library.json")
+    if data is None:
+        return {"total_count": 0, "goldfingers": []}
+    return data
+
+
+def get_hooks() -> dict[str, Any]:
+    data = _load_library("hook-library.json")
+    if data is None:
+        return {"total_count": 0, "hooks": []}
+    return data
+
+
+def get_taboos() -> dict[str, Any]:
+    data = _load_library("taboo-library.json")
+    if data is None:
+        return {"total_count": 0, "taboos": []}
+    return data
+
+
+def get_shuangdians() -> dict[str, Any]:
+    data = _load_library("shuangdian-library.json")
+    if data is None:
+        return {"total_count": 0, "shuangdians": []}
+    return data
+
+
+def get_worlds() -> dict[str, Any]:
+    data = _load_library("world-library.json")
+    if data is None:
+        return {"total_count": 0, "worlds": []}
+    return data
+
+
+def get_dialogues() -> dict[str, Any]:
+    data = _load_library("dialogue-library.json")
+    if data is None:
+        return {"total_count": 0, "dialogues": []}
+    return data
+
+
+def get_characters() -> dict[str, Any]:
+    data = _load_library("character-library.json")
+    if data is None:
+        return {"total_count": 0, "characters": []}
+    return data
+
+
+def get_emotions() -> dict[str, Any]:
+    data = _load_library("emotion-library.json")
+    if data is None:
+        return {"total_count": 0, "emotions": []}
+    return data
+
+

@@ -19,6 +19,14 @@ import re
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+import chapter_loader
+
 WINDOW = 12          # 连续匹配判定长度
 QUOTE_WARN = 20      # 引号内原文片段警告阈值
 
@@ -121,14 +129,14 @@ def scan_asset(asset: dict, ngram: set) -> tuple:
     return errors, warns
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="拆书输出版权合规扫描")
     ap.add_argument("asset", help="资产 JSON（voice-card / genre-pack / trope-library）")
     ap.add_argument("book", help="原文整本 TXT（用于 12 字连续匹配检测）")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     asset = load_json(Path(args.asset))
-    book_text = Path(args.book).read_text(encoding="utf-8")
+    book_text = chapter_loader.read_text_file(Path(args.book))
     ngram = build_ngram_index(book_text)
     print(f"[i] 原文已建索引: {len(ngram):,} 个 {WINDOW}-gram 窗口")
 
@@ -142,12 +150,12 @@ def main():
 
     if errors:
         print("\n结论: REJECT（含版权风险，禁止入库）")
-        sys.exit(1)
+        return 1
     if warns:
         print("\n结论: WARN（无硬错误，建议人工复核后入库）")
-        sys.exit(2)
+        return 2
     print("\n结论: PASS（合规）")
-    sys.exit(0)
+    return 0
 
 
 if __name__ == "__main__":

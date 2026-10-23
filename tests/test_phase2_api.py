@@ -27,7 +27,9 @@ def setUpModule():
     _SAVED["ROOT_DIR"] = config.ROOT_DIR
     config.ROOT_DIR = Path(_TMP)
     for name in ("STATE_ROOT", "STATE_JSON_DIR", "ASSETS_ROOT", "NOVEL_DIR",
-                 "CORPUS_DIR", "PROMPTS_DIR", "REPORTS_DIR"):
+                 "CORPUS_DIR", "PROMPTS_DIR", "REPORTS_DIR",
+                 # 派生常量是导入期快照，patch STATE_ROOT 带不动，必须一起重定向。
+                 "DB_PATH", "LOCK_PATH"):
         _SAVED[name] = getattr(config, name)
         setattr(config, name, config.ROOT_DIR / name.lower())
     config.ASSETS_ROOT.mkdir(parents=True, exist_ok=True)
@@ -67,13 +69,30 @@ class TestRouteRegistration(unittest.TestCase):
     def test_writing_quality_routes_registered(self):
         # 2026-09-29：POST /api/writing/projects（新建写作项目）加入后 13→14。
         # 2026-09-30：写作创作页新增 14 条路由（大纲/人物/便签/统计/导出），14→28。
+        # 2026-10-10：新增大纲批量重排（outlines/reorder）与去 AI 味检测（deslop），28→30。
+        # 2026-10-10：新增项目元数据管理（GET/POST /api/writing/projects/.../meta），30→32。
+        # 2026-10-15：新增跨语种字数统计（POST /api/writing/count-words），32→33。
+        # 2026-10-15：新增章节情绪张力波形分析（POST /api/writing/tension-analysis），33→34。
         from gui import router
         new_routes = [r for r in router.ROUTES
                       if '/api/writing/' in r[1].pattern or '/api/quality/' in r[1].pattern]
-        self.assertEqual(len(new_routes), 28, f"Expected 28 routes, got {len(new_routes)}")
+        self.assertEqual(len(new_routes), 34, f"Expected 34 routes, got {len(new_routes)}")
 
 
 class TestWritingEndpoints(unittest.TestCase):
+    def test_tension_analysis(self):
+        resp = _dispatch('POST', '/api/writing/tension-analysis', {
+            'text': '剑光纵横！狂暴的杀气崩裂天地，他咬紧牙关，目眦欲裂地斩出最后一剑！',
+            'benchmark': 'classic',
+            'segments_count': 5,
+        })
+        self.assertEqual(resp['code'], 0)
+        self.assertIn('tension_curve', resp['data'])
+        self.assertEqual(len(resp['data']['tension_curve']), 5)
+        self.assertIn('benchmark_curve', resp['data'])
+        self.assertEqual(len(resp['data']['benchmark_curve']), 5)
+        self.assertIn('pacing_feedback', resp['data'])
+
     def test_projects(self):
         resp = _dispatch('GET', '/api/writing/projects')
         self.assertEqual(resp['code'], 0)

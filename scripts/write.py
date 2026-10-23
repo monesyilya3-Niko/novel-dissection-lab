@@ -17,12 +17,19 @@ M2.2 章节生成 + 入库 — 资产驱动创作的正式入口
 """
 import argparse
 import json
+import os
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts"))
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+import chapter_loader
 import llm_client
 
 
@@ -40,7 +47,16 @@ def ensure_novel_structure(novel_dir: Path, name: str = "新书"):
             "word_count_today": 0,
             "last_updated": "",
         }
-        state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp_file = state_file.with_name(f".state-{os.getpid()}-{threading.get_ident()}.tmp")
+        tmp_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        try:
+            tmp_file.replace(state_file)
+        except OSError:
+            if tmp_file.exists():
+                try:
+                    tmp_file.unlink()
+                except OSError:
+                    pass
     return state_file
 
 
@@ -63,7 +79,16 @@ def save_chapter(novel_dir: Path, chapter_no: int, content: str) -> Path:
         state["last_write_date"] = today
     state["word_count_today"] = state.get("word_count_today", 0) + len(content)
     state["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-    state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp_file = state_file.with_name(f".state-{os.getpid()}-{threading.get_ident()}.tmp")
+    tmp_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        tmp_file.replace(state_file)
+    except OSError:
+        if tmp_file.exists():
+            try:
+                tmp_file.unlink()
+            except OSError:
+                pass
     return ch_file
 
 
@@ -82,7 +107,7 @@ def run_consistency(voice_path: Path, ch_file: Path) -> None:
     try:
         vc_data = json.loads(voice_path.read_text(encoding="utf-8"))
         score, details, _ = consistency.score_text(
-            vc_data, ch_file.read_text(encoding="utf-8"), label=ch_file.name)
+            vc_data, chapter_loader.read_text_file(ch_file), label=ch_file.name)
         print(f"  一致性打分: {score:.1f}/100" + ("  ✅ PASS" if score >= 75 else "  ⚠️ 未达 75，建议改写"))
         for d in details:
             print(f"    {d}")
@@ -129,10 +154,10 @@ def run_conflict_check(novel_dir: Path, content: str) -> None:
         print(f"  [跳过] 冲突检测异常: {e}")
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="M2.2 章节生成 + 入库（资产驱动）")
     ap.add_argument("--prompt", required=True, help="注入的写作 prompt（inject.py 产物）")
-    ap.add_argument("--chapter", type=int, required=True, help="章节号")
+    ap.add_argument("--chapter", type=int, required=True, help="章节号（≥1）")
     ap.add_argument("--task", required=True, help="本章要点（场景/事件/钩子要求）")
     ap.add_argument("--novel-dir", default="novel", help="novel-writing 项目目录")
     ap.add_argument("--novel-name", default="新书", help="书名")
@@ -142,7 +167,21 @@ def main():
     ap.add_argument("--target-score", type=int, default=90, help="一致性目标分（默认 90，未达标自动改写）")
     ap.add_argument("--quality-target", type=int, default=None, help="章节质量目标分（可选；缺省时按题材包 quality_thresholds 回退，再回退 75）")
     ap.add_argument("--dry-run", action="store_true", help="只打印将调用的内容，不调 LLM")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
+
+    # ── 章号下限校验（2026-10-13 审计修复 CLI-15）──────────────────────
+    # 原实现无下限：--chapter -1 会静默写出 chapters/arc-0/chapter--01.txt
+    # （arc = (chapter_no-1)//30+1 对负数得 0），并把 state.json 的
+    # current_chapter 记成 -1。用户改用 --chapter 1 后两个文件共存，
+    # 此后该书的质检/检查（按章号排序与去重）全部不可用。
+    # 必须在**任何文件系统写操作之前**拒绝——包括下面的
+    # ensure_novel_structure（它会建目录与 state.json）。
+    if args.chapter < 1:
+        sys.exit(f"章节号必须 ≥ 1，收到 {args.chapter}")
+    # 上限与 GUI 侧一致（_safe_chapter_no / chapter_no ≤ 100000）：
+    # 章号直接拼进文件名与排序键，过大值会造成 MAX_PATH 或排序异常。
+    if args.chapter > 100000:
+        sys.exit(f"章节号过大（上限 100000），收到 {args.chapter}")
 
     prompt_path = Path(args.prompt)
     if not prompt_path.exists():
@@ -150,7 +189,18 @@ def main():
     system = prompt_path.read_text(encoding="utf-8")
 
     novel_dir = Path(args.novel_dir)
-    state_file = ensure_novel_structure(novel_dir, args.novel_name)
+    # ⚠️ 建目录延后到 dry-run 检查之后（2026-10-13 审计修复 CLI-18）：
+    # 原实现无条件先调 ensure_novel_structure（建 settings/chapters/tracker
+    # 三目录 + 写 state.json），再检查 --dry-run——于是「只打印将调用的内容」
+    # 的预演动作凭空多出一个 novel/ 目录与 state.json。若该目录恰与既有项目
+    # 同名（默认值就是裸相对串 novel），预演还会静默复用/污染既有项目状态。
+    # 与其它子命令 dry-run 的零副作用语义不一致。
+    #
+    # dry-run 之前只用 novel_dir 拼路径（下面的 outline_path），不读 state_file，
+    # 故延后建目录不影响预演输出。
+    state_file = None
+    if not args.dry_run:
+        state_file = ensure_novel_structure(novel_dir, args.novel_name)
 
     # 解析章节质量达标线：CLI 显式 > 题材包 quality_thresholds > 默认 75
     # （提前解析，供「无外部模型」提示文本与主循环两处复用同一事实来源）
@@ -191,7 +241,7 @@ def main():
     print(f"[1/4] 准备: {prompt_path.name} → 第{args.chapter}章 ({args.words}字)")
     if args.dry_run:
         print(f"  [dry-run] system {len(system)} 字, user {len(user)} 字，跳过 LLM")
-        return
+        return 0
 
     # 2026-09-01 起：无外部模型模式——生成本地 AI 接管写作任务清单后优雅退出，
     # 正文生成与改写由 WorkBuddy 内置智能在会话内完成（与 pipeline.py 拆书降级对称）。
@@ -362,6 +412,7 @@ def main():
         print(f"  [跳过] 全书 QA 异常: {e}")
 
     print(f"\n✅ 完成: 第{args.chapter}章已写入 {ch_file}")
+    return 0
 
 
 if __name__ == "__main__":

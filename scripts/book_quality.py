@@ -24,6 +24,12 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 import chapter_loader
 
 # --------------------------------------------------------------------------
@@ -621,7 +627,26 @@ def book_quality_check(chapter_dir: str, voice_card_path: str = None, prev_chapt
     # 加载 voice-card（可选）
     voice_card = None
     if voice_card_path:
-        voice_card = json.loads(Path(voice_card_path).read_text(encoding='utf-8'))
+        # ⚠️ 可读错误处理（2026-10-13 审计修复 CLI-19）：
+        # 原实现直接 json.loads(read_text(...))，文件不存在时抛裸
+        # FileNotFoundError 栈（15 行 traceback，最后一行才是原因）——
+        # 用户手写路径打错一个字，看到的是"程序崩了"而非"路径不存在"。
+        # 同仓库的「检查」子命令对同类错误给一行中文提示，两条路径体感分裂。
+        # 这里返回结构化 error（调用方 book_quality_check 已有 error 通道，
+        # CLI 会把它渲染成可读信息并非零退出）。
+        vc_path = Path(voice_card_path)
+        if not vc_path.is_file():
+            return {
+                "error": f"voice-card 不存在: {voice_card_path}",
+                "error_type": "voice_card_missing",
+            }
+        try:
+            voice_card = json.loads(vc_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
+            return {
+                "error": f"voice-card 读取失败: {voice_card_path} — {exc}",
+                "error_type": "voice_card_unreadable",
+            }
 
     # 自动探测实体表（可选）。章节传入路径可能是 novel_dir/chapters（目录）或
     # 单章文件，实体表约定位于 novel_dir/settings/entities.json：
@@ -711,12 +736,12 @@ def format_truncation_hint(total: int, rendered: int) -> str:
     return f"⚠ 共 {total} 条，仅显示前 {rendered} 条"
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="全书内容质检")
     ap.add_argument("chapter_dir", help="章节目录或单章txt文件路径")
     ap.add_argument("--voice", help="voice-card JSON（可选，用于风格一致性检查）")
     ap.add_argument("--json", action="store_true", help="输出JSON格式")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     
     result = book_quality_check(args.chapter_dir, args.voice)
 
@@ -726,7 +751,7 @@ def main():
             print(json.dumps(result, ensure_ascii=False, indent=2))
         else:
             print(f"[X] {result['error']}")
-        sys.exit(1)
+        return 1
 
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -757,7 +782,7 @@ def main():
                           if result.get("issues_truncated") else "")
             print(f"  {hint}{limit_note}")
     
-    sys.exit(0 if result['verdict'] == "PASS" else 1)
+    return 0 if result['verdict'] == "PASS" else 1
 
 
 if __name__ == "__main__":

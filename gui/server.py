@@ -18,12 +18,70 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
+# 直接执行兼容：`python3 gui/server.py`（不走 `python -m gui.server`）时，
+# 脚本目录是 gui/ 而非仓库根，手动把仓库根加入 sys.path；-m 方式下已存在则 no-op。
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from gui import admin, auto_backup, config, db, router, services
 from gui.logging_setup import get_logger, setup_logging
-from gui.services import ServiceError, unique_corpus_path as _unique_corpus_path
+from gui.services import ServiceError
+from gui.services import unique_corpus_path as _unique_corpus_path
 from gui.sse import broker
 
 _log = get_logger("server")
+
+# 访问日志里必须脱敏的查询参数。这些值本身就是凭据：
+# - `auth`：NOVEL_LAB_TOKEN 的查询参数形式；
+# - `handshake`：桌面端 main.js 用 `/?handshake=<token>` 把身份握手令牌交给前端，
+#   这条 GET 请求行会被下面的访问日志原样记录；
+# - `handshake_token`：EventSource 发不了自定义头，SSE 只能把同一个令牌放查询串。
+# 令牌一旦落进 gui.log，读到日志的人就等于拿到桌面版的调用凭据。
+_SENSITIVE_QUERY_RE = re.compile(r"([?&])(auth|handshake_token|handshake)=([^ \r\n&]*)", re.I)
+
+
+def _mask_sensitive_query(line: str) -> str:
+    """把请求行里的敏感查询参数值替换成 ``***``，保留参数名与其它参数。"""
+    return _SENSITIVE_QUERY_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}=***", line)
+
+
+def announce_initial_password(initial_pw: str) -> Path | None:
+    """把管理员初始密码交到用户手上；成功返回指引文件路径，写不进去返回 None。
+
+    密码只写进数据目录下的指引文件（改密后由 admin.change_password 自动删除），
+    **不进日志**：gui.log 会随轮转长期留存，写进去等于把凭据另存一份没人负责清理的副本。
+    只有指引文件写不出来时才退回日志——那时它是唯一还能把密码交付出去的通道。
+    """
+    hint_fp = config.STATE_ROOT / admin.ADMIN_HINT_FILE_NAME
+    hint_text = "\n".join([
+        "管理员初始账号",
+        "================",
+        "用户名：admin",
+        "初始密码：" + initial_pw,
+        "（该密码仅生成一次）",
+        "",
+        "操作：用上面的账号密码登录管理后台，立即修改密码。",
+        "修改成功后本文件会被自动删除；也可手动删除。",
+        "数据目录：" + str(config.STATE_ROOT),
+        "",
+    ]) + "\n"
+    _log.warning("=" * 60)
+    try:
+        # STATE_ROOT 在极端时序下可能还没建出来，这里自己兜底而不是假设启动顺序。
+        hint_fp.parent.mkdir(parents=True, exist_ok=True)
+        hint_fp.write_text(hint_text, encoding="utf-8")
+    except OSError as exc:
+        _log.warning("写入初始密码指引文件失败: %s", exc)
+        # 指引文件写不出来时，日志是唯一还能把密码交出去的路径，只能在此破例。
+        _log.warning("管理员初始账号已创建：用户名 admin / 初始密码 %s", initial_pw)
+        _log.warning("=" * 60)
+        return None
+    _log.warning("管理员初始账号已创建：用户名 admin（初始密码见数据目录下的 %s，改密后自动删除）",
+                 admin.ADMIN_HINT_FILE_NAME)
+    _log.warning("请立即登录管理后台修改密码（该密码仅显示一次）。")
+    _log.warning("=" * 60)
+    return hint_fp
 
 
 def _safe_upload_filename(name: str) -> str:
@@ -475,9 +533,10 @@ class _Handler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *args: Any) -> None:
         # HTTP 访问日志：INFO 级落盘（gui_state/logs/gui.log），不刷控制台。
-        # ?auth= 查询参数脱敏，避免令牌进入日志。
-        line = format % args
-        line = re.sub(r"([?&])auth=[^ ]+", r"auth=***", line)
+        # 凭据类查询参数（auth / handshake / handshake_token）一律脱敏：桌面版把身份
+        # 握手令牌交给前端走 `/?handshake=`，SSE 又只能用 `?handshake_token=`，
+        # 原样落进 gui.log 就等于把调用凭据写给任何能读到日志的人。
+        line = _mask_sensitive_query(format % args)
         _log.info("http %s %s", self.address_string(), line)
 
 
@@ -633,6 +692,51 @@ def _read_lock_pid(path: Path) -> int | None:
     return pid if pid > 0 else None
 
 
+def ensure_curated_seed_once() -> dict[str, Any]:
+    """启动时的一次性精选神作灌装保障（2026-10-11 引入；2026-10-12 加"已灌装"标记）。
+
+    为什么需要"一次性标记"而不是「数量不足就补」：
+    后者无法区分两种情况——
+      a) 从未灌装过（新用户 / 库刚建）→ 应该补
+      b) 用户**显式删除**了不想看的精选书 → 不该复活
+    实测（审计发现）：用户删掉一本 curated 书后，下次启动被静默恢复，
+    用户无法摆脱不想要的书，删除动作看起来"没生效"。
+
+    现行语义：settings.json 记 `curated_seeded` 标记。只在**从未灌装过**
+    且库中没有任何 curated 记录时灌装一次；之后即便数量不足也不再自动补。
+    需要恢复时，用户可显式调 ``essence_service.ensure_curated_library()``
+    或删掉 settings.json 里的该标记。
+
+    失败只记日志，不阻断启动（与 builtin_sync 同口径）。
+    """
+    try:
+        from gui import essence_service, system_service
+
+        settings = system_service._load_settings_file()
+        if settings.get("curated_seeded"):
+            return {"action": "skipped", "reason": "already_seeded"}
+
+        # LIKE 里的 `_` 是通配符，必须 ESCAPE（同 essence_service 的垃圾清理修复）
+        conn = db.get_conn()
+        n_curated = conn.execute(
+            "SELECT count(*) FROM essence_books WHERE book_id LIKE 'curated\\_%' ESCAPE '\\'"
+        ).fetchone()[0]
+
+        seeded = False
+        if n_curated == 0:
+            essence_service.ensure_curated_library(clean_raw_corpus=False)
+            seeded = True
+
+        # 无论本次是否真灌装（老库可能已有人工数据），都落标记，
+        # 避免把"用户已整理过的库"当成"未初始化"反复补写。
+        settings["curated_seeded"] = True
+        system_service._save_settings_file(settings)
+        return {"action": "seeded" if seeded else "marked", "curated_books": n_curated}
+    except Exception as exc:  # noqa: BLE001 — 不阻断启动
+        _log.warning("精选神作档案就绪初始化跳过: %s", exc)
+        return {"action": "failed", "error": str(exc)}
+
+
 class GuiServer:
     """封装 ThreadingHTTPServer 的启动 / 停机。"""
 
@@ -777,30 +881,16 @@ class GuiServer:
         from gui import builtin_sync
         builtin_sync.sync_at_startup()
 
+        # 小说精华库传世神作就绪保障（2026-10-11；2026-10-12 加"已灌装"标记）
+        ensure_curated_seed_once()
+
         # 管理员系统：首次启动生成随机初始密码（只打印一次）。
         # P1-2 修复（2026-09-29）：桌面端无控制台窗口（windowsHide），只写日志
         # 用户无从得知。首次生成时同步写入数据目录下的明文指引文件，
         # 改密成功后自动删除。
         initial_pw = admin.ensure_initialized()
         if initial_pw:
-            _log.warning("=" * 60)
-            _log.warning("管理员初始账号已创建：用户名 admin / 初始密码 %s", initial_pw)
-            _log.warning("请立即登录管理后台修改密码（该密码仅显示一次）。")
-            _log.warning("=" * 60)
-            try:
-                hint_fp = config.STATE_ROOT / "admin-初始密码.txt"
-                hint_fp.write_text(
-                    "管理员初始账号\n"
-                    "================\n"
-                    f"用户名：admin\n初始密码：{initial_pw}\n"
-                    "（该密码仅生成一次）\n\n"
-                    "操作：用上面的账号密码登录管理后台，立即修改密码。\n"
-                    "修改成功后本文件会被自动删除；也可手动删除。\n"
-                    f"数据目录：{config.STATE_ROOT}\n",
-                    encoding="utf-8",
-                )
-            except OSError as exc:
-                _log.warning("写入初始密码指引文件失败: %s", exc)
+            announce_initial_password(initial_pw)
 
         # W15/D3：启动自清理 scratch 残留
         try:

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import AsyncBoundary from './AsyncBoundary'
+import { I18nProvider } from '../../state/I18nContext'
 
 describe('AsyncBoundary 四态', () => {
   it('loading 态渲染骨架屏', () => {
@@ -71,5 +72,32 @@ describe('AsyncBoundary 四态', () => {
       </AsyncBoundary>,
     )
     expect(screen.getByText('ready-data')).toBeInTheDocument()
+  })
+
+  it('en-US 语言环境下渲染英文默认空态与重试按钮', async () => {
+    const onRetry = vi.fn()
+    const { rerender } = render(
+      <I18nProvider initialLocale="en-US">
+        <AsyncBoundary loading={false} error={new TypeError('Failed to fetch')} onRetry={onRetry}>
+          <div>data</div>
+        </AsyncBoundary>
+      </I18nProvider>
+    )
+
+    // 英文重试按钮
+    const retryBtn = screen.getByRole('button', { name: 'Retry' })
+    expect(retryBtn).toBeInTheDocument()
+    await userEvent.click(retryBtn)
+    expect(onRetry).toHaveBeenCalledOnce()
+
+    // 英文默认空态
+    rerender(
+      <I18nProvider initialLocale="en-US">
+        <AsyncBoundary loading={false} error={null} empty>
+          <div>data</div>
+        </AsyncBoundary>
+      </I18nProvider>
+    )
+    expect(screen.getByText('No Data Available')).toBeInTheDocument()
   })
 })

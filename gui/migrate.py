@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import sys
 import time
@@ -197,11 +198,18 @@ def prune_backups(keep: int = BACKUP_KEEP) -> list[Path]:
     """备份保留策略：只保留最近 ``keep`` 个 ``*.bak-*``，删除更旧的。
 
     备份文件名形如 ``index.db.bak-{YYYYmmdd-HHMMSS}``，时间戳可直接字符串排序，
-    故按名字升序排列即时间先后。保留末位 ``keep`` 个，其余删除；``keep <= 0``
-    时清空全部备份（谨慎使用）。
+    故按名字升序排列即时间先后。保留末位 ``keep`` 个，其余删除。
+
+    ⚠️ ``keep <= 0`` 有**最小保留保护**（2026-10-14 审计修复 D21）：
+    原实现 ``keep <= 0`` 时 ``stale = backups`` → **删光全部备份**。
+    实测：keep=0 删 3/3、keep=-5 删 2/2。若调用方把配置项（如环境变量
+    未设时的空串）转成 0，数据安全网会被静默清空——而备份是 rollback 的
+    唯一依托，删光等于失去最后一道恢复手段。
+    现改为：``keep < 1`` 一律按 1 处理（至少留一个）。确需清空请显式
+    逐个 unlink，不要经由本函数。
 
     Args:
-        keep: 保留的最近备份数量，默认 ``BACKUP_KEEP``（3）。
+        keep: 保留的最近备份数量，默认 ``BACKUP_KEEP``（3）。小于 1 按 1 处理。
 
     Returns:
         被删除的备份路径列表（按从旧到新）。
@@ -210,10 +218,10 @@ def prune_backups(keep: int = BACKUP_KEEP) -> list[Path]:
     if not parent.is_dir():
         return []
     backups = sorted(parent.glob("*.bak-*"))  # 名字含可排序时间戳 → 升序即时间先后
-    keep = max(int(keep), 0)
+    keep = max(int(keep), 1)   # D21：至少保留 1 个，禁止经此函数删光
     if len(backups) <= keep:
         return []
-    stale = backups[: len(backups) - keep] if keep > 0 else backups
+    stale = backups[: len(backups) - keep]
     removed: list[Path] = []
     for old in stale:
         try:
@@ -275,10 +283,24 @@ def rollback() -> Path | None:
             "请先停止服务后再试。"
         )
     src = db.db_path()
-    backups = sorted(src.parent.glob("index.db.bak-*"))
+    # 只认**符合时间戳格式**的备份（2026-10-14 审计修复 D21 第 2 点）：
+    # 原实现用 sorted(glob("index.db.bak-*"))[-1] 取"最新"。备份文件名是
+    # index.db.bak-{YYYYmmdd-HHMMSS}（固定宽度数字），本函数自身产物排序正确；
+    # 但 glob 会**一并匹配非本函数产物**（如手工放的 index.db.bak-manual），
+    # 而 'm' > '2' 使其在字符串序中排到最后 → rollback 会去恢复那个手工文件
+    # 而非真正最新的备份。实测：存在 index.db.bak-manual 时 latest 指向它。
+    #
+    # 改为正则白名单 + 按文件名时间戳排序（比 mtime 更可靠：备份可能被复制
+    # 到别处再拷回，mtime 会变，而文件名内嵌的时间戳是其固有属性）。
+    _BACKUP_RE = re.compile(r"^index\.db\.bak-(\d{8}-\d{6})$")
+    backups = [
+        p for p in src.parent.glob("index.db.bak-*")
+        if _BACKUP_RE.match(p.name)
+    ]
     if not backups:
         return None
-    latest = backups[-1]
+    # 按文件名内嵌时间戳排序（正则已保证格式统一，字符串序即时间序）。
+    latest = sorted(backups, key=lambda p: _BACKUP_RE.match(p.name).group(1))[-1]
     # B1：先校验备份，坏备份拒绝恢复。
     db._verify_backup(latest)
     db.close()  # 先关闭连接，避免 Windows 文件锁。
@@ -327,7 +349,43 @@ def rollback() -> Path | None:
     db._verify_backup(src)
     # 重建连接指向恢复后的库（下次 get_conn 会因 _conn_path 已清空而重连）。
     db._reset_conn()
+    # ── 同步 JSON 派生副本（2026-10-13 审计修复 D11）─────────────────────
+    # rollback 原先只恢复 index.db，**不碰** STATE_JSON_DIR 下的派生副本。
+    # 而 state_store.load_state() 只读 JSON（不读 SQLite）——实测回滚后
+    # SQLite 是 idle/rev=1、JSON 仍是 done/rev=5，**双源分裂**：
+    # 服务层按 JSON 认为任务已完成，库却是回滚前的旧状态。
+    # SQLite 是权威源，故以它为准重建 JSON。
+    _resync_json_from_db()
     return latest
+
+
+def _resync_json_from_db() -> int:
+    """以 SQLite（权威）为准，重建全部 JSON 派生副本。返回重建条数。
+
+    仅处理库中**存在**的 task：JSON 里多出来的（库中无对应行）保持不动——
+    那可能是尚未落库的进行中状态，删掉会丢数据。
+    """
+    try:
+        from gui import state_store
+    except Exception:  # noqa: BLE001 — 循环依赖或环境异常时不阻断回滚
+        return 0
+    rebuilt = 0
+    try:
+        rows = db.get_conn().execute(
+            "SELECT book_id FROM analysis_tasks").fetchall()
+    except Exception:  # noqa: BLE001 — 表不存在（旧库）时无事可做
+        return 0
+    for row in rows:
+        book_id = row["book_id"] if hasattr(row, "keys") else row[0]
+        if not book_id:
+            continue
+        try:
+            task = state_store.load_task(book_id)   # 权威源重建
+            state_store._save_state_json(task)      # 写回 JSON 副本
+            rebuilt += 1
+        except Exception:  # noqa: BLE001 — 单条失败不阻断其余
+            continue
+    return rebuilt
 
 
 # ---------------------------------------------------------------------------
@@ -371,6 +429,18 @@ _rel_path = rel_path
 
 def _upsert_book(conn: Any, book_id: str, title: str, source_path: str | None,
                  genre: str | None, status: str) -> None:
+    """书 UPSERT（幂等）。
+
+    ⚠️ ``status`` 必须参与更新（2026-10-12 审计修复 D4）：
+    原实现的 ``DO UPDATE`` 里没有 status，于是 ``books.status`` 永远卡在
+    **首次写入**的值。实测：先用 ``_upsert_book(..., 'idle')`` 登记一本仅导入
+    未拆的书，拆完后再调 ``_upsert_book(..., 'done')`` —— status 仍是 idle。
+    后果：「已拆书」统计永久失真（拆完的书一直算未拆）。
+
+    为什么不是简单的 ``status = excluded.status``：为避免将来调用顺序变化
+    造成**降级**（done 被改回 idle），这里只允许「idle → done」单向推进。
+    正常迁移路径里三个调用点的集合互斥，本不会互相覆盖；本约束是防线。
+    """
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     conn.execute(
         """
@@ -380,6 +450,10 @@ def _upsert_book(conn: Any, book_id: str, title: str, source_path: str | None,
             title = excluded.title,
             source_path = COALESCE(excluded.source_path, books.source_path),
             genre = COALESCE(excluded.genre, books.genre),
+            status = CASE
+                WHEN books.status = 'done' THEN 'done'
+                ELSE excluded.status
+            END,
             updated_at = excluded.updated_at
         """,
         (book_id, title, source_path, genre, status, now, now),
@@ -389,20 +463,59 @@ def _upsert_book(conn: Any, book_id: str, title: str, source_path: str | None,
 def _upsert_asset(conn: Any, asset_key: str, kind: str, name: str, path: str,
                   book_id: str | None, genre: str | None, size: int | None,
                   mtime: float | None, meta_json: str) -> None:
-    """资产 UPSERT（幂等）。链式 ``ON CONFLICT``（SQLite 3.35.0+）覆盖两个唯一约束：
+    """资产 UPSERT（幂等）。处理 ``asset_key`` 与 ``path`` 两个唯一约束。
 
-    1. ``asset_key`` 冲突（``kind:stem`` 相同）→ 更新非键列，重复迁移不重复插行。
-    2. ``path`` 冲突（同一文件已存在别的 ``asset_key``）→ **存量库被旧代码迁移过**的
-       场景：老版本把 ``genre-prose-card-index.json`` 判为 ``trope``、把 ``*-distilled``
-       判为对应基础卡，库里留有 ``trope:genre-prose-card-index`` /
-       ``voice:xxx-voice-card-distilled`` 这类旧 kind 行（path 与文件一致）。新代码推断出的
-       ``asset_key`` 与旧行不冲突，但 ``assets.path`` 是 UNIQUE——只处理 asset_key 会
-       ``IntegrityError``，被 ``db.tx()`` 整体回滚，迁移**永久失败**、新 kind 进不了库。
-       故按 path 命中时把历史行**原地**改写成新 ``asset_key`` + 新 ``kind``
-       （``path`` 已等于 ``excluded.path``，无需回写）：既不删行、不重建库，也避免
-       ``asset_key`` 与 ``get_asset_detail``/``_item_id`` 的 ``kind:stem`` 口径漂移。
+    历史行改写的必要性：**存量库被旧代码迁移过**时，老版本把
+    ``genre-prose-card-index.json`` 判为 ``trope``、把 ``*-distilled`` 判为
+    对应基础卡，库里留有 ``trope:genre-prose-card-index`` 这类旧 kind 行
+    （path 与文件一致）。新代码推断出的 ``asset_key`` 与旧行不冲突，但
+    ``assets.path`` 是 UNIQUE——只处理 asset_key 会 ``IntegrityError``，
+    被 ``db.tx()`` 整体回滚，迁移**永久失败**。
+
+    ⚠️ 为何不能只用链式 ``ON CONFLICT``（2026-10-12 审计修复 D2）：
+    SQLite 的链式冲突子句**只处理第一个命中的目标**。当 ``asset_key`` 撞
+    行 A、``path`` 撞行 B（两行不同）时，第一子句更新完行 A 后，其
+    ``path`` 可能落到行 B 已有的值上，第二子句不再介入 → 抛
+    ``UNIQUE constraint failed: assets.path``，整个迁移回滚。
+
+    实测复现（修复前）：
+        库中 ('K1','P1') 与 ('K2','P2')
+        插入 ('K1', ..., 'P2') → IntegrityError: UNIQUE constraint failed: assets.path
+
+    修法：**先把 path 冲突的历史行原地改写**（UPDATE 成新 asset_key/kind，
+    保留 id 与 created_at），再走常规 upsert。这样冲突被拆成两步，
+    链式子句不再需要同时处理两个目标。
+
+    为何坚持「原地更新」而非「删旧插新」：assets.id 是主键，被删除后
+    AUTOINCREMENT 不复用；历史行原地升级能保持 id 稳定，避免任何按 id
+    建立的引用（日志、外部脚本）失效。回归锚点见
+    tests/test_migrate.py::test_legacy_rows_upgraded_in_place。
     """
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    # 第一步：消解 path 冲突。
+    # 若同一 path 已挂在**别的** asset_key 下，说明这是旧代码迁移留下的行。
+    existing = conn.execute(
+        "SELECT asset_key FROM assets WHERE path = ?", (path,)).fetchone()
+    if existing is not None and existing[0] != asset_key:
+        holder = conn.execute(
+            "SELECT path FROM assets WHERE asset_key = ?", (asset_key,)).fetchone()
+        if holder is not None:
+            # 双冲突（key 撞行 A、path 撞行 B，两行不同）——两个 UNIQUE 互相牵制，
+            # 这是链式 ON CONFLICT 无法表达的根因。删行 A 会让它对应文件的
+            # created_at 丢失；删行 B（本次要取代的那行）更符合"新口径覆盖旧口径"。
+            # 故删 B 后 INSERT，而不是改写 B。
+            conn.execute("DELETE FROM assets WHERE path = ?", (path,))
+        else:
+            # 仅 path 冲突：原地改写保留 id/created_at（回归锚点见
+            # tests/test_migrate.py::test_legacy_rows_upgraded_in_place）。
+            conn.execute(
+                """UPDATE assets SET asset_key = ?, kind = ?, name = ?, book_id = ?,
+                       genre = ?, size = ?, mtime = ?, meta_json = ?, updated_at = ?
+                   WHERE path = ?""",
+                (asset_key, kind, name, book_id, genre, size, mtime, meta_json, now, path),
+            )
+
     conn.execute(
         """
         INSERT INTO assets (asset_key, kind, name, path, book_id, genre, size, mtime,
@@ -412,16 +525,6 @@ def _upsert_asset(conn: Any, asset_key: str, kind: str, name: str, path: str,
             kind = excluded.kind,
             name = excluded.name,
             path = excluded.path,
-            book_id = excluded.book_id,
-            genre = excluded.genre,
-            size = excluded.size,
-            mtime = excluded.mtime,
-            meta_json = excluded.meta_json,
-            updated_at = excluded.updated_at
-        ON CONFLICT(path) DO UPDATE SET
-            asset_key = excluded.asset_key,
-            kind = excluded.kind,
-            name = excluded.name,
             book_id = excluded.book_id,
             genre = excluded.genre,
             size = excluded.size,
@@ -483,26 +586,46 @@ def _upsert_genre(conn: Any, name: str, display_name: str | None, kind: str | No
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     sanitized = _sanitize_genre_kind(kind)
     priority = GENRE_KIND_PRIORITY.get(sanitized or "", 0)
+    # 拆成两步（2026-10-14 审计修复 D15）：
+    #
+    # 原实现把 display_name 与 kind 写在**同一条** DO UPDATE 里，并带
+    # `WHERE excluded.kind IS NOT NULL` —— 于是当新值的 kind 为 None
+    # （典型场景：只想补一个 display_name）时整条 UPDATE 被跳过，
+    # display_name 永远补不上。实测：先 _upsert_genre('g', None, None)
+    # 再 _upsert_genre('g', '显示名', None)，display_name 仍是 NULL。
+    #
+    # 两步各自独立裁决：
+    #   ① display_name：只要新值非空就补（COALESCE 保证不覆盖已有非空值），
+    #      与 kind 的优先级无关。
+    #   ② kind：仍按优先级严格高于才覆盖（保持原防后写覆盖策略）。
+    # 先 INSERT 保证行存在，再分别 UPDATE。
     conn.execute(
-        """
-        INSERT INTO genres (name, display_name, kind, created_at)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(name) DO UPDATE SET
-            display_name = COALESCE(excluded.display_name, genres.display_name),
-            kind = CASE
-                       WHEN excluded.kind IS NULL THEN genres.kind
-                       ELSE excluded.kind
-                   END
-        WHERE excluded.kind IS NOT NULL
-          AND (? > CASE COALESCE(genres.kind, '')
-                        WHEN 'genre_pack' THEN 3
-                        WHEN 'book'       THEN 2
-                        WHEN 'prose_card' THEN 1
-                        ELSE 0
-                    END)
-        """,
-        (name, display_name, sanitized, now, priority),
+        "INSERT INTO genres (name, display_name, kind, created_at) "
+        "VALUES (?, ?, ?, ?) ON CONFLICT(name) DO NOTHING",
+        (name, display_name, sanitized, now),
     )
+    # ① display_name：非空即补，不覆盖已有值。
+    if display_name:
+        conn.execute(
+            "UPDATE genres SET display_name = ? "
+            "WHERE name = ? AND (display_name IS NULL OR display_name = '')",
+            (display_name, name),
+        )
+    # ② kind：仅当优先级严格高于现有值才覆盖（防后写降级）。
+    if sanitized is not None:
+        conn.execute(
+            """
+            UPDATE genres SET kind = ?
+            WHERE name = ?
+              AND (? > CASE COALESCE(kind, '')
+                            WHEN 'genre_pack' THEN 3
+                            WHEN 'book'       THEN 2
+                            WHEN 'prose_card' THEN 1
+                            ELSE 0
+                        END)
+            """,
+            (sanitized, name, priority),
+        )
 
 
 def _report_char_count(fp: Path) -> int:
@@ -690,12 +813,27 @@ def prune(dry_run: bool = False) -> dict[str, Any]:
     Returns:
         dict: {"assets_pruned": [...], "reports_pruned": [...], "dry_run": bool}
     """
-    # 复用 check() 的扫描对账结果作为唯一判据，避免「两处各自解析路径」造成口径分叉。
+    # 复用 check() 的扫描对账结果作为判据。
     # （曾试过用 config.ROOT_DIR / rel 解析存量相对路径，但 _rel_path 在源目录不在
     #  ROOT_DIR 内时走的是 `<目录名>/<文件名>` 回退分支，解析会失真。）
     diff = check()
     gone_asset_paths = set(diff["assets"]["extra"])
     gone_report_paths = set(diff["reports"]["extra"])
+
+    # ── 安全闸（2026-10-12 审计修复 D7）────────────────────────────────
+    # prune 是**破坏性**操作，而它的唯一判据是"磁盘扫描不到"。若源目录
+    # 临时不可见（网络盘断开、权限变更、杀软隔离、root 配置错误），
+    # scan_assets() 返回空 → 库中每一行都被判为 extra → **整表清空**。
+    # 实测复现：assets/ 不存在时，3 行全部进 assets_pruned。
+    #
+    # 判据：磁盘侧扫到 0 个文件、而库里有行——这几乎只可能是扫描失败而非
+    # "用户真的删光了"。此时拒绝执行（dry_run 仍可查看将被删的清单）。
+    # 部分不可见（扫到一些、漏掉另一些）无法可靠识别，不在本闸覆盖范围。
+    suspicious = []
+    if diff["assets"]["disk"] == 0 and diff["assets"]["db"] > 0:
+        suspicious.append(f"assets（库中 {diff['assets']['db']} 行，磁盘扫描到 0 个文件）")
+    if diff["reports"]["disk"] == 0 and diff["reports"]["db"] > 0:
+        suspicious.append(f"reports（库中 {diff['reports']['db']} 行，磁盘扫描到 0 个文件）")
 
     assets_gone = [(str(r.get("asset_key") or ""), r.get("path"))
                    for r in db.list_asset_rows(limit=100000)
@@ -703,6 +841,15 @@ def prune(dry_run: bool = False) -> dict[str, Any]:
     reports_gone = [(str(r.get("report_key") or ""), r.get("path"))
                     for r in db.list_reports()
                     if r.get("path") in gone_report_paths]
+
+    if suspicious and not dry_run:
+        raise RuntimeError(
+            "prune 已中止：源目录疑似不可见——"
+            + "；".join(suspicious)
+            + "。这通常意味着路径配置错误或目录暂时无法访问，"
+              "继续执行会清空索引表。请确认目录可访问后重试"
+              "（dry_run=True 仍可查看将被删除的清单）。"
+        )
 
     if not dry_run and (assets_gone or reports_gone):
         # 破坏性操作：先备份现有库，保证可回滚（与 run_migrate 同口径）。
@@ -736,11 +883,14 @@ def _print_result(result: dict[str, Any]) -> None:
         print(f"  unrecognized  = {result['unrecognized']}")
 
 
-def sync_asset(fp: Path) -> None:
+def sync_asset(fp: Path) -> bool:
     """单文件重索引：组装写完 assets/*.json 后调用，幂等 upsert 进 SQLite。
 
-    复用 infer_kind / infer_book_id / infer_genre + _upsert_asset（db.tx 内）。
-    不调 run_migrate()（避免每次 backup() 与全量扫描）。
+    **返回是否真的入库**（2026-10-14 审计修复 D12）：
+    原先返回 None，且对「文件不存在 / JSON 解析失败 / 非 dict」三类情况
+    **静默 return**——调用方（builtin_sync._reindex_copied）无法区分
+    "成功入库"与"静默跳过"，把它们一并计入 reindexed，报告数字虚高
+    （用户看到"已重索引 5 个"，实际可能只有 2 个真进了库）。
 
     ``asset_key`` 与 ``path`` 必须与 :func:`run_migrate` / :meth:`AssetIndex._item_id`
     同口径（``f"{kind}:{stem}"`` / ``_rel_path``）：详情定位走
@@ -751,18 +901,25 @@ def sync_asset(fp: Path) -> None:
 
     fp = Path(fp)
     if not fp.is_file():
-        return
+        return False
     try:
         content = json.loads(fp.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return
+        return False
     if not isinstance(content, dict):
-        return
+        return False
 
     stem = fp.stem
     kind = infer_kind(stem, content)
     book_id = infer_book_id(stem)
     genre = infer_genre(stem, content)
+    # 显示名口径必须与 run_migrate 一致（2026-10-14 审计修复 D14）：
+    # run_migrate 用 `meta.name or stem`，而此处原先写死 `stem`——
+    # 同一文件经两条路径入库会得到**不同的 name**，索引口径漂移
+    # （GUI 资产库的显示名随入库路径而变）。
+    meta = content.get("meta") if isinstance(content, dict) else None
+    display_name = (meta or {}).get("name") if isinstance(meta, dict) else None
+    name = display_name or stem
     meta_json = json.dumps(content.get("meta", {}), ensure_ascii=False)
     try:
         size = fp.stat().st_size
@@ -772,8 +929,9 @@ def sync_asset(fp: Path) -> None:
 
     with _db.tx() as conn:
         _upsert_asset(
-            conn, asset_key=f"{kind}:{stem}", kind=kind, name=stem, path=_rel_path(fp),
+            conn, asset_key=f"{kind}:{stem}", kind=kind, name=name, path=_rel_path(fp),
             book_id=book_id, genre=genre, size=size, mtime=mtime, meta_json=meta_json)
+    return True
 
 
 def main(argv: list[str] | None = None) -> int:

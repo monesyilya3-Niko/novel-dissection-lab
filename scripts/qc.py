@@ -408,7 +408,7 @@ def _dim_banned(texts: dict, asset: dict, book_path: str) -> DimensionScore:
     score = 100.0
     if book_path:
         try:
-            book_text = Path(book_path).read_text(encoding="utf-8")
+            book_text = chapter_loader.read_text_file(Path(book_path))
             ngram = compliance.build_ngram_index(book_text)
             errors, warns = compliance.scan_asset(asset, ngram)
             for e in errors:
@@ -702,7 +702,7 @@ def to_markdown(report: QCReport) -> str:
 # CLI
 # ---------------------------------------------------------------------------
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="QC 统一质检入口（四层十二维）")
     ap.add_argument("chapter_dir", help="章节目录或单章 txt")
     ap.add_argument("--voice", help="voice-card 路径")
@@ -714,7 +714,7 @@ def main():
     ap.add_argument("--no-save", action="store_true", help="不落盘，仅打印到 stdout")
     ap.add_argument("--llm-hook", action="store_true",
                     help="启用 LLM 因果合理性二次判定（无模型时自动降级为纯算法）")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     report = run_qc(
         args.chapter_dir,
@@ -744,7 +744,7 @@ def main():
         if not args.no_save:
             print(f"\n报告已落盘: reports/qc/{report.book_title or 'book'}-qc.{{json,md}}")
 
-    sys.exit(0 if report.verdict == "PASS" else 1)
+    return 0 if report.verdict == "PASS" else 1
 
 
 if __name__ == "__main__":

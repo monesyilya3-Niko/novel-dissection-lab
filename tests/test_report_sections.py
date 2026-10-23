@@ -4,9 +4,13 @@
 build_report / section_* 均为纯函数（dict in → markdown out），
 用固定夹具直接调用，不依赖 LLM 与磁盘。
 """
+import io
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -103,6 +107,20 @@ class TestBuildReport(unittest.TestCase):
         # 报告头必须声明不含原文摘录（合规要求）
         md = report_mod.build_report(_voice(), {}, {})
         self.assertIn("不含原文摘录", md)
+
+
+class TestReportMainCLI(unittest.TestCase):
+    def test_main_with_explicit_argv(self):
+        with tempfile.TemporaryDirectory() as td:
+            vc_file = Path(td) / "test-voice-card.json"
+            vc_file.write_text(json.dumps(_voice(), ensure_ascii=False), encoding="utf-8")
+            out_file = Path(td) / "out.md"
+            with mock.patch("sys.stdout", new_callable=io.StringIO) as mock_out:
+                code = report_mod.main([str(vc_file), "--out", str(out_file), "--title", "CLI测试报告"])
+            self.assertEqual(code, 0)
+            self.assertTrue(out_file.exists())
+            self.assertIn("CLI测试报告", out_file.read_text(encoding="utf-8"))
+            self.assertIn("拆书报告已生成", mock_out.getvalue())
 
 
 if __name__ == "__main__":

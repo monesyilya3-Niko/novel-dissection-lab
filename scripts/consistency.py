@@ -7,6 +7,18 @@ import json
 import sys
 from pathlib import Path
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+try:
+    from scripts import chapter_loader
+except ImportError:
+    import chapter_loader
+
 # 直陈式情绪词（出现即扣分）
 DIRECT_EMOTION = ["很愤怒", "很生气", "感到难过", "非常开心", "很伤心", "感到害怕",
                   "很紧张", "很幸福", "很沮丧", "很兴奋", "很失落", "很委屈"]
@@ -22,6 +34,8 @@ def extract_keywords(desc: str, max_kws: int = 8) -> list:
     现对长描述改为抽取其中引号片段（「…」/''/""/“…”）作为关键词；
     短字符串（≤10 字）仍整段收录；无引号片段的长描述跳过。
     """
+    if not isinstance(desc, str):
+        return []
     kws = []
     if len(desc) >= 2 and len(desc) <= 10:
         kws.append(desc)
@@ -232,84 +246,6 @@ def check_imagery(text, imagery):
     src = f"，含资产领域 {asset_hits} 个" if asset_domains else ""
     return score, [f"  意象领域命中 {len(hit_domains)} 个{src} → {score}/10"]
 
-def consistency_check(voice_card_path: str, chapter_path: str):
-    """主函数：一致性打分。"""
-    voice_card = json.loads(Path(voice_card_path).read_text(encoding="utf-8"))
-    chapter_text = Path(chapter_path).read_text(encoding="utf-8")
-    voices = voice_card.get("dialogue", {}).get("character_voices", [])
-    emotion = voice_card.get("emotion_handling", {})
-    narration = voice_card.get("narration", {})
-    banned = voice_card.get("banned_words", [])
-    imagery = voice_card.get("imagery", {})
-    voice_score, voice_details = check_voices(chapter_text, voices)
-    emotion_score, emotion_details = check_emotion(chapter_text, emotion)
-    narration_score, narration_details = check_narration(chapter_text, narration)
-    banned_score, banned_details = check_banned(chapter_text, banned)
-    imagery_score, imagery_details = check_imagery(chapter_text, imagery)
-    total_score = voice_score + emotion_score + narration_score + banned_score + imagery_score
-    print("=== 风格一致性自检 ===")
-    print(f"章: {Path(chapter_path).name} ({len(chapter_text)} 字)")
-    print()
-    print(f"[1] 角色声线 (35): {voice_score:.1f}")
-    for d in voice_details:
-        print(d)
-    print(f"[2] 情绪写法 (20): {emotion_score:.1f}")
-    for d in emotion_details:
-        print(d)
-    print(f"[3] 叙述层 (15): {narration_score:.1f}")
-    for d in narration_details:
-        print(d)
-    print(f"[4] 禁忌 (20): {banned_score:.1f}")
-    for d in banned_details:
-        print(d)
-    print(f"[5] 意象 (10): {imagery_score:.1f}")
-    for d in imagery_details:
-        print(d)
-    print()
-    print(f"=== 总分: {total_score:.1f}/100 ===")
-    if total_score >= 75:
-        print("✅ PASS（≥75，符合要求）")
-    elif total_score >= 60:
-        print("⚠️ WARN（60-75，建议人工润色）")
-    else:
-        print("❌ FAIL（<60，需要修改）")
-    return {
-        "score": total_score,
-        "voice": voice_score,
-        "emotion": emotion_score,
-        "narration": narration_score,
-        "banned": banned_score,
-        "imagery": imagery_score
-    }
-
-def main(argv=None) -> int:
-    """CLI 入口：风格一致性自检。
-
-    2026-09-21 新增退出码语义 —— 此前只打印诊断、进程恒返回 0，无法用于
-    CI 或上层脚本判断。现按阈值给判定：达标返回 0，未达标返回 1。
-
-    阈值默认 75，与 novel-lab 其余维度保持一致（chapter_check / qc 的 PASS 线），
-    可用 --threshold 覆盖。
-    """
-    parser = argparse.ArgumentParser(description="风格一致性自检")
-    parser.add_argument("voice", help="voice-card JSON 文件路径")
-    parser.add_argument("chapter", help="生成章文件路径")
-    parser.add_argument("--threshold", type=float, default=75.0,
-                        help="PASS 阈值（默认 75，与 chapter_check / qc 一致）")
-    args = parser.parse_args(argv)
-    result = consistency_check(args.voice, args.chapter)  # 返回 dict：score/voice/emotion/…
-    total = float(result["score"])
-    ok = total >= args.threshold
-    print()
-    print(f"CLI 判定: {'PASS' if ok else 'FAIL'}"
-          f"（阈值 {args.threshold:g}，总分 {total:.1f}）")
-    return 0 if ok else 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())
-
-
 def score_text(voice_card: dict, text: str, label: str = ""):
     """供 novel.py 调用的接口：返回 (score, details, raw)"""
     # 提取voice-card中的各个维度
@@ -354,3 +290,94 @@ def score_text(voice_card: dict, text: str, label: str = ""):
     }
 
     return total_score, details, raw
+
+
+def consistency_check(voice_card_path: str, chapter_path: str, quiet: bool = False):
+    """主函数：一致性打分。"""
+    voice_card = json.loads(Path(voice_card_path).read_text(encoding="utf-8"))
+    chapter_text = chapter_loader.read_text_file(Path(chapter_path))
+    voices = voice_card.get("dialogue", {}).get("character_voices", [])
+    emotion = voice_card.get("emotion_handling", {})
+    narration = voice_card.get("narration", {})
+    banned = voice_card.get("banned_words", [])
+    imagery = voice_card.get("imagery", {})
+    voice_score, voice_details = check_voices(chapter_text, voices)
+    emotion_score, emotion_details = check_emotion(chapter_text, emotion)
+    narration_score, narration_details = check_narration(chapter_text, narration)
+    banned_score, banned_details = check_banned(chapter_text, banned)
+    imagery_score, imagery_details = check_imagery(chapter_text, imagery)
+    total_score = voice_score + emotion_score + narration_score + banned_score + imagery_score
+    if not quiet:
+        print("=== 风格一致性自检 ===")
+        print(f"章: {Path(chapter_path).name} ({len(chapter_text)} 字)")
+        print()
+        print(f"[1] 角色声线 (35): {voice_score:.1f}")
+        for d in voice_details:
+            print(d)
+        print(f"[2] 情绪写法 (20): {emotion_score:.1f}")
+        for d in emotion_details:
+            print(d)
+        print(f"[3] 叙述层 (15): {narration_score:.1f}")
+        for d in narration_details:
+            print(d)
+        print(f"[4] 禁忌 (20): {banned_score:.1f}")
+        for d in banned_details:
+            print(d)
+        print(f"[5] 意象 (10): {imagery_score:.1f}")
+        for d in imagery_details:
+            print(d)
+        print()
+        print(f"=== 总分: {total_score:.1f}/100 ===")
+        if total_score >= 75:
+            print("✅ PASS（≥75，符合要求）")
+        elif total_score >= 60:
+            print("⚠️ WARN（60-75，建议人工润色）")
+        else:
+            print("❌ FAIL（<60，需要修改）")
+    return {
+        "score": total_score,
+        "voice": voice_score,
+        "emotion": emotion_score,
+        "narration": narration_score,
+        "banned": banned_score,
+        "imagery": imagery_score
+    }
+
+
+def main(argv=None) -> int:
+    """CLI 入口：风格一致性自检。
+
+    2026-09-21 新增退出码语义 —— 此前只打印诊断、进程恒返回 0，无法用于
+    CI 或上层脚本判断。现按阈值给判定：达标返回 0，未达标返回 1。
+
+    阈值默认 75，与 novel-lab 其余维度保持一致（chapter_check / qc 的 PASS 线），
+    可用 --threshold 覆盖。
+    """
+    parser = argparse.ArgumentParser(description="风格一致性自检")
+    parser.add_argument("voice", help="voice-card JSON 文件路径")
+    parser.add_argument("chapter", help="生成章文件路径")
+    parser.add_argument("--threshold", type=float, default=75.0,
+                        help="PASS 阈值（默认 75，与 chapter_check / qc 一致）")
+    parser.add_argument("--json", action="store_true", help="以 JSON 格式输出打分结果")
+    parser.add_argument("-q", "--quiet", action="store_true", help="静默模式")
+    args = parser.parse_args(argv)
+
+    quiet_run = args.quiet or args.json
+    result = consistency_check(args.voice, args.chapter, quiet=quiet_run)  # 返回 dict：score/voice/emotion/…
+    total = float(result["score"])
+    ok = total >= args.threshold
+
+    if args.json:
+        payload = dict(result)
+        payload["pass"] = ok
+        payload["threshold"] = args.threshold
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    elif not args.quiet:
+        print()
+        print(f"CLI 判定: {'PASS' if ok else 'FAIL'}"
+              f"（阈值 {args.threshold:g}，总分 {total:.1f}）")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

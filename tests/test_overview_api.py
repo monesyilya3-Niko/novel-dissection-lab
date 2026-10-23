@@ -21,6 +21,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import _isolation  # noqa: E402
 
 from gui import asset_index, config, router  # noqa: E402
 from gui.services import ServiceError  # noqa: E402
@@ -41,12 +44,17 @@ class TestOverviewAPI(unittest.TestCase):
             # R1：STATE_JSON_DIR 必须与 STATE_ROOT 成对隔离，否则 list_books_summary
             # 会读到真实 gui/state/ 的历史残留，导致 total_books 断言失真。
             "STATE_JSON_DIR": config.STATE_JSON_DIR,
+            # 派生常量是 STATE_ROOT 的导入期快照，patch STATE_ROOT 带不动，一起重定向。
+            "DB_PATH": config.DB_PATH,
+            "LOCK_PATH": config.LOCK_PATH,
         }
         config.ASSETS_ROOT = cls._tmp / "assets"
         config.REPORTS_DIR = cls._tmp / "reports"
         config.CORPUS_DIR = cls._tmp / "corpus"
         config.CONFIG_DIR = cls._tmp / "config"
         config.STATE_ROOT = cls._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_JSON_DIR = cls._tmp / "gui" / "state"
 
         for d in (config.ASSETS_ROOT, config.REPORTS_DIR, config.CORPUS_DIR,
@@ -88,6 +96,7 @@ class TestOverviewAPI(unittest.TestCase):
         # 还原单例（重新扫描真实目录）。
         asset_index.index = asset_index.AssetIndex(ttl_seconds=5)
         asset_index.index.invalidate()
+        _isolation.remove_tree(cls._tmp)
 
     # ------------------------------------------------------------------
     # 工具

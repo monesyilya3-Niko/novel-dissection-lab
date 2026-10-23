@@ -12,7 +12,16 @@
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+import chapter_loader
 
 # 章节标题识别：第X章 / 第X回 / 第X节 / 第X卷 / Chapter N
 CHAPTER_RE = re.compile(
@@ -167,14 +176,14 @@ def build_slices(chapters, sel):
     return slices
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="分层采样：整本 TXT → 带标记分片")
     ap.add_argument("book", help="整本小说 TXT 路径")
     ap.add_argument("--out", help="输出目录，默认 corpus/sampled/<书名>")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     src = Path(args.book)
-    text = src.read_text(encoding="utf-8")
+    text = chapter_loader.read_text_file(src)
     chapters = split_chapters(text)
     sel = select(chapters)
     slices = build_slices(chapters, sel)
@@ -217,6 +226,7 @@ def main():
     print(f"[OK] {name}: 共 {len(chapters)} 章，采样 {len(indices)} 章")
     print(f"  pass2 抽取对话 {len(dlg)} 条")
     print(f"  输出目录: {out}")
+    return 0
 
 
 if __name__ == "__main__":

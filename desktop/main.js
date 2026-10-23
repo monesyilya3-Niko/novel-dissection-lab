@@ -3,7 +3,7 @@
 // 后端零依赖（纯标准库），随包携带 Windows embeddable Python，用户机器无需装 Python。
 'use strict'
 
-const { app, BrowserWindow, dialog, shell } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
 const { spawn } = require('child_process')
 const path = require('path')
 const http = require('http')
@@ -18,9 +18,14 @@ const isPackaged = app.isPackaged
 const BACKEND_DIR = isPackaged
   ? path.join(process.resourcesPath, 'backend')
   : path.join(__dirname, '..')
+// 开发模式下的解释器名：Windows 上 `python3` 是 Microsoft Store 别名，
+// 实测 spawn 它得到退出码 9009 且零输出（2026-10-08），后端根本不启动，
+// 界面只能干等到超时。可用 NOVEL_LAB_PYTHON 显式指定（与 .githooks/pre-commit 同约定）。
+// 打包态走 resources/backend/python-win/python.exe，与此无关。
 const PYTHON_EXE = isPackaged
   ? path.join(BACKEND_DIR, 'python-win', 'python.exe')
-  : 'python3'
+  : (process.env.NOVEL_LAB_PYTHON
+    || (process.platform === 'win32' ? 'python' : 'python3'))
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -131,6 +136,26 @@ function saveWindowState(win) {
   } catch (_) { /* 保存失败不影响运行 */ }
 }
 
+// 原生路径选择器。质检/拆书的"章节路径"填的是用户硬盘上的真实路径，手打
+// 一长串 Windows 路径（反斜杠、盘符、中文目录）既是"有些路径放不进去"这类反馈的
+// 来源之一，也容易填错。这里只把路径字符串交回页面，之后的准入仍由后端
+// gui/text_access 判定——主进程不是安全边界，别在这里加"允许哪些目录"的白名单。
+// 只认两种枚举值，其它输入一律当作没选：渲染层能要求的仅仅是一个路径。
+ipcMain.handle('novel-lab:pick-path', async (_event, kind) => {
+  if (kind !== 'dir' && kind !== 'file') return null
+  const options = kind === 'dir'
+    ? { title: '选择章节目录', properties: ['openDirectory'] }
+    : {
+        title: '选择章节文件',
+        properties: ['openFile'],
+        filters: [{ name: '正文', extensions: ['txt', 'md'] }],
+      }
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined
+  const res = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+  if (res.canceled || !res.filePaths.length) return null
+  return res.filePaths[0]
+})
+
 function createWindow() {
   // 窗口状态持久化：记住用户调整后的大小/位置，下次启动恢复。
   const winState = loadWindowState()
@@ -149,6 +174,9 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      // 沙箱下 preload 仍可用 contextBridge + ipcRenderer（Electron 官方支持的子集），
+      // 因此不需要为了桥而关掉 sandbox。
+      preload: path.join(__dirname, 'preload.js'),
     },
   })
   // 关闭/退出前保存窗口状态（防崩溃丢失：resize/move 即时保存）。
@@ -161,21 +189,38 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => mainWindow.show())
   // 外部链接用系统浏览器打开，不在应用窗口内跳转。
   // setWindowOpenHandler 只拦截 window.open() 弹窗；will-navigate 拦截
-  // 同窗口导航（链接点击、重定向、location.href），否则外部页面会在
-  // 应用窗口内加载。
+  // 同窗口导航（链接点击、重定向、location.href）。
+  //
   // 安全：用 URL origin 严格比较，不用字符串前缀（前缀可被绕过，
   // 如 backendUrl=http://127.0.0.1:8000 时 http://127.0.0.1:8000.evil.com 也会通过）。
+  //
+  // ⚠️ 同源导航也要拦（2026-10-14 审计修复 ELE-04）：
+  // 原实现只对**跨源**导航做 preventDefault，同源则放行——而注释自称
+  // "防止外部页面在应用窗口内加载"，两者范围不一致。虽然后端
+  // _serve_static 只服务 DIST_DIR（含路径穿越防护），同源可达的内容仍是
+  // 本应用自己的页面，风险有限；但 Electron 窗口**没有地址栏**，一旦窗口内
+  // 出现非入口页的内容，用户无法分辨。
+  //
+  // 本应用前端**不使用路由**（全仓无 pushState / react-router / location.href），
+  // 故同源导航没有任何合法用途——除初始入口页与资源加载（资源不经 will-navigate）。
+  // 现收紧为：只允许加载应用入口（backendUrl + '/'，可带 handshake 查询串），
+  // 其余一律拦截（同源的开系统浏览器无意义，故直接忽略；跨源的转交系统浏览器）。
   const backendOrigin = new URL(backendUrl).origin
+  const entryPath = new URL(backendUrl).pathname || '/'
   const isInternalUrl = (url) => {
     try {
-      return new URL(url).origin === backendOrigin
+      const u = new URL(url)
+      // 只认「同源 + 入口路径」——同源的其它路径不再放行（见上方说明）。
+      return u.origin === backendOrigin && u.pathname === entryPath
     } catch (_) {
       return false
     }
   }
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (!isInternalUrl(url)) {
-      event.preventDefault()
+    if (isInternalUrl(url)) return
+    event.preventDefault()
+    // 仅跨源的转交系统浏览器；同源的其它路径直接拦掉（开浏览器无意义）。
+    if (new URL(url).origin !== backendOrigin) {
       shell.openExternal(url)
     }
   })

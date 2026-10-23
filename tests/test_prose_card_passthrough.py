@@ -15,6 +15,9 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import _isolation  # noqa: E402
 
 
 class TestProseCardPassthrough(unittest.TestCase):
@@ -32,6 +35,7 @@ class TestProseCardPassthrough(unittest.TestCase):
         from gui import config
         for k, v in cls._saved.items():
             setattr(config, k, v)
+        _isolation.remove_tree(cls._tmp)
 
     def _dispatch(self, body):
         from gui import router
@@ -68,6 +72,7 @@ class TestProseCardPassthrough(unittest.TestCase):
     def test_prose_card_reaches_prompt(self):
         """端到端：真实 inject() 下 prose_card 进入 injected_kinds。"""
         import json
+
         from gui import config, writing_service
         assets = config.ROOT_DIR / "assets"
         assets.mkdir(parents=True, exist_ok=True)

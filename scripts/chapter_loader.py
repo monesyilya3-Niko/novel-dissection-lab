@@ -257,14 +257,34 @@ def discover_chapter_files(source) -> dict:
     return result
 
 
-def _read_text(path: Path) -> str:
-    """读取章节文本；失败时抛出带出问题文件路径的 OSError / UnicodeError。"""
+def read_text_file(path: Path) -> str:
+    """读取正文文件；失败时抛出带出问题文件路径的 OSError / UnicodeError。
+
+    先按 UTF-8 解，失败退 GBK——与 ``gui/services._secure_read_text``（拆书导入）
+    的解码口径一致。国内用户的 `.txt` 相当一部分是 GBK/GB2312，只认 UTF-8 会让
+    整本质检在真稿上报"解码失败"，看上去像路径问题，其实是编码问题。
+
+    **BOM 剥离**（2026-10-12 补）：Windows 记事本「另存为 UTF-8」会写入 BOM
+    （EF BB BF），这是国内作者的高频操作。BOM 若留在正文首字符，会让首章标题
+    匹配失败——实测 ``\\ufeff第一章 初见`` 被切章器识别为「（无标题开头）」，
+    章节标题丢失并连锁影响导航显示与报告章节名。
+    与 ``scripts/assemble.py`` 读 JSON 用 ``utf-8-sig`` 的口径保持一致。
+
+    措辞用"正文文件"而不是"章节文件"：这个入口也用于整本书（`--book`）。
+    """
     try:
-        return path.read_text(encoding="utf-8")
-    except UnicodeError as exc:
-        raise UnicodeError(f"章节文件解码失败（非 UTF-8？）: {path} — {exc}") from exc
+        data = path.read_bytes()
     except OSError as exc:
-        raise OSError(f"章节文件读取失败: {path} — {exc}") from exc
+        raise OSError(f"正文文件读取失败: {path} — {exc}") from exc
+    try:
+        return data.decode("utf-8-sig")   # utf-8-sig 解普通 UTF-8 同样正确，仅额外剥 BOM
+    except UnicodeError:
+        try:
+            # GBK 无 BOM 概念；但少数编辑器会给 GBK 文件加 UTF-16 BOM，此处不处理。
+            return data.decode("gbk")
+        except UnicodeError as exc:
+            raise UnicodeError(
+                f"正文文件编码无法识别（仅支持 UTF-8 / GBK）: {path} — {exc}") from exc
 
 
 def _first_alias(aliases: dict):
@@ -296,7 +316,7 @@ def load_chapter_texts(source) -> dict:
     if diagnostic["duplicates"]:
         number = min(diagnostic["duplicates"])
         raise ChapterLoadError(source, number, diagnostic["duplicates"][number])
-    return {number: _read_text(path)
+    return {number: read_text_file(path)
             for number, path in diagnostic["files"].items()}
 
 

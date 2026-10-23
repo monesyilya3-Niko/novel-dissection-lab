@@ -207,13 +207,13 @@ def build_prompt(books: list, thresholds: dict) -> str:
 
 # --------------------------------------------------------------------------
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Pass5 题材包聚合器")
     ap.add_argument("--genre", required=True, help="题材 id，如 campus-redemption")
     ap.add_argument("--books", help="逗号分隔的书名，默认聚合该题材全部")
     ap.add_argument("--out", help="输出路径，默认 assets/<genre>-genre-pack.json")
     ap.add_argument("--dry-run", action="store_true", help="只统计特征，不调 LLM")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     book_names = [b.strip() for b in args.books.split(",") if b.strip()] if args.books else None
     books, mismatches = collect_books(args.genre, book_names)
@@ -258,7 +258,7 @@ def main():
 
     if args.dry_run:
         print("\n[dry-run] 跳过 LLM 聚合")
-        return
+        return 0
 
     # 2. LLM 聚合
     print("\n[2/3] LLM 聚合题材包:")
@@ -300,6 +300,7 @@ def main():
     print(f"  铁律 {len(pack.get('language_rules', {}).get('iron_rules', []))} 条, "
           f"必需要素 {len(pack.get('language_rules', {}).get('required_elements', []))} 条")
     print("\n→ 题材包可被 inject.py 注入写作（--genre-pack 参数）")
+    return 0
 
 
 if __name__ == "__main__":

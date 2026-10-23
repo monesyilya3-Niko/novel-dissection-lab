@@ -116,7 +116,7 @@ def analyze_craft_card(craft: dict) -> dict:
     return stats
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     """CLI 入口：python deep_analyze.py <craft-card.json> [--in-place]
 
     默认只打印统计，不写回；``--in-place`` 时把补齐后的 craft-card 写回原文件。
@@ -124,7 +124,7 @@ def main():
     ap = argparse.ArgumentParser(description="技法深度分析质量校验 + 组装器")
     ap.add_argument("craft_card", help="craft-card JSON 文件路径")
     ap.add_argument("--in-place", action="store_true", help="就地补齐并写回原文件")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     path = Path(args.craft_card)
     if not path.exists():
@@ -145,6 +145,8 @@ def main():
     if args.in_place:
         path.write_text(json.dumps(craft, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"✓ 已就地补齐并写回: {path}")
+
+    return 0
 
 
 if __name__ == "__main__":

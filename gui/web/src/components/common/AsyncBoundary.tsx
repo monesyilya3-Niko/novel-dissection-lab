@@ -5,6 +5,7 @@ import Skeleton from '@mui/material/Skeleton'
 import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
 import { friendlyError } from '../../api/client'
+import { useI18n } from '../../state/I18nContext'
 
 export interface AsyncBoundaryProps {
   loading: boolean
@@ -31,13 +32,16 @@ export default function AsyncBoundary({
   loading,
   error,
   empty = false,
-  emptyTitle = '暂无数据',
+  emptyTitle,
   emptyHint,
   emptyCta,
   onRetry,
   minHeight = 240,
   children,
 }: AsyncBoundaryProps) {
+  const { t } = useI18n()
+  const resolvedEmptyTitle = emptyTitle ?? t('async_empty_title', '暂无数据')
+
   if (loading) {
     return (
       <Box sx={{ p: 2, minHeight }} data-testid="async-skeleton">
@@ -58,7 +62,7 @@ export default function AsyncBoundary({
           action={
             onRetry && (
               <Button color="inherit" size="small" onClick={onRetry}>
-                重试
+                {t('async_retry_btn', '重试')}
               </Button>
             )
           }
@@ -83,7 +87,7 @@ export default function AsyncBoundary({
         }}
         data-testid="async-empty"
       >
-        <Typography variant="subtitle1">{emptyTitle}</Typography>
+        <Typography variant="subtitle1">{resolvedEmptyTitle}</Typography>
         {emptyHint && (
           <Typography variant="body2" color="text.secondary">
             {emptyHint}

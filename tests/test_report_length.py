@@ -327,5 +327,108 @@ class TestReportLengthThreshold(unittest.TestCase):
         self.assertTrue(len(report) > 0)
 
 
+class TestCombinedReportOkMissingField(unittest.TestCase):
+    """combined_report_ok 的 missing 字段（2026-10-12 审计 CLI-02 引入）。
+
+    该字段记录**哪一份报告为空**，供调用方明确点名（novel.py「分析」的
+    铁律二校验用它打印"其中 XX 为空"），避免用户只看到"合计不足"却
+    不知道是哪一份没生成。
+
+    注意：曾短暂存在 require_both 参数（要求两份齐全才判 ok），
+    2026-10-13 已移除——那是 CLI-12/13 两个 regression 的根源：
+    pipeline 只产笔法分析、batch 只产拆书报告，单产一份的命令天然无法
+    满足"两份齐全"。判定口径回到「合计 ≥ 10000」（铁律二原文）。
+    """
+
+    def setUp(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "report_missing", SCRIPTS / "report.py")
+        self.report = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.report)
+
+    def test_missing_empty_when_both_present(self):
+        r = self.report.combined_report_ok(6000, 6000)
+        self.assertEqual(r["missing"], [])
+        self.assertTrue(r["ok"])
+
+    def test_missing_names_the_absent_side(self):
+        self.assertEqual(self.report.combined_report_ok(20000, 0)["missing"], ["craft"])
+        self.assertEqual(self.report.combined_report_ok(0, 20000)["missing"], ["book"])
+        self.assertEqual(self.report.combined_report_ok(0, 0)["missing"], ["book", "craft"])
+
+    def test_ok_is_pure_sum_threshold(self):
+        """判定只看合计（铁律二原文口径），与 missing 无关。"""
+        self.assertTrue(self.report.combined_report_ok(20000, 0)["ok"],
+                        "合计达标即通过——单份缺失不改变判定（铁律二只管合计）")
+        self.assertFalse(self.report.combined_report_ok(100, 100)["ok"])
+        self.assertTrue(self.report.combined_report_ok(5000, 5000)["ok"])
+
+    def test_require_both_parameter_is_gone(self):
+        """回归锚点：require_both 已随 CLI-12/13 一并移除，不得复活。
+
+        复活它会重新引入误报——除非先解决「单产一份报告的命令无法满足
+        两份齐全」这个语义错配。
+        """
+        import inspect
+        sig = inspect.signature(self.report.combined_report_ok)
+        self.assertNotIn("require_both", sig.parameters,
+                         "require_both 复活了——它是 CLI-12/13 误报的根源")
+
+
+
+class TestIronRule2AppliesToFullChainOnly(unittest.TestCase):
+    """铁律二的适用边界（2026-10-13 修正）。
+
+    背景：2026-10-12 修 CLI-01 时给「拆书」「批量」加了 enforce_iron_rule_2，
+    但那是**语义错配**，引入两个 regression（CLI-12/CLI-13）：
+      - pipeline.py 只产笔法分析一份，batch.py 只产拆书报告一份
+      - 而铁律二的口径是「拆书报告 + 笔法分析**合计** ≥ 10000」
+      - 实测仓库真实报告：单份拆书报告 4719~7204 字、单份笔法分析
+        5163~22128 字（2/6 不足 10000）——单产一份的命令天然无法满足
+    故两个命令会对正常产出**误报失败**，比原缺陷更糟。
+
+    现行结论：铁律二由「分析」命令收口（它跑完整链路、两份都产，
+    在 staging 上做合计校验后再原子发布）。拆书/批量的单份报告字数
+    提示由 report.py 自己的 soft warning 承担。
+
+    本类锁定两件事：
+      1. 辅助函数 enforce_iron_rule_2 已随 regression 一并移除（不留死代码）
+      2. 真正的校验入口（combined_report_ok）语义正确且被「分析」使用
+    """
+
+    def setUp(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("novel_ir2", ROOT / "novel.py")
+        self.novel = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.novel)
+
+        spec2 = importlib.util.spec_from_file_location("report_ir2", SCRIPTS / "report.py")
+        self.report = importlib.util.module_from_spec(spec2)
+        spec2.loader.exec_module(self.report)
+
+    def test_helper_removed_with_the_regression(self):
+        """死代码不得残留——它会让人误以为 CLI-01 仍被覆盖着。"""
+        self.assertFalse(
+            hasattr(self.novel, "enforce_iron_rule_2"),
+            "enforce_iron_rule_2 已确认是误报源并移除；若重新引入，"
+            "必须先解决「单产一份报告无法满足合计门槛」这个语义错配",
+        )
+
+    def test_combined_gate_uses_sum_of_both(self):
+        """铁律二的真实口径：两份相加 ≥ 10000（单一来源仍在 report.py）。"""
+        self.assertTrue(self.report.combined_report_ok(6000, 6000)["ok"])
+        self.assertFalse(self.report.combined_report_ok(9000, 0)["ok"],
+                         "单份 9000 应不足（合计口径）")
+        self.assertTrue(self.report.combined_report_ok(5000, 5000)["ok"],
+                        "恰好 10000 应通过")
+
+    def test_analysis_command_still_checks_on_staging(self):
+        """「分析」的 staging 校验必须还在——那是铁律二的真正执行点。"""
+        src = (ROOT / "novel.py").read_text(encoding="utf-8")
+        self.assertIn("check_combined_report_length(staging, name)", src,
+                      "分析命令的 staging 合计校验被删了——铁律二将失去唯一执行点")
+
+
 if __name__ == "__main__":
     unittest.main()

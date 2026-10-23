@@ -30,6 +30,13 @@ import re
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (str(ROOT), str(SCRIPTS_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+import chapter_loader
 from metrics import dialogue_char_count
 
 # ---------------------------------------------------------------------------
@@ -685,18 +692,19 @@ def chapter_check(text: str, genre_pack: dict = None) -> dict:
     }
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="章节质量自检（100 分制）")
     ap.add_argument("chapter", help="章节文件路径")
     ap.add_argument("--genre-pack", help="题材包 JSON（可选，用于附加检查）")
     ap.add_argument("--json", action="store_true", help="输出 JSON 格式")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     ch_path = Path(args.chapter)
     if not ch_path.exists():
-        sys.exit(f"文件不存在: {ch_path}")
+        print(f"文件不存在: {ch_path}", file=sys.stderr)
+        return 1
 
-    text = ch_path.read_text(encoding="utf-8")
+    text = chapter_loader.read_text_file(ch_path)
     gp = None
     if args.genre_pack:
         gp = json.loads(Path(args.genre_pack).read_text(encoding="utf-8"))
@@ -718,7 +726,7 @@ def main():
             for i in result['issues']:
                 print(f"  ⚠ {i}")
 
-    sys.exit(0 if result['verdict'] == "PASS" else 1)
+    return 0 if result['verdict'] == "PASS" else 1
 
 
 if __name__ == "__main__":

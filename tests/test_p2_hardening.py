@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import socket
 import sys
 import tempfile
 import unittest
@@ -22,6 +23,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import _isolation  # noqa: E402
 
 from gui import (
     config,  # noqa: E402
@@ -44,6 +48,7 @@ class TestLoggingSetup(unittest.TestCase):
         for h in list(root.handlers):
             root.removeHandler(h)
             h.close()
+        _isolation.remove_tree(self._tmp)
 
     def test_setup_creates_file_and_writes(self):
         log = logging_setup.setup_logging()
@@ -78,6 +83,7 @@ class TestTokenAuth(unittest.TestCase):
         cls._orig_token = config.API_TOKEN
         cls._orig_state_root = config.STATE_ROOT
         cls._orig_state_json_dir = config.STATE_JSON_DIR
+        cls._orig_db_path = config.DB_PATH
         cls._tmp = Path(tempfile.mkdtemp(prefix="auth_qa_"))
         config.LOCK_PATH = cls._tmp / ".lock"
         config.API_TOKEN = cls.TOKEN
@@ -85,6 +91,8 @@ class TestTokenAuth(unittest.TestCase):
         # 建库（gui_state/index.db）。2026-09-28 干净安装复测发现此前未隔离，
         # 真实 gui_state/ 落下 index.db。STATE_JSON_DIR 成对隔离（R1）。
         config.STATE_ROOT = cls._tmp / "gui_state"
+        # DB_PATH 是 STATE_ROOT 的导入期快照，跟看真实数据目录，成对重定向。
+        config.DB_PATH = config.STATE_ROOT / "index.db"
         config.STATE_JSON_DIR = cls._tmp / "gui" / "state"
         # 隔离：起真实服务会触发 auto_backup（真实 gui_state 备份+剪枝），替换为 no-op
         cls._orig_bk = (server_mod.auto_backup.startup_backup,
@@ -108,7 +116,9 @@ class TestTokenAuth(unittest.TestCase):
         config.LOCK_PATH = cls._orig_lock
         config.API_TOKEN = cls._orig_token
         config.STATE_ROOT = cls._orig_state_root
+        config.DB_PATH = cls._orig_db_path
         config.STATE_JSON_DIR = cls._orig_state_json_dir
+        _isolation.remove_tree(cls._tmp)
 
     def _get(self, path: str, headers: dict | None = None) -> int:
         req = urllib.request.Request(f"http://127.0.0.1:{self.port}{path}", headers=headers or {})
@@ -159,6 +169,10 @@ class TestSecretStore(unittest.TestCase):
         import secret_store
         self.ss = secret_store
         self._tmp = Path(tempfile.mkdtemp(prefix="secrets_qa_"))
+
+    def tearDown(self):
+        # DPAPI 落盘的 .secrets.bin 在这里，以前整个目录从不回收。
+        _isolation.remove_tree(self._tmp)
 
     def test_roundtrip(self):
         data = {"m1": "sk-测试密钥", "m2": "key-2"}
@@ -219,6 +233,7 @@ class TestAutoBackup(unittest.TestCase):
 
     def tearDown_fake(self, migrate):
         migrate.backup = self._orig
+        _isolation.remove_tree(self._tmp_backup_path.parent)
 
     def test_startup_backup_registers_date(self):
         migrate = self.setUp_fake()
@@ -247,6 +262,144 @@ class TestAutoBackup(unittest.TestCase):
             self.assertIsNone(self.ab._last_backup_date, "失败不应登记日期（次日可重试）")
         finally:
             self.tearDown_fake(migrate)
+
+
+class TestAccessLogMasking(unittest.TestCase):
+    """访问日志脱敏（2026-10-08 实机发现）。
+
+    桌面版把身份握手令牌交给前端走 `/?handshake=`，SSE 只能用 `?handshake_token=`；
+    旧脱敏只覆盖 `auth=`，所以真令牌会**明文写进 gui.log**。另外旧替换串里混着一个
+    旧脱敏只覆盖 auth=，所以真令牌会**明文写进 gui.log**。另外旧替换串里混着一个 SOH 控制字节
+    """
+
+    def test_credential_params_masked_and_others_kept(self):
+        from gui import server
+
+        cases = [
+            ("GET /api/books?auth=T1&limit=5 HTTP/1.1",
+             "GET /api/books?auth=***&limit=5 HTTP/1.1"),
+            ("GET /api/events?task_id=q1&handshake_token=HTOK HTTP/1.1",
+             "GET /api/events?task_id=q1&handshake_token=*** HTTP/1.1"),
+            ("GET /?handshake=H1 HTTP/1.1",
+             "GET /?handshake=*** HTTP/1.1"),
+            ("GET /api/x?author=Bob HTTP/1.1",
+             "GET /api/x?author=Bob HTTP/1.1"),
+            ("GET /api/x?Auth=MIX&b=2 HTTP/1.1",
+             "GET /api/x?Auth=***&b=2 HTTP/1.1"),
+        ]
+        for src, want in cases:
+            with self.subTest(src=src):
+                self.assertEqual(server._mask_sensitive_query(src), want)
+
+    def test_no_control_bytes_in_masked_line(self):
+        from gui import server
+
+        out = server._mask_sensitive_query("GET /x?auth=SECRET&y=2 HTTP/1.1")
+        bad = [c for c in out if ord(c) < 32 and c != " "]
+        self.assertEqual(bad, [], f"日志行混进控制字符：{out!r}")
+
+    def test_handler_path_uses_the_masker(self):
+        """走真正的 _Handler.log_message，确认接线没断（只测纯函数会漏掉这一步）。"""
+        import logging
+
+        from gui import server
+
+        class _Capturing(logging.Handler):
+            def __init__(self):
+                super().__init__()
+                self.messages = []
+
+            def emit(self, record):
+                self.messages.append(record.getMessage())
+
+        class _Stub:
+            def address_string(self):
+                return "127.0.0.1"
+
+            log_message = server._Handler.log_message
+
+        logger = logging.getLogger("novellab.server")
+        cap = _Capturing()
+        old_level = logger.level
+        logger.setLevel(logging.INFO)
+        logger.addHandler(cap)
+        try:
+            _Stub().log_message("%s %s", "GET /api/books?auth=SECRET&limit=5 HTTP/1.1", "200")
+        finally:
+            logger.removeHandler(cap)
+            logger.setLevel(old_level)
+        joined = chr(10).join(cap.messages)
+        self.assertIn("auth=***", joined, f"日志里没有脱敏结果：{joined}")
+        self.assertNotIn("SECRET", joined, f"令牌明文出现在日志里：{joined}")
+
+
+class TestHandshakeGate(unittest.TestCase):
+    """Electron 握手令牌的准入（2026-10-08，对应 docs/AGENT_API.md §2.1）。
+
+    手册承诺"事件流发不了自定义头，可用 ?handshake_token= 传令牌，与请求头等效"。
+    这种承诺没有回归断言就会悄悄烂掉，所以在这里把"谁能用查询参数"逐条钉住。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from gui import server as server_mod
+
+        cls._tmp = Path(tempfile.mkdtemp(prefix="hs_gate_"))
+        cls._iso = _isolation.isolate_paths(cls._tmp)
+        cls._iso.__enter__()
+        # 起真实服务会触发启动备份 + 每请求跨天备份，这里只关心门禁，全部 no-op
+        # （与 TestTokenAuth 同一套处理，避免在临时库里白跑 SQLite 在线备份）。
+        cls._orig_bk = (server_mod.auto_backup.startup_backup,
+                        server_mod.auto_backup.daily_backup_if_due)
+        server_mod.auto_backup.startup_backup = lambda: None
+        server_mod.auto_backup.daily_backup_if_due = lambda: None
+        # 端口由内核分配，避开并行 worker 抢固定端口的假失败。
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        cls.token = "HANDSHAKE-TOKEN-for-test-only"
+        cls.srv = server_mod.GuiServer(preferred_port=port, handshake_token=cls.token)
+        _host, cls.port = cls.srv.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        from gui import server as server_mod
+
+        cls.srv.shutdown()
+        server_mod.auto_backup.startup_backup, server_mod.auto_backup.daily_backup_if_due = cls._orig_bk
+        cls._iso.__exit__(None, None, None)
+        _isolation.remove_tree(cls._tmp)
+
+    def _status(self, path: str, headers: dict[str, str] | None = None):
+        url = f"http://127.0.0.1:{self.port}{path}"
+        req = urllib.request.Request(url, headers=headers or {})
+        try:
+            with urllib.request.urlopen(req, timeout=4) as r:
+                return r.status
+        except urllib.error.HTTPError as exc:
+            return exc.code
+
+    def test_sse_and_api_gate_matrix(self):
+        # `?handshake_token=` 是给 EventSource（发不了自定义头）开的豁免，
+        # 作用域严格限制在 /api/events（见 `_check_auth` 的 `path == "/api/events"`
+        # 分支）。普通 API 若也认查询参数，等于多开一条令牌泄漏通道
+        # ——查询串会进访问日志、Referer、浏览器历史，而自定义头不会。
+        self.assertEqual(self._status("/api/events"), 403, "SSE 无令牌应被拒")
+        self.assertEqual(self._status("/api/events?handshake_token=WRONG"), 403,
+                         "SSE 错令牌应被拒")
+        self.assertEqual(self._status("/api/events?handshake_token=" + self.token), 200,
+                         "SSE 用查询参数带正确令牌应放行（与 §2.1 的承诺一致）")
+        self.assertEqual(self._status("/api/overview"), 403, "普通 API 无令牌应被拒")
+        self.assertEqual(
+            self._status("/api/overview", {"X-Handshake-Token": self.token}), 200,
+            "普通 API 用 X-Handshake-Token 头应放行",
+        )
+        self.assertEqual(self._status("/api/overview?handshake_token=" + self.token), 403,
+                         "查询参数豁免只适用于 /api/events，普通 API 不认")
+
+    def test_static_root_is_exempt(self):
+        # 令牌由 main.js 拼在 `/?handshake=` 上交给前端，静态入口本身不校验。
+        self.assertEqual(self._status("/"), 200, "静态入口不应受握手门禁")
 
 
 if __name__ == "__main__":

@@ -28,6 +28,15 @@ from typing import Any
 
 from gui import config
 
+# 供服务层标注「SQLite 行对象」用的类型别名。
+#
+# 背景：``gui/db.py`` 是唯一 import sqlite3 的层（AGENTS.md §2 依赖方向禁令）。
+# 但服务层需要给「可能拿到 Row、也可能拿到 dict」的参数标类型，此前
+# essence_service 为此自行 import sqlite3，构成对依赖方向的违反。
+# 该导入仅用于标注（运行时不需要 sqlite3），故在此导出别名供各层复用：
+# 服务层写 ``db.RowLike`` 即可，无需触碰 sqlite3 本身。
+RowLike = sqlite3.Row | dict[str, Any]
+
 # ---------------------------------------------------------------------------
 # 连接管理：每线程独立连接（不是进程级单连接）
 #
@@ -155,8 +164,29 @@ def init_schema() -> None:
 
     直接执行建表 SQL（等价于 0001_init.sql 的 DDL），保证即便迁移登记表为空、
     基础 schema 也能先落地；后续 ``apply_migrations`` 再按版本号执行缺失迁移。
+
+    ⚠️ 不得用 ``executescript``（2026-10-13 审计修复 D13）：
+    ``executescript`` 会先**隐式提交当前事务**再执行脚本。若调用方已在
+    ``with db.tx()`` 里（例如业务逻辑中途确保 schema 存在），一次
+    ``init_schema()`` 就会把那个事务提交掉——后续抛错时回滚失效，
+    半成品数据留在库里。实测复现：事务内 INSERT 后调 init_schema，
+    ``in_transaction`` 由 True 变 False，raise 触发 rollback 后该行仍残留。
+
+    改为逐条 execute（复用 ``split_sql_statements``，与 apply_migrations 同口径），
+    且**只在没有活动事务时才 commit**——DDL 的隐式提交已被避免，但显式
+    ``commit()`` 同样会提交调用方的事务。实测：仅去掉 executescript 仍不够，
+    末尾的 commit 照样把 in_transaction 由 True 变 False。
     """
-    _exec_sql_file(Path(__file__).parent / "migrations" / "0001_init.sql")
+    sql_path = Path(__file__).parent / "migrations" / "0001_init.sql"
+    if not sql_path.is_file():
+        return
+    conn = get_conn()
+    # 记录进入时的状态：若调用方已在事务中，我们不得提交它。
+    had_tx = conn.in_transaction
+    for stmt in split_sql_statements(sql_path.read_text(encoding="utf-8")):
+        conn.execute(stmt)
+    if not had_tx:
+        conn.commit()
 
 
 def split_sql_statements(script: str) -> list[str]:
@@ -241,8 +271,15 @@ def apply_migrations() -> list[int]:
             continue
         # 整条迁移（DDL + 版本登记）在一个显式事务内执行。
         # 注意：不能用 executescript（会隐式提交，破坏原子性），改为逐条 execute。
+        #
+        # ⚠️ 必须用 BEGIN IMMEDIATE（2026-10-13 审计修复 D18）：
+        # 裸 ``BEGIN`` 是 DEFERRED —— 它**不立即取写锁**，等到第一条写语句
+        # 才尝试升级。两个进程并发迁移时（桌面版 + CLI 同时启动是真实场景），
+        # 双方都可能先读到旧快照，随后一条升级锁失败 → ``database is locked``，
+        # 迁移中断。IMMEDIATE 在 BEGIN 时就取写锁，把冲突前移到起点：
+        # 后来者直接等锁（受 busy_timeout 约束），而不是走到一半才失败。
         conn = get_conn()
-        conn.execute("BEGIN")
+        conn.execute("BEGIN IMMEDIATE")
         try:
             for stmt in split_sql_statements(sql_path.read_text(encoding="utf-8")):
                 conn.execute(stmt)
@@ -334,18 +371,26 @@ def rows_to_dicts(rows: Any) -> list[dict[str, Any]]:
     return [_row_to_dict(r) for r in rows]
 
 
+def table_exists(table_name: str) -> bool:
+    """探测指定表在当前 SQLite 库中是否存在（只读元数据查询）。"""
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?",
+            (table_name,),
+        ).fetchone()
+        return row is not None
+    except sqlite3.Error:
+        return False
+
+
 def _db_ready() -> bool:
     """判断 schema 是否已初始化（``assets`` 表存在即视为就绪）。
 
     只读探测：未建库（如旧测试 monkeypatch STATE_ROOT 后未 init_schema）时返回 False，
     让上层（asset_index / services / state_store）回退目录扫描 / JSON，避免 OperationalError。
     """
-    conn = get_conn()
-    try:
-        conn.execute("SELECT 1 FROM assets LIMIT 1").fetchone()
-        return True
-    except sqlite3.Error:
-        return False
+    return table_exists("assets")
 
 
 def count_assets(kind: str | None = None, genre: str | None = None,
@@ -467,7 +512,7 @@ def get_genres() -> list[dict[str, Any]]:
 
 def get_task(book_id: str) -> dict[str, Any] | None:
     """按 book_id 查询分析任务。未建库时返回 None（上层回退 JSON）。"""
-    if not _db_ready():
+    if not table_exists("analysis_tasks"):
         return None
     conn = get_conn()
     row = conn.execute("SELECT * FROM analysis_tasks WHERE book_id = ?", (book_id,)).fetchone()
@@ -479,6 +524,8 @@ def upsert_task(task: dict[str, Any]) -> None:
 
     task 需含 book_id；batch_state 用 JSON 字符串落库。
     """
+    if not table_exists("analysis_tasks"):
+        return
     book_id = task.get("book_id", "")
     if not book_id:
         raise ValueError("task 缺 book_id")
@@ -522,8 +569,14 @@ def upsert_task(task: dict[str, Any]) -> None:
 def backup_to(dst: Path) -> None:
     """把当前库在线备份到 *dst*（正确处理 WAL 未 checkpoint 的写入）。
 
-    优先走原生 ``Connection.backup`` API；失败时回退 ``shutil.copy2``。
+    优先走原生 ``Connection.backup`` API；失败时回退到**同时复制主库与 WAL**。
     ``migrate.backup()`` 调用本函数，不再自行 import sqlite3。
+
+    ⚠️ 回退分支不能用裸 ``shutil.copy2(src, dst)``（2026-10-12 修）：
+    WAL 模式下新写入的表/数据可能整个还在 ``-wal`` 文件里。实测——
+    建表后立即 copy2 主库，备份文件打开报 "no such table: t"，因为
+    表结构都在 WAL 中未合并。那种"备份"是无效的（虽然
+    ``_verify_backup`` 会因缺关键表而拦下，但等于备份功能整体不可用）。
     """
     import shutil
 
@@ -538,7 +591,26 @@ def backup_to(dst: Path) -> None:
     except Exception:  # noqa: BLE001 — 连接异常时退化为文件拷贝
         src = db_path()
         if src.is_file():
+            # 复制主库 **与 WAL/SHM 边车文件**。只复制主库会丢数据：
+            # WAL 模式下新写入的表/数据可能整个还在 -wal 里，裸 copy2 得到的
+            # "备份"打开报 no such table（实测）。
+            #
+            # 注意：此处**不做** checkpoint。回退分支的触发条件本就是
+            # "连接/备份 API 异常"，此时库上很可能有其它连接持锁，
+            # 再尝试 wal_checkpoint(TRUNCATE) 会以 "database table is locked"
+            # 失败并污染错误路径（2026-10-12 实测：导致 migrate 的三个测试
+            # 在全量运行时报错）。直接连带边车文件复制即可——SQLite 打开
+            # 备份时能自行从 -wal 恢复出完整内容。
             shutil.copy2(src, dst)
+            for suffix in ("-wal", "-shm"):
+                side = Path(str(src) + suffix)
+                if side.is_file():
+                    try:
+                        shutil.copy2(side, Path(str(dst) + suffix))
+                    except OSError:
+                        # 边车文件可能正被其它连接持有（Windows 独占），
+                        # 复制失败不致命：主库+已复制的部分仍可打开。
+                        continue
     # 验证备份可用：损坏的备份比没有备份更危险（恢复时才发现）。
     _verify_backup(dst)
 
@@ -550,12 +622,12 @@ def _verify_backup(dst: Path) -> None:
     try:
         chk = sqlite3.connect(str(dst))
     except sqlite3.Error as e:
-        raise RuntimeError(f"备份文件无法打开：{e}")
+        raise RuntimeError(f"备份文件无法打开：{e}") from e
     try:
         try:
             row = chk.execute("PRAGMA integrity_check").fetchone()
         except sqlite3.Error as e:
-            raise RuntimeError(f"备份完整性校验失败：{e}")
+            raise RuntimeError(f"备份完整性校验失败：{e}") from e
         if not row or row[0] != "ok":
             raise RuntimeError(f"备份完整性校验失败：{row}")
         # 关键表存在性抽查
@@ -569,8 +641,25 @@ def _verify_backup(dst: Path) -> None:
 
 
 def reset_all() -> None:
-    """清空所有表（测试隔离用，非生产接口）。"""
+    """清空所有表（测试隔离用，非生产接口）。
+
+    ⚠️ 表清单**动态发现**，不再手写（2026-10-13 审计修复 D20）：
+    原实现硬编码 6 张表（assets/reports/books/analysis_tasks/genres/
+    schema_migrations），而迁移 0002~0004 又加了 9 张（essence_* ×4、
+    writing_* ×5）。实测：往各表插一行后调 reset_all，6 张老表归零、
+    **9 张新表各残留 1 行**——测试隔离不彻底，数据跨轮累积
+    （项目历史上有过同类事故：gui/state 泄漏导致测试持续失败）。
+
+    改为查 sqlite_master 清空全部业务表：新增迁移时自动覆盖，
+    不会再出现"加了表忘了加进清单"。
+    """
     conn = get_conn()
+    tables = [
+        r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name NOT LIKE 'sqlite_%'"
+        )
+    ]
     with tx() as c:
-        for t in ("assets", "reports", "books", "analysis_tasks", "genres", "schema_migrations"):
-            c.execute(f"DELETE FROM {t}")
+        for t in tables:
+            c.execute(f"DELETE FROM {t}")   # noqa: S608 — 表名来自 sqlite_master，非用户输入

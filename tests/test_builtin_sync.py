@@ -28,6 +28,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import _isolation  # noqa: E402
 
 from gui import builtin_sync, config, db  # noqa: E402
 
@@ -41,6 +44,9 @@ class TestBuiltinSync(unittest.TestCase):
     def setUpClass(cls):
         cls._orig = {"ROOT_DIR": config.ROOT_DIR, "ASSETS_ROOT": config.ASSETS_ROOT,
                      "STATE_ROOT": config.STATE_ROOT,
+                     # 派生常量是 STATE_ROOT 的导入期快照，一起保存才能成对还原。
+                     "DB_PATH": config.DB_PATH,
+                     "LOCK_PATH": config.LOCK_PATH,
                      "STATE_JSON_DIR": config.STATE_JSON_DIR}
         cls._tmp = Path(tempfile.mkdtemp(prefix="builtin_sync_"))
         cls.shipped = cls._tmp / "repo" / "assets"
@@ -52,6 +58,8 @@ class TestBuiltinSync(unittest.TestCase):
         # sync() 会把补齐的文件重索引进 SQLite：STATE_ROOT 也隔离到 tmp，
         # 避免污染开发库；db 在连接时实时解析 STATE_ROOT。
         config.STATE_ROOT = cls._tmp / "state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_JSON_DIR = cls._tmp / "state"
         config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
         db._reset_conn()
@@ -72,6 +80,7 @@ class TestBuiltinSync(unittest.TestCase):
         for k, v in cls._orig.items():
             setattr(config, k, v)
         db._reset_conn()
+        _isolation.remove_tree(cls._tmp)
 
     def _reset_runtime(self):
         """恢复用户目录夹具到初始态（b 一致 / c 被改过 / d 自有，无 a）。"""
@@ -157,6 +166,9 @@ class _ManifestFixture(unittest.TestCase):
     def setUpClass(cls):
         cls._orig = {"ROOT_DIR": config.ROOT_DIR, "ASSETS_ROOT": config.ASSETS_ROOT,
                      "STATE_ROOT": config.STATE_ROOT,
+                     # 派生常量是 STATE_ROOT 的导入期快照，一起保存才能成对还原。
+                     "DB_PATH": config.DB_PATH,
+                     "LOCK_PATH": config.LOCK_PATH,
                      "STATE_JSON_DIR": config.STATE_JSON_DIR}
         cls._tmp = Path(tempfile.mkdtemp(prefix="builtin_manifest_"))
         cls.repo = cls._tmp / "repo"
@@ -167,6 +179,8 @@ class _ManifestFixture(unittest.TestCase):
         config.ROOT_DIR = cls.repo
         config.ASSETS_ROOT = cls.runtime
         config.STATE_ROOT = cls._tmp / "state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_JSON_DIR = cls._tmp / "state"
         config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
         db._reset_conn()
@@ -203,6 +217,7 @@ class _ManifestFixture(unittest.TestCase):
         for k, v in cls._orig.items():
             setattr(config, k, v)
         db._reset_conn()
+        _isolation.remove_tree(cls._tmp)
 
     def _reset_runtime(self):
         self.runtime.mkdir(parents=True, exist_ok=True)
@@ -254,6 +269,7 @@ class TestWriteManifest(unittest.TestCase):
 
     def tearDown(self):
         config.ROOT_DIR = self._orig["ROOT_DIR"]
+        _isolation.remove_tree(self._tmp)
 
     def test_generate_covers_all_files(self):
         m = builtin_sync.write_manifest()
@@ -278,6 +294,17 @@ class TestWriteManifest(unittest.TestCase):
         m3 = builtin_sync.write_manifest()
         self.assertEqual(m3["files"]["x.json"]["previous_hashes"], [old_hash])
 
+    def test_regen_without_changes_skips_write(self):
+        """无变化重跑：不写文件（字节不变），返回现有 manifest。"""
+        from gui import config
+        m1 = builtin_sync.write_manifest()
+        mp = config.ROOT_DIR / builtin_sync.MANIFEST_NAME
+        before = mp.read_bytes()
+        m2 = builtin_sync.write_manifest()
+        self.assertEqual(mp.read_bytes(), before)  # 文件未被触碰
+        self.assertEqual(m2["files"], m1["files"])
+        self.assertEqual(m2["generated_at"], m1["generated_at"])
+
     def test_load_manifest_rejects_broken(self):
         (config.ROOT_DIR / builtin_sync.MANIFEST_NAME).write_text("not json", encoding="utf-8")
         self.assertIsNone(builtin_sync.load_manifest())
@@ -292,6 +319,9 @@ class TestSyncRefreshSqlite(unittest.TestCase):
     def setUp(self):
         self._orig = {"ROOT_DIR": config.ROOT_DIR, "ASSETS_ROOT": config.ASSETS_ROOT,
                       "STATE_ROOT": config.STATE_ROOT,
+                      # 派生常量是 STATE_ROOT 的导入期快照，一起保存才能成对还原。
+                      "DB_PATH": config.DB_PATH,
+                      "LOCK_PATH": config.LOCK_PATH,
                       "STATE_JSON_DIR": config.STATE_JSON_DIR}
         self._tmp = Path(tempfile.mkdtemp(prefix="sync_sqlite_"))
         self.shipped = self._tmp / "repo" / "assets"
@@ -304,6 +334,8 @@ class TestSyncRefreshSqlite(unittest.TestCase):
         config.ASSETS_ROOT = self._tmp / "user" / "assets"
         config.ASSETS_ROOT.mkdir(parents=True, exist_ok=True)
         config.STATE_ROOT = self._tmp / "state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_JSON_DIR = self._tmp / "state"
         config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
         db._reset_conn()
@@ -314,6 +346,7 @@ class TestSyncRefreshSqlite(unittest.TestCase):
         for k, v in self._orig.items():
             setattr(config, k, v)
         db._reset_conn()
+        _isolation.remove_tree(self._tmp)
 
     def _asset_rows(self) -> int:
         conn = db.get_conn()
@@ -340,23 +373,28 @@ class TestSyncRefreshSqlite(unittest.TestCase):
 
 
 class TestRealWorldExpansion(unittest.TestCase):
-    """真实 65→86 扩充场景：随包 86 个真实内置资产，用户目录只有前 65 个。"""
+    """真实 65→102 扩充场景：随包 102 个真实内置资产，用户目录只有前 65 个。"""
 
     def setUp(self):
         self._orig = {"ROOT_DIR": config.ROOT_DIR, "ASSETS_ROOT": config.ASSETS_ROOT,
                       "STATE_ROOT": config.STATE_ROOT,
+                      # 派生常量是 STATE_ROOT 的导入期快照，一起保存才能成对还原。
+                      "DB_PATH": config.DB_PATH,
+                      "LOCK_PATH": config.LOCK_PATH,
                       "STATE_JSON_DIR": config.STATE_JSON_DIR}
         self._tmp = Path(tempfile.mkdtemp(prefix="real_expand_"))
         config.ROOT_DIR = ROOT  # 真实仓库根：读真实 assets/ 与真实 manifest。
         config.ASSETS_ROOT = self._tmp / "user" / "assets"
         config.ASSETS_ROOT.mkdir(parents=True, exist_ok=True)
         config.STATE_ROOT = self._tmp / "state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
         config.STATE_JSON_DIR = self._tmp / "state"
         config.STATE_ROOT.mkdir(parents=True, exist_ok=True)
         db._reset_conn()
         db.init_schema()
         shipped = sorted((ROOT / "assets").glob("*.json"))
-        assert len(shipped) == 86, f"随包资产应为 86 个，实测 {len(shipped)}"
+        assert len(shipped) == 105, f"随包资产应为 105 个，实测 {len(shipped)}"
         import shutil
         for p in shipped[:65]:
             shutil.copy2(p, config.ASSETS_ROOT / p.name)
@@ -367,10 +405,11 @@ class TestRealWorldExpansion(unittest.TestCase):
         for k, v in self._orig.items():
             setattr(config, k, v)
         db._reset_conn()
+        _isolation.remove_tree(self._tmp)
 
-    def test_65_to_86(self):
+    def test_65_to_105(self):
         r = builtin_sync.diff()
-        self.assertEqual(r["shipped_total"], 86)
+        self.assertEqual(r["shipped_total"], 105)
         self.assertEqual(r["runtime_total"], 65)
         self.assertEqual(r["missing"], self._expected_missing)
         self.assertEqual(r["modified"], [])
@@ -378,12 +417,12 @@ class TestRealWorldExpansion(unittest.TestCase):
         self.assertEqual(r["manifest_version"], __import__("gui").__version__)
         r2 = builtin_sync.sync()
         self.assertEqual(r2["copied"], self._expected_missing)
-        # 86 个全部就位。
-        self.assertEqual(len(sorted(config.ASSETS_ROOT.glob("*.json"))), 86)
-        # SQLite 同步可见：21 个新行。
+        # 105 个全部就位。
+        self.assertEqual(len(sorted(config.ASSETS_ROOT.glob("*.json"))), 105)
+        # SQLite 同步可见：40 个新行。
         conn = db.get_conn()
         n = int(conn.execute("SELECT COUNT(*) AS n FROM assets").fetchone()["n"])
-        self.assertEqual(n, 21)
+        self.assertEqual(n, 40)
 
 
 if __name__ == "__main__":

@@ -13,18 +13,20 @@ import Chip from '@mui/material/Chip'
 import { systemApi } from '../api/client'
 import ModelManager from './ModelManager'
 import { friendlyError } from '../api/client'
+import { useI18n } from '../state/I18nContext'
 
 export default function SystemWorkbench() {
+  const { t } = useI18n()
   const [tab, setTab] = useState(0)
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: 1, borderColor: 'divider', pr: 1 }}>
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ flex: 1, px: 2 }}>
-        <Tab label="系统状态" />
-        <Tab label="版权合规" />
-        <Tab label="模型配置" />
-        <Tab label="设置" />
-      </Tabs>
+          <Tab label={t('system_tab_status')} />
+          <Tab label={t('system_tab_compliance')} />
+          <Tab label={t('system_tab_models')} />
+          <Tab label={t('system_tab_settings')} />
+        </Tabs>
         <ContextHelpButton guideKey="system" />
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: 2 }}>
@@ -42,6 +44,7 @@ export default function SystemWorkbench() {
 // ---------------------------------------------------------------------------
 
 function SystemStatusPanel() {
+  const { t } = useI18n()
   const [status, setStatus] = useState<Record<string, unknown> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -79,21 +82,21 @@ function SystemStatusPanel() {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6">系统状态</Typography>
-        <Button variant="outlined" size="small" onClick={load}>刷新</Button>
+        <Typography variant="h6">{t('system_status_title')}</Typography>
+        <Button variant="outlined" size="small" onClick={load}>{t('system_status_refresh')}</Button>
       </Box>
 
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle2" gutterBottom>磁盘占用</Typography>
-        <Typography variant="body2">资产：{fmtSize(Number(disk.assetsBytes ?? 0))} | 报告：{fmtSize(Number(disk.reportsBytes ?? 0))}</Typography>
-        <Typography variant="body2">语料：{fmtSize(Number(disk.corpusBytes ?? 0))} | 写作：{fmtSize(Number(disk.novelBytes ?? 0))}</Typography>
-        <Typography variant="body2">数据库：{fmtSize(Number(disk.dbBytes ?? 0))} | 总计：{fmtSize(Number(disk.totalBytes ?? 0))}</Typography>
+        <Typography variant="subtitle2" gutterBottom>{t('system_disk_title')}</Typography>
+        <Typography variant="body2">{t('system_disk_assets')}{fmtSize(Number(disk.assetsBytes ?? 0))} | {t('system_disk_reports')}{fmtSize(Number(disk.reportsBytes ?? 0))}</Typography>
+        <Typography variant="body2">{t('system_disk_corpus')}{fmtSize(Number(disk.corpusBytes ?? 0))} | {t('system_disk_novel')}{fmtSize(Number(disk.novelBytes ?? 0))}</Typography>
+        <Typography variant="body2">{t('system_disk_db')}{fmtSize(Number(disk.dbBytes ?? 0))} | {t('system_disk_total')}{fmtSize(Number(disk.totalBytes ?? 0))}</Typography>
       </Paper>
 
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle2" gutterBottom>数据统计</Typography>
+        <Typography variant="subtitle2" gutterBottom>{t('system_counts_title')}</Typography>
         <Typography variant="body2">
-          资产 {String(counts.assets ?? 0)} 个 | 报告 {String(counts.reports ?? 0)} 份 | 已拆书 {((counts.bookNames ?? counts.book_names ?? []) as string[]).length} 本
+          {t('system_counts_assets_prefix')}{String(counts.assets ?? 0)}{t('system_counts_assets_unit')}{String(counts.reports ?? 0)}{t('system_counts_reports_unit')}{((counts.bookNames ?? counts.book_names ?? []) as string[]).length}{t('system_counts_books_unit')}
         </Typography>
         <Typography variant="body2" color="text.secondary">
           {((counts.bookNames ?? counts.book_names ?? []) as string[]).join('、')}
@@ -101,15 +104,15 @@ function SystemStatusPanel() {
       </Paper>
 
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle2" gutterBottom>模型状态</Typography>
-        <Chip label={model.configured ? '已配置' : '未配置'} size="small" color={model.configured ? 'success' : 'warning'} />
+        <Typography variant="subtitle2" gutterBottom>{t('system_model_title')}</Typography>
+        <Chip label={model.configured ? t('system_model_configured') : t('system_model_unconfigured')} size="small" color={model.configured ? 'success' : 'warning'} />
         {Array.isArray(model.models) && (model.models as Record<string, unknown>[]).map((m, i) => (
           <Typography key={i} variant="body2">{String(m.id)} — {String(m.name)}</Typography>
         ))}
       </Paper>
 
       <Paper sx={{ p: 2 }}>
-        <Typography variant="subtitle2" gutterBottom>路径</Typography>
+        <Typography variant="subtitle2" gutterBottom>{t('system_paths_title')}</Typography>
         {Object.entries(paths).map(([k, v]) => (
           <Typography key={k} variant="body2" sx={{ fontSize: 12, fontFamily: 'monospace' }}>
             {k}: {v}
@@ -125,6 +128,7 @@ function SystemStatusPanel() {
 // ---------------------------------------------------------------------------
 
 function CompliancePanel() {
+  const { t } = useI18n()
   const [results, setResults] = useState<Record<string, unknown> | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -147,14 +151,14 @@ function CompliancePanel() {
 
   return (
     <Box>
-      <Typography variant="h6" gutterBottom>版权合规扫描</Typography>
+      <Typography variant="h6" gutterBottom>{t('system_comp_title')}</Typography>
       <Button variant="contained" onClick={doScan} disabled={loading} sx={{ mb: 2 }}>
-        {loading ? <CircularProgress size={20} /> : '全量扫描'}
+        {loading ? <CircularProgress size={20} /> : t('system_comp_btn_scan')}
       </Button>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {summary && (
         <Alert severity={summary.rejected > 0 ? 'error' : summary.warned > 0 ? 'warning' : 'success'} sx={{ mb: 2 }}>
-          共 {summary.total} 个资产：{summary.passed} PASS / {summary.warned} WARN / {summary.rejected} REJECT
+          {t('system_comp_summary_total')}{summary.total}{t('system_comp_summary_assets')}{summary.passed} PASS / {summary.warned} WARN / {summary.rejected} REJECT
         </Alert>
       )}
       {items.map((r) => (
@@ -179,12 +183,11 @@ function CompliancePanel() {
 }
 
 // ---------------------------------------------------------------------------
-// 模型配置
-// ---------------------------------------------------------------------------
 // 设置
 // ---------------------------------------------------------------------------
 
 function SettingsPanel() {
+  const { t } = useI18n()
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null)
   const [error, setError] = useState('')
 
@@ -202,29 +205,30 @@ function SettingsPanel() {
 
   return (
     <Box>
-      <Typography variant="h6" gutterBottom>系统设置</Typography>
+      <Typography variant="h6" gutterBottom>{t('system_settings_title')}</Typography>
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle2" gutterBottom>服务</Typography>
-        <Typography variant="body2">端口：{String(settings.port ?? '-')}</Typography>
-        <Typography variant="body2">批次大小：{String(settings.batchSize ?? settings.batch_size ?? '-')} 字符</Typography>
+        <Typography variant="subtitle2" gutterBottom>{t('system_settings_service')}</Typography>
+        <Typography variant="body2">{t('system_settings_port')}{String(settings.port ?? '-')}</Typography>
+        <Typography variant="body2">{t('system_settings_batch_size')}{String(settings.batchSize ?? settings.batch_size ?? '-')}{t('system_settings_chars_unit')}</Typography>
       </Paper>
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle2" gutterBottom>路径</Typography>
+        <Typography variant="subtitle2" gutterBottom>{t('system_paths_title')}</Typography>
         {Object.entries(paths).map(([k, v]) => (
           <Typography key={k} variant="body2" sx={{ fontSize: 12, fontFamily: 'monospace' }}>{k}: {String(v)}</Typography>
         ))}
       </Paper>
       <Paper sx={{ p: 2 }}>
-        <Typography variant="subtitle2" gutterBottom>环境变量覆盖</Typography>
+        <Typography variant="subtitle2" gutterBottom>{t('system_settings_env_title')}</Typography>
         {Object.entries(env).map(([k, v]) => (
           <Typography key={k} variant="body2" sx={{ fontSize: 12, fontFamily: 'monospace' }}>
-            {k}: {v ? String(v) : '（未设置）'}
+            {k}: {v ? String(v) : t('system_settings_env_unset')}
           </Typography>
         ))}
       </Paper>
       <Alert severity="info" sx={{ mt: 2 }}>
-        设置修改请通过环境变量或直接编辑 gui/config.py。GUI 写入设置属阶段三规划。
+        {t('system_settings_notice')}
       </Alert>
     </Box>
   )
 }
+

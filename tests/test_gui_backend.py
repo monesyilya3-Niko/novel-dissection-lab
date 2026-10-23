@@ -10,7 +10,6 @@
 """
 from __future__ import annotations
 
-import shutil
 import sys
 import tempfile
 import unittest
@@ -19,6 +18,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import _isolation  # noqa: E402
 
 from gui import config, engine_adapter, router, services, state_store  # noqa: E402
 
@@ -37,16 +39,25 @@ _TMP = None
 _ORIG_STATE_ROOT = None
 _ORIG_STATE_JSON_DIR = None
 _ORIG_ASSETS_ROOT = None
+_ORIG_DB_PATH = None
+_ORIG_LOCK_PATH = None
 
 
 def setUpModule():
-    """进入本模块测试前：成对重定向三个数据路径常量到临时目录。"""
+    """进入本模块测试前：成对重定向数据路径常量到临时目录。"""
     global _TMP, _ORIG_STATE_ROOT, _ORIG_STATE_JSON_DIR, _ORIG_ASSETS_ROOT
+    global _ORIG_DB_PATH, _ORIG_LOCK_PATH
     _TMP = tempfile.mkdtemp(prefix="gui_qa_")
     _ORIG_STATE_ROOT = config.STATE_ROOT
     _ORIG_STATE_JSON_DIR = config.STATE_JSON_DIR
     _ORIG_ASSETS_ROOT = config.ASSETS_ROOT
+    _ORIG_DB_PATH = config.DB_PATH
+    _ORIG_LOCK_PATH = config.LOCK_PATH
     config.STATE_ROOT = Path(_TMP) / "gui_state"
+    # DB_PATH / LOCK_PATH 是 STATE_ROOT 的导入期快照，patch STATE_ROOT 带不动它们：
+    # 不一起重定向，读到的就是用户真实数据目录里的库和锁。
+    config.DB_PATH = config.STATE_ROOT / "index.db"
+    config.LOCK_PATH = config.STATE_ROOT / ".lock"
     # R1：STATE_JSON_DIR 必须与 STATE_ROOT 成对隔离。save_state 把 JSON 写进
     # STATE_JSON_DIR，漏 patch 会让全部夹具落进真实 gui/state/ 并跨轮累积。
     config.STATE_JSON_DIR = Path(_TMP) / "gui" / "state"
@@ -60,10 +71,13 @@ def tearDownModule():
     config.STATE_ROOT = _ORIG_STATE_ROOT
     config.STATE_JSON_DIR = _ORIG_STATE_JSON_DIR
     config.ASSETS_ROOT = _ORIG_ASSETS_ROOT
+    config.DB_PATH = _ORIG_DB_PATH
+    config.LOCK_PATH = _ORIG_LOCK_PATH
     if _TMP:
-        # ignore_errors：Windows 上隔离库文件句柄可能仍被占用，回收失败不影响
-        # 正确性（config 已还原），只影响临时目录是否残留。
-        shutil.rmtree(_TMP, ignore_errors=True)
+        # 用 _isolation.remove_tree：它会先关掉开在这棵目录里的 SQLite 连接再删。
+        # 以前这里写死 shutil.rmtree(..., ignore_errors=True) 并注释"回收失败不影响
+        # 正确性"——失败就是每跑一轮留一个 gui_qa_ 目录，从来没人回收它。
+        _isolation.remove_tree(_TMP)
         _TMP = None
 
 
@@ -378,12 +392,35 @@ class TestResumeSkipsSuccess(unittest.TestCase):
         _cleanup_state_files()
 
     def _wait_done(self, book_id, timeout=5.0):
+        """等待分析完成 **且后台线程真正退出**。
+
+        只等 ``status == "done"`` 不够：``_run_analysis`` 先置 status 再收尾，
+        两者之间有窗口期。此时调用 ``resume()`` 会走到 ``start_analysis`` 的
+        ``rt["thread"].is_alive()`` 检查并抛 409「分析已在运行中」——
+        机器负载高时窗口期被拉长，测试间歇性 ERROR（2026-10-11 实修：
+        全量套件下约每十几次触发一次，单跑 15 次全过，是典型的时序竞态）。
+
+        2026-10-13 追加加固：还要等 **status 与线程退出之间的一致性**稳定。
+        实测在全量套件下仍偶发 ``called`` 非空（resume 重跑了批），
+        怀疑是"新线程已启动但读到旧状态"——故额外要求线程退出后
+        再确认一次状态未回退（``status`` 仍为终态），缩小竞态窗口。
+        """
         import time
         deadline = time.time() + timeout
+        stable = 0
         while time.time() < deadline:
             st = services.get_status(book_id)
             if st["status"] in ("done", "error"):
-                return st
+                rt = services._runtime.get(book_id)
+                th = rt.get("thread") if rt else None
+                if th is None or not th.is_alive():
+                    # 连续两次采样都处于终态且无线程，才认为真正稳定
+                    stable += 1
+                    if stable >= 2:
+                        return st
+                    time.sleep(0.05)
+                    continue
+            stable = 0
             time.sleep(0.05)
         return services.get_status(book_id)
 
@@ -404,9 +441,22 @@ class TestResumeSkipsSuccess(unittest.TestCase):
         # 重置调用记录，再 resume，并等待 resume 线程真正跑完。
         self.called.clear()
         services.resume(book_id)
+        # ⚠️ 必须先等新线程**真正启动**（2026-10-13 加固）：
+        # resume 是异步的——它调 start_analysis 启动线程后立即返回。
+        # 若直接调 _wait_done，可能在"新线程尚未启动、状态仍是上一轮的
+        # done"时命中终态检查而**提前返回**，此时 _run_analysis 甚至还没
+        # 走到第一批的跳过判断，后续断言就建立在未完成的执行之上。
+        # 等 _runtime 里出现**存活线程**再等它结束，消除该窗口。
+        import time
+        deadline = time.time() + 3.0
+        while time.time() < deadline:
+            rt = services._runtime.get(book_id)
+            th = rt.get("thread") if rt else None
+            if th is not None and th.is_alive():
+                break
+            time.sleep(0.01)
         self._wait_done(book_id)
         # 额外小睡确保后台线程完成调度（避免竞态）。
-        import time
         time.sleep(0.3)
 
         # 核心断言：已 success 的批不应再次调用 run_batch。
