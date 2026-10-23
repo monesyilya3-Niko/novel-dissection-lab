@@ -79,6 +79,43 @@ vi.mock('../api/client', () => ({
       cliffhangerRating: 'STRONG',
       recommendations: ['节奏推进优异'],
     }),
+    estimateReaderRetention: vi.fn().mockResolvedValue({
+      benchmark: 'classic',
+      benchmarkName: '经典商业递进三章标杆',
+      pointsPerChapter: 10,
+      totalChapters: 3,
+      totalChars: 3000,
+      retentionCurve: [100.0, 92.0, 88.0, 84.0],
+      finalRetentionRate: 84.0,
+      totalDropPct: 16.0,
+      overallGrade: 'S',
+      gradeDescription: '商业留存成色极佳',
+      chaptersRetention: [
+        {
+          chapterIndex: 1,
+          charCount: 1000,
+          startRetention: 100.0,
+          endRetention: 92.0,
+          chapterChurnPct: 8.0,
+          retentionRate: 92.0,
+          hotspotsCount: 0,
+          avgTension: 60,
+          maxTension: 70,
+        },
+      ],
+      dropoffHotspots: [
+        {
+          chapterIndex: 2,
+          segmentIndex: 0,
+          segmentLabel: '第2章第1段 (0-10%)',
+          riskLevel: 'HIGH',
+          estimatedDropPct: 6.5,
+          reason: '承接前章张力骤降，引发失速',
+          fixSuggestion: '章首快速回钩',
+        },
+      ],
+      retentionAdvice: ['保持首章入局速度，中段补一次小高潮'],
+    }),
   },
   toolsApi: {
     getHooks: vi.fn().mockResolvedValue({
@@ -118,6 +155,9 @@ vi.mock('./charts/EmotionWaveChart', () => ({
 }))
 vi.mock('./charts/RhythmRadarChart', () => ({
   default: () => <div data-testid="rhythm-radar-chart">RhythmRadarChart</div>,
+}))
+vi.mock('./charts/ReaderRetentionChart', () => ({
+  default: () => <div data-testid="reader-retention-chart">ReaderRetentionChart</div>,
 }))
 
 describe('WritingExtras 创作扩展工作台', () => {
@@ -335,6 +375,49 @@ describe('WritingExtras 创作扩展工作台', () => {
       expect(screen.getByText('黄金三章成色：极佳')).toBeInTheDocument()
       expect(screen.getByText('黄金三章专家修改建议：')).toBeInTheDocument()
       expect(screen.getByText('节奏推进优异')).toBeInTheDocument()
+    })
+  })
+
+  it('读者留存预测弹窗正常交互、示范载入与结果全景渲染', async () => {
+    render(<WritingExtras />)
+    await waitFor(() => {
+      expect(screen.getByText('创作者仪表盘')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByText('创作者仪表盘'))
+
+    await waitFor(() => {
+      expect(screen.getByText('读者留存预测')).toBeInTheDocument()
+    })
+
+    // 打开读者留存预测弹窗
+    fireEvent.click(screen.getByText('读者留存预测'))
+
+    await waitFor(() => {
+      expect(screen.getByText('商业网文读者留存流失预测模型')).toBeInTheDocument()
+      expect(screen.getByText('载入示范高留存三章 (S/A级)')).toBeInTheDocument()
+      expect(screen.getByText('载入示范断崖失速三章 (高危跳出)')).toBeInTheDocument()
+      expect(screen.getByText('开始读者留存测算')).toBeInTheDocument()
+    })
+
+    // 载入高留存示范并测算
+    fireEvent.click(screen.getByText('载入示范高留存三章 (S/A级)'))
+
+    await waitFor(() => {
+      expect(screen.getByText('商业成色与读者留存全景')).toBeInTheDocument()
+      expect(screen.getByTestId('reader-retention-chart')).toBeInTheDocument()
+      expect(screen.getByText('综合评级 S · 商业留存成色极佳')).toBeInTheDocument()
+      expect(screen.getByText('终局预计留存率: 84%')).toBeInTheDocument()
+      expect(screen.getByText('累计流失漏斗: 16%')).toBeInTheDocument()
+      expect(screen.getByText('弃读跳出高危风险点与挽留改法：')).toBeInTheDocument()
+      expect(screen.getByText(/第2章第1段/)).toBeInTheDocument()
+      expect(screen.getByText('战略防跳出与留存优化建议：')).toBeInTheDocument()
+      expect(screen.getByText('保持首章入局速度，中段补一次小高潮')).toBeInTheDocument()
+    })
+
+    // 收起结果面板
+    fireEvent.click(screen.getByText('关闭'))
+    await waitFor(() => {
+      expect(screen.queryByText('商业成色与读者留存全景')).not.toBeInTheDocument()
     })
   })
 })

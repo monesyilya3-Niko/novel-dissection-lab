@@ -497,6 +497,11 @@ export const writingApi = {
     benchmark?: 'classic' | 'upgrade_shuangwen' | 'fast_hook' | 'suspense_mystery'
     points_per_chapter?: number
   }) => post<GoldenThreeTensionResult>('/writing/golden-three-tension', body),
+  estimateReaderRetention: (body: {
+    chapters: string[]
+    benchmark?: 'classic' | 'upgrade_shuangwen' | 'fast_hook' | 'suspense_mystery'
+    points_per_chapter?: number
+  }) => post<ReaderRetentionResult>('/writing/reader-retention', body),
   getProjectMeta: (project: string) =>
     get<ProjectMeta>(`/writing/projects/${encodeURIComponent(project)}/meta`),
   updateProjectMeta: (
@@ -581,6 +586,44 @@ export interface GoldenThreeTensionResult {
   verdictTitle: string
   cliffhangerRating: 'STRONG' | 'MODERATE' | 'WEAK'
   recommendations: string[]
+}
+
+export interface ChapterRetentionItem {
+  chapterIndex: number
+  charCount: number
+  startRetention: number
+  endRetention: number
+  chapterChurnPct: number
+  retentionRate: number
+  hotspotsCount: number
+  avgTension: number
+  maxTension: number
+}
+
+export interface DropoffHotspot {
+  chapterIndex: number
+  segmentIndex: number
+  segmentLabel: string
+  riskLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM'
+  estimatedDropPct: number
+  reason: string
+  fixSuggestion: string
+}
+
+export interface ReaderRetentionResult {
+  benchmark: string
+  benchmarkName: string
+  pointsPerChapter: number
+  totalChapters: number
+  totalChars: number
+  retentionCurve: number[]
+  finalRetentionRate: number
+  totalDropPct: number
+  overallGrade: 'S' | 'A' | 'B' | 'C'
+  gradeDescription: string
+  chaptersRetention: ChapterRetentionItem[]
+  dropoffHotspots: DropoffHotspot[]
+  retentionAdvice: string[]
 }
 
 export interface ProjectMeta {

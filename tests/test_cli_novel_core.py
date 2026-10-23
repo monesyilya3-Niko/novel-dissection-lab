@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import shutil
 import sys
 import tempfile
@@ -154,16 +155,20 @@ class TestRunScript(unittest.TestCase):
     def test_run_script_invokes_subprocess_with_env(self):
         dummy = self.tmp / "dummy.py"
         dummy.write_text("print('ok')", encoding="utf-8")
-        with mock.patch("subprocess.call", return_value=0) as mock_call:
-            rc = novel.run_script("dummy.py", ["--foo", "bar"])
-            self.assertEqual(rc, 0)
-            mock_call.assert_called_once()
-            cmd = mock_call.call_args[0][0]
-            kwargs = mock_call.call_args[1]
-            self.assertEqual(cmd[0], sys.executable)
-            self.assertEqual(cmd[1], str(dummy))
-            self.assertEqual(cmd[2:], ["--foo", "bar"])
-            self.assertEqual(kwargs["env"]["PYTHONIOENCODING"], "utf-8:backslashreplace")
+        # 生产实现是 env.setdefault：宿主若已设置 PYTHONIOENCODING（如本机
+        # Git Bash 的 utf-8）则尊重原值。剥离该变量，断言才与宿主环境无关。
+        with mock.patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("PYTHONIOENCODING", None)
+            with mock.patch("subprocess.call", return_value=0) as mock_call:
+                rc = novel.run_script("dummy.py", ["--foo", "bar"])
+                self.assertEqual(rc, 0)
+                mock_call.assert_called_once()
+                cmd = mock_call.call_args[0][0]
+                kwargs = mock_call.call_args[1]
+                self.assertEqual(cmd[0], sys.executable)
+                self.assertEqual(cmd[1], str(dummy))
+                self.assertEqual(cmd[2:], ["--foo", "bar"])
+                self.assertEqual(kwargs["env"]["PYTHONIOENCODING"], "utf-8:backslashreplace")
 
 
 class TestCmdResetAdminPassword(unittest.TestCase):
