@@ -294,7 +294,12 @@ def _calculate_segment_tension(seg_text: str) -> int:
     emotion_score = (emotion_hits / c) * 500 * 7.0
     dialogue_score = (dialogue_hits / c) * 500 * 6.0
 
-    raw_tension = 35.0 + pace_bonus + punctuation_boost + conflict_score + emotion_score + dialogue_score
+    has_tension_signal = (conflict_hits + emotion_hits + dialogue_hits + exc_count) > 0
+    if not has_tension_signal:
+        effective_pace = min(0.0, pace_bonus)
+        raw_tension = 22.0 + effective_pace
+    else:
+        raw_tension = 35.0 + pace_bonus + punctuation_boost + conflict_score + emotion_score + dialogue_score
     return max(15, min(98, int(round(raw_tension))))
 
 
@@ -662,6 +667,216 @@ def analyze_golden_three_tension(
         "verdict_title": verdict_title,
         "cliffhanger_rating": cliffhanger_rating,
         "recommendations": recommendations,
+    }
+
+
+def estimate_reader_retention(
+    chapters: list[str],
+    benchmark: str = "classic",
+    points_per_chapter: int = 10,
+) -> dict[str, Any]:
+    """商业网文读者留存流失预测模型（Reader Churn & Drop-off Estimator）。
+
+    基于黄金三章细粒度情绪张力、首章入局速度、平淡注水期密度、跨章过渡落差与末尾留钩，
+    量化推导各章节读者留存率衰减曲线、定位跳出高危风险点并给出挽留优化建议。
+    """
+    base_data = analyze_golden_three_tension(chapters, benchmark=benchmark, points_per_chapter=points_per_chapter)
+    pts = base_data["points_per_chapter"]
+    total_chapters = base_data["total_chapters"]
+    combined_curve = base_data["combined_curve"]
+    handoffs = base_data["handoffs"]
+    chapters_metrics = base_data["chapters_metrics"]
+
+    total_segments = len(combined_curve)
+    retention_curve: list[float] = [100.0]
+    segment_drops: list[dict[str, Any]] = []
+    dropoff_hotspots: list[dict[str, Any]] = []
+
+    current_retention = 100.0
+
+    for i in range(total_segments):
+        ch_idx = i // pts
+        seg_idx = i % pts
+        ch_num = ch_idx + 1
+        seg_num = seg_idx + 1
+        tension = combined_curve[i]
+        label = f"第{ch_num}章第{seg_num}段 ({int(round(seg_idx * 100 / pts))}-{int(round((seg_idx + 1) * 100 / pts))}%)"
+
+        # 1. 基础自然流失率（按章节递减）
+        if ch_idx == 0:
+            base_drop = 3.5 if seg_idx == 0 else 1.2
+        elif ch_idx == 1:
+            base_drop = 2.2 if seg_idx == 0 else 0.8
+        elif ch_idx == 2:
+            base_drop = 1.6 if seg_idx == 0 else 0.6
+        else:
+            base_drop = 0.5
+
+        # 2. 动态调节因子
+        modifier = 0.0
+        reasons: list[str] = []
+
+        # (a) 首章第一切片入局效应
+        if i == 0:
+            if tension < 35:
+                modifier += 8.5
+                reasons.append("首章开局过于平缓，缺乏即时悬念刺激")
+            elif tension < 45:
+                modifier += 4.0
+                reasons.append("开局入局较慢")
+            elif tension >= 65:
+                modifier -= 2.5
+
+        # (b) 跨章承接失速效应
+        if seg_idx == 0 and ch_idx > 0 and ch_idx - 1 < len(handoffs):
+            h = handoffs[ch_idx - 1]
+            if h["status"] == "CLIFF_DROP":
+                drop_val = h["drop"]
+                penalty = min(15.0, max(8.0, 8.0 + (drop_val - 35) * 0.35))
+                modifier += penalty
+                reasons.append(f"承接前章张力骤降 {drop_val} 分，引发断崖式失速")
+            elif h["status"] == "WEAK_HOOK":
+                modifier += 4.5
+                reasons.append("前章章尾缺乏追读钩子，读者翻页意愿低迷")
+            elif h["status"] == "SMOOTH":
+                modifier -= 1.5
+
+        # (c) 平淡注水期惩罚
+        is_flat = tension < 35 and (
+            (seg_idx > 0 and combined_curve[i - 1] < 35) or
+            (seg_idx < pts - 1 and i + 1 < total_segments and combined_curve[i + 1] < 35)
+        )
+        if is_flat:
+            modifier += 3.2
+            reasons.append("陷入低张力连续平淡期，易引起疲劳跳读")
+
+        # (d) 高潮爽点与宣泄留存加成
+        if tension >= 85:
+            modifier -= 2.8
+        elif tension >= 75:
+            modifier -= 1.4
+        elif tension < 30 and not is_flat:
+            modifier += 1.8
+
+        # (e) 章末断章悬念效应
+        if seg_idx == pts - 1:
+            if tension >= 75:
+                modifier -= 2.2
+            elif tension < 40:
+                modifier += 3.5
+                reasons.append("章末收束偏平，缺乏驱动翻页的强力留白")
+
+        # (f) 章节内容缺失/字数过短严重惩罚
+        if chapters_metrics[ch_idx]["char_count"] < 30:
+            modifier += 10.0
+            reasons.append("章节字数过短或为空，读者跳出率极高")
+
+        # 计算切片综合流失率 (0.2% - 22.0%)
+        effective_drop = max(0.2, min(22.0, round(base_drop + modifier, 2)))
+        current_retention = max(5.0, min(100.0, round(current_retention * (1.0 - effective_drop / 100.0), 2)))
+        retention_curve.append(current_retention)
+
+        segment_drops.append({
+            "segment_index": i,
+            "chapter_index": ch_num,
+            "label": label,
+            "tension": tension,
+            "drop_pct": effective_drop,
+            "retention_after": current_retention,
+        })
+
+        # 识别流失高危点 (Hotspot)
+        if effective_drop >= 5.0 or reasons:
+            risk_level = "CRITICAL" if effective_drop >= 9.0 else "HIGH" if effective_drop >= 5.5 else "MEDIUM"
+            primary_reason = "、".join(reasons) if reasons else "自然流失率偏高"
+
+            # 生成可落地的修复策略
+            if "断崖式失速" in primary_reason:
+                fix = "避免在章首平推大段背景或修炼设定，直接切入前章遗留的即时危机或次级冲突"
+            elif "开局过于平缓" in primary_reason:
+                fix = "前置主角核心危机、紧迫倒计时或强设定金手指，让读者在前三分钟产生共鸣"
+            elif "连续平淡期" in primary_reason:
+                fix = "压缩纯说明性描写与寒暄，穿插角色微表情博弈、环境压迫或暗线线索"
+            elif "章末收束偏平" in primary_reason:
+                fix = "重构断章切片，将结尾卡在人物揭面、危机突现或反派挑衅的最高点"
+            elif "章节字数过短" in primary_reason:
+                fix = "补充完整章节正文情节与细节描写，避免章节内容缺失"
+            else:
+                fix = "加快剧情推进节奏，精简冗余字数"
+
+            dropoff_hotspots.append({
+                "chapter_index": ch_num,
+                "segment_index": seg_idx,
+                "segment_label": label,
+                "risk_level": risk_level,
+                "estimated_drop_pct": effective_drop,
+                "reason": primary_reason,
+                "fix_suggestion": fix,
+            })
+
+    # 计算各章节汇总保留数据
+    chapters_retention: list[dict[str, Any]] = []
+    for c_idx in range(total_chapters):
+        c_num = c_idx + 1
+        c_start = retention_curve[c_idx * pts]
+        c_end = retention_curve[(c_idx + 1) * pts]
+        c_churn = round(c_start - c_end, 2)
+        c_rate = round((c_end / c_start) * 100.0, 1) if c_start > 0 else 0.0
+        c_hotspots = [h for h in dropoff_hotspots if h["chapter_index"] == c_num]
+
+        chapters_retention.append({
+            "chapter_index": c_num,
+            "char_count": chapters_metrics[c_idx]["char_count"],
+            "start_retention": round(c_start, 1),
+            "end_retention": round(c_end, 1),
+            "chapter_churn_pct": c_churn,
+            "retention_rate": c_rate,
+            "hotspots_count": len(c_hotspots),
+            "avg_tension": chapters_metrics[c_idx]["avg_tension"],
+            "max_tension": chapters_metrics[c_idx]["max_tension"],
+        })
+
+    final_retention = round(retention_curve[-1], 1)
+    total_drop = round(100.0 - final_retention, 1)
+
+    # 商业成色评级
+    if final_retention >= 68.0:
+        grade = "S"
+        grade_desc = "神作级黄金三章：读者黏性极高，高潮与钩子层层递进，追读流失极小"
+    elif final_retention >= 52.0:
+        grade = "A"
+        grade_desc = "优质商业级三章：节奏张弛有度，核心看点明确，具备出色的首轮签约过审与入架率"
+    elif final_retention >= 38.0:
+        grade = "B"
+        grade_desc = "及格线三章：整体尚可但存在局部失速漏斗，需重点修补流失高危点"
+    else:
+        grade = "C"
+        grade_desc = "高危预警三章：读者流失过半，多处断崖失速或平淡注水，弃书风险极高"
+
+    # 战略修改与挽留建议
+    advice: list[str] = []
+    if dropoff_hotspots:
+        top_hotspots = sorted(dropoff_hotspots, key=lambda h: h["estimated_drop_pct"], reverse=True)[:3]
+        for h in top_hotspots:
+            advice.append(f"【重点挽留 · {h['segment_label']}】预估跳出 {h['estimated_drop_pct']}%（{h['risk_level']}）。原因：{h['reason']}。改法：{h['fix_suggestion']}。")
+
+    if total_chapters >= 2 and chapters_retention[1]["chapter_churn_pct"] > 25.0:
+        advice.append(f"【第二章弃书潮警惕】第 2 章单章流失高达 {chapters_retention[1]['chapter_churn_pct']}%，是整部作品最大的跳出漏斗，建议彻底重组该章前半部分节奏。")
+
+    if final_retention >= 65.0 and not advice:
+        advice.append("【留存结构健康】前三章未发现致命跳出漏斗，节奏递进契合商业网文黄金模型，建议保持当前文风并稳步推进第四章。")
+
+    return {
+        "overall_grade": grade,
+        "grade_description": grade_desc,
+        "final_retention_rate": final_retention,
+        "total_drop_rate": total_drop,
+        "total_chapters": total_chapters,
+        "total_segments": total_segments,
+        "chapters_retention": chapters_retention,
+        "dropoff_hotspots": dropoff_hotspots,
+        "retention_curve": retention_curve,
+        "retention_advice": advice,
     }
 
 

@@ -76,7 +76,8 @@ class TestRouteRegistration(unittest.TestCase):
         from gui import router
         new_routes = [r for r in router.ROUTES
                       if '/api/writing/' in r[1].pattern or '/api/quality/' in r[1].pattern]
-        self.assertEqual(len(new_routes), 35, f"Expected 35 routes, got {len(new_routes)}")
+        # 2026-10-23：新增商业网文读者留存流失预测（POST /api/writing/reader-retention），35→36。
+        self.assertEqual(len(new_routes), 36, f"Expected 36 routes, got {len(new_routes)}")
 
 
 class TestWritingEndpoints(unittest.TestCase):
