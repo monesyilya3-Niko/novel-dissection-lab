@@ -168,6 +168,41 @@ _BENCHMARK_NAMES = {
     "face_slap": "极限压抑逆袭打脸标杆",
 }
 
+_GOLDEN_THREE_BENCHMARK_PROFILES: dict[str, list[list[int]]] = {
+    # 经典商业递进三章标杆（第1章抓人留钩，第2章承接发酵防塌陷，第3章爆发首卷高潮）
+    "classic": [
+        [45, 55, 62, 70, 65, 58, 68, 75, 82, 88],
+        [65, 60, 55, 68, 72, 78, 75, 82, 85, 86],
+        [70, 75, 80, 85, 90, 95, 92, 88, 92, 96],
+    ],
+    # 升级爽文逆袭打脸标杆（第1章低谷压抑退婚，第2章金手指激活底牌展现，第3章首次正面反打碾压打脸）
+    "upgrade_shuangwen": [
+        [50, 40, 35, 30, 45, 60, 68, 75, 82, 88],
+        [70, 65, 60, 68, 75, 80, 84, 86, 88, 90],
+        [75, 82, 88, 92, 96, 98, 94, 90, 93, 97],
+    ],
+    # 快穿生死时速高压标杆（第1章生死线逃亡，第2章紧迫博弈背水一战，第3章绝地反转引爆连环反杀）
+    "fast_hook": [
+        [85, 90, 82, 78, 80, 85, 88, 85, 90, 95],
+        [75, 70, 75, 80, 85, 88, 85, 88, 90, 92],
+        [80, 85, 90, 92, 95, 98, 95, 90, 94, 98],
+    ],
+    # 悬疑无限流惊悚标杆（第1章诡异异象初探，第2章规则博弈人心险恶，第3章生死反抗毛骨悚然断章）
+    "suspense_mystery": [
+        [60, 65, 70, 75, 68, 72, 80, 85, 88, 92],
+        [72, 70, 74, 78, 82, 85, 82, 86, 88, 90],
+        [78, 82, 86, 90, 94, 96, 92, 88, 92, 98],
+    ],
+}
+_GOLDEN_THREE_BENCHMARKS = _GOLDEN_THREE_BENCHMARK_PROFILES
+
+_GOLDEN_THREE_BENCHMARK_NAMES: dict[str, str] = {
+    "classic": "经典商业递进三章标杆",
+    "upgrade_shuangwen": "升级爽文逆袭打脸标杆",
+    "fast_hook": "快穿生死时速高压标杆",
+    "suspense_mystery": "悬疑无限流惊悚标杆",
+}
+
 _DEFAULT_10_LABELS = [
     "开端 (0-10%)", "伏笔 (10-20%)", "微冲突 (20-30%)", "试探 (30-40%)", "积蓄 (40-50%)",
     "爆发 (50-60%)", "高潮 (60-70%)", "喘息 (70-80%)", "反扑 (80-90%)", "收束 (90-100%)",
@@ -374,6 +409,259 @@ def analyze_tension_curve(
         "benchmark_alignment_score": alignment_score,
         "flat_zones": flat_zones,
         "pacing_feedback": feedback,
+    }
+
+
+def analyze_golden_three_tension(
+    chapters: list[str],
+    benchmark: str = "classic",
+    points_per_chapter: int = 10,
+) -> dict[str, Any]:
+    """多章黄金三章张力曲线重叠比对引擎（Multi-Chapter Golden Three Tension Comparator）。
+
+    支持对前三章（或任意多章）文本进行细粒度情绪张力计算，
+    比对神作标杆曲线，检测中段失速、首章钩子、断章力度与跨章过渡断崖。
+    """
+    if not isinstance(chapters, (list, tuple)):
+        raise ServiceError("chapters 必须为非空字符串列表", 400)
+    if len(chapters) == 0:
+        raise ServiceError("chapters 必须为非空字符串列表", 400)
+    for idx, ch in enumerate(chapters):
+        if not isinstance(ch, str):
+            raise ServiceError(f"第 {idx + 1} 章内容必须为字符串", 400)
+
+    # 规范化点数与标杆
+    pts = max(3, min(20, int(points_per_chapter or 10)))
+    bm_key = (benchmark or "classic").strip().lower()
+    if bm_key not in _GOLDEN_THREE_BENCHMARK_PROFILES:
+        bm_key = "classic"
+    bm_templates = _GOLDEN_THREE_BENCHMARK_PROFILES[bm_key]
+    bm_name = _GOLDEN_THREE_BENCHMARK_NAMES.get(bm_key, "经典商业递进三章标杆")
+
+    total_chapters = len(chapters)
+    chapters_metrics: list[dict[str, Any]] = []
+
+    for i, ch_text in enumerate(chapters):
+        ch_num = i + 1
+        clean_text = ch_text.strip()
+        char_count = len(_WS_RE.sub("", ch_text))
+
+        # 获取当前章对应的标杆模板
+        tpl = bm_templates[min(i, len(bm_templates) - 1)]
+        bm_curve = _resample_curve(tpl, pts)
+
+        # 构建本章分段标签
+        labels = [f"第{ch_num}章第{p + 1}段 ({int(round(p * 100 / pts))}-{int(round((p + 1) * 100 / pts))}%)" for p in range(pts)]
+
+        if not clean_text:
+            ch_curve = [0] * pts
+            max_t = 0
+            avg_t = 0.0
+            variance = 0.0
+            climax_idx = 0
+            opening_score = 0
+            hook_score = 0
+            flat_zones: list[dict[str, Any]] = []
+            verdict = "章节为空"
+        else:
+            segments = _split_into_segments(clean_text, pts)
+            ch_curve = [_calculate_segment_tension(s) for s in segments]
+            climax_idx = max(range(pts), key=lambda idx: ch_curve[idx])
+            max_t = ch_curve[climax_idx]
+            avg_t = round(sum(ch_curve) / pts, 1)
+            variance = round((sum((t - avg_t) ** 2 for t in ch_curve) / pts) ** 0.5, 1)
+            opening_score = ch_curve[0]
+            hook_score = ch_curve[-1]
+
+            flat_zones = []
+            for p, t in enumerate(ch_curve):
+                if t < 35 and ((p > 0 and ch_curve[p - 1] < 35) or (p < pts - 1 and ch_curve[p + 1] < 35)):
+                    flat_zones.append({
+                        "segment_index": p,
+                        "label": labels[p],
+                        "tension": t,
+                    })
+
+            # 单章评价
+            if i == 0:
+                if opening_score >= 60 and hook_score >= 65:
+                    verdict = "黄金开局，首尾张力强劲"
+                elif hook_score < 40:
+                    verdict = "开篇平缓，章尾断章钩子偏弱"
+                else:
+                    verdict = "开篇及格，节奏平稳"
+            elif i == 1:
+                if avg_t >= 50 and max_t >= 65:
+                    verdict = "承接有力，防失速良好"
+                elif avg_t < 38:
+                    verdict = "中段失速，存在跳读弃书风险"
+                else:
+                    verdict = "过渡平稳，张力均衡"
+            elif i == 2:
+                if max_t >= 80 and hook_score >= 70:
+                    verdict = "首轮高潮爆发充分，断章吸睛"
+                elif max_t < 60:
+                    verdict = "高潮力度偏弱，反差爽点不足"
+                else:
+                    verdict = "首卷收束及格"
+            else:
+                verdict = "后续连载推进"
+
+        chapters_metrics.append({
+            "chapter_index": ch_num,
+            "char_count": char_count,
+            "segments": labels,
+            "tension_curve": ch_curve,
+            "benchmark_curve": bm_curve,
+            "max_tension": max_t,
+            "avg_tension": avg_t,
+            "tension_variance": variance,
+            "climax_index": climax_idx,
+            "climax_segment": labels[climax_idx],
+            "opening_score": opening_score,
+            "hook_score": hook_score,
+            "flat_zones": flat_zones,
+            "chapter_verdict": verdict,
+        })
+
+    # 跨章连接过渡 (Handoffs)
+    handoffs: list[dict[str, Any]] = []
+    has_cliff_drop = False
+    for i in range(total_chapters - 1):
+        c1 = chapters_metrics[i]
+        c2 = chapters_metrics[i + 1]
+        end_t = c1["hook_score"]
+        start_t = c2["opening_score"]
+        drop = end_t - start_t
+        if drop > 35:
+            status = "CLIFF_DROP"
+            comment = f"第 {i + 1} 章末尾张力 ({end_t}) 至第 {i + 2} 章开头 ({start_t}) 骤降 {drop} 分，存在断崖失速风险，读者容易在此处弃读。"
+            has_cliff_drop = True
+        elif drop < -30:
+            status = "SUDDEN_JUMP"
+            comment = f"第 {i + 1} 章至第 {i + 2} 章张力骤增 {-drop} 分，开局极度紧迫，注意铺垫前置逻辑。"
+        elif end_t < 40:
+            status = "WEAK_HOOK"
+            comment = f"第 {i + 1} 章章末张力仅为 {end_t} 分，断章缺乏足够追读勾连，读者翻页意愿可能偏低。"
+        else:
+            status = "SMOOTH"
+            comment = f"第 {i + 1} 章至第 {i + 2} 章张力承接自然（落差 {drop} 分），具有良好的连续追读节奏。"
+
+        handoffs.append({
+            "from_chapter": i + 1,
+            "to_chapter": i + 2,
+            "end_tension": end_t,
+            "start_tension": start_t,
+            "drop": drop,
+            "status": status,
+            "comment": comment,
+        })
+
+    # 全局联合曲线
+    combined_curve: list[int] = []
+    combined_benchmark: list[int] = []
+    for cm in chapters_metrics:
+        combined_curve.extend(cm["tension_curve"])
+        combined_benchmark.extend(cm["benchmark_curve"])
+
+    diffs = [abs(t - b) for t, b in zip(combined_curve, combined_benchmark, strict=False)]
+    mean_diff = sum(diffs) / len(diffs) if diffs else 0
+    alignment_score = max(0, min(100, int(round(100 - mean_diff))))
+
+    # 全局高潮
+    if combined_curve and max(combined_curve) > 0:
+        global_max_idx = max(range(len(combined_curve)), key=lambda idx: combined_curve[idx])
+        global_max_tension = combined_curve[global_max_idx]
+        global_climax_chapter = (global_max_idx // pts) + 1
+        global_climax_segment = (global_max_idx % pts) + 1
+    else:
+        global_max_tension = 0
+        global_climax_chapter = 1
+        global_climax_segment = 1
+
+    # 综合裁决判定
+    all_flat = all(cm["avg_tension"] < 38 for cm in chapters_metrics)
+    if has_cliff_drop:
+        overall_verdict = "WARNING_DROP"
+        verdict_title = "黄金三章成色：警惕中段失速 (跨章存在落差过大塌陷)"
+    elif all_flat or global_max_tension < 50:
+        overall_verdict = "WARNING_FLAT"
+        verdict_title = "黄金三章成色：整体偏平缓 (缺乏强冲突与首轮高潮)"
+    elif alignment_score >= 75 and global_max_tension >= 75:
+        overall_verdict = "EXCELLENT"
+        verdict_title = "黄金三章成色：极佳 (高留存潜力，起承转合鲜明)"
+    elif alignment_score >= 60:
+        overall_verdict = "GOOD"
+        verdict_title = "黄金三章成色：良好 (节奏达标，局部可微调)"
+    else:
+        overall_verdict = "FAIR"
+        verdict_title = "黄金三章成色：及格 (建议根据标杆针对性优化)"
+
+    # 最后一章断章钩子评价
+    last_hook = chapters_metrics[-1]["hook_score"]
+    if last_hook >= 80:
+        cliffhanger_rating = "STRONG"
+    elif last_hook >= 50:
+        cliffhanger_rating = "MODERATE"
+    else:
+        cliffhanger_rating = "WEAK"
+
+    # 生成修改建议
+    recommendations: list[str] = []
+    if chapters_metrics[0]["opening_score"] < 40:
+        recommendations.append(
+            f"【首章开局抓人】第 1 章前 10% 张力较低（{chapters_metrics[0]['opening_score']} 分），商业网文读者前三千字极易弃读，建议在开篇 500 字内迅速抛出核心困境或强设定钩子。"
+        )
+    if chapters_metrics[0]["hook_score"] < 45:
+        recommendations.append(
+            f"【首章断章钩子】第 1 章末尾情绪回落明显（{chapters_metrics[0]['hook_score']} 分），缺乏'引而不发'的悬念，建议在章末卡在危机触发或关键人物登场的瞬间。"
+        )
+    if total_chapters >= 2 and chapters_metrics[1]["avg_tension"] < 40:
+        recommendations.append(
+            f"【第二章防失速】第 2 章整章平均张力偏低（{chapters_metrics[1]['avg_tension']} 分），网文常有'第二章弃书潮'，应避免在此处长篇大论介绍背景设定，建议借事件冲突带出金手指与世界观。"
+        )
+    if has_cliff_drop:
+        recommendations.append(
+            "【跨章断崖失速】检测到跨章张力骤降超过 35 分，前一章好不容易调动起的情绪在下一章开头被泼冷水，建议平滑过渡或直接承接上一章悬念。"
+        )
+    if total_chapters >= 3 and chapters_metrics[2]["max_tension"] < 70:
+        recommendations.append(
+            f"【第三章首轮高潮】第 3 章峰值张力未达 70 分（实测 {chapters_metrics[2]['max_tension']} 分），首卷未能形成第一个小高潮闭环，建议强化反派施压与主角正面破局/反击爽感。"
+        )
+    total_flat_count = sum(len(cm["flat_zones"]) for cm in chapters_metrics)
+    if total_flat_count >= 3:
+        recommendations.append(
+            f"【多处平推注水】全篇检测到 {total_flat_count} 处连续平淡区间，建议压缩日常寒暄或纯说明性文段，提升信息密度。"
+        )
+    if cliffhanger_rating == "WEAK":
+        recommendations.append(
+            f"【末尾断章乏力】黄金三章终局张力仅 {last_hook} 分，难以吸引读者继续付费订阅或加入书架，建议章末设置'致命悬念'或'重大转折'。"
+        )
+    if alignment_score >= 80 and not recommendations:
+        recommendations.append(
+            f"【标杆拟合优异】三章节奏推进与【{bm_name}】高度契合（拟合度 {alignment_score}%），情绪蓄势、矛盾递进与高潮释放层次分明。"
+        )
+
+    return {
+        "benchmark": bm_key,
+        "benchmark_name": bm_name,
+        "points_per_chapter": pts,
+        "total_chapters": total_chapters,
+        "total_chars": sum(cm["char_count"] for cm in chapters_metrics),
+        "chapters_metrics": chapters_metrics,
+        "handoffs": handoffs,
+        "combined_curve": combined_curve,
+        "combined_benchmark_curve": combined_benchmark,
+        "combined_alignment_score": alignment_score,
+        "global_climax": {
+            "chapter_index": global_climax_chapter,
+            "segment_index": global_climax_segment,
+            "max_tension": global_max_tension,
+        },
+        "verdict": overall_verdict,
+        "verdict_title": verdict_title,
+        "cliffhanger_rating": cliffhanger_rating,
+        "recommendations": recommendations,
     }
 
 
