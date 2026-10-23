@@ -87,3 +87,6 @@ uv.lock
 # 本地下载与安装包制品
 dist-installer/
 *.exe
+
+# 一次性本地工作脚本（codemod 等，不入库）
+scratch/

@@ -1276,6 +1276,50 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '跨章过渡动量诊断',
     'en-US': 'Chapter Handoff Momentum',
   },
+  extras_retention_btn: {
+    'zh-CN': '读者留存预测',
+    'en-US': 'Reader Retention Predictor',
+  },
+  extras_retention_dialog_title: {
+    'zh-CN': '商业网文读者留存流失预测模型',
+    'en-US': 'Commercial Reader Churn & Retention Estimator',
+  },
+  extras_retention_dialog_desc: {
+    'zh-CN': '基于前三章细粒度情绪张力、首章入局刺激、平淡注水期漏斗、跨章过渡断崖与末尾留钩，量化推导各章节读者留存衰减曲线并精准定位跳出高危点。',
+    'en-US': 'Simulate chapter-by-chapter reader retention decay curves based on tension, opening stimulation, pacing funnels, handoff cliff drops, and cliffhangers.',
+  },
+  extras_retention_sample_high: {
+    'zh-CN': '载入示范高留存三章 (S/A级)',
+    'en-US': 'Load Sample High Retention (S/A)',
+  },
+  extras_retention_sample_drop: {
+    'zh-CN': '载入示范断崖失速三章 (高危跳出)',
+    'en-US': 'Load Sample Cliff Drop (High Risk)',
+  },
+  extras_retention_start_btn: {
+    'zh-CN': '开始读者留存测算',
+    'en-US': 'Estimate Reader Retention',
+  },
+  extras_retention_result_title: {
+    'zh-CN': '商业成色与读者留存全景',
+    'en-US': 'Reader Retention & Commercial Grade',
+  },
+  extras_retention_final_rate: {
+    'zh-CN': '终局预计留存率',
+    'en-US': 'Projected Final Retention',
+  },
+  extras_retention_total_churn: {
+    'zh-CN': '累计流失漏斗',
+    'en-US': 'Total Churn Funnel',
+  },
+  extras_retention_hotspots_title: {
+    'zh-CN': '弃读跳出高危风险点与挽留改法',
+    'en-US': 'Drop-off Hotspots & Retention Fixes',
+  },
+  extras_retention_advice_title: {
+    'zh-CN': '战略防跳出与留存优化建议',
+    'en-US': 'Strategic Retention Recommendations',
+  },
   extras_export_success: {
     'zh-CN': '成功导出 {chapters} 章、约 {words} 字：{filename}',
     'en-US': 'Successfully exported {chapters} chapters, ~{words} words: {filename}',
@@ -4804,6 +4848,22 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   chart_rate_aria: {
     'zh-CN': '创作速率与字数统计折线图',
     'en-US': 'Creation Rate & Word Count Line Chart',
+  },
+  chart_retention_aria: {
+    'zh-CN': '商业网文读者留存流失预测图',
+    'en-US': 'Commercial Reader Retention & Churn Chart',
+  },
+  chart_retention_rate: {
+    'zh-CN': '读者留存率',
+    'en-US': 'Reader Retention Rate',
+  },
+  chart_retention_start: {
+    'zh-CN': '开局',
+    'en-US': 'Opening',
+  },
+  chart_retention_point: {
+    'zh-CN': '切片',
+    'en-US': 'Segment',
   },
   chart_aria_bar: {
     'zh-CN': '柱状图',

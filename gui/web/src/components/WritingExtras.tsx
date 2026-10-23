@@ -34,13 +34,14 @@ import MenuBookIcon from '@mui/icons-material/MenuBook'
 import AssignmentIcon from '@mui/icons-material/Assignment'
 import { writingApi, toolsApi, friendlyError } from '../api/client'
 import type { WritingProject } from '../types'
-import type { OutlineItem, CharacterCard, NoteItem, WritingStats, HookItem, TensionAnalysisResult, GoldenThreeTensionResult } from '../api/client'
+import type { OutlineItem, CharacterCard, NoteItem, WritingStats, HookItem, TensionAnalysisResult, GoldenThreeTensionResult, ReaderRetentionResult } from '../api/client'
 import { useThemeMode } from '../state/ThemeModeContext'
 import { useI18n } from '../state/I18nContext'
 import { ink, glassCard } from '../ink'
 import CreationRateChart from './charts/CreationRateChart'
 import EmotionWaveChart from './charts/EmotionWaveChart'
 import RhythmRadarChart from './charts/RhythmRadarChart'
+import ReaderRetentionChart from './charts/ReaderRetentionChart'
 
 const OUTLINE_STATUS_COLOR: Record<string, 'default' | 'primary' | 'success'> = {
   planned: 'default',
@@ -937,6 +938,12 @@ function DashboardPanel({ project }: { project: string }) {
   const [ch2Input, setCh2Input] = useState('')
   const [ch3Input, setCh3Input] = useState('')
 
+  // 商业网文读者留存流失预测（与黄金三章共用三章草稿输入）
+  const [retentionBm, setRetentionBm] = useState<'classic' | 'upgrade_shuangwen' | 'fast_hook' | 'suspense_mystery'>('classic')
+  const [retentionResult, setRetentionResult] = useState<ReaderRetentionResult | null>(null)
+  const [retentionLoading, setRetentionLoading] = useState(false)
+  const [showRetentionDialog, setShowRetentionDialog] = useState(false)
+
   const load = useCallback(() => {
     writingApi
       .stats(project, days)
@@ -986,6 +993,30 @@ function DashboardPanel({ project }: { project: string }) {
       setError(`黄金三章比对失败: ${friendlyError(e)}`)
     } finally {
       setGoldenThreeLoading(false)
+    }
+  }
+
+  const runReaderRetention = async (
+    ch1 = ch1Input,
+    ch2 = ch2Input,
+    ch3 = ch3Input,
+    bm = retentionBm,
+  ) => {
+    const chapters = [ch1, ch2, ch3].filter((c) => c.trim().length > 0)
+    if (chapters.length === 0) return
+    setRetentionLoading(true)
+    try {
+      const res = await writingApi.estimateReaderRetention({
+        chapters,
+        benchmark: bm,
+        points_per_chapter: 10,
+      })
+      setRetentionResult(res)
+      setShowRetentionDialog(false)
+    } catch (e) {
+      setError(`读者留存测算失败: ${friendlyError(e)}`)
+    } finally {
+      setRetentionLoading(false)
     }
   }
 
@@ -1114,6 +1145,13 @@ function DashboardPanel({ project }: { project: string }) {
                     >
                       {t('extras_golden_three_btn', '黄金三章连环比对')}
                     </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => setShowRetentionDialog(true)}
+                    >
+                      {t('extras_retention_btn', '读者留存预测')}
+                    </Button>
                   </Box>
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
@@ -1240,6 +1278,69 @@ function DashboardPanel({ project }: { project: string }) {
                 <RhythmRadarChart height={240} />
               </Paper>
             </Grid>
+
+            {/* 商业成色与读者留存全景（读者留存预测结果） */}
+            {retentionResult && (
+              <Grid item xs={12}>
+                <Paper elevation={0} sx={{ p: 2.5, ...glassCard(isDark) }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                    <Typography variant="subtitle1" fontWeight={700}>
+                      {t('extras_retention_result_title', '商业成色与读者留存全景')}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                      <Chip
+                        size="small"
+                        color={retentionResult.overallGrade === 'S' ? 'success' : retentionResult.overallGrade === 'A' ? 'primary' : retentionResult.overallGrade === 'B' ? 'warning' : 'error'}
+                        label={`综合评级 ${retentionResult.overallGrade} · ${retentionResult.gradeDescription}`}
+                        sx={{ fontWeight: 600 }}
+                      />
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label={`${t('extras_retention_final_rate', '终局预计留存率')}: ${retentionResult.finalRetentionRate}%`}
+                      />
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label={`${t('extras_retention_total_churn', '累计流失漏斗')}: ${retentionResult.totalDropPct}%`}
+                      />
+                      <Button size="small" onClick={() => setRetentionResult(null)}>
+                        {t('action_close', '关闭')}
+                      </Button>
+                    </Box>
+                  </Box>
+                  <ReaderRetentionChart
+                    retentionCurve={retentionResult.retentionCurve}
+                    hotspots={retentionResult.dropoffHotspots}
+                    height={280}
+                  />
+                  {retentionResult.dropoffHotspots.length > 0 && (
+                    <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(225, 29, 72, 0.06)' : 'rgba(225, 29, 72, 0.03)' }}>
+                      <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.5, color: '#E11D48' }}>
+                        {t('extras_retention_hotspots_title', '弃读跳出高危风险点与挽留改法')}：
+                      </Typography>
+                      {retentionResult.dropoffHotspots.map((h, i) => (
+                        <Typography key={i} variant="caption" sx={{ display: 'block', color: 'text.secondary', mb: 0.5 }}>
+                          [{h.riskLevel}] {h.segmentLabel}（预估跳出 {h.estimatedDropPct}%）：{h.reason} → {h.fixSuggestion}
+                        </Typography>
+                      ))}
+                    </Box>
+                  )}
+                  {retentionResult.retentionAdvice.length > 0 && (
+                    <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
+                      <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.5 }}>
+                        {t('extras_retention_advice_title', '战略防跳出与留存优化建议')}：
+                      </Typography>
+                      {retentionResult.retentionAdvice.map((a, i) => (
+                        <Typography key={i} variant="caption" sx={{ display: 'block', color: 'text.secondary', mb: 0.5 }}>
+                          {a}
+                        </Typography>
+                      ))}
+                    </Box>
+                  )}
+                </Paper>
+              </Grid>
+            )}
           </Grid>
         </>
       )}
@@ -1317,6 +1418,96 @@ function DashboardPanel({ project }: { project: string }) {
             onClick={() => runGoldenThreeAnalysis()}
           >
             {goldenThreeLoading ? t('extras_tension_analyzing', '分析中…') : t('extras_golden_three_start_btn', '开始三章联合比对')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 读者留存流失预测弹窗（与黄金三章共用三章草稿） */}
+      <Dialog open={showRetentionDialog} onClose={() => setShowRetentionDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>{t('extras_retention_dialog_title', '商业网文读者留存流失预测模型')}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            {t('extras_retention_dialog_desc', '基于前三章细粒度情绪张力、首章入局刺激、平淡注水期漏斗、跨章过渡断崖与末尾留钩，量化推导各章节读者留存衰减曲线并精准定位跳出高危点。')}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <TextField
+              select
+              size="small"
+              value={retentionBm}
+              onChange={(e) => setRetentionBm(e.target.value as any)}
+              sx={{ minWidth: 220 }}
+              label="商业神作标杆类型"
+            >
+              <MenuItem value="classic">经典商业递进三章标杆</MenuItem>
+              <MenuItem value="upgrade_shuangwen">升级爽文逆袭打脸标杆</MenuItem>
+              <MenuItem value="fast_hook">快穿生死时速高压标杆</MenuItem>
+              <MenuItem value="suspense_mystery">悬疑无限流惊悚标杆</MenuItem>
+            </TextField>
+          </Box>
+          <TextField
+            label={t('extras_golden_three_ch1', '第一章：开篇危机与入局')}
+            multiline
+            rows={4}
+            value={ch1Input}
+            onChange={(e) => setCh1Input(e.target.value)}
+            placeholder="粘贴第 1 章正文草稿（前 30% 快速入局，章末留下微悬念钩子）……"
+            fullWidth
+          />
+          <TextField
+            label={t('extras_golden_three_ch2', '第二章：承接升级防失速')}
+            multiline
+            rows={4}
+            value={ch2Input}
+            onChange={(e) => setCh2Input(e.target.value)}
+            placeholder="粘贴第 2 章正文草稿（防中段失速塌陷，金手指与核心危机介入展开）……"
+            fullWidth
+          />
+          <TextField
+            label={t('extras_golden_three_ch3', '第三章：首轮高潮与断章')}
+            multiline
+            rows={4}
+            value={ch3Input}
+            onChange={(e) => setCh3Input(e.target.value)}
+            placeholder="粘贴第 3 章正文草稿（首卷爆发高潮与爽点释放，末尾强断章钩子）……"
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            size="small"
+            onClick={() => {
+              const sampleCh1 = '寒冬深夜，刺骨杀机骤起！\n黑衣刺客长刀撕裂长空，狠厉劈向少年头颅！“受死吧！”\n狂暴刀芒带着刺耳呼啸，鲜血瞬间染红青石砖。少年目眦欲裂，咬牙翻滚！\n身后的巨石崩裂成无数碎块，剧毒烟雾弥漫四周！生死一线，少年怀中神秘断玉突然迸发耀眼红芒！'
+              const sampleCh2 = '断玉散发灼热高温，一股狂暴暖流瞬间涌入少年四肢百骸！\n刺客惊疑不定：“上古至宝？交出来饶你不死！”\n少年咬紧牙关，趁势翻身跃起，借着狂暴灵力一掌拍向刺客胸膛！\n轰！刺客被震退三步，嘴角溢血，眼中贪婪更盛：“好小子，今日你插翅难飞！”'
+              const sampleCh3 = '“狂妄之徒，给我纳命来！”刺客怒吼，拔出背后淬毒短匕全力扑杀！\n生死刹那，少年眼神骤冷，断玉中猛然觉醒上古无上剑意！\n嗤啦！剑气如惊雷破空，瞬间贯穿刺客咽喉！反派轰然倒地，全场震撼死寂！\n少年拔出长剑，正欲喘息，长街尽头却突现数道更加可怖的黑袍身影，杀气封锁全城！'
+              setCh1Input(sampleCh1)
+              setCh2Input(sampleCh2)
+              setCh3Input(sampleCh3)
+              runReaderRetention(sampleCh1, sampleCh2, sampleCh3)
+            }}
+          >
+            {t('extras_retention_sample_high', '载入示范高留存三章 (S/A级)')}
+          </Button>
+          <Button
+            size="small"
+            onClick={() => {
+              const sampleCh1 = '清晨的阳光洒进教室，同学们安静地早读。他翻开课本，按照顺序温习了昨天的知识点，整理了课堂笔记。课间休息时，他去走廊接了一杯温水，看了一会儿窗外的梧桐树，然后回到座位继续预习。'
+              const sampleCh2 = '午饭过后，大家依次回到教室午休。他先整理好桌面，把文具摆放整齐，随后趴在桌上休息了半小时。下午的课程按时开始，老师讲述新的内容，他认真听讲并做了记录，没有遇到什么困难。'
+              const sampleCh3 = '放学后，他步行回家，路上买了一些文具，顺便在小区门口看了看公告栏。晚饭后，他复习了两个小时，把当天的作业按时完成，然后收拾好书桌，洗漱之后就按时休息了。'
+              setCh1Input(sampleCh1)
+              setCh2Input(sampleCh2)
+              setCh3Input(sampleCh3)
+              runReaderRetention(sampleCh1, sampleCh2, sampleCh3)
+            }}
+          >
+            {t('extras_retention_sample_drop', '载入示范断崖失速三章 (高危跳出)')}
+          </Button>
+          <Button onClick={() => setShowRetentionDialog(false)}>{t('action_cancel')}</Button>
+          <Button
+            variant="contained"
+            disabled={(!ch1Input.trim() && !ch2Input.trim() && !ch3Input.trim()) || retentionLoading}
+            onClick={() => runReaderRetention()}
+          >
+            {retentionLoading ? t('extras_tension_analyzing', '分析中…') : t('extras_retention_start_btn', '开始读者留存测算')}
           </Button>
         </DialogActions>
       </Dialog>
