@@ -535,6 +535,26 @@ def _h_writing_tension_analysis(_params: dict[str, Any], body: dict[str, Any]) -
     return ok(writing_extra.analyze_tension_curve(text, benchmark=benchmark, segments_count=segments_count))
 
 
+def _h_writing_golden_three_tension(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from gui import writing_extra
+    b = body or {}
+    chapters = b.get("chapters")
+    if not isinstance(chapters, (list, tuple)) or len(chapters) == 0:
+        raise ServiceError("chapters 必须为非空列表", 400)
+    for idx, ch in enumerate(chapters):
+        if not isinstance(ch, str):
+            raise ServiceError(f"第 {idx + 1} 章必须为字符串", 400)
+    benchmark = b.get("benchmark", "classic")
+    if not isinstance(benchmark, str):
+        raise ServiceError("benchmark 必须为字符串", 400)
+    points_per_chapter = b.get("points_per_chapter", 10)
+    if not isinstance(points_per_chapter, int) or isinstance(points_per_chapter, bool):
+        raise ServiceError("points_per_chapter 必须为整数", 400)
+    return ok(writing_extra.analyze_golden_three_tension(
+        chapters, benchmark=benchmark, points_per_chapter=points_per_chapter,
+    ))
+
+
 def _h_quality_check(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import quality_service
     b = body or {}
@@ -1223,6 +1243,7 @@ ROUTES: list[tuple[str, re.Pattern, Callable[[dict, dict], dict]]] = [
     ("POST", re.compile(r"^/api/writing/deslop$"), _h_writing_deslop),
     ("POST", re.compile(r"^/api/writing/count-words$"), _h_writing_count_words),
     ("POST", re.compile(r"^/api/writing/tension-analysis$"), _h_writing_tension_analysis),
+    ("POST", re.compile(r"^/api/writing/golden-three-tension$"), _h_writing_golden_three_tension),
     # W15 阶段二：质检（M3）
     ("POST", re.compile(r"^/api/quality/check$"), _h_quality_check),
     ("POST", re.compile(r"^/api/quality/book$"), _h_quality_book),
