@@ -492,6 +492,11 @@ export const writingApi = {
     benchmark?: 'classic' | 'fast_hook' | 'steady' | 'face_slap'
     segments_count?: number
   }) => post<TensionAnalysisResult>('/writing/tension-analysis', body),
+  analyzeGoldenThreeTension: (body: {
+    chapters: string[]
+    benchmark?: 'classic' | 'upgrade_shuangwen' | 'fast_hook' | 'suspense_mystery'
+    points_per_chapter?: number
+  }) => post<GoldenThreeTensionResult>('/writing/golden-three-tension', body),
   getProjectMeta: (project: string) =>
     get<ProjectMeta>(`/writing/projects/${encodeURIComponent(project)}/meta`),
   updateProjectMeta: (
@@ -523,6 +528,59 @@ export interface TensionAnalysisResult {
     tension: number
   }>
   pacingFeedback: string[]
+}
+
+export interface ChapterMetric {
+  chapterIndex: number
+  charCount: number
+  segments: string[]
+  tensionCurve: number[]
+  benchmarkCurve: number[]
+  maxTension: number
+  avgTension: number
+  tensionVariance: number
+  climaxIndex: number
+  climaxSegment: string
+  openingScore: number
+  hookScore: number
+  flatZones: Array<{
+    segmentIndex: number
+    label: string
+    tension: number
+  }>
+  chapterVerdict: string
+}
+
+export interface ChapterHandoff {
+  fromChapter: number
+  toChapter: number
+  endTension: number
+  startTension: number
+  drop: number
+  status: 'SMOOTH' | 'CLIFF_DROP' | 'SUDDEN_JUMP' | 'WEAK_HOOK'
+  comment: string
+}
+
+export interface GoldenThreeTensionResult {
+  benchmark: string
+  benchmarkName: string
+  pointsPerChapter: number
+  totalChapters: number
+  totalChars: number
+  chaptersMetrics: ChapterMetric[]
+  handoffs: ChapterHandoff[]
+  combinedCurve: number[]
+  combinedBenchmarkCurve: number[]
+  combinedAlignmentScore: number
+  globalClimax: {
+    chapterIndex: number
+    segmentIndex: number
+    maxTension: number
+  }
+  verdict: 'EXCELLENT' | 'GOOD' | 'WARNING_DROP' | 'WARNING_FLAT' | 'FAIR'
+  verdictTitle: string
+  cliffhangerRating: 'STRONG' | 'MODERATE' | 'WEAK'
+  recommendations: string[]
 }
 
 export interface ProjectMeta {

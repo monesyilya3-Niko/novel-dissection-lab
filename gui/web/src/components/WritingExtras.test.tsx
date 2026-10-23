@@ -21,6 +21,64 @@ vi.mock('../api/client', () => ({
     notes: (proj: string) => mockNotes(proj),
     stats: (proj: string) => mockStats(proj),
     export: (proj: string, fmt: string) => mockExport(proj, fmt),
+    analyzeTension: vi.fn().mockResolvedValue({
+      segments: ['第1段'],
+      tensionCurve: [50],
+      benchmarkCurve: [50],
+      benchmarkName: '经典标杆',
+      climaxIndex: 0,
+      climaxSegment: '第1段',
+      maxTension: 50,
+      avgTension: 50,
+      tensionVariance: 0,
+      benchmarkAlignmentScore: 85,
+      flatZones: [],
+      pacingFeedback: ['节奏良好'],
+    }),
+    analyzeGoldenThreeTension: vi.fn().mockResolvedValue({
+      benchmark: 'classic',
+      benchmarkName: '经典商业递进三章标杆',
+      pointsPerChapter: 10,
+      totalChapters: 3,
+      totalChars: 3000,
+      chaptersMetrics: [
+        {
+          chapterIndex: 1,
+          charCount: 1000,
+          segments: ['第1章第1段'],
+          tensionCurve: [60],
+          benchmarkCurve: [60],
+          maxTension: 60,
+          avgTension: 60,
+          tensionVariance: 0,
+          climaxIndex: 0,
+          climaxSegment: '第1章第1段',
+          openingScore: 60,
+          hookScore: 65,
+          flatZones: [],
+          chapterVerdict: '黄金开局',
+        },
+      ],
+      handoffs: [
+        {
+          fromChapter: 1,
+          toChapter: 2,
+          endTension: 65,
+          startTension: 60,
+          drop: 5,
+          status: 'SMOOTH',
+          comment: '承接平滑',
+        },
+      ],
+      combinedCurve: [60],
+      combinedBenchmarkCurve: [60],
+      combinedAlignmentScore: 88,
+      globalClimax: { chapterIndex: 1, segmentIndex: 1, maxTension: 60 },
+      verdict: 'EXCELLENT',
+      verdictTitle: '黄金三章成色：极佳',
+      cliffhangerRating: 'STRONG',
+      recommendations: ['节奏推进优异'],
+    }),
   },
   toolsApi: {
     getHooks: vi.fn().mockResolvedValue({
@@ -249,6 +307,35 @@ describe('WritingExtras 创作扩展工作台', () => {
     } finally {
       removeStorage('novellab.locale')
     }
+  })
+
+  it('黄金三章连环比对弹窗正常交互与示范数据载入', async () => {
+    render(<WritingExtras />)
+    await waitFor(() => {
+      expect(screen.getByText('创作者仪表盘')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByText('创作者仪表盘'))
+
+    await waitFor(() => {
+      expect(screen.getByText('黄金三章连环比对')).toBeInTheDocument()
+    })
+
+    // 点击打开黄金三章比对弹窗
+    fireEvent.click(screen.getByText('黄金三章连环比对'))
+
+    await waitFor(() => {
+      expect(screen.getByText('黄金三章张力曲线重叠比对')).toBeInTheDocument()
+      expect(screen.getByText('载入示范三章范例')).toBeInTheDocument()
+    })
+
+    // 点击载入示范数据
+    fireEvent.click(screen.getByText('载入示范三章范例'))
+
+    await waitFor(() => {
+      expect(screen.getByText('黄金三章成色：极佳')).toBeInTheDocument()
+      expect(screen.getByText('黄金三章专家修改建议：')).toBeInTheDocument()
+      expect(screen.getByText('节奏推进优异')).toBeInTheDocument()
+    })
   })
 })
 

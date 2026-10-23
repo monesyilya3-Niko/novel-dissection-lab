@@ -34,7 +34,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook'
 import AssignmentIcon from '@mui/icons-material/Assignment'
 import { writingApi, toolsApi, friendlyError } from '../api/client'
 import type { WritingProject } from '../types'
-import type { OutlineItem, CharacterCard, NoteItem, WritingStats, HookItem, TensionAnalysisResult } from '../api/client'
+import type { OutlineItem, CharacterCard, NoteItem, WritingStats, HookItem, TensionAnalysisResult, GoldenThreeTensionResult } from '../api/client'
 import { useThemeMode } from '../state/ThemeModeContext'
 import { useI18n } from '../state/I18nContext'
 import { ink, glassCard } from '../ink'
@@ -928,6 +928,15 @@ function DashboardPanel({ project }: { project: string }) {
   const [showTensionDialog, setShowTensionDialog] = useState(false)
   const [draftInput, setDraftInput] = useState('')
 
+  // 黄金三章连环多章比对
+  const [goldenThreeBm, setGoldenThreeBm] = useState<'classic' | 'upgrade_shuangwen' | 'fast_hook' | 'suspense_mystery'>('classic')
+  const [goldenThreeResult, setGoldenThreeResult] = useState<GoldenThreeTensionResult | null>(null)
+  const [goldenThreeLoading, setGoldenThreeLoading] = useState(false)
+  const [showGoldenThreeDialog, setShowGoldenThreeDialog] = useState(false)
+  const [ch1Input, setCh1Input] = useState('')
+  const [ch2Input, setCh2Input] = useState('')
+  const [ch3Input, setCh3Input] = useState('')
+
   const load = useCallback(() => {
     writingApi
       .stats(project, days)
@@ -953,6 +962,30 @@ function DashboardPanel({ project }: { project: string }) {
       setError(`张力分析失败: ${friendlyError(e)}`)
     } finally {
       setTensionLoading(false)
+    }
+  }
+
+  const runGoldenThreeAnalysis = async (
+    ch1 = ch1Input,
+    ch2 = ch2Input,
+    ch3 = ch3Input,
+    bm = goldenThreeBm,
+  ) => {
+    const chapters = [ch1, ch2, ch3].filter((c) => c.trim().length > 0)
+    if (chapters.length === 0) return
+    setGoldenThreeLoading(true)
+    try {
+      const res = await writingApi.analyzeGoldenThreeTension({
+        chapters,
+        benchmark: bm,
+        points_per_chapter: 10,
+      })
+      setGoldenThreeResult(res)
+      setShowGoldenThreeDialog(false)
+    } catch (e) {
+      setError(`黄金三章比对失败: ${friendlyError(e)}`)
+    } finally {
+      setGoldenThreeLoading(false)
     }
   }
 
@@ -1073,12 +1106,60 @@ function DashboardPanel({ project }: { project: string }) {
                     >
                       {t('extras_dash_btn_analyze')}
                     </Button>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      size="small"
+                      onClick={() => setShowGoldenThreeDialog(true)}
+                    >
+                      {t('extras_golden_three_btn', '黄金三章连环比对')}
+                    </Button>
                   </Box>
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                   监测剧情平淡期与高潮爆发期，红线为章节实测，虚线为神作对标基准
                 </Typography>
-                {tensionResult && (
+                {goldenThreeResult && (
+                  <Box sx={{ mb: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(225, 29, 72, 0.08)' : 'rgba(225, 29, 72, 0.04)', border: '1px solid rgba(225, 29, 72, 0.2)' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Chip
+                          size="small"
+                          label={goldenThreeResult.verdictTitle}
+                          color={goldenThreeResult.verdict === 'EXCELLENT' ? 'success' : goldenThreeResult.verdict === 'WARNING_DROP' ? 'error' : 'warning'}
+                          sx={{ fontWeight: 600 }}
+                        />
+                        <Chip
+                          size="small"
+                          label={`综合拟合度: ${goldenThreeResult.combinedAlignmentScore}%`}
+                          variant="outlined"
+                        />
+                        <Chip
+                          size="small"
+                          label={`断章评级: ${goldenThreeResult.cliffhangerRating}`}
+                          variant="outlined"
+                        />
+                      </Box>
+                      <Button size="small" onClick={() => setGoldenThreeResult(null)}>
+                        返回单章
+                      </Button>
+                    </Box>
+                    {goldenThreeResult.handoffs.length > 0 && (
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {goldenThreeResult.handoffs.map((h, i) => (
+                          <Chip
+                            key={i}
+                            size="small"
+                            label={`第${h.fromChapter}章→第${h.toChapter}章: ${h.status === 'CLIFF_DROP' ? '⚠️断崖失速' : h.status === 'SMOOTH' ? '✅平滑承接' : h.status} (落差${h.drop}分)`}
+                            color={h.status === 'CLIFF_DROP' ? 'error' : h.status === 'SMOOTH' ? 'success' : 'default'}
+                            variant="outlined"
+                          />
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+                )}
+                {!goldenThreeResult && tensionResult && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                     <Chip
                       size="small"
@@ -1100,12 +1181,44 @@ function DashboardPanel({ project }: { project: string }) {
                 )}
                 <EmotionWaveChart
                   height={240}
-                  tensionPoints={tensionResult ? tensionResult.tensionCurve : undefined}
-                  benchmarkPoints={tensionResult ? tensionResult.benchmarkCurve : undefined}
-                  benchmarkName={tensionResult?.benchmarkName}
-                  labels={tensionResult?.segments}
+                  tensionPoints={
+                    goldenThreeResult
+                      ? goldenThreeResult.combinedCurve
+                      : tensionResult
+                        ? tensionResult.tensionCurve
+                        : undefined
+                  }
+                  benchmarkPoints={
+                    goldenThreeResult
+                      ? goldenThreeResult.combinedBenchmarkCurve
+                      : tensionResult
+                        ? tensionResult.benchmarkCurve
+                        : undefined
+                  }
+                  benchmarkName={
+                    goldenThreeResult
+                      ? goldenThreeResult.benchmarkName
+                      : tensionResult?.benchmarkName
+                  }
+                  labels={
+                    goldenThreeResult
+                      ? goldenThreeResult.chaptersMetrics.flatMap((m) => m.segments)
+                      : tensionResult?.segments
+                  }
                 />
-                {tensionResult?.pacingFeedback && tensionResult.pacingFeedback.length > 0 && (
+                {goldenThreeResult && goldenThreeResult.recommendations.length > 0 && (
+                  <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
+                    <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.5, color: '#E11D48' }}>
+                      黄金三章专家修改建议：
+                    </Typography>
+                    {goldenThreeResult.recommendations.map((rec, i) => (
+                      <Typography key={i} variant="caption" sx={{ display: 'block', color: 'text.secondary', mb: 0.5 }}>
+                        {rec}
+                      </Typography>
+                    ))}
+                  </Box>
+                )}
+                {!goldenThreeResult && tensionResult?.pacingFeedback && tensionResult.pacingFeedback.length > 0 && (
                   <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
                     {tensionResult.pacingFeedback.map((f, i) => (
                       <Typography key={i} variant="caption" sx={{ display: 'block', color: 'text.secondary', mb: 0.5 }}>
@@ -1130,6 +1243,83 @@ function DashboardPanel({ project }: { project: string }) {
           </Grid>
         </>
       )}
+
+      {/* 黄金三章连环多章比对弹窗 */}
+      <Dialog open={showGoldenThreeDialog} onClose={() => setShowGoldenThreeDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>{t('extras_golden_three_dialog_title', '黄金三章张力曲线重叠比对')}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            {t('extras_golden_three_dialog_desc', '连环测算网络小说前三章张力波形，与商业神作标杆对齐，精准检测中段失速、首章吸睛度与章末断章悬念。')}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <TextField
+              select
+              size="small"
+              value={goldenThreeBm}
+              onChange={(e) => setGoldenThreeBm(e.target.value as any)}
+              sx={{ minWidth: 220 }}
+              label="商业神作标杆类型"
+            >
+              <MenuItem value="classic">经典商业递进三章标杆</MenuItem>
+              <MenuItem value="upgrade_shuangwen">升级爽文逆袭打脸标杆</MenuItem>
+              <MenuItem value="fast_hook">快穿生死时速高压标杆</MenuItem>
+              <MenuItem value="suspense_mystery">悬疑无限流惊悚标杆</MenuItem>
+            </TextField>
+          </Box>
+          <TextField
+            label={t('extras_golden_three_ch1', '第一章：开篇危机与入局')}
+            multiline
+            rows={4}
+            value={ch1Input}
+            onChange={(e) => setCh1Input(e.target.value)}
+            placeholder="粘贴第 1 章正文草稿（前 30% 快速入局，章末留下微悬念钩子）……"
+            fullWidth
+          />
+          <TextField
+            label={t('extras_golden_three_ch2', '第二章：承接升级防失速')}
+            multiline
+            rows={4}
+            value={ch2Input}
+            onChange={(e) => setCh2Input(e.target.value)}
+            placeholder="粘贴第 2 章正文草稿（防中段失速塌陷，金手指与核心危机介入展开）……"
+            fullWidth
+          />
+          <TextField
+            label={t('extras_golden_three_ch3', '第三章：首轮高潮与断章')}
+            multiline
+            rows={4}
+            value={ch3Input}
+            onChange={(e) => setCh3Input(e.target.value)}
+            placeholder="粘贴第 3 章正文草稿（首卷爆发高潮与爽点释放，末尾强断章钩子）……"
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            size="small"
+            onClick={() => {
+              const sampleCh1 = '寒冬深夜，刺骨杀机骤起！\n黑衣刺客长刀撕裂长空，狠厉劈向少年头颅！“受死吧！”\n狂暴刀芒带着刺耳呼啸，鲜血瞬间染红青石砖。少年目眦欲裂，咬牙翻滚！\n身后的巨石崩裂成无数碎块，剧毒烟雾弥漫四周！生死一线，少年怀中神秘断玉突然迸发耀眼红芒！'
+              const sampleCh2 = '断玉散发灼热高温，一股狂暴暖流瞬间涌入少年四肢百骸！\n刺客惊疑不定：“上古至宝？交出来饶你不死！”\n少年咬紧牙关，趁势翻身跃起，借着狂暴灵力一掌拍向刺客胸膛！\n轰！刺客被震退三步，嘴角溢血，眼中贪婪更盛：“好小子，今日你插翅难飞！”'
+              const sampleCh3 = '“狂妄之徒，给我纳命来！”刺客怒吼，拔出背后淬毒短匕全力扑杀！\n生死刹那，少年眼神骤冷，断玉中猛然觉醒上古无上剑意！\n嗤啦！剑气如惊雷破空，瞬间贯穿刺客咽喉！反派轰然倒地，全场震撼死寂！\n少年拔出长剑，正欲喘息，长街尽头却突现数道更加可怖的黑袍身影，杀气封锁全城！'
+              setCh1Input(sampleCh1)
+              setCh2Input(sampleCh2)
+              setCh3Input(sampleCh3)
+              runGoldenThreeAnalysis(sampleCh1, sampleCh2, sampleCh3)
+            }}
+          >
+            {t('extras_golden_three_sample_btn', '载入示范三章范例')}
+          </Button>
+          <Button onClick={() => setShowGoldenThreeDialog(false)}>{t('action_cancel')}</Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            disabled={(!ch1Input.trim() && !ch2Input.trim() && !ch3Input.trim()) || goldenThreeLoading}
+            onClick={() => runGoldenThreeAnalysis()}
+          >
+            {goldenThreeLoading ? t('extras_tension_analyzing', '分析中…') : t('extras_golden_three_start_btn', '开始三章联合比对')}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* 章节草稿张力测算弹窗 */}
       <Dialog open={showTensionDialog} onClose={() => setShowTensionDialog(false)} maxWidth="sm" fullWidth>

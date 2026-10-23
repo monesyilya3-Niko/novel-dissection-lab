@@ -1240,6 +1240,42 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '开始比对',
     'en-US': 'Start Comparison',
   },
+  extras_golden_three_btn: {
+    'zh-CN': '黄金三章连环比对',
+    'en-US': 'Golden 3 Chapters Comparison',
+  },
+  extras_golden_three_dialog_title: {
+    'zh-CN': '黄金三章张力曲线重叠比对',
+    'en-US': 'Golden Three Chapters Tension Comparator',
+  },
+  extras_golden_three_dialog_desc: {
+    'zh-CN': '连环测算网络小说前三章张力波形，与商业神作标杆对齐，精准检测中段失速、首章吸睛度与章末断章悬念。',
+    'en-US': 'Analyze the first three chapters tension waveforms against commercial masterpiece benchmarks, detecting middle stalling, opening hooks, and cliffhangers.',
+  },
+  extras_golden_three_ch1: {
+    'zh-CN': '第一章：开篇危机与入局',
+    'en-US': 'Chapter 1: Opening Crisis & Hook',
+  },
+  extras_golden_three_ch2: {
+    'zh-CN': '第二章：承接升级防失速',
+    'en-US': 'Chapter 2: Escalation & Retention',
+  },
+  extras_golden_three_ch3: {
+    'zh-CN': '第三章：首轮高潮与断章',
+    'en-US': 'Chapter 3: First Climax & Cliffhanger',
+  },
+  extras_golden_three_sample_btn: {
+    'zh-CN': '载入示范三章范例',
+    'en-US': 'Load Sample 3 Chapters',
+  },
+  extras_golden_three_start_btn: {
+    'zh-CN': '开始三章联合比对',
+    'en-US': 'Start 3-Chapter Comparison',
+  },
+  extras_golden_three_handoff_title: {
+    'zh-CN': '跨章过渡动量诊断',
+    'en-US': 'Chapter Handoff Momentum',
+  },
   extras_export_success: {
     'zh-CN': '成功导出 {chapters} 章、约 {words} 字：{filename}',
     'en-US': 'Successfully exported {chapters} chapters, ~{words} words: {filename}',
