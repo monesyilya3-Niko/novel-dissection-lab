@@ -19,7 +19,7 @@
   "dependencies": {
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
-    "@mui/icons-material": "^5.16.7",
+    "@mui/icons-material": "^9.5.0",
     "@mui/material": "^5.16.7",
     "@tanstack/react-virtual": "^3.14.21",
     "@tiptap/extension-character-count": "^3.32.0",
