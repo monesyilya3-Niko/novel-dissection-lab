@@ -7,7 +7,7 @@
 > - **Monorepo / Engineering Codename**: `novel-lab`
 >
 > **Effective Date**: 2026-10-15  
-> **Version**: v2.2.0  
+> **Version**: v2.3.0  
 > **Target Audience**: All Autonomous Agents and Developers maintaining or extending novel-lab (暮冬念春 / Exoscribe)  
 > **Authority Level**: **Supreme Hard Constraint (Project Constitution)**. Any code modification, feature addition, or corpus onboarding that violates this charter is deemed a **P0 Critical Bug** requiring immediate remediation or rollback.  
 > 

@@ -26,7 +26,7 @@ describe('WorkbenchNav 左侧导航栏组件', () => {
     expect(screen.getByText('帮助中心')).toBeInTheDocument()
 
     // 版本号展示
-    expect(screen.getByText('v2.2.0')).toBeInTheDocument()
+    expect(screen.getByText('v2.3.0')).toBeInTheDocument()
   })
 
   it('高亮当前选中的工作台项目，点击切换触发 onChange 回调', () => {

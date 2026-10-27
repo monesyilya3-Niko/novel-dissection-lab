@@ -7,7 +7,7 @@
 > - **工程代号 / Monorepo**：`novel-lab`
 >
 > **生效日期 / Effective Date**：2026-10-15  
-> **版本 / Version**：v2.2.0  
+> **版本 / Version**：v2.3.0  
 > **适用对象 / Scope**：所有参与、维护、扩展 novel-lab（暮冬念春 / Exoscribe）的自主 Agent 与开发人员 / All Autonomous Agents and Developers  
 > **效力等级 / Authority Level**：**最高级硬约束（工程思想宪法）/ Supreme Hard Constraint (Project Constitution)**  
 > 
