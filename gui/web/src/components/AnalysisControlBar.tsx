@@ -1,5 +1,5 @@
 // 一键分析控制条：题材下拉（必填，来自 /api/genres）+ 「一键分析」按钮 + 任务状态。
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
@@ -13,6 +13,7 @@ import { useApp } from '../state/AppContext'
 import { getGenres } from '../api/client'
 import { useI18n } from '../state/I18nContext'
 import type { TaskStatus } from '../types'
+import DisabledTooltipButton from './common/DisabledTooltipButton'
 
 const STATUS_KEYS: Record<TaskStatus, string> = {
   idle: 'analysis_status_idle',
@@ -37,7 +38,7 @@ export interface AnalysisControlBarProps {
 
 export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarProps) {
   const { t } = useI18n()
-  const { book, status, runFullAnalysis } = useApp()
+  const { book, overview, status, runFullAnalysis } = useApp()
   const [genres, setGenres] = useState<string[]>([])
   const [genre, setGenre] = useState('')
   const [busy, setBusy] = useState(false)
@@ -63,6 +64,15 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
 
   const taskStatus: TaskStatus = status?.status ?? 'idle'
   const isRunning = taskStatus === 'running'
+
+  const disabledReason = useMemo(() => {
+    if (!book) return t('analysis_need_file')
+    if (!genre) return t('analysis_need_genre')
+    if (overview && !overview.modelConfigured) return t('analysis_need_model')
+    return ''
+  }, [book, genre, overview, t])
+
+  const isDisabled = busy || isRunning || !genre || Boolean(overview && !overview.modelConfigured)
 
   const doRun = async () => {
     if (!genre) {
@@ -117,15 +127,17 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
               ))}
             </Select>
           </FormControl>
-          <Button
-            variant="contained"
-            size="small"
-            disabled={busy || isRunning || !genre}
-            onClick={doRun}
-            startIcon={busy ? <CircularProgress size={14} color="inherit" /> : undefined}
-          >
-            {isRunning ? t('analysis_btn_running') : t('analysis_btn_start')}
-          </Button>
+          <DisabledTooltipButton disabled={isDisabled} disabledReason={disabledReason}>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={isDisabled}
+              onClick={doRun}
+              startIcon={busy ? <CircularProgress size={14} color="inherit" /> : undefined}
+            >
+              {isRunning ? t('analysis_btn_running') : t('analysis_btn_start')}
+            </Button>
+          </DisabledTooltipButton>
         </>
       )}
 

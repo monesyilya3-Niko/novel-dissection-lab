@@ -26,8 +26,21 @@ export default function ImportPanel({ compact }: Props) {
 
   const doUpload = useCallback(
     async (file: File) => {
-      if (!file.name.toLowerCase().endsWith('.txt')) {
-        setError(t('analysis_import_only_txt'))
+      const lower = file.name.toLowerCase()
+      if (!lower.endsWith('.txt')) {
+        const ext = lower.includes('.') ? lower.slice(lower.lastIndexOf('.')) : ''
+        const knownHints: Record<string, string> = {
+          '.pdf': 'analysis_import_pdf_hint',
+          '.doc': 'analysis_import_doc_hint',
+          '.docx': 'analysis_import_doc_hint',
+          '.md': 'analysis_import_md_hint',
+        }
+        const hintKey = ext ? knownHints[ext] : undefined
+        if (hintKey) {
+          setError(t(hintKey))
+        } else {
+          setError(t('analysis_import_only_txt'))
+        }
         return
       }
       setLoading(true)

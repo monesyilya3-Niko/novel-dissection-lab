@@ -57,7 +57,7 @@ describe('ImportPanel 导入面板组件', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByText('仅支持 .txt 文件导入')).toBeInTheDocument()
+      expect(screen.getByText(/暂不支持 Word 文档导入|仅支持 .txt 文件导入/)).toBeInTheDocument()
     })
     expect(mockUploadBook).not.toHaveBeenCalled()
   })

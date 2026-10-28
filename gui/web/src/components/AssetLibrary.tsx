@@ -21,6 +21,8 @@ import * as api from '../api/client'
 import type { AssetItem, AssetKind } from '../types'
 import { KIND_LABELS } from '../assetKindLabels'
 import { friendlyError } from '../api/client'
+import EmptyState from './common/EmptyState'
+import { useAppOptional } from '../state/AppContext'
 import { useI18n } from '../state/I18nContext'
 
 const getKindLabel = (k: AssetKind, t: (k: string, fb?: string) => string) => {
@@ -124,6 +126,8 @@ function SummaryView({ text }: { text: string }) {
 
 export default function AssetLibrary() {
   const { t } = useI18n()
+  const app = useAppOptional()
+  const setWorkbench = app?.setWorkbench ?? (() => {})
   const [kind, setKind] = useState<AssetKind | null>(null)
   const [items, setItems] = useState<AssetItem[]>([])
   const [total, setTotal] = useState(0)
@@ -218,9 +222,12 @@ export default function AssetLibrary() {
                   <CircularProgress size={24} />
                 </Box>
               ) : items.length === 0 ? (
-                <Typography variant="body2" color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
-                  {t('asset_lib_empty')}
-                </Typography>
+                <EmptyState
+                  title={t('asset_lib_empty')}
+                  hint={kind ? t('asset_lib_empty_hint_filtered', '该类型暂无资产，换个分类或去分析页拆书') : t('asset_lib_empty_hint', '先去分析工作台导入小说并完成拆书')}
+                  primaryCta={{ label: t('asset_lib_empty_cta', '去分析'), onClick: () => setWorkbench('analysis') }}
+                  minHeight={180}
+                />
               ) : (
                 <List dense disablePadding>
                   {items.map((it) => (

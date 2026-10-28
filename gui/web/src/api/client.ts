@@ -45,10 +45,35 @@ export function onAdminUnauthorized(fn: (() => void) | null) {
 
 /** 把底层异常翻译为用户可读中文（AsyncBoundary/告警条统一展示）。 */
 export function friendlyError(e: unknown): string {
-  if (e instanceof ApiError) return e.message
+  if (e instanceof ApiError) {
+    const msg = e.message || ''
+    const lower = msg.toLowerCase()
+    // File too large / 100MB limit — actionable hint (backend: "文件超过 100MB 上限" / 413)
+    if (lower.includes('100mb') || lower.includes('file too large') || lower.includes('exceeds') && lower.includes('size') || msg.includes('超过 100MB') || msg.includes('文件过大')) {
+      return msg.includes('100MB') || msg.includes('超过') ? msg + '，请拆分后重试' : msg
+    }
+    // Symlink — not actionable beyond message, pass through with hint
+    if (lower.includes('symlink') || msg.includes('符号链接')) {
+      return msg
+    }
+    // Port busy / EADDRINUSE — actionable hint
+    if (lower.includes('eaddrinuse') || lower.includes('address already in use') || lower.includes('port') && lower.includes('already') || lower.includes('port') && lower.includes('in use') || msg.includes('端口') && msg.includes('占用')) {
+      return msg + '，请关闭占用程序或更换端口后重试'
+    }
+    return msg
+  }
   if (e instanceof DOMException && e.name === 'AbortError') return '请求超时，请重试'
-  if (e instanceof TypeError) return '无法连接服务——请确认暮冬念春正在运行'
-  if (e instanceof Error && e.message) return e.message
+  if (e instanceof TypeError) {
+    const m = e.message.toLowerCase()
+    if (m.includes('eaddrinuse') || m.includes('address already in use')) return '端口被占用，请关闭占用程序或更换端口后重试'
+    return '无法连接服务——请确认暮冬念春正在运行'
+  }
+  if (e instanceof Error && e.message) {
+    const lm = e.message.toLowerCase()
+    if (lm.includes('eaddrinuse') || lm.includes('address already in use')) return '端口被占用，请关闭占用程序或更换端口后重试'
+    if (lm.includes('file too large') || lm.includes('exceeds') && lm.includes('size')) return e.message + '，请拆分后重试'
+    return e.message
+  }
   return '发生未知错误，请重试'
 }
 

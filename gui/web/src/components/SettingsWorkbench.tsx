@@ -12,9 +12,12 @@ import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
 import Divider from '@mui/material/Divider'
 import Chip from '@mui/material/Chip'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import { systemApi } from '../api/client'
 import { friendlyError } from '../api/client'
 import { useApp } from '../state/AppContext'
+import { useUiMode } from '../state/UiModeContext'
 import { useI18n } from '../state/I18nContext'
 import type { TranslationKey } from '../i18n/translations'
 
@@ -80,6 +83,7 @@ const FIELD_HELPER_KEYS: Record<FieldName, TranslationKey> = {
 export default function SettingsWorkbench() {
   const { t } = useI18n()
   const { refreshThresholds } = useApp()
+  const { mode: uiMode, setMode: setUiMode } = useUiMode()
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -200,6 +204,30 @@ export default function SettingsWorkbench() {
       </Box>
       {message && <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert>}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+      {/* 界面偏好：简洁/进阶切换（双持久化，立即生效） */}
+      <Paper sx={{ p: 2, mb: 2 }} data-testid="settings-ui-mode">
+        <Typography variant="subtitle2" gutterBottom>{t('settings_section_ui_mode', '界面偏好')}</Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+          {t('settings_ui_mode_desc', '简洁模式只显示核心功能（首页/分析/写作/质检），进阶模式显示全部工具。切换立即生效并自动保存。')}
+        </Typography>
+        <ToggleButtonGroup
+          exclusive
+          value={uiMode}
+          onChange={(_, v) => { if (v) setUiMode(v) }}
+          size="small"
+          color="primary"
+          aria-label={t('settings_ui_mode_aria', '界面模式')}
+          data-testid="settings-ui-mode-toggle"
+        >
+          <ToggleButton value="simple" aria-label={t('settings_ui_mode_simple', '简洁')}>
+            {t('settings_ui_mode_simple', '简洁')}
+          </ToggleButton>
+          <ToggleButton value="advanced" aria-label={t('settings_ui_mode_advanced', '进阶')}>
+            {t('settings_ui_mode_advanced', '进阶')}
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Paper>
 
       {/* 打分阈值 */}
       <Paper sx={{ p: 2, mb: 2 }}>

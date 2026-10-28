@@ -11,7 +11,7 @@ import React, {
 import type { Book, BookResults, Chapter, Overview, ProgressEvent, StatusInfo } from '../types'
 import type { WorkbenchKey } from '../layout/WorkbenchNav'
 import * as api from '../api/client'
-import { systemApi } from '../api/client'
+import { systemApi, adminApi } from '../api/client'
 
 interface AppState {
   // 当前导入的书
@@ -48,6 +48,10 @@ interface AppState {
   // 设置页保存后刷新阈值（避免 QC/写作面板沿用旧值直到整页刷新）
   refreshThresholds: () => Promise<void>
 
+  // 管理员可见性（AppContext 探测 admin/me；默认隐藏，登录后可见）
+  isAdmin: boolean
+  refreshAdmin: () => Promise<void>
+
   // actions
   importBook: (path: string) => Promise<void>
   uploadBook: (file: File) => Promise<void>
@@ -73,6 +77,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [initError, setInitError] = useState<string | null>(null)
   const [qualityPassLine, setQualityPassLine] = useState(75)
   const [consistencyTarget, setConsistencyTarget] = useState(90)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   // 阶段一新增状态。
   const [workbench, setWorkbench] = useState<WorkbenchKey>('home')
@@ -231,6 +236,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const refreshAdmin = useCallback(async () => {
+    try {
+      const r = await adminApi.me()
+      setIsAdmin(!!r.loggedIn)
+    } catch {
+      setIsAdmin(false)
+    }
+  }, [])
+
   // 初始加载：恢复会话 + 加载概览（P1-F8：错误写入 initError，不再静默吞掉）。
   /* eslint-disable react-hooks/set-state-in-effect -- 本 effect 内所有 setState
      均在异步回调（.then/.catch）中触发，非 effect 同步体；这是标准的数据加载模式。 */
@@ -247,8 +261,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .catch(fail)
     refreshOverview().catch(fail)
     refreshThresholds()
+    refreshAdmin()
     return () => { cancelled = true }
-  }, [refreshStatus, refreshOverview, refreshThresholds])
+  }, [refreshStatus, refreshOverview, refreshThresholds, refreshAdmin])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const value = useMemo<AppState>(
@@ -263,6 +278,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       status,
       lastEvent,
       batchStates,
+      isAdmin,
+      refreshAdmin,
       workbench,
       setWorkbench,
       helpRequest,
@@ -286,9 +303,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [
       book, selectedChapter, currentChapter, status, lastEvent, batchStates,
       initError, qualityPassLine, consistencyTarget,
-      workbench, overview, bookResults,
+      isAdmin, workbench, overview, bookResults,
       importBook, uploadBook, importSampleBook, selectChapter, refreshStatus, startAnalysis, runFullAnalysis,
-      pauseAnalysis, resumeAnalysis, retryFailed, refreshThresholds, refreshOverview, loadBookResults, refreshBookResults,
+      pauseAnalysis, resumeAnalysis, retryFailed, refreshThresholds, refreshAdmin, refreshOverview, loadBookResults, refreshBookResults,
       helpRequest, openHelp,
     ],
   )

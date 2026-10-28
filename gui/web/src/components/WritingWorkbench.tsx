@@ -67,6 +67,8 @@ import DeslopPanel from './DeslopPanel'
 import InspirationWorkbench from './InspirationWorkbench'
 import EssenceWorkbench from './EssenceWorkbench'
 import { useWritingAssets, type WritingAssetSelection } from './useWritingAssets'
+import GlossaryTooltip from './common/GlossaryTooltip'
+import DisabledTooltipButton from './common/DisabledTooltipButton'
 
 const WritingExtras = lazy(() => import('./WritingExtras'))
 
@@ -451,17 +453,33 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
           </DialogActions>
         </Dialog>
         <TextField label="章节号" type="number" value={chapterNo} onChange={(e) => setChapterNo(Math.max(1, Math.round(Number(e.target.value) || 1)))} sx={{ width: 100 }} size="small" />
-        <TextField select label="voice-card" value={voice} onChange={(e) => setVoice(e.target.value)} sx={{ minWidth: 200 }} size="small">
-          {byKind('voice').map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
-        </TextField>
-        <TextField select label="genre-pack（可选）" value={genrePack} onChange={(e) => setGenrePack(e.target.value)} sx={{ minWidth: 200 }} size="small">
-          <MenuItem value="">无</MenuItem>
-          {byKind('genre_pack').map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
-        </TextField>
+        <GlossaryTooltip term="声线卡">
+          <TextField select label="声线卡（voice-card）" value={voice} onChange={(e) => setVoice(e.target.value)} sx={{ minWidth: 200 }} size="small">
+            {byKind('voice').map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
+          </TextField>
+        </GlossaryTooltip>
+        <GlossaryTooltip term="题材包">
+          <TextField select label="题材包（genre-pack，可选）" value={genrePack} onChange={(e) => setGenrePack(e.target.value)} sx={{ minWidth: 200 }} size="small">
+            <MenuItem value="">无</MenuItem>
+            {byKind('genre_pack').map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
+          </TextField>
+        </GlossaryTooltip>
         <TextField label="写作要点" value={task} onChange={(e) => setTask(e.target.value)} sx={{ minWidth: 250 }} size="small" />
-        <Button variant="contained" onClick={doGenerate} disabled={!project || !voice || !task || running}>
-          {running ? <CircularProgress size={20} /> : '开始写作'}
-        </Button>
+        {(() => {
+          const missing: string[] = []
+          if (!project) missing.push('写作项目')
+          if (!voice) missing.push('声线卡')
+          if (!task.trim()) missing.push('写作要点')
+          const disabled = missing.length > 0 || running
+          const reason = missing.length > 0 ? `请先填写：${missing.join('、')}` : undefined
+          return (
+            <DisabledTooltipButton disabled={disabled && !running} disabledReason={reason}>
+              <Button variant="contained" onClick={doGenerate} disabled={disabled}>
+                {running ? <CircularProgress size={20} /> : '开始写作'}
+              </Button>
+            </DisabledTooltipButton>
+          )
+        })()}
       </Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 

@@ -11,6 +11,11 @@ vi.mock('../state/AppContext', () => ({
   useAppOptional: () => null,
 }))
 
+vi.mock('../state/UiModeContext', () => ({
+  useUiMode: () => ({ mode: 'advanced', setMode: vi.fn(), isHydrated: true }),
+  useUiModeOptional: () => ({ mode: 'advanced', setMode: vi.fn(), isHydrated: true }),
+}))
+
 vi.mock('../api/client', () => ({
   systemApi: {
     settings: vi.fn(),

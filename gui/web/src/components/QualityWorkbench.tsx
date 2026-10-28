@@ -19,6 +19,7 @@ import type { QualityTaskState, QcReportItem } from '../types'
 import { friendlyError } from '../api/client'
 import QcVisuals from './QcVisuals'
 import PoisonCheckPanel from './PoisonCheckPanel'
+import EmptyState from './common/EmptyState'
 import { useI18n } from '../state/I18nContext'
 
 /**
@@ -169,6 +170,13 @@ function CheckPanel() {
         />
       )}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {!result && !error && !loading && (
+        <EmptyState
+          title={t('quality_check_empty_title', '还没有检查结果')}
+          hint={t('quality_check_empty_hint', '填入章节路径或粘贴正文后点检查')}
+          minHeight={160}
+        />
+      )}
       {result && (
         <Paper sx={{ p: 2 }}>
           {quality && (

@@ -1,0 +1,324 @@
+// 共享术语表：供 HelpWorkbench 与悬浮提示等组件复用。
+// 数据与 HelpWorkbench 中的 GLOSSARY 口径一致，新增 deslop / poison 两条以覆盖常见行话。
+import type { Locale } from '../i18n/translations'
+
+export type TermCategory = 'concept' | 'asset' | 'feature'
+
+export interface GlossaryTerm {
+  term: Record<Locale, string>
+  pinyin?: string
+  category: TermCategory
+  definition: Record<Locale, string>
+  example?: Record<Locale, string>
+}
+
+export const GLOSSARY: GlossaryTerm[] = [
+  {
+    term: {
+      'zh-CN': '资产',
+      'en-US': 'Asset',
+    },
+    category: 'concept',
+    definition: {
+      'zh-CN': '系统对小说进行拆解分析后，沉淀下来的结构化知识卡片。每一本书拆完，会产生一组资产，存放在资产库中。就像把一栋房子拆成"户型图、装修方案、水电图纸"，资产就是小说的"设计图纸与叙事构件"。',
+      'en-US': 'Structured knowledge cards crystallized after the deconstruction and analysis of a novel. Each analyzed novel generates a set of assets stored in the Asset Library — functioning as architectural blueprints and narrative blueprints.',
+    },
+    example: {
+      'zh-CN': '拆完《暮冬念春》，得到声线卡、结构观测、笔法卡、商业观测共 4 张核心资产卡。',
+      'en-US': 'Analyzing a novel produces 4 core asset cards: Voice Card, Structure Observation, Craft Card, and Commercial Observation.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '声线卡',
+      'en-US': 'Voice Card',
+    },
+    category: 'asset',
+    definition: {
+      'zh-CN': '记录某本书（或某个人物）的语言风格特征：句式长短、用词偏好、对话节奏、语气词习惯、叙述视角等。它是"这本书说话像谁"的数字化描述。',
+      'en-US': 'Digital profile capturing language style traits of a book or character: sentence length, diction patterns, dialogue cadence, modal particle habits, and narrative point of view.',
+    },
+    example: {
+      'zh-CN': '温霜禾的声线：短句多、爱用"随便吧"、对话带撒娇尾音。',
+      'en-US': 'Protagonist voice: predominantly short sentences, distinctive signature phrasing, and lively trailing dialogue tones.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '结构观测',
+      'en-US': 'Structure Observation',
+    },
+    category: 'asset',
+    definition: {
+      'zh-CN': '章节结构分析：开篇方式、冲突设置、节奏曲线、高潮位置、结尾手法、视角切换规律等。它回答"这本书的结构是怎么搭的"。',
+      'en-US': 'Chapter macro-structural analysis: hook style, conflict escalation, rhythm curve, climax placement, cliffhanger techniques, and POV switching patterns.',
+    },
+    example: {
+      'zh-CN': '第一章用"倒叙+悬念"开篇，第10章第一次大冲突，每8-10章一个小高潮。',
+      'en-US': 'Chapter 1 opens with flashback suspense, Chapter 10 introduces the first major conflict, with micro-climaxes every 8-10 chapters.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '商业观测',
+      'en-US': 'Commercial Observation',
+    },
+    category: 'asset',
+    definition: {
+      'zh-CN': '从市场角度分析：目标读者画像、爽点/虐点分布、题材热度、商业化潜力、平台适配性。它回答"这本书为什么能卖"。',
+      'en-US': 'Market-oriented analysis: target audience persona, payoff/angst distribution, genre market warmth, monetization potential, and platform fit.',
+    },
+    example: {
+      'zh-CN': '校园救赎题材，爽点集中在"误会解除"章节，目标读者为18-25岁女性。',
+      'en-US': 'Campus redemption genre: emotional payoffs concentrated in misunderstanding resolution chapters; core audience female ages 18-25.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '笔法卡',
+      'en-US': 'Craft Card',
+    },
+    category: 'asset',
+    definition: {
+      'zh-CN': '具体写作技巧：修辞手法、描写技巧、视角运用、伏笔埋设、转场方式等。它是"这本书的写作手法清单"。',
+      'en-US': 'Concrete prose techniques: rhetorical devices, sensory description, POV handling, foreshadowing placement, and scene transition mechanics.',
+    },
+    example: {
+      'zh-CN': '用"器物特写"推进情绪，如反复出现的粉色发圈；转场善用"空镜头"。',
+      'en-US': 'Prop close-ups driving emotional arcs (recurring keepsake); scene transitions utilizing empty space cutaways.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '题材包',
+      'en-US': 'Genre Pack',
+    },
+    category: 'asset',
+    definition: {
+      'zh-CN': '某一题材的完整资产集合：包含该题材的声线、结构、笔法等全部卡片，打包成一个可复用的"题材模板"。写同题材新书时可直接参考。',
+      'en-US': 'Comprehensive asset bundle for a genre: aggregates voice, structure, and craft cards into a reusable narrative template for direct reference in new projects.',
+    },
+    example: {
+      'zh-CN': '"校园救赎"题材包：含3本书的全部资产，以及该题材的结构规范。',
+      'en-US': '"Campus Redemption" pack: bundles assets from 3 benchmark novels along with standardized structural conventions.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '文风卡',
+      'en-US': 'Style Card',
+    },
+    category: 'asset',
+    definition: {
+      'zh-CN': '整本书的文风特征描述：语言密度、意象系统、叙事语调、节奏感。它比声线卡更宏观，描述"这本书读起来是什么感觉"。',
+      'en-US': 'Holistic prose fingerprint description: linguistic density, sensory imagery, narrative tone, and overall rhythm — capturing the subjective reading experience.',
+    },
+    example: {
+      'zh-CN': '文风：细腻、意象密集、善用通感，读来如江南烟雨。',
+      'en-US': 'Prose tone: nuanced, dense sensory imagery, synesthesia, evocative and immersive cadence.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '蒸馏规则',
+      'en-US': 'Distilled Rule',
+    },
+    category: 'asset',
+    definition: {
+      'zh-CN': '从多本同题材书中提炼出的通用写作规律。像蒸馏酒一样，把多本书的"精华"提炼出来，去掉每本书特有的"杂质"（具体情节、人物名），留下通用的写作规律。',
+      'en-US': 'Universal writing heuristics extracted across multiple books of the same genre, abstracting away novel-specific entities while preserving invariant craft mechanics.',
+    },
+    example: {
+      'zh-CN': '"校园救赎文对话规律：短句为主、每段对话不超过3轮、情绪转折用动作描写间隔"。',
+      'en-US': '"Dialogue rule: brief exchanges under 3 beats, emotional shifts punctuated by physical action beats".',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '桥段',
+      'en-US': 'Trope',
+    },
+    category: 'asset',
+    definition: {
+      'zh-CN': '经典情节套路的结构化描述：包含搭建（setup）、发展、引爆点的骨架，以及多个变体写法。不是抄袭情节，而是学习"这类情节怎么写才好看"。',
+      'en-US': 'Structured anatomy of classic plot conventions: setup, escalation, and climax payoff skeletons along with stylistic variations.',
+    },
+    example: {
+      'zh-CN': '"雨夜共伞"桥段：5种变体写法，核心是"被迫接近→心跳加速→欲言又止"。',
+      'en-US': '"Sharing an Umbrella in the Rain" trope: 5 variations centered on forced proximity, racing heartbeat, and hesitation to speak.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '报告',
+      'en-US': 'Report',
+    },
+    category: 'asset',
+    definition: {
+      'zh-CN': '完整的分析报告文档（Markdown格式）：拆书报告、笔法分析等。可导出、可打印。',
+      'en-US': 'Comprehensive analytical documents in Markdown format: deconstruction reports, prose craft evaluations, exportable and printable.',
+    },
+    example: {
+      'zh-CN': '《暮冬念春-拆书报告.md》：全文结构分析、人物分析、主题分析。',
+      'en-US': '"Late-Winter-Analysis-Report.md": full structural analysis, character breakdown, and thematic breakdown.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '语料',
+      'en-US': 'Corpus',
+    },
+    category: 'asset',
+    definition: {
+      'zh-CN': '原始文本：导入的 .txt 小说原文，分章节存储。语料是资产的"原材料"，拆书就是从语料中提取资产。',
+      'en-US': 'Raw source manuscripts: imported .txt novel texts segmented by chapter. Corpus acts as the foundational raw material for asset extraction.',
+    },
+    example: {
+      'zh-CN': '《暮冬念春》157章原文，275,379字。',
+      'en-US': 'Raw novel text: 157 chapters, 275,379 words/characters.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '蒸馏',
+      'en-US': 'Distillation',
+    },
+    pinyin: 'zhēng liú',
+    category: 'feature',
+    definition: {
+      'zh-CN': '一种跨书聚合技术。把同一题材的多本书的资产放在一起，找出它们的共同规律，提炼成"蒸馏规则"。需要同一题材至少2本已拆解的书。蒸馏是本地规则聚合，不需要联网、不需要 AI 模型。',
+      'en-US': 'Cross-book aggregation engine. Synthesizes assets across multiple novels in the same genre to extract common conventions into Distilled Rules (requires >= 2 analyzed books; 100% offline rule aggregation, no AI model required).',
+    },
+    example: {
+      'zh-CN': '输入3本校园文的声线卡 → 输出"校园文开篇三要素：场景+人物+悬念钩子"。',
+      'en-US': 'Input 3 campus voice cards -> Output "Campus opening trifecta: setting + character introduction + suspense hook".',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '题材',
+      'en-US': 'Genre',
+    },
+    category: 'concept',
+    definition: {
+      'zh-CN': '小说的类别标签，用于组织资产和蒸馏。题材名用英文小写+中划线，如 campus-redemption（校园救赎）。同一题材的书才能一起蒸馏。',
+      'en-US': 'Novel taxonomy identifier used to categorize assets and govern distillation pipelines. Formatted as lowercase alphanumeric with hyphens (e.g., campus-redemption).',
+    },
+    example: {
+      'zh-CN': 'campus-redemption、dushi-gaowu、xuanhuan、xianxia。',
+      'en-US': 'campus-redemption, litrpg, western-fantasy, progression-fantasy.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '拆书',
+      'en-US': 'Book Analysis',
+    },
+    category: 'feature',
+    definition: {
+      'zh-CN': '把一本完整小说输入系统，自动进行多维度分析，输出报告+资产卡片的全过程。包含章节切分、质量检测、一致性检测、资产提取四个步骤。',
+      'en-US': 'End-to-end multi-dimensional deconstruction pipeline: chapter segmentation, quality audit, consistency check, and structured asset extraction.',
+    },
+    example: {
+      'zh-CN': '导入《暮冬念春》.txt → 得到4张资产卡+2份报告（耗时视章节数和机器性能而定）。',
+      'en-US': 'Import novel .txt -> Generate 4 asset cards + 2 analytical reports.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': 'QC',
+      'en-US': 'QC (Quality Check)',
+    },
+    pinyin: 'Quality Check',
+    category: 'feature',
+    definition: {
+      'zh-CN': '质量检验：对文本进行出版级质量检测。分为单章检查（写完一章快速检查，质量12维+一致性5维）和全书QC（完稿后全面检测，四层十二维）。',
+      'en-US': 'Quality Control: publication-grade manuscript audit. Spans Chapter Inspection (12 quality metrics + 5 consistency checks) and Full Book QC (4 layers, 12 dimensions).',
+    },
+    example: {
+      'zh-CN': '全书QC输出百分制总分和问题列表，标出每处待修改。',
+      'en-US': 'Full Book QC outputs 100-point composite score and itemized revision checklist.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '题材文风卡索引',
+      'en-US': 'Genre Style Index',
+    },
+    category: 'asset',
+    definition: {
+      'zh-CN': '题材到文风卡的映射表：告诉你某个题材有哪些文风卡可用。查询"都市"题材 → 返回该题材下所有文风卡。',
+      'en-US': 'Mapping directory linking genres to available style cards, enabling instant lookup of prose benchmarks within any selected genre.',
+    },
+    example: {
+      'zh-CN': '查询 "dushi" 题材 → 返回都市题材下关联的所有文风指纹与声线卡。',
+      'en-US': 'Querying "dushi" genre -> retrieves all associated style fingerprints and voice cards.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '去AI味',
+      'en-US': 'Deslop',
+    },
+    pinyin: 'qù AI wèi',
+    category: 'feature',
+    definition: {
+      'zh-CN': '检测并消除文本中的 AI 写作痕迹：程式化套路、悬浮比喻、无由排比、俗套口癖、被动句堆砌等。去 AI 味体检会给出 AI 指数与逐句优化建议，一键生成去味稿供对比。',
+      'en-US': 'Detection and removal of AI writing fingerprints: formulaic tropes, floating metaphors, empty parallelism, clichéd habits, and passive-voice stacking. The Anti-Slop audit scores AI-likeness and provides per-sentence polish suggestions with a side-by-side comparison draft.',
+    },
+    example: {
+      'zh-CN': '质检台"去 AI 味体检"检出"让字密度过高、机械排比 3 处"，点击"一键去味"生成润色稿。',
+      'en-US': 'The Anti-Slop audit flags excessive passive density and 3 mechanical parallelisms; "One-click Deslop" produces a polished comparison draft.',
+    },
+  },
+  {
+    term: {
+      'zh-CN': '毒点',
+      'en-US': 'Poison (Taboo)',
+    },
+    category: 'feature',
+    definition: {
+      'zh-CN': '会让读者弃坑的致命情节雷区：过度憋屈、圣母资敌、降智舔狗、战力断崖、长篇说教、女配白送等。毒点排查按 10 大红线扫描文本，标出命中词与改法建议。',
+      'en-US': 'Fatal narrative taboos that drive readers to abandon a novel: excessive frustration, enemy mercy, simp behavior, power cliffs, preachy monologues, freebie side-characters, and more. Poison Check scans against 10 redlines and flags matched triggers with revision guidance.',
+    },
+    example: {
+      'zh-CN': '章节编辑器"毒点排查"命中"虐主 3 章不给爽点"，提示"高危：弃坑倒计时"。',
+      'en-US': 'Chapter editor Poison Check flags "3 consecutive angst chapters without payoff" as high-risk drop-off danger.',
+    },
+  },
+]
+
+// 别名索引：支援 tooltip 按 jargon key 查找（如 deslop / poison / qc 等）。
+const GLOSSARY_ALIAS_MAP: Record<string, GlossaryTerm> = {
+  deslop: GLOSSARY[GLOSSARY.length - 2],
+  '去ai味': GLOSSARY[GLOSSARY.length - 2],
+  '去AI味': GLOSSARY[GLOSSARY.length - 2],
+  poison: GLOSSARY[GLOSSARY.length - 1],
+  '毒点': GLOSSARY[GLOSSARY.length - 1],
+}
+
+// 按中文或英文术语精确或大小写不敏感匹配
+function findByTermName(key: string): GlossaryTerm | undefined {
+  const lower = key.trim().toLowerCase()
+  if (!lower) return undefined
+  return GLOSSARY.find(t => t.term['zh-CN'].toLowerCase() === lower || t.term['en-US'].toLowerCase() === lower)
+}
+
+/**
+ * 供 tooltip / 内联帮助调用：按展示名或 jargon key 查找术语。
+ * locale 决定返回的 term / definition 文案语言。
+ */
+export function getGlossaryTerm(
+  termKey: string,
+  locale: Locale = 'zh-CN',
+): { term: string; definition: string; example?: string; category: TermCategory } | undefined {
+  const aliasHit = GLOSSARY_ALIAS_MAP[termKey] ?? GLOSSARY_ALIAS_MAP[termKey.toLowerCase()]
+  const hit = aliasHit ?? findByTermName(termKey)
+  if (!hit) return undefined
+  return {
+    term: hit.term[locale] ?? hit.term['zh-CN'],
+    definition: hit.definition[locale] ?? hit.definition['zh-CN'],
+    example: hit.example ? (hit.example[locale] ?? hit.example['zh-CN']) : undefined,
+    category: hit.category,
+  }
+}

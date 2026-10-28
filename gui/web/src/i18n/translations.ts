@@ -37,6 +37,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'en-US': 'Command Palette (Ctrl+K)',
   },
 
+  nav_group_more: {
+    'zh-CN': '更多工具',
+    'en-US': 'More Tools',
+  },
   // 导航分组
   nav_group_create: {
     'zh-CN': '创作',
@@ -2648,6 +2652,14 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '单章检查',
     'en-US': 'Single Chapter Quality Check',
   },
+  quality_check_empty_title: {
+    'zh-CN': '还没有检查结果',
+    'en-US': 'No results yet',
+  },
+  quality_check_empty_hint: {
+    'zh-CN': '填入章节路径或粘贴正文后点检查',
+    'en-US': 'Enter a chapter path or paste text, then click Check',
+  },
   quality_check_target_label: {
     'zh-CN': '章节路径（或粘贴文本）',
     'en-US': 'Chapter Path (or Paste Draft)',
@@ -2779,6 +2791,18 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   asset_lib_empty: {
     'zh-CN': '暂无资产',
     'en-US': 'No assets found',
+  },
+  asset_lib_empty_hint: {
+    'zh-CN': '先去分析拆书，完成后再回来查看',
+    'en-US': 'Analyze a book first, then return here',
+  },
+  asset_lib_empty_hint_filtered: {
+    'zh-CN': '该类型暂无资产，换个分类试试',
+    'en-US': 'No assets in this category, try another filter',
+  },
+  asset_lib_empty_cta: {
+    'zh-CN': '去分析',
+    'en-US': 'Go to Analysis',
   },
   asset_lib_select_hint: {
     'zh-CN': '从左侧选择一个资产查看详情',
@@ -2998,6 +3022,43 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '请先导入书籍',
     'en-US': 'Please import a book first',
   },
+  analysis_need_file: {
+    'zh-CN': '请先导入书籍文件',
+    'en-US': 'Please import a book file first',
+  },
+  analysis_need_genre: {
+    'zh-CN': '请选择题材分类',
+    'en-US': 'Please select a genre',
+  },
+  analysis_need_model: {
+    'zh-CN': '尚未配置模型，请先在设置中配置模型',
+    'en-US': 'No model configured. Please set up a model in Settings first',
+  },
+  analysis_import_pdf_hint: {
+    'zh-CN': '暂不支持 PDF 导入，请先用 Word/记事本另存为 .txt (UTF-8 编码)',
+    'en-US': 'PDF import is not supported. Please save as .txt (UTF-8) via Word or Notepad first',
+  },
+  analysis_import_doc_hint: {
+    'zh-CN': '暂不支持 Word 文档导入，请先另存为 .txt (UTF-8 编码)',
+    'en-US': 'Word document import is not supported. Please save as .txt (UTF-8) first',
+  },
+  analysis_import_md_hint: {
+    'zh-CN': '暂不支持 Markdown 导入，请先另存为 .txt (UTF-8 编码)',
+    'en-US': 'Markdown import is not supported. Please save as .txt (UTF-8) first',
+  },
+  error_action_file_too_large: {
+    'zh-CN': '文件过大(100MB上限)，请拆分后重试',
+    'en-US': 'File too large (100MB limit). Please split the file and try again',
+  },
+  error_action_symlink_rejected: {
+    'zh-CN': '不支持符号链接，请选择源文件本身',
+    'en-US': 'Symbolic links are not supported. Please select the original file',
+  },
+  error_action_port_busy: {
+    'zh-CN': '端口被占用，请关闭占用程序或更换端口后重试',
+    'en-US': 'Port is busy. Please close the conflicting program or try another port',
+  },
+
   analysis_genre_label: {
     'zh-CN': '题材 *',
     'en-US': 'Genre *',
@@ -3921,6 +3982,42 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'en-US': 'Warn line must be ≤ pass line',
   },
 
+  settings_section_ui_mode: {
+    'zh-CN': '界面偏好',
+    'en-US': 'Interface Preference',
+  },
+  settings_ui_mode_desc: {
+    'zh-CN': '简洁模式只显示核心功能（首页/分析/写作/质检），进阶模式显示全部工具。切换立即生效并自动保存。',
+    'en-US': 'Simple shows core features (Home/Analysis/Writing/Quality); Advanced shows all tools. Switch takes effect immediately.',
+  },
+  settings_ui_mode_simple: {
+    'zh-CN': '简洁',
+    'en-US': 'Simple',
+  },
+  settings_ui_mode_advanced: {
+    'zh-CN': '进阶',
+    'en-US': 'Advanced',
+  },
+  settings_ui_mode_aria: {
+    'zh-CN': '界面模式',
+    'en-US': 'UI Mode',
+  },
+  ui_mode_simple: {
+    'zh-CN': '简洁',
+    'en-US': 'Simple',
+  },
+  ui_mode_advanced: {
+    'zh-CN': '进阶',
+    'en-US': 'Advanced',
+  },
+  ui_mode_tooltip_simple: {
+    'zh-CN': '简洁模式：只显示核心功能，点击切换为进阶',
+    'en-US': 'Simple mode: core features only. Click to switch to Advanced',
+  },
+  ui_mode_tooltip_advanced: {
+    'zh-CN': '进阶模式：显示全部工具，点击切换为简洁',
+    'en-US': 'Advanced mode: all tools visible. Click to switch to Simple',
+  },
   // ==========================================
   // 管理后台 (AdminWorkbench)
   // ==========================================

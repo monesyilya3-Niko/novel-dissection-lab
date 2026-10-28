@@ -289,6 +289,9 @@ def get_settings() -> dict[str, Any]:
             "default_words": saved.get("writing", {}).get("default_words", 2400),
             "max_attempts": saved.get("writing", {}).get("max_attempts", 3),
         },
+        "ui": {
+            "mode": saved.get("ui", {}).get("mode", "simple") if isinstance(saved.get("ui"), dict) and saved.get("ui", {}).get("mode") in ("simple", "advanced") else "simple",
+        },
         "paths": {
             "root": str(config.ROOT_DIR),
             "assets": str(config.ASSETS_ROOT),
@@ -357,6 +360,18 @@ def update_settings(updates: dict[str, Any]) -> dict[str, Any]:
         if isinstance(val, bool) or not isinstance(val, int) or not (100 <= val <= 100000):
             raise ServiceError("batch_size 必须为 100-100000 的整数", 400)
         saved["batch_size"] = val
+
+    # 界面模式（simple/advanced）：前端 localStorage 为主存，后端为跨端备份。
+    if "ui" in updates:
+        ui = updates["ui"]
+        if not isinstance(ui, dict):
+            raise ServiceError("ui 必须为对象", 400)
+        if "mode" in ui:
+            val = ui["mode"]
+            if val not in ("simple", "advanced"):
+                raise ServiceError("ui.mode 必须为 simple 或 advanced", 400)
+            saved.setdefault("ui", {})
+            saved["ui"]["mode"] = val
 
     _save_settings_file(saved)
     return get_settings()

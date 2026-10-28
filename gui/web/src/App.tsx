@@ -15,6 +15,7 @@ import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import { AppProvider, useApp } from './state/AppContext'
+import { UiModeProvider, useUiMode } from './state/UiModeContext'
 import { useThemeMode } from './state/ThemeModeContext'
 import { buildMuiTheme } from './theme'
 import { ink } from './ink'
@@ -29,6 +30,9 @@ import WorkbenchTransition from './components/WorkbenchTransition'
 import { DashboardSkeleton } from './components/SkeletonBlocks'
 import Fab from '@mui/material/Fab'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
+import Chip from '@mui/material/Chip'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import DashboardIcon from '@mui/icons-material/Dashboard'
 
 // 4B：页面级组件 lazy 加载，主包只含框架 + 导航 + 主题
 const HomeDashboard = lazy(() => import('./components/HomeDashboard'))
@@ -85,9 +89,58 @@ export default function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AppProvider>
-        <AppShell />
+        <UiModeShell />
       </AppProvider>
     </ThemeProvider>
+  )
+}
+
+function UiModeChip() {
+  const { mode, setMode } = useUiMode()
+  const { t } = useI18n()
+  const isSimple = mode === 'simple'
+  const label = isSimple
+    ? t('ui_mode_simple', '简洁')
+    : t('ui_mode_advanced', '进阶')
+  const tip = isSimple
+    ? t('ui_mode_tooltip_simple', '简洁模式：只显示核心功能，点击切换为进阶')
+    : t('ui_mode_tooltip_advanced', '进阶模式：显示全部工具，点击切换为简洁')
+  return (
+    <Tooltip title={tip}>
+      <Chip
+        size="small"
+        icon={isSimple ? <DashboardIcon sx={{ fontSize: 16 }} /> : <AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+        label={label}
+        onClick={() => setMode(isSimple ? 'advanced' : 'simple')}
+        sx={{
+          height: 28,
+          fontSize: 12,
+          fontWeight: 600,
+          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+          color: (theme) => theme.palette.mode === 'dark' ? ink.moonWhite : ink.text,
+          border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? ink.nightLine : ink.hairline}`,
+          '& .MuiChip-icon': { color: 'inherit', ml: '4px' },
+          '&:hover': { bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.18)' : ink.hairline },
+          cursor: 'pointer',
+          display: { xs: 'none', sm: 'inline-flex' },
+        }}
+        data-testid="ui-mode-chip"
+      />
+    </Tooltip>
+  )
+}
+
+function UiModeShell() {
+  const { overview } = useApp()
+  const defaultMode = useMemo(() => {
+    if (!overview) return undefined
+    // 新手空库默认简洁模式，有内容的老用户默认完整模式（尊重存储偏好，切换由 UiModeContext 接管）
+    return (overview.totalBooks === 0 && overview.totalAssets < 5 ? 'simple' : 'advanced') as 'simple' | 'advanced'
+  }, [overview])
+  return (
+    <UiModeProvider defaultMode={defaultMode}>
+      <AppShell />
+    </UiModeProvider>
   )
 }
 
@@ -96,8 +149,9 @@ const WORKBENCH_ORDER: WorkbenchKey[] = [
 ]
 
 function AppShell() {
-  const { workbench, setWorkbench, overview, initError, helpRequest, openHelp } = useApp()
+  const { workbench, setWorkbench, overview, initError, helpRequest, openHelp, isAdmin } = useApp()
   const { t } = useI18n()
+  const { mode: uiMode } = useUiMode()
   const wide = useMediaQuery('(min-width: 961px)')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [onboarded, setOnboarded] = useState(isOnboarded)
@@ -121,6 +175,8 @@ function AppShell() {
   const nav = (
     <WorkbenchNav
       active={workbench}
+      mode={uiMode}
+      isAdmin={isAdmin}
       onChange={(k) => {
         setWorkbench(k)
         setDrawerOpen(false)
@@ -167,6 +223,7 @@ function AppShell() {
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <UiModeChip />
             <LanguageToggle />
             <ModeToggle />
           </Box>

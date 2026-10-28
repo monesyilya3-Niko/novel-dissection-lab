@@ -30,7 +30,7 @@ describe('AnalysisControlBar 题材必填', () => {
       expect(mockGetGenres).toHaveBeenCalled()
     })
     // MUI Select 应渲染
-    expect(screen.getByLabelText(/题材/)).toBeInTheDocument()
+    expect(screen.getAllByLabelText(/题材/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('未选题材时一键分析按钮禁用', async () => {
@@ -60,7 +60,7 @@ describe('AnalysisControlBar 题材必填', () => {
     await waitFor(() => {
       expect(mockGetGenres).toHaveBeenCalled()
     })
-    expect(screen.getByLabelText(/Genre/i)).toBeInTheDocument()
+    expect(screen.getAllByLabelText(/Genre/i).length).toBeGreaterThanOrEqual(1)
     const btn = screen.getByRole('button', { name: /One-Click Analysis/i })
     expect(btn).toBeDisabled()
   })
