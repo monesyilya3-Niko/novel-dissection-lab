@@ -12,22 +12,36 @@ export interface EmotionWaveChartProps {
   labels?: string[]
   height?: number
   ariaLabel?: string
+  showDemo?: boolean
+  /** @deprecated alias for showDemo */
+  isDemo?: boolean
 }
 
-const DEFAULT_WAVE = [30, 45, 40, 65, 55, 85, 92, 70, 88, 95, 60]
+export const DEFAULT_WAVE = [30, 45, 40, 65, 55, 85, 92, 70, 88, 95, 60]
 
 export default function EmotionWaveChart({
-  tensionPoints = DEFAULT_WAVE,
+  tensionPoints,
   benchmarkPoints,
   benchmarkName,
   labels,
   height = 240,
   ariaLabel,
+  showDemo = false,
+  isDemo,
 }: EmotionWaveChartProps) {
   const { isDark } = useThemeMode()
   const { t } = useI18n()
 
   const resolvedBenchmarkName = benchmarkName ?? t('chart_wave_benchmark_default', '神作标杆基准')
+
+  // Determine effective tension data: use DEFAULT_WAVE only in demo mode
+  const effectiveTensionPoints = useMemo(() => {
+    if (tensionPoints && tensionPoints.length > 0) return tensionPoints
+    if (showDemo || isDemo) return DEFAULT_WAVE
+    return null
+  }, [tensionPoints, showDemo, isDemo])
+
+  const isEmpty = !effectiveTensionPoints
 
   const effectiveLabels = useMemo(() => {
     if (labels && labels.length > 0) return labels
@@ -47,6 +61,7 @@ export default function EmotionWaveChart({
   }, [labels, t])
 
   const option = useMemo(() => {
+    if (!effectiveTensionPoints) return null
     const hasBenchmark = Boolean(benchmarkPoints && benchmarkPoints.length > 0)
     return {
       tooltip: {
@@ -119,7 +134,7 @@ export default function EmotionWaveChart({
               },
             ],
           },
-          data: tensionPoints,
+          data: effectiveTensionPoints,
         },
         ...(hasBenchmark && benchmarkPoints ? [{
           name: resolvedBenchmarkName,
@@ -133,7 +148,27 @@ export default function EmotionWaveChart({
         }] : []),
       ],
     }
-  }, [tensionPoints, benchmarkPoints, resolvedBenchmarkName, effectiveLabels, isDark, t])
+  }, [effectiveTensionPoints, benchmarkPoints, resolvedBenchmarkName, effectiveLabels, isDark, t])
 
-  return <BaseChart option={option} height={height} ariaLabel={ariaLabel ?? t('chart_wave_aria', '情绪起伏波形图')} />
+  if (isEmpty) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: isDark ? ink.moonSoft : ink.textTertiary,
+          fontSize: 14,
+        }}
+        role="img"
+        aria-label={ariaLabel ?? t('chart_wave_aria', '情绪起伏波形图')}
+      >
+        {t('chart_wave_empty', '暂无数据，请先测算')}
+      </div>
+    )
+  }
+
+  return <BaseChart option={option!} height={height} ariaLabel={ariaLabel ?? t('chart_wave_aria', '情绪起伏波形图')} />
 }

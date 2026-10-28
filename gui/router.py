@@ -308,6 +308,8 @@ def _safe_int(value: Any, default: int, field: str) -> int:
     """安全 int 转换：非法值返回 400 而非 500。"""
     if value is None:
         return default
+    if isinstance(value, bool):
+        raise ServiceError(f"{field} 必须为整数", 400)
     try:
         return int(value)
     except (TypeError, ValueError) as exc:
@@ -485,10 +487,14 @@ def _h_writing_note_delete(params: dict[str, Any], _body: dict[str, Any]) -> dic
 
 def _h_writing_stats(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
-    try:
-        days = int(params.get("days") or 30)
-    except (TypeError, ValueError):
+    raw_days = params.get("days")
+    if raw_days is None or raw_days == "":
         days = 30
+    else:
+        try:
+            days = int(raw_days)
+        except (TypeError, ValueError) as exc:
+            raise ServiceError("days 必须为整数", 400) from exc
     return ok(writing_extra.get_stats(params.get("project") or "", days=days))
 
 
@@ -784,8 +790,16 @@ def _h_royalroad_format(_params: dict[str, Any], body: dict[str, Any]) -> dict[s
     head = b.get("author_note_head", "")
     foot = b.get("author_note_foot", "")
     wrap = b.get("wrap_stat_boxes", True)
+    if title is not None and not isinstance(title, str):
+        raise ServiceError("title 必须为字符串", 400)
     if not isinstance(text, str):
         raise ServiceError("text 必须为字符串", 400)
+    if head is not None and not isinstance(head, str):
+        raise ServiceError("author_note_head 必须为字符串", 400)
+    if foot is not None and not isinstance(foot, str):
+        raise ServiceError("author_note_foot 必须为字符串", 400)
+    if wrap is not None and not isinstance(wrap, (bool, int, str)):
+        raise ServiceError("wrap_stat_boxes 必须为布尔值", 400)
     return ok({
         "formatted": platform_service.format_royalroad_chapter(
             title, text, head, foot, wrap_stat_boxes=bool(wrap)
@@ -906,10 +920,14 @@ def _h_admin_reports(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str
 
 def _h_admin_audit(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     from gui import admin
-    try:
-        limit = int(params.get("limit", 100))
-    except (TypeError, ValueError):
+    raw_limit = params.get("limit")
+    if raw_limit is None or raw_limit == "":
         limit = 100
+    else:
+        try:
+            limit = int(raw_limit)
+        except (TypeError, ValueError) as exc:
+            raise ServiceError("limit 必须为整数", 400) from exc
     return ok(admin.read_audit(limit,
                               action=str(params.get("action", "") or ""),
                               username=str(params.get("username", "") or ""),
@@ -947,10 +965,14 @@ def _h_tools_names(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, A
     kind = str(params.get("kind", "character"))
     style = str(params.get("style", "xianxia"))
     gender = str(params.get("gender", "all"))
-    try:
-        count = int(params.get("count", 10))
-    except (TypeError, ValueError):
+    raw_count = params.get("count")
+    if raw_count is None or raw_count == "":
         count = 10
+    else:
+        try:
+            count = int(raw_count)
+        except (TypeError, ValueError) as exc:
+            raise ServiceError("count 必须为整数", 400) from exc
     return ok(services.generate_names(kind=kind, style=style, gender=gender, count=count))
 
 
@@ -1121,14 +1143,30 @@ def _h_writing_project_meta_get(params: dict[str, Any], _body: dict[str, Any]) -
 def _h_writing_project_meta_update(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
     b = body or {}
-    return ok(writing_extra.update_project_meta(
-        project=params["project"],
-        platform=b.get("platform"),
-        genre=b.get("genre"),
-        target_words=b.get("target_words"),
-        summary=b.get("summary"),
-        meta=b.get("meta"),
-    ))
+    # target_words 仅接受 int / 数字字符串 / None；其余（list/dict/bool/…）400。
+    # 另做防御：若后续 writing_extra 内部用 int() / str() 等宽松转换，
+    # 仍由本层抛出 400，而非冒成 500。
+    tw = b.get("target_words")
+    if tw is not None:
+        if isinstance(tw, bool) or not isinstance(tw, (int, str)):
+            raise ServiceError("target_words 必须为整数", 400)
+        if isinstance(tw, str):
+            try:
+                tw = int(tw.strip())
+            except (ValueError, AttributeError) as exc:
+                raise ServiceError("target_words 必须为整数", 400) from exc
+        b["target_words"] = tw
+    try:
+        return ok(writing_extra.update_project_meta(
+            project=params["project"],
+            platform=b.get("platform"),
+            genre=b.get("genre"),
+            target_words=b.get("target_words"),
+            summary=b.get("summary"),
+            meta=b.get("meta"),
+        ))
+    except (TypeError, ValueError) as exc:
+        raise ServiceError("target_words 必须为整数", 400) from exc
 
 
 def _h_essence_chains_list(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
@@ -1140,7 +1178,15 @@ def _h_essence_chains_list(params: dict[str, Any], _body: dict[str, Any]) -> dic
 def _h_essence_chain_create(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import essence_service
     b = body or {}
-    clue = b.get("clue_name") or b.get("title") or ""
+    # clue_name/title 必须为字符串（非字符串时后续拼接/判断变 500）
+    # 注意：用显式 None 检查而非 `or`，避免空字符串跳过类型分支
+    raw_clue = b.get("clue_name") if b.get("clue_name") is not None else b.get("title")
+    if raw_clue is None:
+        clue: str = ""
+    elif isinstance(raw_clue, str):
+        clue = raw_clue
+    else:
+        raise ServiceError("clue_name 必须为字符串", 400)
     cat = b.get("category", "")
     # 类型校验（2026-10-12 补）：cat 非字符串时 `cat not in clue` 抛
     # "argument of type 'int' is not iterable" 变 500。
@@ -1194,7 +1240,11 @@ def _h_essence_export_beats(params: dict[str, Any], _body: dict[str, Any]) -> di
 def _h_essence_constitution_check(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import essence_service
     b = body or {}
-    text = b.get("text") or b.get("content") or ""
+    text = b.get("text") if b.get("text") is not None else b.get("content")
+    # 与 deslop/qc 同口径：非字符串直接 400，避免服务层静默按"合规"放过脏输入
+    if text is not None and not isinstance(text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    text = text or ""
     rules = b.get("rules")
     characters_forbidden = b.get("characters_forbidden") or b.get("charactersForbidden")
     return ok(essence_service.check_constitution_compliance(
@@ -1385,6 +1435,13 @@ _MAX_BODY_BYTES = 10 * 1024 * 1024  # 10 MB
 
 def read_body(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
     """读取 JSON 请求体。L4：非法 Content-Length 返回 400；超大 body 返回 413。"""
+    # chunked 传输编码缺口：http.server 不解码 chunked，若客户端以
+    # Transfer-Encoding: chunked 发送且 Content-Length 为 0，会绕过长度校验。
+    # 此处理论上仅影响带代理的环境（代理可能重写头），浏览器 fetch 正常发 JSON
+    # 时不会同时带 chunked；仍做明确阻断以避免静默绕过。
+    te = handler.headers.get("Transfer-Encoding", "") or ""
+    if "chunked" in te.lower():
+        raise ServiceError("不支持 chunked 传输编码", 400)
     raw_len = handler.headers.get("Content-Length", "0") or "0"
     try:
         length = int(raw_len)
@@ -1454,6 +1511,11 @@ def parse_multipart_upload(raw: bytes, content_type: str) -> tuple[str, bytes, d
     实测 email 包解析 100MB 级 body 时产生约 10 倍瞬时内存放大（服务 RSS
     峰值约 3.1GB）；此处改为切片提取，峰值约为 body 的 2 倍（raw + 文件切片）。
     只取第一个带文件名的 part 为上传文件；其余 form-data 文本 part 进 fields。
+
+    已知边界截断局限：文件内容中若出现与 boundary 完全相同的字节序列
+    （后跟 CRLF + Content-Disposition 头），会被误判为分段分隔符。
+    浏览器生成的随机 boundary 碰撞概率可忽略；若未来发现误截断，
+    可将分隔符判定收紧为「boundary 后必须跟 CRLF + Content-Disposition 头」。
     """
     m = re.search(r"boundary=([^;]+)", content_type or "", re.IGNORECASE)
     if not m:

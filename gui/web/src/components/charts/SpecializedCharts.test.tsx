@@ -20,7 +20,7 @@ describe('Specialized Narrative Analytics Charts & Base Charts i18n', () => {
     it('在 zh-CN 环境下使用默认情绪张力系列与11个标准节拍', () => {
       render(
         <I18nProvider initialLocale="zh-CN">
-          <EmotionWaveChart />
+          <EmotionWaveChart showDemo />
         </I18nProvider>
       )
 
@@ -38,7 +38,7 @@ describe('Specialized Narrative Analytics Charts & Base Charts i18n', () => {
     it('在 en-US 环境下包含标杆基准曲线时正确国际化', () => {
       render(
         <I18nProvider initialLocale="en-US">
-          <EmotionWaveChart benchmarkPoints={[40, 50, 60]} />
+          <EmotionWaveChart showDemo benchmarkPoints={[40, 50, 60]} />
         </I18nProvider>
       )
 

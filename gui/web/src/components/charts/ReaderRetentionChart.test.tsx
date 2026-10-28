@@ -19,7 +19,7 @@ describe('ReaderRetentionChart 读者留存流失预测图组件', () => {
   it('默认模式下渲染衰减留存曲线与 S/A/及格三条阈值辅助线', () => {
     render(
       <I18nProvider initialLocale="zh-CN">
-        <ReaderRetentionChart />
+        <ReaderRetentionChart showDemo />
       </I18nProvider>,
     )
 
@@ -78,7 +78,7 @@ describe('ReaderRetentionChart 读者留存流失预测图组件', () => {
   it('英文国际化环境下正确渲染 aria-label', () => {
     render(
       <I18nProvider initialLocale="en-US">
-        <ReaderRetentionChart />
+        <ReaderRetentionChart showDemo />
       </I18nProvider>,
     )
 

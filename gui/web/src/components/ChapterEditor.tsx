@@ -1,7 +1,7 @@
 // ChapterEditor：章节正文编辑器（基于 Tiptap，设计灵感来自 steven-tey/novel，Apache-2.0）。
 // 定位：比 textarea 更干净的中文长文编辑面，带实时字数统计与占位提示。
 // 数据契约：value/onChange 均为纯文本（后端只收纯文本），编辑器内部富文本状态不外泄。
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
@@ -86,6 +86,11 @@ export default function ChapterEditor({
   const [constitutionResult, setConstitutionResult] = useState<ConstitutionCheckResult | null>(null)
   const [constitutionError, setConstitutionError] = useState('')
 
+  const poisonSeqRef = useRef(0)
+  const deslopSeqRef = useRef(0)
+  const constitutionSeqRef = useRef(0)
+  const chapterSeqRef = useRef(0)
+
   const editor = useEditor({
     extensions: [
       // 纯文本模式：只保留段落与换行，关闭加粗/标题等 mark，避免"排了版却存不下来"的误会。
@@ -129,6 +134,14 @@ export default function ChapterEditor({
     }
   }, [value, editor])
 
+  // Bump chapter generation on value change; cleanup bumps on unmount so stale resolves are ignored.
+  useEffect(() => {
+    chapterSeqRef.current += 1
+    return () => {
+      chapterSeqRef.current += 1
+    }
+  }, [value])
+
   const handleQuickPoisonCheck = async () => {
     const text = editor?.getText() || value
     if (!text.trim()) {
@@ -137,16 +150,22 @@ export default function ChapterEditor({
       setPoisonOpen(true)
       return
     }
+    const seq = ++poisonSeqRef.current
+    const chapterSeq = chapterSeqRef.current
     setPoisonLoading(true)
     setPoisonError('')
     setPoisonOpen(true)
     try {
       const res = await toolsApi.checkPoison(text)
+      if (seq !== poisonSeqRef.current || chapterSeq !== chapterSeqRef.current) return
       setPoisonResult(res)
     } catch (e) {
+      if (seq !== poisonSeqRef.current || chapterSeq !== chapterSeqRef.current) return
       setPoisonError(friendlyError(e))
     } finally {
-      setPoisonLoading(false)
+      if (seq === poisonSeqRef.current && chapterSeq === chapterSeqRef.current) {
+        setPoisonLoading(false)
+      }
     }
   }
 
@@ -158,16 +177,22 @@ export default function ChapterEditor({
       setDeslopOpen(true)
       return
     }
+    const seq = ++deslopSeqRef.current
+    const chapterSeq = chapterSeqRef.current
     setDeslopLoading(true)
     setDeslopError('')
     setDeslopOpen(true)
     try {
       const res = await writingApi.deslop(text)
+      if (seq !== deslopSeqRef.current || chapterSeq !== chapterSeqRef.current) return
       setDeslopResult(res)
     } catch (e) {
+      if (seq !== deslopSeqRef.current || chapterSeq !== chapterSeqRef.current) return
       setDeslopError(friendlyError(e))
     } finally {
-      setDeslopLoading(false)
+      if (seq === deslopSeqRef.current && chapterSeq === chapterSeqRef.current) {
+        setDeslopLoading(false)
+      }
     }
   }
 
@@ -179,6 +204,8 @@ export default function ChapterEditor({
       setConstitutionOpen(true)
       return
     }
+    const seq = ++constitutionSeqRef.current
+    const chapterSeq = chapterSeqRef.current
     setConstitutionLoading(true)
     setConstitutionError('')
     setConstitutionOpen(true)
@@ -188,11 +215,15 @@ export default function ChapterEditor({
         rules: constitutionRules,
         characters_forbidden: charactersForbidden,
       })
+      if (seq !== constitutionSeqRef.current || chapterSeq !== chapterSeqRef.current) return
       setConstitutionResult(res)
     } catch (e) {
+      if (seq !== constitutionSeqRef.current || chapterSeq !== chapterSeqRef.current) return
       setConstitutionError(friendlyError(e))
     } finally {
-      setConstitutionLoading(false)
+      if (seq === constitutionSeqRef.current && chapterSeq === chapterSeqRef.current) {
+        setConstitutionLoading(false)
+      }
     }
   }
 
@@ -236,6 +267,7 @@ export default function ChapterEditor({
               size="small"
               variant="text"
               onClick={handleQuickPoisonCheck}
+              disabled={poisonLoading}
               sx={{
                 fontSize: '0.78rem',
                 color: ink.textSecondary,
@@ -252,6 +284,7 @@ export default function ChapterEditor({
               size="small"
               variant="text"
               onClick={handleQuickDeslopCheck}
+              disabled={deslopLoading}
               sx={{
                 fontSize: '0.78rem',
                 color: ink.textSecondary,
@@ -268,6 +301,7 @@ export default function ChapterEditor({
               size="small"
               variant="text"
               onClick={handleQuickConstitutionCheck}
+              disabled={constitutionLoading}
               sx={{
                 fontSize: '0.78rem',
                 color: ink.textSecondary,

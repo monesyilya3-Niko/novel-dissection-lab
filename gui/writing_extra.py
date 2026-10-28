@@ -27,6 +27,27 @@ from gui.services import ServiceError
 
 _log = get_logger("writing_extra")
 
+def _clamp_int_range(raw: Any, field: str, default: int = 10) -> int:
+    """Clamp integer param to [3,20] with strict validation.
+
+    - None → default (10)
+    - bool → 400 (explicit reject)
+    - else try int(raw); on ValueError/TypeError → 400
+    - then clamp to [3,20]
+    """
+    if raw is None:
+        n = default
+    else:
+        if isinstance(raw, bool):
+            raise ServiceError(f"{field} 必须为 3..20 的整数", 400)
+        try:
+            n = int(raw)
+        except (ValueError, TypeError) as exc:
+            raise ServiceError(f"{field} 必须为 3..20 的整数", 400) from exc
+    return max(3, min(20, n))
+
+
+
 _WS_RE = re.compile(r"\s+")
 # XML 1.0 合法字符过滤：剔除 \x00-\x08, \x0b, \x0c, \x0e-\x1f, \ufffe, \uffff 等非法控制字符
 _ILLEGAL_XML_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
@@ -313,12 +334,14 @@ def analyze_tension_curve(
         raise ServiceError("text 必须为字符串", 400)
 
     # 限制切片数量范围在 3 到 20 之间
-    n = max(3, min(20, int(segments_count or 10)))
+    n = _clamp_int_range(segments_count, "segments_count")
 
-    # 规范化标杆类型
-    bm_key = (benchmark or "classic").strip().lower()
+    # 规范化标杆类型（严格校验：未知 benchmark 必须 400 而非静默回退）
+    if not isinstance(benchmark, str):
+        raise ServiceError("benchmark 必须为字符串", 400)
+    bm_key = benchmark.strip().lower()
     if bm_key not in _BENCHMARK_PROFILES:
-        bm_key = "classic"
+        raise ServiceError(f"未知 benchmark: {bm_key}", 400)
     raw_bm_profile = _BENCHMARK_PROFILES[bm_key]
     benchmark_curve = _resample_curve(raw_bm_profile, n)
     bm_name = _BENCHMARK_NAMES.get(bm_key, "经典起承转合标杆")
@@ -435,11 +458,13 @@ def analyze_golden_three_tension(
         if not isinstance(ch, str):
             raise ServiceError(f"第 {idx + 1} 章内容必须为字符串", 400)
 
-    # 规范化点数与标杆
-    pts = max(3, min(20, int(points_per_chapter or 10)))
-    bm_key = (benchmark or "classic").strip().lower()
+    # 规范化点数与标杆（严格校验：未知 benchmark 必须 400 而非静默回退）
+    pts = _clamp_int_range(points_per_chapter, "points_per_chapter")
+    if not isinstance(benchmark, str):
+        raise ServiceError("benchmark 必须为字符串", 400)
+    bm_key = benchmark.strip().lower()
     if bm_key not in _GOLDEN_THREE_BENCHMARK_PROFILES:
-        bm_key = "classic"
+        raise ServiceError(f"未知 benchmark: {bm_key}", 400)
     bm_templates = _GOLDEN_THREE_BENCHMARK_PROFILES[bm_key]
     bm_name = _GOLDEN_THREE_BENCHMARK_NAMES.get(bm_key, "经典商业递进三章标杆")
 
@@ -680,6 +705,8 @@ def estimate_reader_retention(
     基于黄金三章细粒度情绪张力、首章入局速度、平淡注水期密度、跨章过渡落差与末尾留钩，
     量化推导各章节读者留存率衰减曲线、定位跳出高危风险点并给出挽留优化建议。
     """
+    # Validate points_per_chapter at service layer (None→default, bool/type errors→400)
+    _clamp_int_range(points_per_chapter, "points_per_chapter")
     base_data = analyze_golden_three_tension(chapters, benchmark=benchmark, points_per_chapter=points_per_chapter)
     pts = base_data["points_per_chapter"]
     total_chapters = base_data["total_chapters"]
@@ -743,8 +770,8 @@ def estimate_reader_retention(
 
         # (c) 平淡注水期惩罚
         is_flat = tension < 35 and (
-            (seg_idx > 0 and combined_curve[i - 1] < 35) or
-            (seg_idx < pts - 1 and i + 1 < total_segments and combined_curve[i + 1] < 35)
+            (i > 0 and combined_curve[i - 1] < 35) or
+            (i + 1 < total_segments and combined_curve[i + 1] < 35)
         )
         if is_flat:
             modifier += 3.2
@@ -767,13 +794,16 @@ def estimate_reader_retention(
                 reasons.append("章末收束偏平，缺乏驱动翻页的强力留白")
 
         # (f) 章节内容缺失/字数过短严重惩罚
-        if chapters_metrics[ch_idx]["char_count"] < 30:
+        if chapters_metrics[ch_idx]["char_count"] < 30 and seg_idx == 0:
             modifier += 10.0
             reasons.append("章节字数过短或为空，读者跳出率极高")
 
         # 计算切片综合流失率 (0.2% - 22.0%)
         effective_drop = max(0.2, min(22.0, round(base_drop + modifier, 2)))
-        current_retention = max(5.0, min(100.0, round(current_retention * (1.0 - effective_drop / 100.0), 2)))
+        current_retention = max(0.1, min(100.0, round(current_retention * (1.0 - effective_drop / 100.0), 2)))
+        # 章节过短的整章额外留存惩罚（按章一次，避免 per-segment 10x 放大）
+        if seg_idx == pts - 1 and chapters_metrics[ch_idx]["char_count"] < 30:
+            current_retention = max(0.1, round(current_retention * 0.82, 2))
         retention_curve.append(current_retention)
 
         segment_drops.append({

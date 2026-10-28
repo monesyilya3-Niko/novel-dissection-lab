@@ -12,9 +12,12 @@
 #
 # 绕过（仅在确知要临时跳过时使用）：
 #   git commit --no-verify
+#   或（推荐显式）：NOVEL_LAB_SKIP_HOOKS=1 git commit -m "..."
 #
 # 指定解释器（可选，优先级最高）：
 #   NOVEL_LAB_PYTHON=/path/to/python git commit -m "..."
+#
+# 仅文档变更（*.md / docs/**）自动 fast-path 跳过重测试，仍跑 lint + 资产校验。
 #
 # 纯 POSIX sh + 标准库，无第三方依赖（铁律三）。
 # ---------------------------------------------------------------------------
@@ -37,10 +40,8 @@ resolve_python() {
         echo "[pre-commit] 警告：NOVEL_LAB_PYTHON=$NOVEL_LAB_PYTHON 不存在或不可执行，继续尝试其它候选。" >&2
     fi
 
-    # 2) 项目约定解释器 / 项目内 venv（存在才用）
+    # 2) 项目内 venv（存在才用，可移植）
     for cand in \
-        "C:/Users/monesy/AppData/Local/Programs/Python/Python313/python.exe" \
-        "C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe" \
         "$REPO_ROOT/.venv/Scripts/python.exe" \
         "$REPO_ROOT/.venv/bin/python" \
         "$REPO_ROOT/venv/Scripts/python.exe" \
@@ -61,6 +62,19 @@ resolve_python() {
         fi
     done
 
+    # 4) 硬编码兜底（最后手段，仅兼容旧环境；带警告）
+    for cand in \
+        "C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe" \
+        "C:/Users/monesy/.niko/binaries/python/envs/default/Scripts/python.exe" \
+        "C:/Users/monesy/.niko/binaries/python/envs/default/bin/python"
+    do
+        if [ -x "$cand" ]; then
+            echo "[pre-commit] 警告：回退到硬编码解释器 $cand（建议迁移到 .venv 或 PATH）。" >&2
+            printf '%s\n' "$cand"
+            return 0
+        fi
+    done
+
     return 1
 }
 
@@ -72,6 +86,51 @@ if ! PYTHON=$(resolve_python); then
     echo "  临时绕过：git commit --no-verify" >&2
     echo "============================================================" >&2
     exit 1
+fi
+
+# --- 环境变量一键跳过（用于 --no-verify 侵蚀场景的显式替代） ---------------
+# NOVEL_LAB_SKIP_HOOKS=1 时跳过全部重检查，仍保留提示，避免用户养成 --no-verify 习惯。
+if [ "${NOVEL_LAB_SKIP_HOOKS:-}" = "1" ] || [ "${NOVEL_LAB_SKIP_HOOKS:-}" = "true" ]; then
+    echo "[pre-commit] NOVEL_LAB_SKIP_HOOKS 已启用，跳过全部检查。" >&2
+    exit 0
+fi
+
+# --- docs-only fast-path：仅文档变更时跳过重测试 -----------------------------
+# 若本次暂存文件全部匹配「无需测试」的后缀/路径，则跳过 run_tests.py。
+# 判断方式：只要有一个暂存文件匹配需测试的后缀，就走完整流程；否则 fast-path。
+# 需测试的后缀：py/ts/tsx/js/json/yml/yaml/toml/sh/iss（与 CI 关注的一致）
+# 注意：STAGED_ASSETS 的校验逻辑保持不变，仅复用其 fast-path 已有的 assets 校验。
+
+# 提取本次暂存文件名列表（用于 fast-path 判断）
+STAGED_ALL=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+
+DOCS_ONLY_FAST_PATH=0
+if [ -n "$STAGED_ALL" ]; then
+    # 只要有一个暂存文件匹配需测试后缀，就走完整流程；否则 fast-path
+    if ! printf '%s\n' "$STAGED_ALL" | grep -qE '\.(py|ts|tsx|js|json|yml|yaml|toml|sh|iss)$'; then
+        DOCS_ONLY_FAST_PATH=1
+    fi
+fi
+
+# --- timeout 探测：优先使用系统 timeout/gtimeout，避免 125s+ 挂死 ------------
+# Windows Git Bash 通常无 timeout；有则用，无则退化为直接运行。
+detect_timeout() {
+    if command -v timeout >/dev/null 2>&1; then
+        printf 'timeout'
+        return 0
+    fi
+    if command -v gtimeout >/dev/null 2>&1; then
+        printf 'gtimeout'
+        return 0
+    fi
+    return 1
+}
+
+TIMEOUT_BIN=""
+if TIMEOUT_BIN=$(detect_timeout); then
+    TIMEOUT_PREFIX="$TIMEOUT_BIN 180"
+else
+    TIMEOUT_PREFIX=""
 fi
 
 # --- ruff：CI 每个分支都跑 `ruff check .`，本地守卫不跑就会把 lint 失败留到 CI ----
@@ -103,12 +162,35 @@ if ! run_ruff; then
     exit 1
 fi
 
-echo "[pre-commit] 解释器：$PYTHON"
-echo "[pre-commit] 运行全量回归测试：python run_tests.py"
-echo "[pre-commit] ------------------------------------------------------------"
+# --- 实际执行：区分 fast-path 与全量 --------------------------------------
+if [ "$DOCS_ONLY_FAST_PATH" = "1" ]; then
+    echo "[pre-commit] 检测到仅文档/非代码变更，跳过全量回归测试（fast-path）。" >&2
+    echo "[pre-commit] 如需强制全量：NOVEL_LAB_SKIP_HOOKS=0 git commit 或暂存一个代码文件。" >&2
+    # fast-path 仍跑 lint（若本次变更含需 lint 的文件则已在上方 ruff 覆盖；此处额外提示）
+    echo "[pre-commit] fast-path：跳过 run_tests.py，直接进入资产校验。"
+    STATUS=0
+else
+    echo "[pre-commit] 解释器：$PYTHON"
+    echo "[pre-commit] 运行全量回归测试：python run_tests.py（约 2328 tests / ~2min，超时 180s）..."
+    echo "[pre-commit] ------------------------------------------------------------"
 
-"$PYTHON" run_tests.py
-STATUS=$?
+    if [ -n "$TIMEOUT_PREFIX" ]; then
+        $TIMEOUT_PREFIX "$PYTHON" run_tests.py
+        STATUS=$?
+        if [ "$STATUS" -eq 124 ]; then
+            echo "" >&2
+            echo "============================================================" >&2
+            echo "  [pre-commit] 测试超时（180s），提交已阻止。" >&2
+            echo "  可能原因：死循环 / 挂起 / 测试集过大。" >&2
+            echo "  临时绕过：NOVEL_LAB_SKIP_HOOKS=1 git commit -m "..." 或 git commit --no-verify" >&2
+            echo "============================================================" >&2
+            exit "$STATUS"
+        fi
+    else
+        "$PYTHON" run_tests.py
+        STATUS=$?
+    fi
+fi
 
 if [ "$STATUS" -eq 0 ]; then
     echo "[pre-commit] ------------------------------------------------------------"

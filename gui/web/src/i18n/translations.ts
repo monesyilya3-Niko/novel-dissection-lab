@@ -1349,6 +1349,101 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'en-US': 'Concatenating txt...',
   },
 
+  extras_dash_wave_subtitle: {
+    'zh-CN': '监测剧情平淡期与高潮爆发期，红线为章节实测，虚线为神作对标基准',
+    'en-US': 'Detects flat pacing vs climax bursts — solid line is your chapter, dashed line is the benchmark',
+  },
+  extras_golden_three_combined_fit: {
+    'zh-CN': '综合拟合度: {score}%',
+    'en-US': 'Combined Fit: {score}%',
+  },
+  extras_golden_three_cliff_rating: {
+    'zh-CN': '断章评级: {rating}',
+    'en-US': 'Cliffhanger: {rating}',
+  },
+  extras_golden_three_handoff_chip: {
+    'zh-CN': '第{from}章→第{to}章: {status} (落差{drop}分)',
+    'en-US': 'Ch.{from}→Ch.{to}: {status} (drop {drop})',
+  },
+  extras_golden_three_status_cliff: {
+    'zh-CN': '⚠️断崖失速',
+    'en-US': '⚠️Cliff Drop',
+  },
+  extras_golden_three_status_smooth: {
+    'zh-CN': '✅平滑承接',
+    'en-US': '✅Smooth Handoff',
+  },
+  extras_golden_three_expert_advice: {
+    'zh-CN': '黄金三章专家修改建议：',
+    'en-US': 'Golden 3 Expert Suggestions:',
+  },
+  extras_golden_three_back_single: {
+    'zh-CN': '返回单章',
+    'en-US': 'Back to Single',
+  },
+  extras_tension_bm_fit: {
+    'zh-CN': '标杆拟合度: {score}%',
+    'en-US': 'Benchmark Fit: {score}%',
+  },
+  extras_tension_climax: {
+    'zh-CN': '最高潮: {seg} ({score}分)',
+    'en-US': 'Climax: {seg} ({score})',
+  },
+  extras_tension_avg_var: {
+    'zh-CN': '均值: {avg} ｜ 波动: ±{variance}',
+    'en-US': 'Avg: {avg} | Variance: ±{variance}',
+  },
+  extras_outline_move_up_aria: {
+    'zh-CN': '上移',
+    'en-US': 'Move up',
+  },
+  extras_outline_move_down_aria: {
+    'zh-CN': '下移',
+    'en-US': 'Move down',
+  },
+  extras_action_edit_aria: {
+    'zh-CN': '编辑',
+    'en-US': 'Edit',
+  },
+  extras_action_delete_aria: {
+    'zh-CN': '删除',
+    'en-US': 'Delete',
+  },
+
+  // 黄金三章对话框 - 标杆标签（复用于 Golden Three + Retention 弹窗）
+  extras_benchmark_label: {
+    'zh-CN': '商业神作标杆类型',
+    'en-US': 'Benchmark Template',
+  },
+  extras_benchmark_classic: {
+    'zh-CN': '经典商业递进三章标杆',
+    'en-US': 'Classic Commercial Progression',
+  },
+  extras_benchmark_upgrade: {
+    'zh-CN': '升级爽文逆袭打脸标杆',
+    'en-US': 'Power-Up Revenge Arc',
+  },
+  extras_benchmark_fast_hook: {
+    'zh-CN': '快穿生死时速高压标杆',
+    'en-US': 'High-Stakes Fast Hook',
+  },
+  extras_benchmark_suspense: {
+    'zh-CN': '悬疑无限流惊悚标杆',
+    'en-US': 'Infinite Suspense / Thriller',
+  },
+  extras_golden_three_ch1_ph: {
+    'zh-CN': '粘贴第 1 章正文草稿（前 30% 快速入局，章末留下微悬念钩子）……',
+    'en-US': 'Paste Chapter 1 draft (hook in first 30%, end with a micro-cliffhanger)...',
+  },
+  extras_golden_three_ch2_ph: {
+    'zh-CN': '粘贴第 2 章正文草稿（防中段失速塌陷，金手指与核心危机介入展开）……',
+    'en-US': 'Paste Chapter 2 draft (avoid mid-arc sag, introduce power-up and core conflict)...',
+  },
+  extras_golden_three_ch3_ph: {
+    'zh-CN': '粘贴第 3 章正文草稿（首卷爆发高潮与爽点释放，末尾强断章钩子）……',
+    'en-US': 'Paste Chapter 3 draft (first-volume climax and payoff, end with a strong hook)...',
+  },
+
   // 创作室与写作弹窗 (Writing Studio & Dialogs)
   writing_new_project_title: {
     'zh-CN': '新建写作项目',
@@ -4864,6 +4959,38 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   chart_retention_point: {
     'zh-CN': '切片',
     'en-US': 'Segment',
+  },
+  chart_wave_empty: {
+    'zh-CN': '暂无数据，请先测算',
+    'en-US': 'No data yet. Run analysis to generate waveform.',
+  },
+  chart_retention_empty: {
+    'zh-CN': '暂无数据，请先测算',
+    'en-US': 'No data yet. Run retention analysis.',
+  },
+  chart_retention_tooltip_drop: {
+    'zh-CN': '预估跳出',
+    'en-US': 'Est. Drop-off',
+  },
+  chart_retention_tooltip_reason: {
+    'zh-CN': '原因:',
+    'en-US': 'Reason:',
+  },
+  chart_retention_churn: {
+    'zh-CN': '累计流失',
+    'en-US': 'Cumulative Churn',
+  },
+  chart_retention_line_s: {
+    'zh-CN': 'S级线',
+    'en-US': 'S-Tier',
+  },
+  chart_retention_line_a: {
+    'zh-CN': 'A级线',
+    'en-US': 'A-Tier',
+  },
+  chart_retention_line_pass: {
+    'zh-CN': '及格线',
+    'en-US': 'Pass Line',
   },
   chart_aria_bar: {
     'zh-CN': '柱状图',

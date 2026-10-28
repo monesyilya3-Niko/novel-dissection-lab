@@ -18,7 +18,7 @@ describe('EmotionWaveChart 情绪起伏波形图组件', () => {
   it('默认模式下渲染11个标准节拍、情绪张力单曲线与高潮警戒线', () => {
     render(
       <I18nProvider initialLocale="zh-CN">
-        <EmotionWaveChart />
+        <EmotionWaveChart showDemo />
       </I18nProvider>,
     )
 
@@ -91,7 +91,7 @@ describe('EmotionWaveChart 情绪起伏波形图组件', () => {
   it('在 en-US 环境下全量翻译标准节拍、图例与警戒线标签', () => {
     render(
       <I18nProvider initialLocale="en-US">
-        <EmotionWaveChart benchmarkPoints={[40, 60, 80]} />
+        <EmotionWaveChart showDemo benchmarkPoints={[40, 60, 80]} />
       </I18nProvider>,
     )
 

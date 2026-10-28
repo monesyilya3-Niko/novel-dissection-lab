@@ -1,6 +1,6 @@
 // 创作管理（企业级重构）：大纲 / 人物卡 / 灵感便签 / 创作者仪表盘 / 多格式导出。
 // 挂在辅助写作工作台下的新页签「创作」，各面板按项目隔离。
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Box from '@mui/material/Box'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
@@ -52,7 +52,7 @@ const OUTLINE_STATUS_COLOR: Record<string, 'default' | 'primary' | 'success'> = 
 export default function WritingExtras() {
   const { t } = useI18n()
   const [tab, setTab] = useState(0)
-  const [projects, setProjects] = useState<WritingProject[]>([])
+  const [projects, setProjects] = useState<WritingProject[] | null>(null)
   const [project, setProject] = useState('')
   const [error, setError] = useState('')
 
@@ -83,7 +83,7 @@ export default function WritingExtras() {
           sx={{ minWidth: 220 }}
           size="small"
         >
-          {projects.map((p) => (
+          {(projects ?? []).map((p) => (
             <MenuItem key={p.id} value={p.name}>
               {p.name}
             </MenuItem>
@@ -94,7 +94,9 @@ export default function WritingExtras() {
         </Typography>
       </Box>
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
-      {!project ? (
+      {projects === null ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={28} /></Box>
+      ) : !project ? (
         <Alert severity="info">{t('extras_no_project_alert')}</Alert>
       ) : (
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -125,7 +127,7 @@ export default function WritingExtras() {
 function OutlinePanel({ project }: { project: string }) {
   const { isDark } = useThemeMode()
   const { t } = useI18n()
-  const [items, setItems] = useState<OutlineItem[]>([])
+  const [items, setItems] = useState<OutlineItem[] | null>(null)
   const [error, setError] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<OutlineItem | null>(null)
@@ -138,6 +140,9 @@ function OutlinePanel({ project }: { project: string }) {
   const [templates, setTemplates] = useState<HookItem[]>([])
   const [templateLoading, setTemplateLoading] = useState(false)
   const [selectedHook, setSelectedHook] = useState<HookItem | null>(null)
+  const [isReordering, setIsReordering] = useState(false)
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false)
+  const reqIdRef = useRef(0)
 
   const kindLabel = (k: string) => (k === 'volume' ? t('extras_outline_volume') : t('extras_outline_chapter'))
   const statusLabel = (s: string) => {
@@ -166,11 +171,13 @@ function OutlinePanel({ project }: { project: string }) {
   }
 
   const doApplyTemplate = async () => {
-    if (!selectedHook) return
+    if (!selectedHook || isApplyingTemplate) return
     setError('')
+    setIsApplyingTemplate(true)
+    const createdIds: number[] = []
     try {
-      const baseOrder = items.length
-      await writingApi.createOutline({
+      const baseOrder = (items ?? []).length
+      const r1 = await writingApi.createOutline({
         project,
         kind: 'chapter',
         title: `第1章：${selectedHook.name}（首章生死危机）`,
@@ -178,7 +185,8 @@ function OutlinePanel({ project }: { project: string }) {
         status: 'planned',
         sort_order: baseOrder,
       })
-      await writingApi.createOutline({
+      if (r1 && typeof (r1 as any).id === 'number') createdIds.push((r1 as any).id)
+      const r2 = await writingApi.createOutline({
         project,
         kind: 'chapter',
         title: `第2章：${selectedHook.name}（压迫激化与转机）`,
@@ -186,7 +194,8 @@ function OutlinePanel({ project }: { project: string }) {
         status: 'planned',
         sort_order: baseOrder + 1,
       })
-      await writingApi.createOutline({
+      if (r2 && typeof (r2 as any).id === 'number') createdIds.push((r2 as any).id)
+      const r3 = await writingApi.createOutline({
         project,
         kind: 'chapter',
         title: `第3章：${selectedHook.name}（首爽破局与爽点兑现）`,
@@ -194,18 +203,36 @@ function OutlinePanel({ project }: { project: string }) {
         status: 'planned',
         sort_order: baseOrder + 2,
       })
+      if (r3 && typeof (r3 as any).id === 'number') createdIds.push((r3 as any).id)
       setTemplateOpen(false)
       load()
     } catch (e) {
-      setError(`应用黄金三章模板失败: ${friendlyError(e)}`)
+      for (const id of createdIds) {
+        try { await writingApi.deleteOutline(id) } catch { /* best-effort rollback */ }
+      }
+      if (createdIds.length > 0) {
+        setError(`应用黄金三章模板失败，已回滚 ${createdIds.length} 条已创建的大纲: ${friendlyError(e)}`)
+        load()
+      } else {
+        setError(`应用黄金三章模板失败: ${friendlyError(e)}`)
+      }
+    } finally {
+      setIsApplyingTemplate(false)
     }
   }
 
   const load = useCallback(() => {
+    const cur = ++reqIdRef.current
     writingApi
       .outlines(project)
-      .then(setItems)
-      .catch((e) => setError(`加载大纲失败: ${friendlyError(e)}`))
+      .then((res) => {
+        if (cur !== reqIdRef.current) return
+        setItems(res)
+      })
+      .catch((e) => {
+        if (cur !== reqIdRef.current) return
+        setError(`加载大纲失败: ${friendlyError(e)}`)
+      })
   }, [project])
 
   useEffect(() => {
@@ -240,7 +267,7 @@ function OutlinePanel({ project }: { project: string }) {
       if (editing) {
         await writingApi.updateOutline(editing.id, { kind, title: title.trim(), summary, status })
       } else {
-        await writingApi.createOutline({ project, kind, title: title.trim(), summary, status, sort_order: items.length })
+        await writingApi.createOutline({ project, kind, title: title.trim(), summary, status, sort_order: (items ?? []).length })
       }
       setDialogOpen(false)
       load()
@@ -271,20 +298,25 @@ function OutlinePanel({ project }: { project: string }) {
   }
 
   const doMove = async (index: number, direction: 'up' | 'down') => {
+    if (isReordering) return
+    const list = items ?? []
     const targetIndex = direction === 'up' ? index - 1 : index + 1
-    if (targetIndex < 0 || targetIndex >= items.length) return
-    const newItems = [...items]
+    if (targetIndex < 0 || targetIndex >= list.length) return
+    const prevItems = list
+    const newItems = [...list]
     const temp = newItems[index]
     newItems[index] = newItems[targetIndex]
     newItems[targetIndex] = temp
     setItems(newItems)
-
+    setIsReordering(true)
     try {
       await writingApi.reorderOutlines(project, newItems.map((it) => it.id))
       load()
     } catch (e) {
+      setItems(prevItems)
       setError(`重排序失败: ${friendlyError(e)}`)
-      load()
+    } finally {
+      setIsReordering(false)
     }
   }
 
@@ -301,11 +333,13 @@ function OutlinePanel({ project }: { project: string }) {
           </Button>
         </Box>
         <Typography variant="caption" color="text.secondary">
-          共 {items.filter((i) => i.kind === 'volume').length} {t('extras_outline_volume')} / {items.filter((i) => i.kind === 'chapter').length} {t('extras_outline_chapter')} ｜ 支持上下微移原子重排
+          共 {(items ?? []).filter((i) => i.kind === 'volume').length} {t('extras_outline_volume')} / {(items ?? []).filter((i) => i.kind === 'chapter').length} {t('extras_outline_chapter')} ｜ 支持上下微移原子重排
         </Typography>
       </Box>
 
-      {items.length === 0 ? (
+      {items === null ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={28} /></Box>
+      ) : items.length === 0 ? (
         <Paper elevation={0} sx={{ p: 4, textAlign: 'center', ...glassCard(isDark) }}>
           <Typography color="text.secondary">{t('extras_outline_empty')}</Typography>
         </Paper>
@@ -344,24 +378,26 @@ function OutlinePanel({ project }: { project: string }) {
                 />
                 <IconButton
                   size="small"
-                  disabled={idx === 0}
+                  disabled={idx === 0 || isReordering}
                   onClick={() => doMove(idx, 'up')}
                   title="上移"
+                  aria-label={t('extras_outline_move_up_aria', '上移')}
                 >
                   <ArrowUpwardIcon fontSize="small" />
                 </IconButton>
                 <IconButton
                   size="small"
-                  disabled={idx === items.length - 1}
+                  disabled={idx === (items ?? []).length - 1 || isReordering}
                   onClick={() => doMove(idx, 'down')}
                   title="下移"
+                  aria-label={t('extras_outline_move_down_aria', '下移')}
                 >
                   <ArrowDownwardIcon fontSize="small" />
                 </IconButton>
-                <IconButton size="small" onClick={() => openEdit(it)} title="编辑">
+                <IconButton size="small" onClick={() => openEdit(it)} title="编辑" aria-label={t('extras_action_edit_aria', '编辑')}>
                   <EditIcon fontSize="small" />
                 </IconButton>
-                <IconButton size="small" onClick={() => doDelete(it.id)} title="删除">
+                <IconButton size="small" onClick={() => doDelete(it.id)} title="删除" aria-label={t('extras_action_delete_aria', '删除')}>
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               </Box>
@@ -491,9 +527,9 @@ function OutlinePanel({ project }: { project: string }) {
             variant="contained"
             color="primary"
             onClick={doApplyTemplate}
-            disabled={!selectedHook}
+            disabled={!selectedHook || isApplyingTemplate}
           >
-            {t('extras_outline_template_apply')}
+            {isApplyingTemplate ? t('extras_tension_analyzing', '应用中…') : t('extras_outline_template_apply')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -508,7 +544,7 @@ function OutlinePanel({ project }: { project: string }) {
 function CharacterPanel({ project }: { project: string }) {
   const { isDark } = useThemeMode()
   const { t } = useI18n()
-  const [items, setItems] = useState<CharacterCard[]>([])
+  const [items, setItems] = useState<CharacterCard[] | null>(null)
   const [error, setError] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<CharacterCard | null>(null)
@@ -518,12 +554,20 @@ function CharacterPanel({ project }: { project: string }) {
   const [camp, setCamp] = useState('主角阵营')
   const [relationTarget, setRelationTarget] = useState('')
   const [relationType, setRelationType] = useState('同盟')
+  const reqIdRef = useRef(0)
 
   const load = useCallback(() => {
+    const cur = ++reqIdRef.current
     writingApi
       .characters(project)
-      .then(setItems)
-      .catch((e) => setError(`加载人物卡失败: ${friendlyError(e)}`))
+      .then((res) => {
+        if (cur !== reqIdRef.current) return
+        setItems(res)
+      })
+      .catch((e) => {
+        if (cur !== reqIdRef.current) return
+        setError(`加载人物卡失败: ${friendlyError(e)}`)
+      })
   }, [project])
 
   useEffect(() => {
@@ -623,17 +667,19 @@ function CharacterPanel({ project }: { project: string }) {
           {t('extras_char_add_btn')}
         </Button>
         <Typography variant="caption" color="text.secondary">
-          当前共 {items.length} 位角色 ｜ 支持人物阵营与人物关系网络关联
+          当前共 {(items ?? []).length} 位角色 ｜ 支持人物阵营与人物关系网络关联
         </Typography>
       </Box>
 
-      {items.length === 0 ? (
+      {items === null ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={28} /></Box>
+      ) : items.length === 0 ? (
         <Paper elevation={0} sx={{ p: 4, textAlign: 'center', ...glassCard(isDark) }}>
           <Typography color="text.secondary">{t('extras_char_empty')}</Typography>
         </Paper>
       ) : (
         <Grid container spacing={2}>
-          {items.map((it) => {
+          {items!.map((it) => {
             let extraObj: any = {}
             try {
               extraObj = JSON.parse(it.extra || '{}')
@@ -649,10 +695,10 @@ function CharacterPanel({ project }: { project: string }) {
                         {it.name}
                       </Typography>
                       {it.role && <Chip label={it.role} size="small" color="primary" variant="outlined" />}
-                      <IconButton size="small" onClick={() => openEdit(it)} title="编辑">
+                      <IconButton size="small" onClick={() => openEdit(it)} title="编辑" aria-label={t('extras_action_edit_aria', '编辑')}>
                         <EditIcon fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" onClick={() => doDelete(it.id)} title="删除">
+                      <IconButton size="small" onClick={() => doDelete(it.id)} title="删除" aria-label={t('extras_action_delete_aria', '删除')}>
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Box>
@@ -762,18 +808,26 @@ function CharacterPanel({ project }: { project: string }) {
 function NotePanel({ project }: { project: string }) {
   const { isDark } = useThemeMode()
   const { t } = useI18n()
-  const [items, setItems] = useState<NoteItem[]>([])
+  const [items, setItems] = useState<NoteItem[] | null>(null)
   const [error, setError] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<NoteItem | null>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const reqIdRef = useRef(0)
 
   const load = useCallback(() => {
+    const cur = ++reqIdRef.current
     writingApi
       .notes(project)
-      .then(setItems)
-      .catch((e) => setError(`加载便签失败: ${friendlyError(e)}`))
+      .then((res) => {
+        if (cur !== reqIdRef.current) return
+        setItems(res)
+      })
+      .catch((e) => {
+        if (cur !== reqIdRef.current) return
+        setError(`加载便签失败: ${friendlyError(e)}`)
+      })
   }, [project])
 
   useEffect(() => {
@@ -831,13 +885,15 @@ function NotePanel({ project }: { project: string }) {
           {t('extras_note_add_btn')}
         </Button>
       </Box>
-      {items.length === 0 ? (
+      {items === null ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={28} /></Box>
+      ) : items.length === 0 ? (
         <Paper elevation={0} sx={{ p: 4, textAlign: 'center', ...glassCard(isDark) }}>
           <Typography color="text.secondary">{t('extras_note_empty')}</Typography>
         </Paper>
       ) : (
         <Grid container spacing={2}>
-          {items.map((it) => (
+          {items!.map((it) => (
             <Grid item xs={12} sm={6} md={4} key={it.id}>
               <Paper
                 elevation={0}
@@ -862,6 +918,7 @@ function NotePanel({ project }: { project: string }) {
                       doDelete(it.id)
                     }}
                     title="删除"
+                    aria-label={t('extras_action_delete_aria', '删除')}
                   >
                     <DeleteIcon fontSize="small" />
                   </IconButton>
@@ -943,13 +1000,33 @@ function DashboardPanel({ project }: { project: string }) {
   const [retentionResult, setRetentionResult] = useState<ReaderRetentionResult | null>(null)
   const [retentionLoading, setRetentionLoading] = useState(false)
   const [showRetentionDialog, setShowRetentionDialog] = useState(false)
+  const tensionSeqRef = useRef(0)
+  const goldenThreeSeqRef = useRef(0)
+  const retentionSeqRef = useRef(0)
+  const statsReqIdRef = useRef(0)
 
   const load = useCallback(() => {
+    const cur = ++statsReqIdRef.current
     writingApi
       .stats(project, days)
-      .then(setStats)
-      .catch((e) => setError(`加载仪表盘统计失败: ${friendlyError(e)}`))
+      .then((res) => {
+        if (cur !== statsReqIdRef.current) return
+        setStats(res)
+      })
+      .catch((e) => {
+        if (cur !== statsReqIdRef.current) return
+        setError(`加载仪表盘统计失败: ${friendlyError(e)}`)
+      })
   }, [project, days])
+
+  useEffect(() => {
+    tensionSeqRef.current++
+    goldenThreeSeqRef.current++
+    retentionSeqRef.current++
+    setTensionResult(null)
+    setGoldenThreeResult(null)
+    setRetentionResult(null)
+  }, [project])
 
   useEffect(() => {
     load()
@@ -957,18 +1034,21 @@ function DashboardPanel({ project }: { project: string }) {
 
   const runTensionAnalysis = async (text: string, bm = benchmark) => {
     if (!text.trim()) return
+    const capturedSeq = ++tensionSeqRef.current
     setTensionLoading(true)
     try {
       const res = await writingApi.analyzeTension({
         text,
         benchmark: bm,
       })
+      if (capturedSeq !== tensionSeqRef.current) return
       setTensionResult(res)
       setShowTensionDialog(false)
     } catch (e) {
+      if (capturedSeq !== tensionSeqRef.current) return
       setError(`张力分析失败: ${friendlyError(e)}`)
     } finally {
-      setTensionLoading(false)
+      if (capturedSeq === tensionSeqRef.current) setTensionLoading(false)
     }
   }
 
@@ -980,6 +1060,7 @@ function DashboardPanel({ project }: { project: string }) {
   ) => {
     const chapters = [ch1, ch2, ch3].filter((c) => c.trim().length > 0)
     if (chapters.length === 0) return
+    const capturedSeq = ++goldenThreeSeqRef.current
     setGoldenThreeLoading(true)
     try {
       const res = await writingApi.analyzeGoldenThreeTension({
@@ -987,12 +1068,14 @@ function DashboardPanel({ project }: { project: string }) {
         benchmark: bm,
         points_per_chapter: 10,
       })
+      if (capturedSeq !== goldenThreeSeqRef.current) return
       setGoldenThreeResult(res)
       setShowGoldenThreeDialog(false)
     } catch (e) {
+      if (capturedSeq !== goldenThreeSeqRef.current) return
       setError(`黄金三章比对失败: ${friendlyError(e)}`)
     } finally {
-      setGoldenThreeLoading(false)
+      if (capturedSeq === goldenThreeSeqRef.current) setGoldenThreeLoading(false)
     }
   }
 
@@ -1004,6 +1087,7 @@ function DashboardPanel({ project }: { project: string }) {
   ) => {
     const chapters = [ch1, ch2, ch3].filter((c) => c.trim().length > 0)
     if (chapters.length === 0) return
+    const capturedSeq = ++retentionSeqRef.current
     setRetentionLoading(true)
     try {
       const res = await writingApi.estimateReaderRetention({
@@ -1011,12 +1095,14 @@ function DashboardPanel({ project }: { project: string }) {
         benchmark: bm,
         points_per_chapter: 10,
       })
+      if (capturedSeq !== retentionSeqRef.current) return
       setRetentionResult(res)
       setShowRetentionDialog(false)
     } catch (e) {
+      if (capturedSeq !== retentionSeqRef.current) return
       setError(`读者留存测算失败: ${friendlyError(e)}`)
     } finally {
-      setRetentionLoading(false)
+      if (capturedSeq === retentionSeqRef.current) setRetentionLoading(false)
     }
   }
 
@@ -1155,7 +1241,7 @@ function DashboardPanel({ project }: { project: string }) {
                   </Box>
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                  监测剧情平淡期与高潮爆发期，红线为章节实测，虚线为神作对标基准
+                  {t('extras_dash_wave_subtitle', '监测剧情平淡期与高潮爆发期，红线为章节实测，虚线为神作对标基准')}
                 </Typography>
                 {goldenThreeResult && (
                   <Box sx={{ mb: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(225, 29, 72, 0.08)' : 'rgba(225, 29, 72, 0.04)', border: '1px solid rgba(225, 29, 72, 0.2)' }}>
@@ -1169,17 +1255,17 @@ function DashboardPanel({ project }: { project: string }) {
                         />
                         <Chip
                           size="small"
-                          label={`综合拟合度: ${goldenThreeResult.combinedAlignmentScore}%`}
+                          label={t('extras_golden_three_combined_fit', '综合拟合度: {score}%', { score: goldenThreeResult.combinedAlignmentScore })}
                           variant="outlined"
                         />
                         <Chip
                           size="small"
-                          label={`断章评级: ${goldenThreeResult.cliffhangerRating}`}
+                          label={t('extras_golden_three_cliff_rating', '断章评级: {rating}', { rating: goldenThreeResult.cliffhangerRating })}
                           variant="outlined"
                         />
                       </Box>
                       <Button size="small" onClick={() => setGoldenThreeResult(null)}>
-                        返回单章
+                        {t('extras_golden_three_back_single', '返回单章')}
                       </Button>
                     </Box>
                     {goldenThreeResult.handoffs.length > 0 && (
@@ -1188,7 +1274,7 @@ function DashboardPanel({ project }: { project: string }) {
                           <Chip
                             key={i}
                             size="small"
-                            label={`第${h.fromChapter}章→第${h.toChapter}章: ${h.status === 'CLIFF_DROP' ? '⚠️断崖失速' : h.status === 'SMOOTH' ? '✅平滑承接' : h.status} (落差${h.drop}分)`}
+                            label={t('extras_golden_three_handoff_chip', '第{from}章→第{to}章: {status} (落差{drop}分)', { from: h.fromChapter, to: h.toChapter, status: h.status === 'CLIFF_DROP' ? t('extras_golden_three_status_cliff', '⚠️断崖失速') : h.status === 'SMOOTH' ? t('extras_golden_three_status_smooth', '✅平滑承接') : h.status, drop: h.drop })}
                             color={h.status === 'CLIFF_DROP' ? 'error' : h.status === 'SMOOTH' ? 'success' : 'default'}
                             variant="outlined"
                           />
@@ -1201,25 +1287,32 @@ function DashboardPanel({ project }: { project: string }) {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                     <Chip
                       size="small"
-                      label={`标杆拟合度: ${tensionResult.benchmarkAlignmentScore}%`}
+                      label={t('extras_tension_bm_fit', '标杆拟合度: {score}%', { score: tensionResult.benchmarkAlignmentScore })}
                       color={tensionResult.benchmarkAlignmentScore >= 75 ? 'success' : 'primary'}
                       variant="outlined"
                     />
                     <Chip
                       size="small"
-                      label={`最高潮: ${tensionResult.climaxSegment} (${tensionResult.maxTension}分)`}
+                      label={t('extras_tension_climax', '最高潮: {seg} ({score}分)', { seg: tensionResult.climaxSegment, score: tensionResult.maxTension })}
                       sx={{ bgcolor: 'rgba(225, 29, 72, 0.1)', color: '#E11D48', fontWeight: 600 }}
                     />
                     <Chip
                       size="small"
-                      label={`均值: ${tensionResult.avgTension} ｜ 波动: ±${tensionResult.tensionVariance}`}
+                      label={t('extras_tension_avg_var', '均值: {avg} ｜ 波动: ±{variance}', { avg: tensionResult.avgTension, variance: tensionResult.tensionVariance })}
                       variant="outlined"
                     />
                   </Box>
                 )}
-                <EmotionWaveChart
-                  height={240}
-                  tensionPoints={
+                <Box sx={{ position: 'relative' }}>
+                  {(tensionLoading || goldenThreeLoading || retentionLoading) && (
+                    <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(255,255,255,0.55)', zIndex: 1, borderRadius: 1 }}>
+                      <CircularProgress size={36} />
+                    </Box>
+                  )}
+                  <Box sx={{ opacity: (tensionLoading || goldenThreeLoading || retentionLoading) ? 0.4 : 1, transition: 'opacity 0.2s' }}>
+                    <EmotionWaveChart
+                      height={240}
+                      tensionPoints={
                     goldenThreeResult
                       ? goldenThreeResult.combinedCurve
                       : tensionResult
@@ -1243,11 +1336,13 @@ function DashboardPanel({ project }: { project: string }) {
                       ? goldenThreeResult.chaptersMetrics.flatMap((m) => m.segments)
                       : tensionResult?.segments
                   }
-                />
+                    />
+                  </Box>
+                </Box>
                 {goldenThreeResult && goldenThreeResult.recommendations.length > 0 && (
                   <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
                     <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.5, color: '#E11D48' }}>
-                      黄金三章专家修改建议：
+                      {t('extras_golden_three_expert_advice', '黄金三章专家修改建议：')}
                     </Typography>
                     {goldenThreeResult.recommendations.map((rec, i) => (
                       <Typography key={i} variant="caption" sx={{ display: 'block', color: 'text.secondary', mb: 0.5 }}>
@@ -1309,11 +1404,20 @@ function DashboardPanel({ project }: { project: string }) {
                       </Button>
                     </Box>
                   </Box>
-                  <ReaderRetentionChart
-                    retentionCurve={retentionResult.retentionCurve}
+                  <Box sx={{ position: 'relative' }}>
+                    {retentionLoading && (
+                      <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(255,255,255,0.55)', zIndex: 1, borderRadius: 1 }}>
+                        <CircularProgress size={36} />
+                      </Box>
+                    )}
+                    <Box sx={{ opacity: retentionLoading ? 0.4 : 1, transition: 'opacity 0.2s' }}>
+                      <ReaderRetentionChart
+                        retentionCurve={retentionResult.retentionCurve}
                     hotspots={retentionResult.dropoffHotspots}
                     height={280}
-                  />
+                      />
+                    </Box>
+                  </Box>
                   {retentionResult.dropoffHotspots.length > 0 && (
                     <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(225, 29, 72, 0.06)' : 'rgba(225, 29, 72, 0.03)' }}>
                       <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.5, color: '#E11D48' }}>
@@ -1359,12 +1463,12 @@ function DashboardPanel({ project }: { project: string }) {
               value={goldenThreeBm}
               onChange={(e) => setGoldenThreeBm(e.target.value as any)}
               sx={{ minWidth: 220 }}
-              label="商业神作标杆类型"
+              label={t('extras_benchmark_label', '商业神作标杆类型')}
             >
-              <MenuItem value="classic">经典商业递进三章标杆</MenuItem>
-              <MenuItem value="upgrade_shuangwen">升级爽文逆袭打脸标杆</MenuItem>
-              <MenuItem value="fast_hook">快穿生死时速高压标杆</MenuItem>
-              <MenuItem value="suspense_mystery">悬疑无限流惊悚标杆</MenuItem>
+              <MenuItem value="classic">{t('extras_benchmark_classic', '经典商业递进三章标杆')}</MenuItem>
+              <MenuItem value="upgrade_shuangwen">{t('extras_benchmark_upgrade', '升级爽文逆袭打脸标杆')}</MenuItem>
+              <MenuItem value="fast_hook">{t('extras_benchmark_fast_hook', '快穿生死时速高压标杆')}</MenuItem>
+              <MenuItem value="suspense_mystery">{t('extras_benchmark_suspense', '悬疑无限流惊悚标杆')}</MenuItem>
             </TextField>
           </Box>
           <TextField
@@ -1373,7 +1477,7 @@ function DashboardPanel({ project }: { project: string }) {
             rows={4}
             value={ch1Input}
             onChange={(e) => setCh1Input(e.target.value)}
-            placeholder="粘贴第 1 章正文草稿（前 30% 快速入局，章末留下微悬念钩子）……"
+            placeholder={t('extras_golden_three_ch1_ph', '粘贴第 1 章正文草稿（前 30% 快速入局，章末留下微悬念钩子）……')}
             fullWidth
           />
           <TextField
@@ -1382,7 +1486,7 @@ function DashboardPanel({ project }: { project: string }) {
             rows={4}
             value={ch2Input}
             onChange={(e) => setCh2Input(e.target.value)}
-            placeholder="粘贴第 2 章正文草稿（防中段失速塌陷，金手指与核心危机介入展开）……"
+            placeholder={t('extras_golden_three_ch2_ph', '粘贴第 2 章正文草稿（防中段失速塌陷，金手指与核心危机介入展开）……')}
             fullWidth
           />
           <TextField
@@ -1391,7 +1495,7 @@ function DashboardPanel({ project }: { project: string }) {
             rows={4}
             value={ch3Input}
             onChange={(e) => setCh3Input(e.target.value)}
-            placeholder="粘贴第 3 章正文草稿（首卷爆发高潮与爽点释放，末尾强断章钩子）……"
+            placeholder={t('extras_golden_three_ch3_ph', '粘贴第 3 章正文草稿（首卷爆发高潮与爽点释放，末尾强断章钩子）……')}
             fullWidth
           />
         </DialogContent>
@@ -1436,12 +1540,12 @@ function DashboardPanel({ project }: { project: string }) {
               value={retentionBm}
               onChange={(e) => setRetentionBm(e.target.value as any)}
               sx={{ minWidth: 220 }}
-              label="商业神作标杆类型"
+              label={t('extras_benchmark_label', '商业神作标杆类型')}
             >
-              <MenuItem value="classic">经典商业递进三章标杆</MenuItem>
-              <MenuItem value="upgrade_shuangwen">升级爽文逆袭打脸标杆</MenuItem>
-              <MenuItem value="fast_hook">快穿生死时速高压标杆</MenuItem>
-              <MenuItem value="suspense_mystery">悬疑无限流惊悚标杆</MenuItem>
+              <MenuItem value="classic">{t('extras_benchmark_classic', '经典商业递进三章标杆')}</MenuItem>
+              <MenuItem value="upgrade_shuangwen">{t('extras_benchmark_upgrade', '升级爽文逆袭打脸标杆')}</MenuItem>
+              <MenuItem value="fast_hook">{t('extras_benchmark_fast_hook', '快穿生死时速高压标杆')}</MenuItem>
+              <MenuItem value="suspense_mystery">{t('extras_benchmark_suspense', '悬疑无限流惊悚标杆')}</MenuItem>
             </TextField>
           </Box>
           <TextField
@@ -1450,7 +1554,7 @@ function DashboardPanel({ project }: { project: string }) {
             rows={4}
             value={ch1Input}
             onChange={(e) => setCh1Input(e.target.value)}
-            placeholder="粘贴第 1 章正文草稿（前 30% 快速入局，章末留下微悬念钩子）……"
+            placeholder={t('extras_golden_three_ch1_ph', '粘贴第 1 章正文草稿（前 30% 快速入局，章末留下微悬念钩子）……')}
             fullWidth
           />
           <TextField
@@ -1459,7 +1563,7 @@ function DashboardPanel({ project }: { project: string }) {
             rows={4}
             value={ch2Input}
             onChange={(e) => setCh2Input(e.target.value)}
-            placeholder="粘贴第 2 章正文草稿（防中段失速塌陷，金手指与核心危机介入展开）……"
+            placeholder={t('extras_golden_three_ch2_ph', '粘贴第 2 章正文草稿（防中段失速塌陷，金手指与核心危机介入展开）……')}
             fullWidth
           />
           <TextField
@@ -1468,7 +1572,7 @@ function DashboardPanel({ project }: { project: string }) {
             rows={4}
             value={ch3Input}
             onChange={(e) => setCh3Input(e.target.value)}
-            placeholder="粘贴第 3 章正文草稿（首卷爆发高潮与爽点释放，末尾强断章钩子）……"
+            placeholder={t('extras_golden_three_ch3_ph', '粘贴第 3 章正文草稿（首卷爆发高潮与爽点释放，末尾强断章钩子）……')}
             fullWidth
           />
         </DialogContent>

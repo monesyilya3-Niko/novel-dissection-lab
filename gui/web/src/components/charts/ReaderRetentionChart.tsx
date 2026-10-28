@@ -12,24 +12,32 @@ export interface ReaderRetentionChartProps {
   hotspots?: DropoffHotspot[]
   height?: number
   ariaLabel?: string
+  showDemo?: boolean
+  /** @deprecated alias for showDemo */
+  isDemo?: boolean
 }
 
-const DEFAULT_CURVE = [100.0, 92.5, 88.0, 84.5, 81.0, 78.5, 75.0, 72.0, 68.5, 65.0]
+export const DEFAULT_CURVE = [100.0, 92.5, 88.0, 84.5, 81.0, 78.5, 75.0, 72.0, 68.5, 65.0]
 
 export default function ReaderRetentionChart({
-  retentionCurve = DEFAULT_CURVE,
+  retentionCurve,
   labels,
   hotspots = [],
   height = 260,
   ariaLabel,
+  showDemo = false,
+  isDemo,
 }: ReaderRetentionChartProps) {
   const { isDark } = useThemeMode()
   const { t } = useI18n()
 
+  const effectiveCurve = retentionCurve && retentionCurve.length > 0 ? retentionCurve : (showDemo || isDemo ? DEFAULT_CURVE : null)
+  const isEmpty = !effectiveCurve
+
   const effectiveLabels = useMemo(() => {
     if (labels && labels.length > 0) return labels
-    return retentionCurve.map((_, idx) => (idx === 0 ? t('chart_retention_start', '开局') : `${t('chart_retention_point', '切片')} ${idx}`))
-  }, [labels, retentionCurve, t])
+    return (effectiveCurve ?? []).map((_, idx) => (idx === 0 ? t('chart_retention_start', '开局') : `${t('chart_retention_point', '切片')} ${idx}`))
+  }, [labels, effectiveCurve, t])
 
   const hotspotMap = useMemo(() => {
     const map = new Map<number, DropoffHotspot>()
@@ -44,24 +52,25 @@ export default function ReaderRetentionChart({
   const markPoints = useMemo(() => {
     const pts: any[] = []
     hotspotMap.forEach((h, idx) => {
-      if (idx < retentionCurve.length) {
+      if (idx < (effectiveCurve?.length ?? 0)) {
         const isCritical = h.riskLevel === 'CRITICAL'
         pts.push({
-          coord: [idx, retentionCurve[idx]],
+          coord: [idx, effectiveCurve![idx]],
           value: isCritical ? `-${h.estimatedDropPct}%` : `-${h.estimatedDropPct}%`,
           itemStyle: {
             color: isCritical ? '#E11D48' : '#F59E0B',
           },
           tooltip: {
-            formatter: () => `${h.segmentLabel}<br/><b>${h.riskLevel}</b>: 预估跳出 ${h.estimatedDropPct}%<br/>原因: ${h.reason}`,
+            formatter: () => `${h.segmentLabel}<br/><b>${h.riskLevel}</b>: ${t('chart_retention_tooltip_drop', '预估跳出')} ${h.estimatedDropPct}%<br/>${t('chart_retention_tooltip_reason', '原因:')} ${h.reason}`,
           },
         })
       }
     })
     return pts
-  }, [hotspotMap, retentionCurve])
+  }, [hotspotMap, effectiveCurve, t])
 
   const option = useMemo(() => {
+    if (!effectiveCurve) return null
     return {
       tooltip: {
         trigger: 'axis' as const,
@@ -72,7 +81,7 @@ export default function ReaderRetentionChart({
           const dataIdx = p.dataIndex
           const val = Number(p.value ?? 0).toFixed(1)
           const churn = (100.0 - Number(val)).toFixed(1)
-          let tip = `<b>${p.name}</b><br/>${p.marker} ${t('chart_retention_rate', '读者留存率')}: <b>${val}%</b> (累计流失 ${churn}%)`
+          let tip = `<b>${p.name}</b><br/>${p.marker} ${t('chart_retention_rate', '读者留存率')}: <b>${val}%</b> (${t('chart_retention_churn', '累计流失')} ${churn}%)`
           const hs = hotspotMap.get(dataIdx)
           if (hs) {
             tip += `<br/><span style="color:${hs.riskLevel === 'CRITICAL' ? '#E11D48' : '#F59E0B'};font-weight:600;">[${hs.riskLevel}] ${hs.reason}</span>`
@@ -139,32 +148,52 @@ export default function ReaderRetentionChart({
               {
                 yAxis: 68,
                 lineStyle: { type: 'dashed' as const, color: '#10B981', width: 1.5 },
-                label: { formatter: 'S级线 (68%)', position: 'insideEndTop' as const, color: '#10B981', fontSize: 10 },
+                label: { formatter: `${t('chart_retention_line_s', 'S级线')} (68%)`, position: 'insideEndTop' as const, color: '#10B981', fontSize: 10 },
               },
               {
                 yAxis: 52,
                 lineStyle: { type: 'dashed' as const, color: '#0EA5E9', width: 1.5 },
-                label: { formatter: 'A级线 (52%)', position: 'insideEndTop' as const, color: '#0EA5E9', fontSize: 10 },
+                label: { formatter: `${t('chart_retention_line_a', 'A级线')} (52%)`, position: 'insideEndTop' as const, color: '#0EA5E9', fontSize: 10 },
               },
               {
                 yAxis: 38,
                 lineStyle: { type: 'dashed' as const, color: '#F59E0B', width: 1.5 },
-                label: { formatter: '及格线 (38%)', position: 'insideEndTop' as const, color: '#F59E0B', fontSize: 10 },
+                label: { formatter: `${t('chart_retention_line_pass', '及格线')} (38%)`, position: 'insideEndTop' as const, color: '#F59E0B', fontSize: 10 },
               },
             ],
           },
           markPoint: {
             data: markPoints,
           },
-          data: retentionCurve,
+          data: effectiveCurve!,
         },
       ],
     }
-  }, [effectiveLabels, hotspotMap, isDark, markPoints, retentionCurve, t])
+  }, [effectiveLabels, hotspotMap, isDark, markPoints, effectiveCurve, t])
+
+  if (isEmpty) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: isDark ? ink.moonSoft : ink.textTertiary,
+          fontSize: 14,
+        }}
+        role="img"
+        aria-label={ariaLabel ?? t('chart_retention_aria', '商业网文读者留存流失预测图')}
+      >
+        {t('chart_retention_empty', '暂无数据，请先测算')}
+      </div>
+    )
+  }
 
   return (
     <BaseChart
-      option={option}
+      option={option!}
       height={height}
       ariaLabel={ariaLabel ?? t('chart_retention_aria', '商业网文读者留存流失预测图')}
     />
