@@ -2,6 +2,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import WritingWorkbench from './WritingWorkbench'
 import { I18nProvider } from '../state/I18nContext'
+import { UiModeProvider } from '../state/UiModeContext'
 import { writeStorage, removeStorage } from '../safeStorage'
 
 const mockProjects = vi.fn()
@@ -193,6 +194,51 @@ describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
       expect(screen.getByRole('tab', { name: 'AI 章节生成' })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: '单章质检打分' })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: '去 AI 味实验室' })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: '小说精华数据库' })).toBeInTheDocument()
+    })
+  })
+
+  it('WS-A6：advanced 模式（无 UiModeProvider 回退）仍平铺展示全部 9 个 tab', async () => {
+    render(<WritingWorkbench />)
+    fireEvent.click(screen.getByRole('tab', { name: /工坊流水线/ }))
+    await waitFor(() => {
+      // 9 个 tab 全在，且不出现分组按钮（保留旧肌肉记忆）
+      expect(screen.getAllByRole('tab')).toHaveLength(11) // 2 个模式 tab + 9 个 pipeline tab
+      expect(screen.queryByTestId('pipeline-group-create')).not.toBeInTheDocument()
+    })
+  })
+
+  it('WS-A6：simple 模式按 3 组收敛，切换组只显示该组 tab', async () => {
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <UiModeProvider defaultMode="simple">
+          <WritingWorkbench />
+        </UiModeProvider>
+      </I18nProvider>
+    )
+    fireEvent.click(screen.getByRole('tab', { name: /工坊流水线/ }))
+
+    // 组导航出现
+    await waitFor(() => expect(screen.getByTestId('pipeline-group-create')).toBeInTheDocument())
+    expect(screen.getByTestId('pipeline-group-tools')).toBeInTheDocument()
+    expect(screen.getByTestId('pipeline-group-manage')).toBeInTheDocument()
+
+    // 默认在「创作」组：只渲染该组 3 个 tab
+    expect(screen.getByRole('tab', { name: '资产注入' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'AI 章节生成' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '单章质检打分' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: '小说精华数据库' })).not.toBeInTheDocument()
+
+    // 切到「工具」组 → 显示去 AI 味 / 毒点避雷
+    fireEvent.click(screen.getByTestId('pipeline-group-tools'))
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: '去 AI 味实验室' })).toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: '资产注入' })).not.toBeInTheDocument()
+    })
+
+    // 切到「管理」组 → 显示精华库
+    fireEvent.click(screen.getByTestId('pipeline-group-manage'))
+    await waitFor(() => {
       expect(screen.getByRole('tab', { name: '小说精华数据库' })).toBeInTheDocument()
     })
   })

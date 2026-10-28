@@ -776,6 +776,19 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '小说精华数据库',
     'en-US': 'Fiction Essence Vault',
   },
+  // WS-A6：simple 模式下 9 tab 的三组分组标题
+  pipeline_group_create: {
+    'zh-CN': '创作',
+    'en-US': 'Create',
+  },
+  pipeline_group_tools: {
+    'zh-CN': '工具',
+    'en-US': 'Tools',
+  },
+  pipeline_group_manage: {
+    'zh-CN': '管理',
+    'en-US': 'Manage',
+  },
 
   // 创作扩展企划中心 (WritingExtras)
   extras_project_label: {

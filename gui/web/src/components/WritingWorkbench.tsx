@@ -62,6 +62,7 @@ import {
 import type { WritingProject, WritingTaskState, ScoreResult } from '../types'
 import { useApp } from '../state/AppContext'
 import { useI18n } from '../state/I18nContext'
+import { useUiModeOptional } from '../state/UiModeContext'
 import StylePanel from './StylePanel'
 import DeslopPanel from './DeslopPanel'
 import InspirationWorkbench from './InspirationWorkbench'
@@ -88,11 +89,45 @@ export interface WritingWorkbenchProps {
   initialPipelineTab?: number
 }
 
+// ---------------------------------------------------------------------------
+// WS-A6：Pipeline 9 tab 的三组心智模型（顺序即索引，索引兼容旧 localStorage）
+// ---------------------------------------------------------------------------
+/** 9 个 pipeline tab 的 i18n key，索引即约定：仓库内多处按 0..8 取面板 */
+export const PIPELINE_TAB_KEYS = [
+  'pipeline_tab_inject',
+  'pipeline_tab_generate',
+  'pipeline_tab_score',
+  'pipeline_tab_assemble',
+  'pipeline_tab_style',
+  'pipeline_tab_extras',
+  'pipeline_tab_deslop',
+  'pipeline_tab_poison',
+  'pipeline_tab_essence',
+] as const
+
+export interface PipelineGroup {
+  id: string
+  labelKey: string
+  fallback: string
+  /** 该组包含的 tab 索引（与 PIPELINE_TAB_KEYS 对齐） */
+  tabs: number[]
+}
+
+/** 创作 → 工具 → 管理：simple 模式下按组展开，降低 9 平铺 tab 的认知负荷 */
+export const PIPELINE_GROUPS: PipelineGroup[] = [
+  { id: 'create', labelKey: 'pipeline_group_create', fallback: '创作', tabs: [0, 1, 2] },
+  { id: 'tools', labelKey: 'pipeline_group_tools', fallback: '工具', tabs: [6, 7] },
+  { id: 'manage', labelKey: 'pipeline_group_manage', fallback: '管理', tabs: [3, 4, 5, 8] },
+]
+
 export default function WritingWorkbench({
   initialMode,
   initialPipelineTab = 0,
 }: WritingWorkbenchProps = {}) {
   const { t } = useI18n()
+  // simple 模式启用分组导航；未提供 UiModeProvider 时（遗留单测）回退 advanced 行为
+  const uiMode = useUiModeOptional()
+  const pipelineGrouped = uiMode?.mode === 'simple'
   // 若环境未提供 getProjectMeta（如仅针对资产注入面板的遗留测试），自动以工坊流水线模式运行保持兼容
   const defaultMode =
     initialMode ?? (typeof writingApi?.getProjectMeta === 'function' ? 'studio' : 'pipeline')
@@ -151,23 +186,56 @@ export default function WritingWorkbench({
         ) : (
           <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, bgcolor: 'background.paper' }}>
-              <Tabs
-                value={pipelineTab}
-                onChange={(_, v) => setPipelineTab(v)}
-                sx={{ minHeight: 40 }}
-                variant="scrollable"
-                scrollButtons="auto"
-              >
-                <Tab label={t('pipeline_tab_inject')} />
-                <Tab label={t('pipeline_tab_generate')} />
-                <Tab label={t('pipeline_tab_score')} />
-                <Tab label={t('pipeline_tab_assemble')} />
-                <Tab label={t('pipeline_tab_style')} />
-                <Tab label={t('pipeline_tab_extras')} />
-                <Tab label={t('pipeline_tab_deslop')} />
-                <Tab label={t('pipeline_tab_poison')} />
-                <Tab label={t('pipeline_tab_essence')} />
-              </Tabs>
+              {/* WS-A6：advanced 保持 9 tab 原序（肌肉记忆不破）；simple 收敛为 3 组两级导航 */}
+              {pipelineGrouped ? (
+                <>
+                  {/* 组级小标题（可点，选中即跳到该组第一个 tab） */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pt: 1 }}>
+                    {PIPELINE_GROUPS.map((g, gi) => {
+                      const active = g.tabs.includes(pipelineTab)
+                      return (
+                        <Box key={g.id} sx={{ display: 'flex', alignItems: 'center' }}>
+                          {gi > 0 && <Divider orientation="vertical" flexItem sx={{ mx: 0.75, my: 1 }} />}
+                          <Button
+                            size="small"
+                            variant={active ? 'contained' : 'text'}
+                            onClick={() => setPipelineTab(g.tabs[0])}
+                            data-testid={`pipeline-group-${g.id}`}
+                            sx={{ minWidth: 0, fontSize: 12, py: 0.25, px: 1.25 }}
+                          >
+                            {t(g.labelKey, g.fallback)}
+                          </Button>
+                        </Box>
+                      )
+                    })}
+                  </Box>
+                  <Tabs
+                    value={pipelineTab}
+                    onChange={(_, v) => setPipelineTab(v)}
+                    sx={{ minHeight: 40 }}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                  >
+                    {PIPELINE_GROUPS
+                      .find((g) => g.tabs.includes(pipelineTab))!
+                      .tabs.map((idx) => (
+                        <Tab key={idx} value={idx} label={t(PIPELINE_TAB_KEYS[idx])} />
+                      ))}
+                  </Tabs>
+                </>
+              ) : (
+                <Tabs
+                  value={pipelineTab}
+                  onChange={(_, v) => setPipelineTab(v)}
+                  sx={{ minHeight: 40 }}
+                  variant="scrollable"
+                  scrollButtons="auto"
+                >
+                  {PIPELINE_TAB_KEYS.map((k, idx) => (
+                    <Tab key={k} value={idx} label={t(k)} />
+                  ))}
+                </Tabs>
+              )}
             </Box>
             <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: 2 }}>
               {pipelineTab === 0 && <InjectPanel sel={sel} />}
