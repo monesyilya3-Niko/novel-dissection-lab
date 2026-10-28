@@ -327,11 +327,22 @@ def _is_applied(version: int) -> bool:
 
 
 def _exec_sql_file(sql_path: Path) -> None:
-    """执行单个 SQL 文件（幂等 DDL，可在事务外运行）。"""
+    """执行单个 SQL 文件（幂等 DDL，**必须在事务外调用**）。
+
+    ⚠️ executescript 会隐式提交活动事务（2026-10-13 D13/D18 同因）：
+    若在 ``with db.tx()`` 内调用，调用方的部分写入会被提前提交，
+    后续回滚失效、留下半成品数据。此处显式守卫 + 改为逐条 execute
+    （复用 split_sql_statements，与 init_schema / apply_migrations 同口径）。
+    """
     if not sql_path.is_file():
         return
     conn = get_conn()
-    conn.executescript(sql_path.read_text(encoding="utf-8"))
+    assert not conn.in_transaction, (
+        "_exec_sql_file 不得在活动事务内调用：executescript/commit 会提交"
+        "调用方的事务导致回滚失效"
+    )
+    for stmt in split_sql_statements(sql_path.read_text(encoding="utf-8")):
+        conn.execute(stmt)
     conn.commit()
 
 

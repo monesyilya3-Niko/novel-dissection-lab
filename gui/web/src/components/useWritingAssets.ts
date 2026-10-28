@@ -4,7 +4,7 @@
 // state，导致「注入」页签的 InlineGuide 宣称「写作页签生成章节时会自动用上
 // 这里选好的资产」与事实不符。现在选择状态上提到 WritingWorkbench，两处
 // 下拉读写同一份 state，文案即事实。
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { assetApi } from '../api/client'
 
 export interface AssetOption {
@@ -83,15 +83,15 @@ export function useWritingAssets(): WritingAssetSelection {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const byKind = (k: string) => assets.filter((a) => a.kind === k)
+  const byKind = useCallback((k: string) => assets.filter((a) => a.kind === k), [assets])
 
-  const genreOf = (id: string): string | undefined => {
+  const genreOf = useCallback((id: string): string | undefined => {
     if (!id) return undefined
     const a = assets.find((x) => x.id === id) ?? distilledAssets.find((x) => x.id === id)
     return a?.genre || undefined
-  }
+  }, [assets, distilledAssets])
 
-  const voiceGenre = genreOf(voice) || undefined
+  const voiceGenre = useMemo(() => genreOf(voice) || undefined, [genreOf, voice])
 
   const mismatches = useMemo<GenreMismatch[]>(() => {
     if (!voiceGenre) return []
@@ -119,3 +119,6 @@ export function useWritingAssets(): WritingAssetSelection {
     byKind, genreOf, voiceGenre, mismatches,
   }
 }
+
+
+

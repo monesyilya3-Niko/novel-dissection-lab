@@ -390,10 +390,16 @@ class TestLibraryCache(unittest.TestCase):
 
     def _write_lib(self, name, data):
         import json as _json
-        import time
-        time.sleep(0.01)   # 确保 mtime 前进
-        (self._tmp / name).write_text(
-            _json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        import os as _os
+        p = self._tmp / name
+        p.write_text(_json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        self._mtime_seq = getattr(self, "_mtime_seq", 0) + 1
+        try:
+            st = p.stat()
+            ns = st.st_mtime_ns + self._mtime_seq
+            _os.utime(p, ns=(ns, ns))
+        except OSError:
+            pass
 
     def test_returns_data_and_caches(self):
         self._write_lib("hook-library.json", {"total_count": 1, "hooks": [{"id": "h1"}]})

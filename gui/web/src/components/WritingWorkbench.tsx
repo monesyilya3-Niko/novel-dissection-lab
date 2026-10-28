@@ -1,5 +1,5 @@
 // M2 写作工作台：一屏三栏沉浸创作室（Studio）+ 专业工坊流水线（Pipeline）。
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react'
 import Box from '@mui/material/Box'
 import ContextHelpButton from './ContextHelpButton'
 import InlineGuide from './InlineGuide'
@@ -63,11 +63,12 @@ import type { WritingProject, WritingTaskState, ScoreResult } from '../types'
 import { useApp } from '../state/AppContext'
 import { useI18n } from '../state/I18nContext'
 import StylePanel from './StylePanel'
-import WritingExtras from './WritingExtras'
 import DeslopPanel from './DeslopPanel'
 import InspirationWorkbench from './InspirationWorkbench'
 import EssenceWorkbench from './EssenceWorkbench'
 import { useWritingAssets, type WritingAssetSelection } from './useWritingAssets'
+
+const WritingExtras = lazy(() => import('./WritingExtras'))
 
 // 写作任务状态中文化
 const WRITING_STATUS_LABELS: Record<string, string> = {
@@ -172,7 +173,11 @@ export default function WritingWorkbench({
               {pipelineTab === 2 && <ScorePanel />}
               {pipelineTab === 3 && <AssemblePanel />}
               {pipelineTab === 4 && <StylePanel />}
-              {pipelineTab === 5 && <WritingExtras />}
+              {pipelineTab === 5 && (
+                <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={28} /></Box>}>
+                  <WritingExtras />
+                </Suspense>
+              )}
               {pipelineTab === 6 && <DeslopPanel />}
               {pipelineTab === 7 && <InspirationWorkbench />}
               {pipelineTab === 8 && <EssenceWorkbench />}
@@ -302,11 +307,7 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
     return () => { sseUnsubRef.current?.() }
   }, [])
 
-  useEffect(() => {
-    loadProjects()
-  }, [])
-
-  const loadProjects = (selectId?: string) => {
+  const loadProjects = useCallback((selectId?: string) => {
     writingApi
       .projects()
       .then((ps) => {
@@ -314,7 +315,11 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
         if (selectId) setProject(selectId)
       })
       .catch((e) => setError(`加载项目失败: ${e}`))
-  }
+  }, [])
+
+  useEffect(() => {
+    loadProjects()
+  }, [loadProjects])
 
   // 新建项目对话框
   const [newProjOpen, setNewProjOpen] = useState(false)
@@ -338,7 +343,7 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
     }
   }
 
-  const doGenerate = async () => {
+  const doGenerate = useCallback(async () => {
     setRunning(true)
     setError('')
     setTaskState(null)
@@ -369,9 +374,9 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
       setError(friendlyError(e))
       setRunning(false)
     }
-  }
+  }, [voice, project, chapterNo, task, consistencyTarget, genrePack])
 
-  const doImport = async () => {
+  const doImport = useCallback(async () => {
     if (!importContent.trim() || !project || importing) return
     setImporting(true)
     try {
@@ -388,9 +393,9 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
     } finally {
       setImporting(false)
     }
-  }
+  }, [importContent, project, importing, voice, genrePack, chapterNo])
 
-  const writableProjects = projects.filter((p) => !p.readOnly)
+  const writableProjects = useMemo(() => projects.filter((p) => !p.readOnly), [projects])
 
   return (
     <Box>
@@ -812,7 +817,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   }, [chains, chapterNo])
 
   // 加载项目列表与当前项目关联信息
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     try {
       const ps = await writingApi.projects()
       setProjects(ps)
@@ -822,9 +827,9 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     } catch (e) {
       setError(`加载项目失败: ${friendlyError(e)}`)
     }
-  }
+  }, [])
 
-  const loadProjectData = async (projName: string) => {
+  const loadProjectData = useCallback(async (projName: string) => {
     if (!projName) return
     try {
       const [metaRes, outlineRes, charRes, noteRes, statsRes, chainRes] = await Promise.all([
@@ -856,9 +861,9 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     } catch (e) {
       console.warn('加载项目详情失败', e)
     }
-  }
+  }, [])
 
-  const loadEssenceAssets = async () => {
+  const loadEssenceAssets = useCallback(async () => {
     try {
       const cat = essenceCategory === 'all' ? undefined : essenceCategory
       const res = await essenceApi.listAssets({ category: cat })
@@ -866,7 +871,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     } catch (e) {
       console.warn('加载精华资产失败', e)
     }
-  }
+  }, [essenceCategory])
 
   useEffect(() => {
     loadProjects()
@@ -958,7 +963,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   }
 
   // 下一章快捷切换（带本地草稿记忆防误触）
-  const handleNextChapter = () => {
+  const handleNextChapter = useCallback(() => {
     if (content.trim()) {
       try {
         localStorage.setItem(getDraftKey(currentProject, chapterNo), content)
@@ -977,7 +982,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     }
     setContent(savedDraft)
     setToast(`已准备好开启第 ${next} 章创作${savedDraft ? '（已自动恢复本章本地草稿）' : ''}`)
-  }
+  }, [content, currentProject, chapterNo])
 
   // 快捷创建章节大纲
   const handleCreateOutline = async () => {
@@ -1063,7 +1068,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   }
 
   // 章节保存入库
-  const handleSaveChapter = async () => {
+  const handleSaveChapter = useCallback(async () => {
     if (!content.trim()) {
       setError('章节正文不能为空')
       return
@@ -1090,7 +1095,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     } finally {
       setSaving(false)
     }
-  }
+  }, [content, currentProject, chapterNo, chapterTitle])
 
   // 快捷键支持：Ctrl+S 保存入库，Alt+N 快速开启下一章
   useEffect(() => {
@@ -1109,7 +1114,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   }, [content, currentProject, chapterNo, chapterTitle])
 
   // 一键全维排毒与去AI检测
-  const handleRunFullCheck = async () => {
+  const handleRunFullCheck = useCallback(async () => {
     if (!content.trim()) {
       setError('请先在编辑器输入或生成正文')
       return
@@ -1133,10 +1138,10 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       setPoisonLoading(false)
       setDeslopLoading(false)
     }
-  }
+  }, [content])
 
   // 多平台签约过稿预测
-  const handleRunPlatformDiagnose = async () => {
+  const handleRunPlatformDiagnose = useCallback(async () => {
     if (!content.trim()) {
       setError('请先在编辑器输入正文')
       return
@@ -1160,18 +1165,18 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     } finally {
       setDiagLoading(false)
     }
-  }
+  }, [content, chapterTitle, chapterNo, meta?.platform])
 
   // 精华资产/人设一键插入正文
-  const insertTextToEditor = (textToInsert: string, label: string) => {
+  const insertTextToEditor = useCallback((textToInsert: string, label: string) => {
     setContent((prev) => (prev ? `${prev}\n\n${textToInsert}` : textToInsert))
     setToast(`已成功将【${label}】插入当前正文`)
-  }
+  }, [])
 
-  const platformInfo = PLATFORM_LABELS[meta?.platform || 'fanqie'] || PLATFORM_LABELS.general
-  const totalWords = stats?.totalWords || 0
-  const targetWords = meta?.targetWords || 1000000
-  const progressPct = Math.min(100, Math.round((totalWords / targetWords) * 100))
+  const platformInfo = useMemo(() => PLATFORM_LABELS[meta?.platform || 'fanqie'] || PLATFORM_LABELS.general, [meta?.platform])
+  const totalWords = useMemo(() => stats?.totalWords || 0, [stats?.totalWords])
+  const targetWords = useMemo(() => meta?.targetWords || 1000000, [meta?.targetWords])
+  const progressPct = useMemo(() => Math.min(100, Math.round((totalWords / targetWords) * 100)), [totalWords, targetWords])
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -2343,4 +2348,15 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     </Box>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
 

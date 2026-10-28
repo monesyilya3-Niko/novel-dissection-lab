@@ -242,12 +242,21 @@ class TestMetaCacheInvalidation(unittest.TestCase):
         self._shutil.rmtree(self._tmp, ignore_errors=True)
 
     def _write_card(self, slug, genre_id=None):
-        import time
-        time.sleep(0.01)  # 确保 mtime 前进（文件系统时间戳分辨率）
-        (self._tmp / f"genre-prose-card-{slug}.json").write_text(
+        import os
+        p = self._tmp / f"genre-prose-card-{slug}.json"
+        p.write_text(
             json.dumps({"meta": {"kind": "genre-prose-card", "id": genre_id or slug}}),
             encoding="utf-8",
         )
+        # 确定性 mtime 推进：用序列号 bump mtime_ns，避免依赖 wall-clock
+        # 与文件系统时间戳分辨率（高负载/Defender/粗粒度 FS 下会合并导致 flake）。
+        self._mtime_seq = getattr(self, "_mtime_seq", 0) + 1
+        try:
+            st = p.stat()
+            ns = st.st_mtime_ns + self._mtime_seq
+            os.utime(p, ns=(ns, ns))
+        except OSError:
+            pass
 
     def test_cache_hit_returns_same_result(self):
         """重复调用结果一致（缓存没有引入随机性）。"""
@@ -351,7 +360,6 @@ class TestMetaCacheInvalidation(unittest.TestCase):
         由 test_explicit_invalidate_forces_rescan 覆盖。
         """
         import os
-        import time
         os.environ["NOVEL_LAB_GENRE_TTL"] = "5"
         try:
             self._write_card("genre-prose-card-genre-aaa", genre_id="genre-aaa")
@@ -360,7 +368,6 @@ class TestMetaCacheInvalidation(unittest.TestCase):
             # TTL 内：看不到新文件（设计如此）
             self.assertNotIn("bbb", REGISTRY.prose_genres(),
                              "TTL 窗口内不应感知磁盘变化")
-            time.sleep(0.01)
             REGISTRY.invalidate_meta_cache()
             self.assertIn("bbb", REGISTRY.prose_genres(),
                           "invalidate 后应立即感知")

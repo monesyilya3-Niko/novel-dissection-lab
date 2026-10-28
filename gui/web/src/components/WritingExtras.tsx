@@ -33,6 +33,7 @@ import ArticleIcon from '@mui/icons-material/Article'
 import MenuBookIcon from '@mui/icons-material/MenuBook'
 import AssignmentIcon from '@mui/icons-material/Assignment'
 import { writingApi, toolsApi, friendlyError } from '../api/client'
+import { GOLDEN_THREE_HIGH_TENSION, LOW_TENSION_THREE, TENSION_SINGLE_SAMPLE } from './writingExtras.samples'
 import type { WritingProject } from '../types'
 import type { OutlineItem, CharacterCard, NoteItem, WritingStats, HookItem, TensionAnalysisResult, GoldenThreeTensionResult, ReaderRetentionResult } from '../api/client'
 import { useThemeMode } from '../state/ThemeModeContext'
@@ -1512,9 +1513,7 @@ function DashboardPanel({ project }: { project: string }) {
           <Button
             size="small"
             onClick={() => {
-              const sampleCh1 = '寒冬深夜，刺骨杀机骤起！\n黑衣刺客长刀撕裂长空，狠厉劈向少年头颅！“受死吧！”\n狂暴刀芒带着刺耳呼啸，鲜血瞬间染红青石砖。少年目眦欲裂，咬牙翻滚！\n身后的巨石崩裂成无数碎块，剧毒烟雾弥漫四周！生死一线，少年怀中神秘断玉突然迸发耀眼红芒！'
-              const sampleCh2 = '断玉散发灼热高温，一股狂暴暖流瞬间涌入少年四肢百骸！\n刺客惊疑不定：“上古至宝？交出来饶你不死！”\n少年咬紧牙关，趁势翻身跃起，借着狂暴灵力一掌拍向刺客胸膛！\n轰！刺客被震退三步，嘴角溢血，眼中贪婪更盛：“好小子，今日你插翅难飞！”'
-              const sampleCh3 = '“狂妄之徒，给我纳命来！”刺客怒吼，拔出背后淬毒短匕全力扑杀！\n生死刹那，少年眼神骤冷，断玉中猛然觉醒上古无上剑意！\n嗤啦！剑气如惊雷破空，瞬间贯穿刺客咽喉！反派轰然倒地，全场震撼死寂！\n少年拔出长剑，正欲喘息，长街尽头却突现数道更加可怖的黑袍身影，杀气封锁全城！'
+              const { ch1: sampleCh1, ch2: sampleCh2, ch3: sampleCh3 } = GOLDEN_THREE_HIGH_TENSION
               setCh1Input(sampleCh1)
               setCh2Input(sampleCh2)
               setCh3Input(sampleCh3)
@@ -1589,9 +1588,7 @@ function DashboardPanel({ project }: { project: string }) {
           <Button
             size="small"
             onClick={() => {
-              const sampleCh1 = '寒冬深夜，刺骨杀机骤起！\n黑衣刺客长刀撕裂长空，狠厉劈向少年头颅！“受死吧！”\n狂暴刀芒带着刺耳呼啸，鲜血瞬间染红青石砖。少年目眦欲裂，咬牙翻滚！\n身后的巨石崩裂成无数碎块，剧毒烟雾弥漫四周！生死一线，少年怀中神秘断玉突然迸发耀眼红芒！'
-              const sampleCh2 = '断玉散发灼热高温，一股狂暴暖流瞬间涌入少年四肢百骸！\n刺客惊疑不定：“上古至宝？交出来饶你不死！”\n少年咬紧牙关，趁势翻身跃起，借着狂暴灵力一掌拍向刺客胸膛！\n轰！刺客被震退三步，嘴角溢血，眼中贪婪更盛：“好小子，今日你插翅难飞！”'
-              const sampleCh3 = '“狂妄之徒，给我纳命来！”刺客怒吼，拔出背后淬毒短匕全力扑杀！\n生死刹那，少年眼神骤冷，断玉中猛然觉醒上古无上剑意！\n嗤啦！剑气如惊雷破空，瞬间贯穿刺客咽喉！反派轰然倒地，全场震撼死寂！\n少年拔出长剑，正欲喘息，长街尽头却突现数道更加可怖的黑袍身影，杀气封锁全城！'
+              const { ch1: sampleCh1, ch2: sampleCh2, ch3: sampleCh3 } = GOLDEN_THREE_HIGH_TENSION
               setCh1Input(sampleCh1)
               setCh2Input(sampleCh2)
               setCh3Input(sampleCh3)
@@ -1603,9 +1600,7 @@ function DashboardPanel({ project }: { project: string }) {
           <Button
             size="small"
             onClick={() => {
-              const sampleCh1 = '清晨的阳光洒进教室，同学们安静地早读。他翻开课本，按照顺序温习了昨天的知识点，整理了课堂笔记。课间休息时，他去走廊接了一杯温水，看了一会儿窗外的梧桐树，然后回到座位继续预习。'
-              const sampleCh2 = '午饭过后，大家依次回到教室午休。他先整理好桌面，把文具摆放整齐，随后趴在桌上休息了半小时。下午的课程按时开始，老师讲述新的内容，他认真听讲并做了记录，没有遇到什么困难。'
-              const sampleCh3 = '放学后，他步行回家，路上买了一些文具，顺便在小区门口看了看公告栏。晚饭后，他复习了两个小时，把当天的作业按时完成，然后收拾好书桌，洗漱之后就按时休息了。'
+              const { ch1: sampleCh1, ch2: sampleCh2, ch3: sampleCh3 } = LOW_TENSION_THREE
               setCh1Input(sampleCh1)
               setCh2Input(sampleCh2)
               setCh3Input(sampleCh3)
@@ -1646,7 +1641,7 @@ function DashboardPanel({ project }: { project: string }) {
           <Button
             size="small"
             onClick={() => {
-              const sample = '寒风呼啸，江水刺骨冰冷。红围巾在夜色中如鲜血翻飞！少年毫不犹豫甩开外套跃入刺骨冰江！\n“救命！”呼救声微弱颤抖，水花狂暴激荡。他咬紧牙关，在生死边缘拉回了下沉的躯体！\n岸边警笛骤鸣，众人骇然围拢。危机暂退，两人精疲力竭倒在雪地中，大口喘息。'
+              const sample = TENSION_SINGLE_SAMPLE
               setDraftInput(sample)
               runTensionAnalysis(sample)
             }}

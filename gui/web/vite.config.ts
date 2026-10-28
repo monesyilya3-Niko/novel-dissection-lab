@@ -17,12 +17,23 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 650,
     rollupOptions: {
       output: {
-        // 4B：react+mui 合并为 vendor 避免 circular；echarts 独立 chunk。
-        manualChunks: {
-          'vendor': ['react', 'react-dom', '@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
-          'echarts': ['echarts'],
+        // 按依赖/功能分 chunk：首屏只拉 vendor+index，echarts/tiptap/markdown 按需，
+        // writing 主体与 writing-extras（图表+重度面板）分离避免 monolithic 600KB+。
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('echarts')) return 'echarts'
+            if (id.includes('@tiptap') || id.includes('prosemirror')) return 'tiptap'
+            if (id.includes('react-markdown') || id.includes('remark-')) return 'markdown'
+            if (id.includes('@tanstack')) return 'virtual'
+            if (id.includes('react') || id.includes('@mui') || id.includes('@emotion')) return 'vendor'
+          }
+          // writing-extras 仅在 WritingWorkbench「创作」tab 才加载，与核心分离
+          if (id.includes('/components/WritingExtras') || id.includes('/components/writingExtras.samples')) return 'writing-extras'
+          // writingExt 板内 4 张专用图表：仅 extras 引用，外置避免 WritingWorkbench 垄断 600KB
+          if (id.includes('/components/charts/CreationRateChart') || id.includes('/components/charts/EmotionWaveChart') || id.includes('/components/charts/RhythmRadarChart') || id.includes('/components/charts/ReaderRetentionChart')) return 'writing-extras'
         },
       },
     },
