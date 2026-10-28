@@ -62,8 +62,8 @@ interface Step {
   title: string
   body: ReactNode
   cta: { label: string; go?: WorkbenchKey }
-  /** 为未配模型时提供的替代 CTA（仅 step 2 使用） */
-  altCta?: { label: string; go: WorkbenchKey; hint: string }
+  /** s2 的"直接去做"捷径（可选）：与主按钮文案必须不同，避免同屏两个同名按钮 */
+  shortcutCta?: { label: string; go: WorkbenchKey }
 }
 
 type NextAction = { key: WorkbenchKey; title: string; desc: string; accent: string }
@@ -99,7 +99,7 @@ export default function OnboardingWizard({
         title: t('onboarding_s1_title', '欢迎使用暮冬念春'),
         body: (
           <Typography variant="body2" color="text.secondary">
-            {t('onboarding_s1_body', '把优秀小说拆成可复用的写作资产，再用这些资产驱动创作。全流程在本机完成，不会上传任何数据。三步上手，随时可跳过。')}
+            {t('onboarding_s1_body', '把优秀小说拆成可复用的写作资产，再用这些资产驱动创作。全流程在本机完成，不会上传任何数据。四步上手，随时可跳过。')}
           </Typography>
         ),
         cta: { label: t('onboarding_next', '下一步') },
@@ -120,12 +120,10 @@ export default function OnboardingWizard({
             {t('onboarding_s2_body', '到「分析」页导入一本 TXT 全本，选择题材后启动拆书。拆解完成后自动生成文风卡、笔法卡、结构/商业观测等资产与万字分析报告。')}
           </Typography>
         ),
-        cta: { label: t('onboarding_goto_import', '去导入'), go: 'analysis' as WorkbenchKey },
-        altCta: modelConfigured === false ? {
-          label: t('onboarding_goto_model', '去配置模型'),
-          go: 'system' as WorkbenchKey,
-          hint: t('onboarding_s2_model_hint', '配好模型才能拆书，也可先用示例语料体验离线功能'),
-        } : undefined,
+        cta: { label: t('onboarding_next', '下一步') },
+        shortcutCta: modelConfigured === false
+          ? { label: t('onboarding_goto_model', '去配置模型'), go: 'system' as WorkbenchKey }
+          : { label: t('onboarding_goto_import', '去导入'), go: 'analysis' as WorkbenchKey },
       },
       {
         title: t('onboarding_s3_title', '第二步：查看资产与质检'),
@@ -175,8 +173,8 @@ export default function OnboardingWizard({
 
   const current = steps[step]
   const isLast = step === steps.length - 1
-  // 未配模型时，第二步主按钮改为去配模型
-  const effectiveCta = step === 1 && current.altCta ? current.altCta : current.cta
+  // s2 提供"直接去做"的捷径（去配置模型 / 去导入），主按钮始终"下一步"以保证 s3/s4 可达。
+  const shortcut = current.shortcutCta ?? null
 
   return (
     <Dialog open onClose={() => finish()} maxWidth="sm" fullWidth data-testid="onboarding">
@@ -202,19 +200,24 @@ export default function OnboardingWizard({
             {t('onboarding_prev', '上一步')}
           </Button>
         )}
-        {/* 未配模型时在第二步额外展示次要去向 */}
-        {step === 1 && current.altCta && (
-          <Button size="small" variant="outlined" onClick={() => finish(current.altCta!.go)} data-testid="onboarding-alt-cta">
-            {current.altCta.label}
+        {/* s2 捷径：直接跳到对应工作台（未配模型→配模型，已配→去导入） */}
+        {shortcut && (
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => finish(shortcut.go)}
+            data-testid="onboarding-shortcut-cta"
+          >
+            {shortcut.label}
           </Button>
         )}
         <Button
           variant="contained"
           size="small"
           data-testid="onboarding-primary-cta"
-          onClick={() => (isLast ? finish(effectiveCta.go) : (step === 1 ? finish(effectiveCta.go) : setStep((s) => s + 1)))}
+          onClick={() => (isLast ? finish(current.cta.go) : setStep((s) => s + 1))}
         >
-          {isLast ? current.cta.label : (step === 1 ? effectiveCta.label : current.cta.label)}
+          {current.cta.label}
         </Button>
       </DialogActions>
     </Dialog>

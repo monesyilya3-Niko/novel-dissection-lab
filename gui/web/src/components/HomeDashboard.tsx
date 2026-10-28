@@ -2,6 +2,7 @@
 // 纸墨质感 + 衬线标题 + 交错入场动画 + 悬浮卡片。
 import { useState, useEffect, useMemo } from 'react'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
@@ -21,6 +22,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import AsyncBoundary from './common/AsyncBoundary'
 import JourneyStepper from './JourneyStepper'
+import { replayOnboarding } from './OnboardingWizard'
 import { useApp } from '../state/AppContext'
 import { lazy, Suspense } from 'react'
 const PieChart = lazy(() => import('./charts/PieChart'))
@@ -280,6 +282,19 @@ export default function HomeDashboard() {
           </Card>
         </Grid>
       </Grid>
+
+      {/* —— 重看引导入口（WS-A4）：曾有用户关掉向导后无法再找到 —— */}
+      <Box sx={{ mt: 3, mb: 1, textAlign: 'center' }}>
+        <Button
+          size="small"
+          variant="text"
+          onClick={() => replayOnboarding()}
+          data-testid="replay-onboarding-home"
+          sx={{ color: ink.textTertiary, fontSize: 13 }}
+        >
+          {t('onboarding_replay')}
+        </Button>
+      </Box>
       </>
       )}
       </AsyncBoundary>

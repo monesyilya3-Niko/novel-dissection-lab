@@ -21,6 +21,7 @@ import StepLabel from '@mui/material/StepLabel'
 import StepContent from '@mui/material/StepContent'
 import Paper from '@mui/material/Paper'
 import Divider from '@mui/material/Divider'
+import Button from '@mui/material/Button'
 import { ink, fontStack } from '../ink'
 import { useI18n, Locale } from '../state/I18nContext'
 
@@ -33,6 +34,7 @@ export interface HelpWorkbenchProps {
 }
 
 import { GLOSSARY, type TermCategory } from '../help/glossary'
+import { replayOnboarding } from './OnboardingWizard'
 
 // ---------------------------------------------------------------------------
 // 数据：功能指南 (双语国际化)
@@ -909,6 +911,14 @@ export default function HelpWorkbench({ initialTab = 'start', initialAnchor = nu
       {tab === 'glossary' && <GlossaryPanel />}
       {tab === 'guides' && <GuidesPanel anchor={initialAnchor} />}
       {tab === 'faq' && <FaqPanel />}
+
+      {/* 重看首启引导（WS-A4）：向导关掉后唯一可发现的回放入口之一 */}
+      <Divider sx={{ mt: 4, mb: 2 }} />
+      <Box sx={{ textAlign: 'center', pb: 2 }}>
+        <Button size="small" variant="text" onClick={() => replayOnboarding()} data-testid="replay-onboarding">
+          {t('onboarding_replay')}
+        </Button>
+      </Box>
     </Box>
   )
 }
