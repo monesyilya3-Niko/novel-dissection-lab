@@ -155,9 +155,10 @@ function AppShell() {
   const wide = useMediaQuery('(min-width: 961px)')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [onboarded, setOnboarded] = useState(isOnboarded)
-  // 重看引导：HelpWorkbench/HomeDashboard 触发，AppShell 监听重置 onboarded
+  // 用户主动"重看引导"：与首次自动弹出不同，此路径不受"空库"条件限制
+  const [replayRequested, setReplayRequested] = useState(false)
   useEffect(() => {
-    const h = () => setOnboarded(false)
+    const h = () => { setOnboarded(false); setReplayRequested(true) }
     window.addEventListener(REPLAY_EVENT, h)
     return () => window.removeEventListener(REPLAY_EVENT, h)
   }, [])
@@ -190,12 +191,19 @@ function AppShell() {
     />
   )
 
-  const showWizard = !!overview && !onboarded && overview.totalBooks === 0 && overview.totalAssets === 0
+  // 首次自动弹出：仅空库 + 未引导过。
+  // 主动重播：用户点了「重看引导」，即使已有数据也必须弹出（否则点击看起来毫无反应）。
+  const isEmptyLibrary = !!overview && overview.totalBooks === 0 && overview.totalAssets === 0
+  const showWizard = !onboarded && (replayRequested || isEmptyLibrary)
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {showWizard && (
-        <OnboardingWizard onDone={() => setOnboarded(true)} onNavigate={setWorkbench} modelConfigured={!!overview?.modelConfigured} />
+        <OnboardingWizard
+          onDone={() => { setOnboarded(true); setReplayRequested(false) }}
+          onNavigate={setWorkbench}
+          modelConfigured={!!overview?.modelConfigured}
+        />
       )}
       <AppBar position="static" elevation={0} sx={{
         background: (theme) => theme.palette.mode === 'dark' ? ink.nightCard : ink.surface,

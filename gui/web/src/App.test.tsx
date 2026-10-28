@@ -1,6 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import App from './App'
+import { replayOnboarding } from './components/OnboardingWizard'
 import { I18nProvider } from './state/I18nContext'
 import { ThemeModeProvider } from './state/ThemeModeContext'
 import { writeStorage, removeStorage } from './safeStorage'
@@ -243,6 +244,31 @@ describe('App 顶层应用框架与导航集成测试', () => {
     await waitFor(() => {
       expect(screen.queryByText('欢迎使用暮冬念春')).toBeNull()
     })
+  })
+
+  it('已有数据时点「重看引导」仍然弹出向导（不受空库条件限制）', async () => {
+    // 有书有资产 —— 首次自动弹出条件不满足
+    vi.mocked(getOverview).mockResolvedValue({ totalBooks: 3, totalAssets: 20 } as any)
+
+    render(
+      <ThemeModeProvider>
+        <I18nProvider>
+          <App />
+        </I18nProvider>
+      </ThemeModeProvider>,
+    )
+
+    // 等首屏渲染完成，确认没有自动弹出
+    await waitFor(() => {
+      expect(screen.queryByText('欢迎使用暮冬念春')).toBeNull()
+    })
+
+    // 触发重播（HomeDashboard/HelpWorkbench 上的按钮走同一事件）
+    act(() => {
+      replayOnboarding()
+    })
+
+    expect(await screen.findByText('欢迎使用暮冬念春')).toBeDefined()
   })
 })
 
