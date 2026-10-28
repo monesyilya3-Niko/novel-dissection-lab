@@ -56,16 +56,22 @@ export default function WritingExtras() {
   const [project, setProject] = useState('')
   const [error, setError] = useState('')
 
+  const projectsReqIdRef = useRef(0)
   const loadProjects = useCallback(() => {
+    const cur = ++projectsReqIdRef.current
     writingApi
       .projects()
       .then((ps) => {
+        if (cur !== projectsReqIdRef.current) return
         setProjects(ps)
         if (ps.length > 0 && !ps.some((p) => p.name === project)) {
           setProject(ps[0].name)
         }
       })
-      .catch((e) => setError(t('extras_err_load_projects', '加载项目失败: {msg}', { msg: friendlyError(e) })))
+      .catch((e) => {
+        if (cur !== projectsReqIdRef.current) return
+        setError(t('extras_err_load_projects', '加载项目失败: {msg}', { msg: friendlyError(e) }))
+      })
   }, [project, t])
 
   useEffect(() => {
