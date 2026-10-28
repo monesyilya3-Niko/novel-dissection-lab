@@ -12,6 +12,7 @@ import MenuItem from '@mui/material/MenuItem'
 import { useApp } from '../state/AppContext'
 import { getGenres } from '../api/client'
 import { useI18n } from '../state/I18nContext'
+import { inferGenreFromFilename } from '../utils/inferGenre'
 import type { TaskStatus } from '../types'
 import DisabledTooltipButton from './common/DisabledTooltipButton'
 
@@ -41,6 +42,7 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
   const { book, overview, status, runFullAnalysis } = useApp()
   const [genres, setGenres] = useState<string[]>([])
   const [genre, setGenre] = useState('')
+  const [inferredFromFilename, setInferredFromFilename] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [errorKey, setErrorKey] = useState<string | null>(null)
   const [rawError, setRawError] = useState<string | null>(null)
@@ -52,7 +54,17 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
       .then((list) => {
         if (cancelled) return
         setGenres(list)
-        // P0-4：不自动选中，用户必须显式选择题材（必填）
+        // WS-A3：若仍未选题材，尝试从文件名自动推断（可手动覆盖）
+        if (book) {
+          const name = (book as unknown as Record<string, unknown>).title as string
+            ?? (book as unknown as Record<string, unknown>).name as string
+            ?? ''
+          const inferred = inferGenreFromFilename(name || book.sourcePath || '', list)
+          if (inferred) {
+            setGenre(inferred)
+            setInferredFromFilename(inferred)
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setErrorKey('analysis_err_load_genres')
@@ -60,7 +72,7 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [book?.bookId])
 
   const taskStatus: TaskStatus = status?.status ?? 'idle'
   const isRunning = taskStatus === 'running'
@@ -117,7 +129,7 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
               labelId="genre-select-label"
               value={genre}
               label={t('analysis_genre_label')}
-              onChange={(e) => setGenre(e.target.value)}
+              onChange={(e) => { setGenre(e.target.value); setInferredFromFilename(null) }}
               sx={{ fontSize: 13 }}
             >
               {genres.map((g) => (
@@ -127,6 +139,14 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
               ))}
             </Select>
           </FormControl>
+          {inferredFromFilename && genre === inferredFromFilename && (
+            <Chip
+              size="small"
+              label={t('analysis_genre_auto_hint', undefined, { genre: inferredFromFilename })}
+              onDelete={() => setInferredFromFilename(null)}
+              sx={{ fontSize: 11 }}
+            />
+          )}
           <DisabledTooltipButton disabled={isDisabled} disabledReason={disabledReason}>
             <Button
               variant="contained"

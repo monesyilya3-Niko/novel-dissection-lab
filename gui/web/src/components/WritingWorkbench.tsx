@@ -196,6 +196,7 @@ export default function WritingWorkbench({
 // ---------------------------------------------------------------------------
 
 function InjectPanel({ sel }: { sel: WritingAssetSelection }) {
+  const { t } = useI18n()
   const { assets, distilledAssets, byKind } = sel
   const { voice, setVoice, genrePack, setGenrePack, craft, setCraft } = sel
   const { distilled, setDistilled, proseCard, setProseCard } = sel
@@ -223,18 +224,9 @@ function InjectPanel({ sel }: { sel: WritingAssetSelection }) {
     <Box>
       <Typography variant="h6" gutterBottom>资产注入</Typography>
       <InlineGuide
-        what="把拆书得到的资产卡拼成一段完整的写作 Prompt：决定「用谁的声音、按什么规则」写，后面生成章节都会按这套风格来。"
-        steps={[
-          'voice-card 必选：决定人物声线和叙事风格（来自你拆过的书）。',
-          '可选叠加：genre-pack（题材规则）、craft-card（笔法技巧）、蒸馏规则（多本书提炼出的通用规律）、prose-card（跨题材文风参照）。',
-          '点「生成 Prompt」可以预览拼好的提示词，确认风格对不对。',
-          '这里选好的 voice-card 与 genre-pack，「写作」页签生成章节时会自动用上（同一份选择）。',
-        ]}
-        tips={[
-          '资产列表是空的？先去「分析」工作台导入一本书并完成拆书。',
-          '蒸馏规则是离线统计生成的，不需要配置 AI 模型也能用。',
-          'voice 与其他资产题材不一致时，后端会按铁律一拒绝（400），请换成同题材资产。',
-        ]}
+        what={t('guide_inject_what')}
+        steps={[t('guide_inject_step_1'), t('guide_inject_step_2'), t('guide_inject_step_3'), t('guide_inject_step_4')]}
+        tips={[t('guide_inject_tip_1'), t('guide_inject_tip_2'), t('guide_inject_tip_3')]}
       />
       {assets.length === 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>暂无可用资产，请先在「分析」工作台完成拆书</Alert>
@@ -403,18 +395,10 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
     <Box>
       <Typography variant="h6" gutterBottom>写作</Typography>
       <InlineGuide
-        what="按你的「写作要点」生成新章节：模型写出初稿后自动打分，不达标就自动改写，直到达标或用完改写次数。写好的章节会落盘保存。"
-        steps={[
-          '选项目：项目就是用户数据目录 novel/ 下的文件夹——在 novel/ 下新建一个文件夹，就是一个新写作项目。',
-          'voice-card 与 genre-pack 沿用「注入」页签的选择（同一份），这里可以直接调整。',
-          '选章节号、写「写作要点」：交代本章发生什么、谁出场、情绪走向、字数和结尾要求，越具体越好。',
-          '点「开始写作」，进度实时显示；完成后会提示章节文件的保存位置。',
-        ]}
-        example={'第5章：深秋傍晚，温霜禾抱着一摞粉色包装的礼物盒走进澜州老街的奶茶店，点了七分糖的芋泥波波奶茶。江春屿跟在后面替她拎包。两人因为"谁请客"斗嘴，温霜禾说了句"随便吧"——其实是生气了。要求：2200字左右，对话占四成，结尾留钩子：温霜禾发现奶茶店落地窗外站着一个熟悉的身影。'}
-        tips={[
-          '没配 AI 模型也能用：会进入降级模式，生成一份「AI接管写作任务.md」指引，你可以手动写完，再用下面的「手动入库」贴回来打分。',
-          '「写作要点」决定了章节质量：只写"写一章校园恋爱"效果会很差，把人物、场景、冲突、字数都写清楚。',
-        ]}
+        what={t('guide_generate_what')}
+        steps={[t('guide_generate_step_1'), t('guide_generate_step_2'), t('guide_generate_step_3'), t('guide_generate_step_4')]}
+        example={t('guide_generate_example')}
+        tips={[t('guide_generate_tip_1'), t('guide_generate_tip_2')]}
         defaultOpen
       />
       {sel.mismatches.length > 0 && (
@@ -544,6 +528,7 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
 // ---------------------------------------------------------------------------
 
 function ScorePanel() {
+  const { t } = useI18n()
   const [assets, setAssets] = useState<{ id: string; name: string; kind: string }[]>([])
   const [voice, setVoice] = useState('')
   const [text, setText] = useState('')
@@ -578,17 +563,9 @@ function ScorePanel() {
     <Box>
       <Typography variant="h6" gutterBottom>双维度打分</Typography>
       <InlineGuide
-        what="给一段章节正文打分：从「风格一致性」（像不像这张声线卡的味道）和「写作质量」（有没有硬伤）两个维度判定，低于及格线会列出具体问题。"
-        steps={[
-          '选一张 voice-card 作为参照标准。',
-          '把章节正文粘贴进来，点「打分」。',
-          '看综合判定：一致性得分 + 质量得分，以及五维明细和质量问题列表。',
-          '分数不够就按列出的问题改，改完可以再打一次。',
-        ]}
-        tips={[
-          '及格线可以在「设置」工作台里调整。',
-          '打分不需要 AI 模型，是本地规则引擎跑的。',
-        ]}
+        what={t('guide_score_what')}
+        steps={[t('guide_score_step_1'), t('guide_score_step_2'), t('guide_score_step_3'), t('guide_score_step_4')]}
+        tips={[t('guide_score_tip_1'), t('guide_score_tip_2')]}
       />
       <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
         <TextField select label="voice-card" value={voice} onChange={(e) => setVoice(e.target.value)} sx={{ minWidth: 220 }} size="small">
@@ -646,6 +623,7 @@ function ScorePanel() {
 // ---------------------------------------------------------------------------
 
 function AssemblePanel() {
+  const { t } = useI18n()
   const [candidates, setCandidates] = useState<{ name: string; passes: string[] }[]>([])
   const [name, setName] = useState('')
   // P2-F14：默认题材改为空，必须显式选择，避免误用 campus-redemption。
@@ -679,15 +657,9 @@ function AssemblePanel() {
     <Box>
       <Typography variant="h6" gutterBottom>资产组装</Typography>
       <InlineGuide
-        what="把一本书多轮拆书（pass1-5）的产出组装成正式资产并入库：书名选已完成全部 pass 的书，填上题材，组装后资产就能在注入和写作里用了。"
-        steps={[
-          '从下拉里选一本已完成 pass1-5 的书。',
-          '填写题材（如：校园、玄幻、悬疑）——题材决定了资产的隔离分组，填错会导致注入时选不到。',
-          '点「组装入库」，产出 voice-card / structure-obs 等正式资产。',
-        ]}
-        tips={[
-          '列表是空的？说明还没有书跑完 pass1-5，先去「分析」工作台完成拆书。',
-        ]}
+        what={t('guide_assemble_what')}
+        steps={[t('guide_assemble_step_1'), t('guide_assemble_step_2'), t('guide_assemble_step_3')]}
+        tips={[t('guide_assemble_tip_1')]}
       />
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {candidates.length === 0 && !error && (
@@ -787,6 +759,19 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   const [metaSummary, setMetaSummary] = useState('')
   const [openNewProj, setOpenNewProj] = useState(false)
   const [newProjName, setNewProjName] = useState('')
+
+  // 命令面板深度跳转：novellab:writing-action { action }
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const action = (e as CustomEvent<{ action: string }>).detail?.action
+      if (action === 'new-project') setOpenNewProj(true)
+      else if (action === 'new-outline') setOpenNewOutline(true)
+      else if (action === 'new-character') setOpenNewChar(true)
+      else if (action === 'new-note') setOpenNewNote(true)
+    }
+    window.addEventListener('novellab:writing-action', handler)
+    return () => window.removeEventListener('novellab:writing-action', handler)
+  }, [])
 
   const [openExportDialog, setOpenExportDialog] = useState(false)
   const [exportFormat, setExportFormat] = useState<'docx' | 'epub' | 'shunn' | 'md' | 'txt'>('docx')

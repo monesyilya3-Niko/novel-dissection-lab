@@ -1,6 +1,6 @@
 // 「分析」工作台：导入 → 拆书（一键串联）→ 进度 → 结果，端到端走通。
 // 左侧章节导航，右侧内容区（导入/进度/结果切换），底部控制栏。
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Box from '@mui/material/Box'
 import ContextHelpButton from './ContextHelpButton'
 import Tabs from '@mui/material/Tabs'
@@ -17,6 +17,16 @@ type SubTab = 'import' | 'progress' | 'result'
 export default function AnalysisView() {
   const { t } = useI18n()
   const [subTab, setSubTab] = useState<SubTab>('import')
+
+  // 命令面板深度跳转：novellab:analysis-tab { tab }
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent<{ tab: SubTab }>).detail?.tab
+      if (tab === 'import' || tab === 'progress' || tab === 'result') setSubTab(tab)
+    }
+    window.addEventListener('novellab:analysis-tab', handler)
+    return () => window.removeEventListener('novellab:analysis-tab', handler)
+  }, [])
 
   return (
     <Box sx={{ display: 'flex', height: '100%', minHeight: 0 }}>

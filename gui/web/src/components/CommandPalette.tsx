@@ -1,4 +1,4 @@
-// 命令面板 (Cmd+K)：全局快速跳转与操作。「墨」设计系统 v3。
+// 命令面板 (Cmd+K)：全局快速跳转与操作。「墨」设计系统 v3 — WS-A5 Discoverability (~30 commands)。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Dialog from '@mui/material/Dialog'
 import Box from '@mui/material/Box'
@@ -23,10 +23,23 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
 import LightModeIcon from '@mui/icons-material/LightMode'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
+import AddIcon from '@mui/icons-material/Add'
+import PersonIcon from '@mui/icons-material/Person'
+import MenuBookIcon from '@mui/icons-material/MenuBook'
+import ViewModuleIcon from '@mui/icons-material/ViewModule'
+import BiotechIcon from '@mui/icons-material/Biotech'
+import PaletteIcon from '@mui/icons-material/Palette'
+import ExtensionIcon from '@mui/icons-material/Extension'
+import StyleIcon from '@mui/icons-material/Style'
+import AssessmentIcon from '@mui/icons-material/Assessment'
+import DashboardCustomizeIcon from '@mui/icons-material/DashboardCustomize'
+import TranslateIcon from '@mui/icons-material/Translate'
 import { useApp } from '../state/AppContext'
 import { useThemeMode } from '../state/ThemeModeContext'
+import { useUiModeOptional } from '../state/UiModeContext'
 import { useI18n } from '../state/I18nContext'
 import type { WorkbenchKey } from '../layout/WorkbenchNav'
+import type { AssetKind } from '../types'
 
 interface CommandItem {
   id: string
@@ -46,17 +59,37 @@ interface WorkbenchMetaItem {
   keywords: string
 }
 
+// ---------------------------------------------------------------------------
+// Helpers for deep navigation (window-event bridge so sub-views can react)
+// ---------------------------------------------------------------------------
+
+function emitAssetFilter(kind: AssetKind) {
+  window.dispatchEvent(new CustomEvent('novellab:asset-filter', { detail: { kind } }))
+}
+
+function emitWritingAction(action: string) {
+  window.dispatchEvent(new CustomEvent('novellab:writing-action', { detail: { action } }))
+}
+
+function emitAnalysisTab(tab: string) {
+  window.dispatchEvent(new CustomEvent('novellab:analysis-tab', { detail: { tab } }))
+}
+
+// ---------------------------------------------------------------------------
+// Workbench meta (10 nav items) — unchanged
+// ---------------------------------------------------------------------------
+
 const WORKBENCH_META: WorkbenchMetaItem[] = [
   { key: 'home', labelToken: 'cmd_nav_home', defaultLabel: '首页', icon: <HomeIcon fontSize="small" />, keywords: 'home 首页 概览 dashboard' },
-  { key: 'analysis', labelToken: 'cmd_nav_analysis', defaultLabel: '分析拆书', icon: <InsightsIcon fontSize="small" />, keywords: 'analysis 分析 拆书' },
-  { key: 'writing', labelToken: 'cmd_nav_writing', defaultLabel: '辅助写作 (沉浸创作室与工坊)', icon: <EditNoteIcon fontSize="small" />, keywords: 'writing 写作 创作室 studio 工坊' },
-  { key: 'quality', labelToken: 'cmd_nav_quality', defaultLabel: '质量检验', icon: <FactCheckIcon fontSize="small" />, keywords: 'quality 质量 检验' },
-  { key: 'assets', labelToken: 'cmd_nav_assets', defaultLabel: '资产库', icon: <FolderOpenIcon fontSize="small" />, keywords: 'assets 资产' },
-  { key: 'advanced', labelToken: 'cmd_nav_advanced', defaultLabel: '高级功能', icon: <AutoAwesomeIcon fontSize="small" />, keywords: 'advanced 高级' },
-  { key: 'system', labelToken: 'cmd_nav_system', defaultLabel: '系统', icon: <TuneIcon fontSize="small" />, keywords: 'system 系统' },
-  { key: 'settings', labelToken: 'cmd_nav_settings', defaultLabel: '设置', icon: <SettingsIcon fontSize="small" />, keywords: 'settings 设置' },
-  { key: 'admin', labelToken: 'cmd_nav_admin', defaultLabel: '管理后台', icon: <AdminPanelSettingsIcon fontSize="small" />, keywords: 'admin 管理 后台' },
-  { key: 'help', labelToken: 'cmd_nav_help', defaultLabel: '帮助中心', icon: <HelpOutlineIcon fontSize="small" />, keywords: 'help 帮助 指南 教程 faq' },
+  { key: 'analysis', labelToken: 'cmd_nav_analysis', defaultLabel: '分析拆书', icon: <InsightsIcon fontSize="small" />, keywords: 'analysis 分析 拆书 book deconstruction' },
+  { key: 'writing', labelToken: 'cmd_nav_writing', defaultLabel: '辅助写作 (沉浸创作室与工坊)', icon: <EditNoteIcon fontSize="small" />, keywords: 'writing 写作 创作室 studio 工坊 craft pipeline' },
+  { key: 'quality', labelToken: 'cmd_nav_quality', defaultLabel: '质量检验', icon: <FactCheckIcon fontSize="small" />, keywords: 'quality 质量 检验 qc check guard' },
+  { key: 'assets', labelToken: 'cmd_nav_assets', defaultLabel: '资产库', icon: <FolderOpenIcon fontSize="small" />, keywords: 'assets 资产 库 matrix library' },
+  { key: 'advanced', labelToken: 'cmd_nav_advanced', defaultLabel: '高级功能', icon: <AutoAwesomeIcon fontSize="small" />, keywords: 'advanced 高级 蒸馏 distill batch' },
+  { key: 'system', labelToken: 'cmd_nav_system', defaultLabel: '系统', icon: <TuneIcon fontSize="small" />, keywords: 'system 系统 status compliance' },
+  { key: 'settings', labelToken: 'cmd_nav_settings', defaultLabel: '设置', icon: <SettingsIcon fontSize="small" />, keywords: 'settings 设置 config preferences' },
+  { key: 'admin', labelToken: 'cmd_nav_admin', defaultLabel: '管理后台', icon: <AdminPanelSettingsIcon fontSize="small" />, keywords: 'admin 管理 后台 administration' },
+  { key: 'help', labelToken: 'cmd_nav_help', defaultLabel: '帮助中心', icon: <HelpOutlineIcon fontSize="small" />, keywords: 'help 帮助 指南 教程 faq glossary docs' },
 ]
 
 /** 简单模糊匹配：query 的字符按序出现在 target 中 */
@@ -78,13 +111,19 @@ export default function CommandPalette() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
-  const { setWorkbench } = useApp()
+  const { setWorkbench, openHelp } = useApp()
   const { mode, setMode } = useThemeMode()
+  const uiModeState = useUiModeOptional()
   const listRef = useRef<HTMLDivElement>(null)
 
   const items: CommandItem[] = useMemo(() => {
     const list: CommandItem[] = []
-    // 工作台跳转
+    const gWorkbench = t('cmd_group_workbench', '工作台')
+    const gCreation = t('cmd_group_creation', '创作')
+    const gAssets = t('cmd_group_assets', '资产')
+    const gSystem = t('cmd_group_system', '系统')
+
+    // ── 工作台跳转 (10) ──
     for (const wb of WORKBENCH_META) {
       const localizedLabel = t(wb.labelToken, wb.defaultLabel)
       list.push({
@@ -92,22 +131,231 @@ export default function CommandPalette() {
         label: `${t('cmd_goto_prefix', '前往')}${localizedLabel}`,
         hint: wb.key === 'home' ? 'Alt+1' : wb.key === 'writing' ? 'Alt+3' : undefined,
         icon: wb.icon,
-        group: t('cmd_group_workbench', '工作台'),
+        group: gWorkbench,
         keywords: wb.keywords,
         run: () => setWorkbench(wb.key),
       })
     }
+
+    // ── 创作域 (7) ──
+    list.push({
+      id: 'creation-new-project',
+      label: t('cmd_creation_new_project', '新建项目'),
+      icon: <AddIcon fontSize="small" />,
+      group: gCreation,
+      keywords: 'new project 新建 项目 创建 create novel book writing',
+      run: () => {
+        setWorkbench('writing')
+        requestAnimationFrame(() => emitWritingAction('new-project'))
+      },
+    })
+    list.push({
+      id: 'creation-new-outline',
+      label: t('cmd_creation_new_outline', '新建大纲'),
+      icon: <MenuBookIcon fontSize="small" />,
+      group: gCreation,
+      keywords: 'outline 大纲 规划 章节 outline chapter volume structure beats',
+      run: () => {
+        setWorkbench('writing')
+        requestAnimationFrame(() => emitWritingAction('new-outline'))
+      },
+    })
+    list.push({
+      id: 'creation-new-character',
+      label: t('cmd_creation_new_character', '新建人物'),
+      icon: <PersonIcon fontSize="small" />,
+      group: gCreation,
+      keywords: 'character 人物 人设 角色 persona card name naming protagonist',
+      run: () => {
+        setWorkbench('writing')
+        requestAnimationFrame(() => emitWritingAction('new-character'))
+      },
+    })
+    list.push({
+      id: 'creation-go-studio',
+      label: t('cmd_creation_go_studio', '去写作 — 沉浸创作室'),
+      icon: <EditNoteIcon fontSize="small" />,
+      group: gCreation,
+      keywords: 'studio 沉浸 创作室 写作 writing immersion draft editor',
+      run: () => setWorkbench('writing'),
+    })
+    list.push({
+      id: 'creation-go-pipeline',
+      label: t('cmd_creation_go_pipeline', '去写作 — 工坊流水线'),
+      icon: <ViewModuleIcon fontSize="small" />,
+      group: gCreation,
+      keywords: 'pipeline 工坊 流水线 craft inject generate pipeline workflow',
+      run: () => setWorkbench('writing'),
+    })
+    list.push({
+      id: 'creation-go-analysis',
+      label: t('cmd_creation_go_analysis', '去拆书'),
+      icon: <BiotechIcon fontSize="small" />,
+      group: gCreation,
+      keywords: 'analysis 拆书 导入 import deconstruction pipeline 书 book',
+      run: () => {
+        setWorkbench('analysis')
+        requestAnimationFrame(() => emitAnalysisTab('import'))
+      },
+    })
+    list.push({
+      id: 'creation-view-results',
+      label: t('cmd_creation_view_results', '查看分析结果'),
+      icon: <AssessmentIcon fontSize="small" />,
+      group: gCreation,
+      keywords: 'result 结果 报告 report score analysis progress result report',
+      run: () => {
+        setWorkbench('analysis')
+        requestAnimationFrame(() => emitAnalysisTab('result'))
+      },
+    })
+
+    // ── 资产域 (7) — 带 kind 预筛选 ──
+    list.push({
+      id: 'asset-voice',
+      label: t('cmd_asset_voice', '查看声线卡'),
+      icon: <StyleIcon fontSize="small" />,
+      group: gAssets,
+      keywords: 'voice 声线 卡 voice-card character voice style narration',
+      run: () => {
+        setWorkbench('assets')
+        requestAnimationFrame(() => emitAssetFilter('voice'))
+      },
+    })
+    list.push({
+      id: 'asset-genre-pack',
+      label: t('cmd_asset_genre_pack', '查看题材包'),
+      icon: <PaletteIcon fontSize="small" />,
+      group: gAssets,
+      keywords: 'genre 题材 包 genre-pack genre pack template tropes',
+      run: () => {
+        setWorkbench('assets')
+        requestAnimationFrame(() => emitAssetFilter('genre_pack'))
+      },
+    })
+    list.push({
+      id: 'asset-distilled',
+      label: t('cmd_asset_distilled', '查看蒸馏规则'),
+      icon: <BiotechIcon fontSize="small" />,
+      group: gAssets,
+      keywords: 'distill 蒸馏 规则 distilled rule distill aggregate genre',
+      run: () => {
+        setWorkbench('assets')
+        requestAnimationFrame(() => emitAssetFilter('distilled'))
+      },
+    })
+    list.push({
+      id: 'asset-prose-card',
+      label: t('cmd_asset_prose_card', '查看文风卡'),
+      icon: <PaletteIcon fontSize="small" />,
+      group: gAssets,
+      keywords: 'prose 文风 卡 prose-card style card prose style',
+      run: () => {
+        setWorkbench('assets')
+        requestAnimationFrame(() => emitAssetFilter('prose_card'))
+      },
+    })
+    list.push({
+      id: 'asset-craft',
+      label: t('cmd_asset_craft', '查看笔法卡'),
+      icon: <ExtensionIcon fontSize="small" />,
+      group: gAssets,
+      keywords: 'craft 笔法 卡 craft-card technique craft writing skill trope deslop',
+      run: () => {
+        setWorkbench('assets')
+        requestAnimationFrame(() => emitAssetFilter('craft'))
+      },
+    })
+    list.push({
+      id: 'asset-trope',
+      label: t('cmd_asset_trope', '查看桥段库'),
+      icon: <ExtensionIcon fontSize="small" />,
+      group: gAssets,
+      keywords: 'trope 桥段 套路 桥段库 shuangdian trope hook goldfinger poison distill',
+      run: () => {
+        setWorkbench('assets')
+        requestAnimationFrame(() => emitAssetFilter('trope'))
+      },
+    })
+    list.push({
+      id: 'asset-report',
+      label: t('cmd_asset_report', '查看报告'),
+      icon: <AssessmentIcon fontSize="small" />,
+      group: gAssets,
+      keywords: 'report 报告 万字 拆书报告 craft report book report analysis',
+      run: () => {
+        setWorkbench('assets')
+        requestAnimationFrame(() => emitAssetFilter('report'))
+      },
+    })
+
+    // ── 系统域 (7) ──
+    list.push({
+      id: 'system-config-model',
+      label: t('cmd_system_config_model', '配置模型'),
+      icon: <TuneIcon fontSize="small" />,
+      group: gSystem,
+      keywords: 'model 模型 配置 config api key llm openai anthropic provider',
+      run: () => setWorkbench('system'),
+    })
+    list.push({
+      id: 'system-toggle-uimode',
+      label: uiModeState?.mode === 'advanced'
+        ? t('cmd_system_uimode_simple', '切换为简洁模式')
+        : t('cmd_system_uimode_advanced', '切换为完整模式'),
+      icon: <DashboardCustomizeIcon fontSize="small" />,
+      group: gSystem,
+      keywords: 'ui mode 简洁 完整 simple advanced toggle switch 模式 切换',
+      run: () => {
+        if (uiModeState) {
+          uiModeState.setMode(uiModeState.mode === 'advanced' ? 'simple' : 'advanced')
+        }
+      },
+    })
+    list.push({
+      id: 'system-help-start',
+      label: t('cmd_system_help_start', '打开帮助 — 新手上路'),
+      icon: <HelpOutlineIcon fontSize="small" />,
+      group: gSystem,
+      keywords: 'help 帮助 新手 上路 start guide workflow onboarding',
+      run: () => openHelp('start', null),
+    })
+    list.push({
+      id: 'system-help-glossary',
+      label: t('cmd_system_help_glossary', '打开帮助 — 术语表'),
+      icon: <TranslateIcon fontSize="small" />,
+      group: gSystem,
+      keywords: 'glossary 术语 词汇 词典 deslop poison trope distill qc craft voice genre terminology',
+      run: () => openHelp('glossary', null),
+    })
+    list.push({
+      id: 'system-help-guides',
+      label: t('cmd_system_help_guides', '打开帮助 — 功能指南'),
+      icon: <HelpOutlineIcon fontSize="small" />,
+      group: gSystem,
+      keywords: 'guide 指南 功能 guides feature docs tutorial howto',
+      run: () => openHelp('guides', null),
+    })
+    list.push({
+      id: 'system-help-faq',
+      label: t('cmd_system_help_faq', '打开帮助 — 常见问题'),
+      icon: <HelpOutlineIcon fontSize="small" />,
+      group: gSystem,
+      keywords: 'faq 常见问题 问答 help troubleshoot issue question',
+      run: () => openHelp('faq', null),
+    })
     // 主题切换
     list.push({
       id: 'theme-toggle',
       label: mode === 'dark' ? t('cmd_theme_light', '切换为亮色模式') : t('cmd_theme_dark', '切换为暗色模式'),
       icon: mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />,
-      group: t('cmd_group_actions', '操作'),
-      keywords: 'theme mode dark light 模式 亮色 暗色 主题',
+      group: gSystem,
+      keywords: 'theme mode dark light 模式 亮色 暗色 主题 night day toggle',
       run: () => setMode(mode === 'dark' ? 'light' : 'dark'),
     })
+
     return list
-  }, [setWorkbench, mode, setMode, t])
+  }, [setWorkbench, openHelp, mode, setMode, uiModeState, t])
 
   const filtered = useMemo(() => {
     if (!query.trim()) return items
@@ -231,7 +479,7 @@ export default function CommandPalette() {
           }}
         />
       </Box>
-      <Box ref={listRef} sx={{ maxHeight: 320, overflowY: 'auto', px: 1.5, pb: 1.5 }}>
+      <Box ref={listRef} sx={{ maxHeight: 360, overflowY: 'auto', px: 1.5, pb: 1.5 }}>
         {filtered.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
             {t('cmd_empty', '没有匹配的结果')}

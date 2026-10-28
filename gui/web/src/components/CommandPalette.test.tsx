@@ -44,9 +44,11 @@ describe('CommandPalette 全局命令面板双语国际化与功能测试', () =
     // 搜索框 placeholder
     expect(screen.getByPlaceholderText('搜索工作台或操作…')).toBeInTheDocument()
 
-    // 分组
+    // 分组——WS-A5 扩为 4 组
     expect(screen.getByText('工作台')).toBeInTheDocument()
-    expect(screen.getByText('操作')).toBeInTheDocument()
+    expect(screen.getByText('创作')).toBeInTheDocument()
+    expect(screen.getByText('资产')).toBeInTheDocument()
+    expect(screen.getByText('系统')).toBeInTheDocument()
 
     // 工作台跳转项
     expect(screen.getByText('前往首页')).toBeInTheDocument()
@@ -91,9 +93,11 @@ describe('CommandPalette 全局命令面板双语国际化与功能测试', () =
     // 搜索框英文 placeholder
     expect(screen.getByPlaceholderText('Search workbenches or actions…')).toBeInTheDocument()
 
-    // 英文分组
+    // 英文分组——WS-A5 4 组
     expect(screen.getByText('Workbenches')).toBeInTheDocument()
-    expect(screen.getByText('Actions')).toBeInTheDocument()
+    expect(screen.getByText('Creation')).toBeInTheDocument()
+    expect(screen.getByText('Assets')).toBeInTheDocument()
+    expect(screen.getByText('System')).toBeInTheDocument()
 
     // 英文工作台跳转
     expect(screen.getByText('Go to Home')).toBeInTheDocument()

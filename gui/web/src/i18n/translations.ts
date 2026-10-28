@@ -2973,6 +2973,32 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'en-US': 'Recent Activity',
   },
 
+  // 使用旅程进度条 (JourneyStepper — HomeDashboard)
+  journey_title: {
+    'zh-CN': '使用旅程',
+    'en-US': 'Your Journey',
+  },
+  journey_subtitle: {
+    'zh-CN': '点击任意一步前往对应工作台',
+    'en-US': 'Click any step to jump to its workbench',
+  },
+  journey_progress: {
+    'zh-CN': '{done} / {total} 已完成',
+    'en-US': '{done} / {total} completed',
+  },
+  journey_step_model_hint: {
+    'zh-CN': '前往系统页配置模型',
+    'en-US': 'Go to System to configure a model',
+  },
+  journey_step_analyze_hint: {
+    'zh-CN': '前往分析页导入并拆解',
+    'en-US': 'Go to Analysis to import & deconstruct',
+  },
+  journey_step_write_qc_hint: {
+    'zh-CN': '前往写作台新建章节并质检',
+    'en-US': 'Go to Writing Studio to draft & QC',
+  },
+
   // 拆书分析工坊 (Analysis View / Story Deconstruction)
   analysis_tab_import: {
     'zh-CN': '导入',
@@ -3070,6 +3096,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   analysis_err_select_genre: {
     'zh-CN': '请选择题材',
     'en-US': 'Please select a genre',
+  },
+  analysis_genre_auto_hint: {
+    'zh-CN': '已根据文件名自动识别为「{genre}」，可手动修改',
+    'en-US': 'Auto-detected as "{genre}" from filename — you can change it',
   },
   analysis_btn_running: {
     'zh-CN': '分析中…',
@@ -4514,6 +4544,31 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'en-US': 'Search…',
   },
 
+  cmd_group_creation: { 'zh-CN': '创作', 'en-US': 'Creation' },
+  cmd_group_assets: { 'zh-CN': '资产', 'en-US': 'Assets' },
+  cmd_group_system: { 'zh-CN': '系统', 'en-US': 'System' },
+  cmd_creation_new_project: { 'zh-CN': '新建项目', 'en-US': 'New Project' },
+  cmd_creation_new_outline: { 'zh-CN': '新建大纲', 'en-US': 'New Outline' },
+  cmd_creation_new_character: { 'zh-CN': '新建人物', 'en-US': 'New Character' },
+  cmd_creation_go_studio: { 'zh-CN': '去写作 — 沉浸创作室', 'en-US': 'Go to Studio (Writing)' },
+  cmd_creation_go_pipeline: { 'zh-CN': '去写作 — 工坊流水线', 'en-US': 'Go to Pipeline (Writing)' },
+  cmd_creation_go_analysis: { 'zh-CN': '去拆书', 'en-US': 'Go to Analysis' },
+  cmd_creation_view_results: { 'zh-CN': '查看分析结果', 'en-US': 'View Analysis Results' },
+  cmd_asset_voice: { 'zh-CN': '查看声线卡', 'en-US': 'View Voice Cards' },
+  cmd_asset_genre_pack: { 'zh-CN': '查看题材包', 'en-US': 'View Genre Packs' },
+  cmd_asset_distilled: { 'zh-CN': '查看蒸馏规则', 'en-US': 'View Distilled Rules' },
+  cmd_asset_prose_card: { 'zh-CN': '查看文风卡', 'en-US': 'View Style Cards' },
+  cmd_asset_craft: { 'zh-CN': '查看笔法卡', 'en-US': 'View Craft Cards' },
+  cmd_asset_trope: { 'zh-CN': '查看桥段库', 'en-US': 'View Trope Library' },
+  cmd_asset_report: { 'zh-CN': '查看报告', 'en-US': 'View Reports' },
+  cmd_system_config_model: { 'zh-CN': '配置模型', 'en-US': 'Configure Model' },
+  cmd_system_uimode_simple: { 'zh-CN': '切换为简洁模式', 'en-US': 'Switch to Simple Mode' },
+  cmd_system_uimode_advanced: { 'zh-CN': '切换为完整模式', 'en-US': 'Switch to Advanced Mode' },
+  cmd_system_help_start: { 'zh-CN': '打开帮助 — 新手上路', 'en-US': 'Open Help — Getting Started' },
+  cmd_system_help_glossary: { 'zh-CN': '打开帮助 — 术语表', 'en-US': 'Open Help — Glossary' },
+  cmd_system_help_guides: { 'zh-CN': '打开帮助 — 功能指南', 'en-US': 'Open Help — Guides' },
+  cmd_system_help_faq: { 'zh-CN': '打开帮助 — 常见问题', 'en-US': 'Open Help — FAQ' },
+
   // ==========================================
   // 首启引导 (OnboardingWizard)
   // ==========================================
@@ -4522,8 +4577,8 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'en-US': 'Welcome to Exoscribe',
   },
   onboarding_s1_body: {
-    'zh-CN': '把优秀小说拆成可复用的写作资产，再用这些资产驱动创作。全流程在本机完成，不会上传任何数据。三步上手，随时可跳过。',
-    'en-US': 'Deconstruct masterworks into reusable writing assets, then drive creative prose. 100% offline & local, never uploading data. 3 steps to start, skip anytime.',
+    'zh-CN': '把优秀小说拆成可复用的写作资产，再用这些资产驱动创作。全流程在本机完成，不会上传任何数据。四步上手，随时可跳过。',
+    'en-US': 'Deconstruct masterworks into reusable writing assets, then drive creative prose. 100% offline & local, never uploading data. 4 steps to start, skip anytime.',
   },
   onboarding_next: {
     'zh-CN': '下一步',
@@ -4541,6 +4596,14 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '去导入',
     'en-US': 'Go to Import',
   },
+  onboarding_goto_model: {
+    'zh-CN': '去配置模型',
+    'en-US': 'Configure Model',
+  },
+  onboarding_s2_model_hint: {
+    'zh-CN': '配好模型才能拆书，也可先用示例语料体验离线功能',
+    'en-US': 'Configure a model to run deconstruction — or explore sample assets & offline tools first.',
+  },
   onboarding_s3_title: {
     'zh-CN': '第二步：查看资产与质检',
     'en-US': 'Step 2: Inspect Assets & QC',
@@ -4548,6 +4611,38 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   onboarding_s3_body: {
     'zh-CN': '「资产库」浏览全部结构化资产；「质检」页可对任意章节跑 12 维质量检查与全书质检；「写作」页用资产注入辅助生成新章节。',
     'en-US': 'Browse all structured assets in "Asset Library"; run 12-dimensional QC and full-book checks in "Quality"; generate chapters with asset injection in "Writing".',
+  },
+  onboarding_s4_title: {
+    'zh-CN': '下一步做什么',
+    'en-US': 'What next?',
+  },
+  onboarding_s4_body: {
+    'zh-CN': '挑一个开始，边用边熟悉：',
+    'en-US': 'Pick one to get started:',
+  },
+  onboarding_s4_action_analysis: {
+    'zh-CN': '拆书',
+    'en-US': 'Analyze a Book',
+  },
+  onboarding_s4_action_analysis_desc: {
+    'zh-CN': '选一本 TXT 一键拆解',
+    'en-US': 'Deconstruct a TXT novel',
+  },
+  onboarding_s4_action_assets: {
+    'zh-CN': '逛资产库',
+    'en-US': 'Browse Assets',
+  },
+  onboarding_s4_action_assets_desc: {
+    'zh-CN': '看示例资产长什么样',
+    'en-US': 'See what assets look like',
+  },
+  onboarding_s4_action_writing: {
+    'zh-CN': '写一章',
+    'en-US': 'Write a Chapter',
+  },
+  onboarding_s4_action_writing_desc: {
+    'zh-CN': '用示例资产试写',
+    'en-US': 'Try writing with sample assets',
   },
   onboarding_get_started: {
     'zh-CN': '开始使用',
@@ -4560,6 +4655,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   onboarding_prev: {
     'zh-CN': '上一步',
     'en-US': 'Back',
+  },
+  onboarding_replay: {
+    'zh-CN': '重看引导',
+    'en-US': 'Replay tour',
   },
 
   // ==========================================
@@ -5278,6 +5377,122 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   extras_retention_hotspot_item: {
     'zh-CN': '[{level}] {label}（预估跳出 {pct}%）：{reason} → {fix}',
     'en-US': '[{level}] {label} (est. drop {pct}%): {reason} → {fix}',
+  },
+
+  // ==========================================
+  // WritingWorkbench InlineGuide (WS-A5)
+  // ==========================================
+  guide_inject_what: {
+    'zh-CN': '把拆书得到的资产卡拼成一段完整的写作 Prompt：决定「用谁的声音、按什么规则」写，后面生成章节都会按这套风格来。',
+    'en-US': 'Assemble analyzed asset cards into a unified writing prompt — pick the voice, rules, and style your chapters will follow.',
+  },
+  guide_inject_step_1: {
+    'zh-CN': 'voice-card 必选：决定人物声线和叙事风格（来自你拆过的书）。',
+    'en-US': 'voice-card is required: sets narrative voice and tone (from a deconstructed book).',
+  },
+  guide_inject_step_2: {
+    'zh-CN': '可选叠加：genre-pack（题材规则）、craft-card（笔法技巧）、蒸馏规则（多本书提炼出的通用规律）、prose-card（跨题材文风参照）。',
+    'en-US': 'Optional layers: genre-pack, craft-card, distilled rules (cross-book synthesis), prose-card (cross-genre voice reference).',
+  },
+  guide_inject_step_3: {
+    'zh-CN': '点「生成 Prompt」可以预览拼好的提示词，确认风格对不对。',
+    'en-US': 'Click "Generate Prompt" to preview the assembled prompt and verify the style.',
+  },
+  guide_inject_step_4: {
+    'zh-CN': '这里选好的 voice-card 与 genre-pack，「写作」页签生成章节时会自动用上（同一份选择）。',
+    'en-US': 'The voice-card & genre-pack selected here carry over automatically when generating chapters.',
+  },
+  guide_inject_tip_1: {
+    'zh-CN': '资产列表是空的？先去「分析」工作台导入一本书并完成拆书。',
+    'en-US': 'Asset list empty? Import a book in the Analysis workbench first.',
+  },
+  guide_inject_tip_2: {
+    'zh-CN': '蒸馏规则是离线统计生成的，不需要配置 AI 模型也能用。',
+    'en-US': 'Distilled rules are generated offline — no AI model needed.',
+  },
+  guide_inject_tip_3: {
+    'zh-CN': 'voice 与其他资产题材不一致时，后端会按铁律一拒绝（400），请换成同题材资产。',
+    'en-US': 'If voice genre mismatches other assets, the backend rejects (400) per Genre Isolation. Use same-genre assets.',
+  },
+  guide_generate_what: {
+    'zh-CN': '按你的「写作要点」生成新章节：模型写出初稿后自动打分，不达标就自动改写，直到达标或用完改写次数。写好的章节会落盘保存。',
+    'en-US': 'Generate a chapter from your brief: the model drafts, auto-scores, and rewrites until it passes. Finished chapters are saved to disk.',
+  },
+  guide_generate_step_1: {
+    'zh-CN': '选项目：项目就是用户数据目录 novel/ 下的文件夹——在 novel/ 下新建一个文件夹，就是一个新写作项目。',
+    'en-US': 'Pick a project: each project is a folder under the novel/ data directory.',
+  },
+  guide_generate_step_2: {
+    'zh-CN': 'voice-card 与 genre-pack 沿用「注入」页签的选择（同一份），这里可以直接调整。',
+    'en-US': 'voice-card & genre-pack carry over from the Asset Injection tab; adjust here if needed.',
+  },
+  guide_generate_step_3: {
+    'zh-CN': '选章节号、写「写作要点」：交代本章发生什么、谁出场、情绪走向、字数和结尾要求，越具体越好。',
+    'en-US': 'Set chapter number and write the brief: what happens, who appears, emotional arc, word count & ending — be specific.',
+  },
+  guide_generate_step_4: {
+    'zh-CN': '点「开始写作」，进度实时显示；完成后会提示章节文件的保存位置。',
+    'en-US': 'Click "Start Writing" — progress streams live; the save path is shown on completion.',
+  },
+  guide_generate_example: {
+    'zh-CN': '第5章：深秋傍晚，温霜禾抱着一摞粉色包装的礼物盒走进澜州老街的奶茶店，点了七分糖的芋泥波波奶茶。江春屿跟在后面替她拎包。两人因为"谁请客"斗嘴，温霜禾说了句"随便吧"——其实是生气了。要求：2200字左右，对话占四成，结尾留钩子：温霜禾发现奶茶店落地窗外站着一个熟悉的身影。',
+    'en-US': 'Ch.5: Late-autumn dusk. Wen Shuanghe enters a milk-tea shop on old-town Lanzhou with pink gift boxes, ordering 70%-sugar taro bubble tea. Jiang Chunyu follows, carrying her bags. They banter over who pays; "whatever" from Wen Shuanghe signals she is actually upset. ~2200 chars, 40% dialogue; cliffhanger: a familiar figure outside the window.',
+  },
+  guide_generate_tip_1: {
+    'zh-CN': '没配 AI 模型也能用：会进入降级模式，生成一份「AI接管写作任务.md」指引，你可以手动写完，再用下面的「手动入库」贴回来打分。',
+    'en-US': 'Works without an AI model too: generates an "AI Takeover Task" guide you can write manually and score via Manual Import.',
+  },
+  guide_generate_tip_2: {
+    'zh-CN': '「写作要点」决定了章节质量：只写"写一章校园恋爱"效果会很差，把人物、场景、冲突、字数都写清楚。',
+    'en-US': 'Brief quality matters: "write a romance chapter" produces weak results — spell out characters, scenes, conflicts, and length.',
+  },
+  guide_score_what: {
+    'zh-CN': '给一段章节正文打分：从「风格一致性」（像不像这张声线卡的味道）和「写作质量」（有没有硬伤）两个维度判定，低于及格线会列出具体问题。',
+    'en-US': 'Score a chapter draft on two axes: voice consistency (does it match the voice-card?) and craft quality (any hard flaws?). Below-threshold scores come with specifics.',
+  },
+  guide_score_step_1: {
+    'zh-CN': '选一张 voice-card 作为参照标准。',
+    'en-US': 'Select a voice-card as the reference standard.',
+  },
+  guide_score_step_2: {
+    'zh-CN': '把章节正文粘贴进来，点「打分」。',
+    'en-US': 'Paste your chapter text and click "Score".',
+  },
+  guide_score_step_3: {
+    'zh-CN': '看综合判定：一致性得分 + 质量得分，以及五维明细和质量问题列表。',
+    'en-US': 'Review the verdict: consistency score + quality score with breakdown and issue list.',
+  },
+  guide_score_step_4: {
+    'zh-CN': '分数不够就按列出的问题改，改完可以再打一次。',
+    'en-US': 'If the score is low, revise per the listed issues and score again.',
+  },
+  guide_score_tip_1: {
+    'zh-CN': '及格线可以在「设置」工作台里调整。',
+    'en-US': 'Pass threshold is adjustable in the Settings workbench.',
+  },
+  guide_score_tip_2: {
+    'zh-CN': '打分不需要 AI 模型，是本地规则引擎跑的。',
+    'en-US': 'Scoring runs on a local rule engine — no AI model needed.',
+  },
+  guide_assemble_what: {
+    'zh-CN': '把一本书多轮拆书（pass1-5）的产出组装成正式资产并入库：书名选已完成全部 pass 的书，填上题材，组装后资产就能在注入和写作里用了。',
+    'en-US': 'Assemble pass1-5 outputs of a deconstructed book into formal, indexed assets: pick a completed book, set its genre, and register the cards.',
+  },
+  guide_assemble_step_1: {
+    'zh-CN': '从下拉里选一本已完成 pass1-5 的书。',
+    'en-US': 'Pick a book that has completed all pass1-5 analysis.',
+  },
+  guide_assemble_step_2: {
+    'zh-CN': '填写题材（如：校园、玄幻、悬疑）——题材决定了资产的隔离分组，填错会导致注入时选不到。',
+    'en-US': 'Enter genre (e.g., campus, fantasy, mystery) — genre is the isolation boundary for assets.',
+  },
+  guide_assemble_step_3: {
+    'zh-CN': '点「组装入库」，产出 voice-card / structure-obs 等正式资产。',
+    'en-US': 'Click "Assemble & Index" to produce voice-card, structure-obs, and other formal assets.',
+  },
+  guide_assemble_tip_1: {
+    'zh-CN': '列表是空的？说明还没有书跑完 pass1-5，先去「分析」工作台完成拆书。',
+    'en-US': 'Empty? No book has finished pass1-5 yet — run Analysis first.',
   },
 }
 

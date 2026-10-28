@@ -42,6 +42,7 @@ import {
   type EssenceChain,
 } from '../api/client'
 import type { WritingProject } from '../types'
+import InlineGuide from './InlineGuide'
 
 const PLATFORM_OPTIONS = [
   { value: 'general', label: '通用网文平台', shortLabel: '通用平台' },
@@ -120,6 +121,10 @@ export default function EssenceWorkbench() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <InlineGuide
+        what="精华工坊：精读一部好书，沉淀为可复用的五维写作资产"
+        steps={['离线精读：粘贴前几章，选平台/题材，一键宏观解构', '资产库/书籍/暗线：筛选、反哺到写作项目、追踪伏笔回收', '宪法审查：粘贴草稿校验世界观与角色声线是否跑偏']}
+      />
       <Paper sx={{ p: 2 }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
           <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto">

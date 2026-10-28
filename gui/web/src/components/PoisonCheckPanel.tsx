@@ -19,6 +19,7 @@ import {
   type TabooItem,
 } from '../api/client'
 import { useI18n } from '../state/I18nContext'
+import InlineGuide from './InlineGuide'
 
 export default function PoisonCheckPanel() {
   const { t } = useI18n()
@@ -26,6 +27,10 @@ export default function PoisonCheckPanel() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <InlineGuide
+        what="排查弃坑雷区，一键扫描 10 大毒点并给出避雷改法"
+        steps={['粘贴正文段落或剧情草稿', '（可选）切换上方“毒点扫描 / 规范库”标签了解红线', '点击“一键扫描毒点”查看扣分与逐条建议']}
+      />
       <Paper sx={{ p: 2 }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
           <Tabs value={subTab} onChange={(_, v) => setSubTab(v)}>

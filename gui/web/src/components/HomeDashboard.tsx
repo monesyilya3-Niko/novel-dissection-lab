@@ -20,6 +20,7 @@ import FolderIcon from '@mui/icons-material/Folder'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import AsyncBoundary from './common/AsyncBoundary'
+import JourneyStepper from './JourneyStepper'
 import { useApp } from '../state/AppContext'
 import { lazy, Suspense } from 'react'
 const PieChart = lazy(() => import('./charts/PieChart'))
@@ -141,6 +142,9 @@ export default function HomeDashboard() {
           {t('home_model_alert')}
         </Alert>
       )}
+
+      {/* —— 使用旅程进度条（WS-A4）：model → analyze → write+qc，置于 alert 之下、KPI 之上 —— */}
+      <JourneyStepper overview={overview} onNavigate={(k) => setWorkbench(k as WorkbenchKey)} />
 
       {/* —— KPI 卡片 —— */}
       <Grid container spacing={2.5} sx={{ mb: 3 }}>

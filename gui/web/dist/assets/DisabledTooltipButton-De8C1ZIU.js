@@ -1,0 +1,1 @@
+import{j as r,F as e}from"./vendor-BoI4W8Fr.js";function p({disabled:i,disabledReason:t,children:o,placement:s="top"}){return i&&t?r.jsx(e,{title:t,arrow:!0,placement:s,children:r.jsx("span",{style:{display:"inline-flex"},children:o})}):o}export{p as D};

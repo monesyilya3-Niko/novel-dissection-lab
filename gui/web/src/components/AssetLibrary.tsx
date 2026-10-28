@@ -163,6 +163,16 @@ export default function AssetLibrary() {
     setPage(1)
   }, [kind, load])
 
+  // 命令面板深度跳转：novellab:asset-filter { kind }
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const k = (e as CustomEvent<{ kind: AssetKind }>).detail?.kind
+      if (k) setKind(k)
+    }
+    window.addEventListener('novellab:asset-filter', handler)
+    return () => window.removeEventListener('novellab:asset-filter', handler)
+  }, [])
+
   const onSelect = useCallback(async (item: AssetItem) => {
     const seq = ++detailSeq.current
     setSelected(item)

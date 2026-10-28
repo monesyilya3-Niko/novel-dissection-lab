@@ -22,6 +22,7 @@ import { useThemeMode } from '../state/ThemeModeContext'
 import { useI18n } from '../state/I18nContext'
 import { ink, glassCard } from '../ink'
 import DiffReviewView from './DiffReviewView'
+import InlineGuide from './InlineGuide'
 
 export default function DeslopPanel() {
   const { isDark } = useThemeMode()
@@ -132,6 +133,11 @@ export default function DeslopPanel() {
           </Button>
         )}
       </Box>
+
+      <InlineGuide
+        what="检测 AI 痕迹，揪出「AI 腔」套话并给出降噪改写建议"
+        steps={['粘贴待检正文', '选择语言模式（自动 / 中文 / 英文）', '点击诊断，查看评分与逐条优化建议']}
+      />
 
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
 

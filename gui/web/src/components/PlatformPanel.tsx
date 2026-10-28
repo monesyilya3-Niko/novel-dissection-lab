@@ -23,6 +23,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import { platformApi, SubmissionDiagnosisResult } from '../api/client'
 import { friendlyError } from '../api/client'
 import { useI18n } from '../state/I18nContext'
+import InlineGuide from './InlineGuide'
 
 interface Platform {
   id: string
@@ -203,6 +204,10 @@ export default function PlatformPanel() {
 
   return (
     <Box>
+      <InlineGuide
+        what="检查平台过稿适配，诊断篇幅、节奏与平台禁忌并给出签约修改建议"
+        steps={['粘贴章节正文（可选标题）', '选择目标平台', '先“检查合规性”再“签约深度诊断”，按报告逐条修改']}
+      />
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
         <Tabs value={panelTab} onChange={(_, v) => setPanelTab(v)}>
           <Tab icon={<AssignmentTurnedInIcon fontSize="small" />} iconPosition="start" label={t('platform_tab_diagnose', '多平台合规与签约诊断')} />

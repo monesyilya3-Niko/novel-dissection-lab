@@ -24,7 +24,7 @@ import LanguageToggle from './components/common/LanguageToggle'
 import WorkbenchNav from './layout/WorkbenchNav'
 import type { WorkbenchKey } from './layout/WorkbenchNav'
 import ErrorBoundary from './components/ErrorBoundary'
-import OnboardingWizard, { isOnboarded } from './components/OnboardingWizard'
+import OnboardingWizard, { isOnboarded, REPLAY_EVENT } from './components/OnboardingWizard'
 import CommandPalette, { CommandPaletteTrigger } from './components/CommandPalette'
 import WorkbenchTransition from './components/WorkbenchTransition'
 import { DashboardSkeleton } from './components/SkeletonBlocks'
@@ -155,6 +155,12 @@ function AppShell() {
   const wide = useMediaQuery('(min-width: 961px)')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [onboarded, setOnboarded] = useState(isOnboarded)
+  // 重看引导：HelpWorkbench/HomeDashboard 触发，AppShell 监听重置 onboarded
+  useEffect(() => {
+    const h = () => setOnboarded(false)
+    window.addEventListener(REPLAY_EVENT, h)
+    return () => window.removeEventListener(REPLAY_EVENT, h)
+  }, [])
 
   // 键盘快捷键：Alt+1..9 切换工作台（输入框聚焦时不劫持）
   useEffect(() => {
@@ -189,7 +195,7 @@ function AppShell() {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {showWizard && (
-        <OnboardingWizard onDone={() => setOnboarded(true)} onNavigate={setWorkbench} />
+        <OnboardingWizard onDone={() => setOnboarded(true)} onNavigate={setWorkbench} modelConfigured={!!overview?.modelConfigured} />
       )}
       <AppBar position="static" elevation={0} sx={{
         background: (theme) => theme.palette.mode === 'dark' ? ink.nightCard : ink.surface,
