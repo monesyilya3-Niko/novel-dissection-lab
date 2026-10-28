@@ -17,12 +17,28 @@ export interface CreationRateChartProps {
   ariaLabel?: string
 }
 
+function formatDateLabel(raw: string): string {
+  // Handle YYYY-MM-DD, YYYY/MM/DD, ISO timestamps, or pre-sliced MM-DD
+  // Extract YYYY/M/D or MM/D by matching date-like prefix
+  const trimmed = raw.trim()
+  if (!trimmed) return trimmed
+  // ISO-ish: YYYY-MM-DD or YYYY/MM/DD (optionally followed by T/space + time)
+  const m = trimmed.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/)
+  if (m) return `${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
+  // Already MM-DD or DD-like short label
+  return trimmed
+}
+
 export default function CreationRateChart({ data, height = 260, ariaLabel }: CreationRateChartProps) {
   const { isDark } = useThemeMode()
   const { t } = useI18n()
 
+  const aria = ariaLabel ?? t('chart_rate_aria', '创作速率与字数统计折线图')
+  const isEmpty = !data || data.length === 0
+
   const option = useMemo(() => {
-    const dates = data.map((d) => d.date.slice(5)) // MM-DD
+    if (isEmpty) return null
+    const dates = data.map((d) => formatDateLabel(d.date))
     const words = data.map((d) => d.words)
     // 计算移动速率（字/天平滑）
     const rates = words.map((_, i, arr) => {
@@ -96,7 +112,27 @@ export default function CreationRateChart({ data, height = 260, ariaLabel }: Cre
         },
       ],
     }
-  }, [data, isDark, t])
+  }, [data, isDark, t, isEmpty])
 
-  return <BaseChart option={option} height={height} ariaLabel={ariaLabel ?? t('chart_rate_aria', '创作速率与字数统计折线图')} />
+  if (isEmpty) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: isDark ? ink.moonSoft : ink.textTertiary,
+          fontSize: 14,
+        }}
+        role="img"
+        aria-label={aria}
+      >
+        {t('chart_rate_empty', '暂无数据，请先创作')}
+      </div>
+    )
+  }
+
+  return <BaseChart option={option!} height={height} ariaLabel={aria} />
 }

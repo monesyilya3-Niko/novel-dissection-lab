@@ -86,6 +86,10 @@ def read_text(
     if max_bytes is None:
         max_bytes = MAX_FILE_BYTES
 
+    if isinstance(raw, bool) or not isinstance(raw, (str, Path)):
+        raise ServiceError(f"{field} 必须为字符串", 400)
+    if isinstance(raw, str) and not raw.strip():
+        raise _fmt(msgs, "missing", path=str(raw), field=field)
     candidate = Path(raw)
     suffix = candidate.suffix.lower()
     if suffix not in suffixes:
@@ -155,6 +159,8 @@ def text_files_in(raw_dir: str | Path, *, field: str) -> list[Path]:
 
     递归会把用户的整个文档库一次性吸进来；正文导出从来也是按单目录组织的。
     """
+    if isinstance(raw_dir, bool) or not isinstance(raw_dir, (str, Path)):
+        raise ServiceError(f"{field} 必须为字符串", 400)
     candidate = Path(raw_dir)
     if candidate.is_symlink():
         raise ServiceError(f"{field} 不接受符号链接目录", 403)

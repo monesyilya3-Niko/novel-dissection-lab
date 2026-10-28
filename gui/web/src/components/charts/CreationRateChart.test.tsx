@@ -50,6 +50,22 @@ describe('CreationRateChart 创作速率与字数统计折线图', () => {
     expect(rateSeries.lineStyle.type).toBe('dashed')
   })
 
+  it('安全处理 YYYY/MM/DD 与 ISO 时间戳日期', () => {
+    const mixedData: DailyStatPoint[] = [
+      { date: '2026/10/05', words: 100 },
+      { date: '2026-10-06T14:30:00.000Z', words: 200 },
+      { date: '10-07', words: 300 },
+    ]
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <CreationRateChart data={mixedData} />
+      </I18nProvider>,
+    )
+    const chart = screen.getByTestId('base-chart')
+    const option = JSON.parse(chart.getAttribute('data-option') || '{}')
+    expect(option.xAxis.data).toEqual(['10-05', '10-06', '10-07'])
+  })
+
   it('支持自定义图表高度与无障碍标签', () => {
     render(
       <I18nProvider initialLocale="zh-CN">
@@ -62,18 +78,22 @@ describe('CreationRateChart 创作速率与字数统计折线图', () => {
     expect(chart).toHaveAttribute('aria-label', '自定义码字速率图')
   })
 
-  it('在空数据场景下安全渲染空坐标轴与空序列', () => {
+  it('在空数据场景下展示空态占位而非空图表', () => {
     render(
       <I18nProvider initialLocale="zh-CN">
         <CreationRateChart data={[]} />
       </I18nProvider>,
     )
 
-    const chart = screen.getByTestId('base-chart')
-    const option = JSON.parse(chart.getAttribute('data-option') || '{}')
-    expect(option.xAxis.data).toEqual([])
-    expect(option.series[0].data).toEqual([])
-    expect(option.series[1].data).toEqual([])
+    expect(screen.queryByTestId('base-chart')).toBeNull()
+    expect(screen.getByRole('img', { name: '创作速率与字数统计折线图' })).toHaveTextContent('暂无数据')
+    // 自定义 aria 透传
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <CreationRateChart data={[]} ariaLabel="自定义空态" />
+      </I18nProvider>,
+    )
+    expect(screen.getByRole('img', { name: '自定义空态' })).toBeInTheDocument()
   })
 
   it('在 en-US 环境下全量国际化图例文案与坐标轴名称', () => {

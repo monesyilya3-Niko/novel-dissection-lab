@@ -956,8 +956,15 @@ def create_outline(project: str, kind: str = "chapter", title: str = "",
                    summary: str = "", status: str = "planned",
                    sort_order: int = 0) -> dict[str, Any]:
     project = _require_project(project)
-    kind = kind if kind in _OUTLINE_KINDS else "chapter"
-    status = status if status in _OUTLINE_STATUSES else "planned"
+    # kind/status strict validation: invalid values must 400, not silent fallback
+    if kind is not None and not isinstance(kind, str):
+        raise ServiceError("kind 必须为字符串", 400)
+    if status is not None and not isinstance(status, str):
+        raise ServiceError("status 必须为字符串", 400)
+    if kind not in _OUTLINE_KINDS:
+        raise ServiceError(f"非法 kind: {kind}", 400)
+    if status not in _OUTLINE_STATUSES:
+        raise ServiceError(f"非法 status: {status}", 400)
     if not title or not title.strip():
         raise ServiceError("大纲标题不能为空", 400)
     now = _now_iso()
@@ -1027,6 +1034,11 @@ def reorder_outlines(project: str, order_ids: list[int]) -> list[dict[str, Any]]
         raise ServiceError("order_ids 必须为列表", 400)
     cleaned_ids: list[int] = []
     for oid in order_ids:
+        # Reject bool and float before int() to avoid silent truncation
+        if isinstance(oid, bool):
+            raise ServiceError(f"非法大纲 ID: {oid!r}", 400)
+        if isinstance(oid, float):
+            raise ServiceError(f"非法大纲 ID: {oid!r}", 400)
         try:
             cleaned_ids.append(int(oid))
         except (ValueError, TypeError):
@@ -1268,7 +1280,16 @@ def get_chapter_words(project: str, chapter_no: int) -> int | None:
 def get_stats(project: str, days: int = 30) -> dict[str, Any]:
     """码字统计：今日 / 累计 / 历史曲线 / 连更天数。"""
     project = _require_project(project)
-    days = max(1, min(int(days), 365))
+    # days: reject bool/float before int() conversion
+    if isinstance(days, bool):
+        raise ServiceError("days 必须为整数", 400)
+    if isinstance(days, float):
+        raise ServiceError("days 必须为整数", 400)
+    try:
+        days = int(days)
+    except (TypeError, ValueError) as exc:
+        raise ServiceError("days 必须为整数", 400) from exc
+    days = max(1, min(days, 365))
     today = date.today()
     start = (today - timedelta(days=days - 1)).isoformat()
 

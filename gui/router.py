@@ -343,14 +343,46 @@ def _safe_batch_size(value: Any) -> int | None:
 def _h_writing_generate(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_service
     b = body or {}
+    # --- string guards (optional fields: None→pass, wrong type→400) ---
+    _voice = b.get("voice", "")
+    if _voice is not None and not isinstance(_voice, str):
+        raise ServiceError("voice 必须为字符串", 400)
+    _project = b.get("project", "")
+    if _project is not None and not isinstance(_project, str):
+        raise ServiceError("project 必须为字符串", 400)
+    _task = b.get("task", "")
+    if _task is not None and not isinstance(_task, str):
+        raise ServiceError("task 必须为字符串", 400)
+    _novel_name = b.get("novel_name")
+    if _novel_name is not None and not isinstance(_novel_name, str):
+        raise ServiceError("novel_name 必须为字符串", 400)
+    _prompt = b.get("prompt")
+    if _prompt is not None and not isinstance(_prompt, str):
+        raise ServiceError("prompt 必须为字符串", 400)
+    _genre_pack = b.get("genre_pack")
+    if _genre_pack is not None and not isinstance(_genre_pack, str):
+        raise ServiceError("genre_pack 必须为字符串", 400)
+    # --- int guards: reject bool/float before handing to _safe_int ---
+    def _guard_int(v: Any, field: str) -> Any:
+        if isinstance(v, bool):
+            raise ServiceError(f"{field} 必须为整数", 400)
+        if isinstance(v, float):
+            raise ServiceError(f"{field} 必须为整数", 400)
+        return v
+    _raw_words = _guard_int(b.get("words"), "words")
+    _raw_target_score = _guard_int(b.get("target_score"), "target_score")
+    _raw_quality_target = b.get("quality_target")
+    if _raw_quality_target is not None:
+        if isinstance(_raw_quality_target, bool) or isinstance(_raw_quality_target, float):
+            raise ServiceError("quality_target 必须为整数", 400)
     return ok(writing_service.generate(
-        voice=b.get("voice", ""), project=b.get("project", ""),
+        voice=_voice, project=_project,
         chapter_no=_safe_chapter_no(b.get("chapter_no"), "chapter_no"),
-        task=b.get("task", ""),
-        novel_name=b.get("novel_name"), prompt=b.get("prompt"),
-        genre_pack=b.get("genre_pack"), words=_safe_int(b.get("words"), 2400, "words"),
-        target_score=_safe_int(b.get("target_score"), 90, "target_score"),
-        quality_target=b.get("quality_target"),
+        task=_task,
+        novel_name=_novel_name, prompt=_prompt,
+        genre_pack=_genre_pack, words=_safe_int(_raw_words, 2400, "words"),
+        target_score=_safe_int(_raw_target_score, 90, "target_score"),
+        quality_target=_raw_quality_target,
         save_prompt=bool(b.get("save_prompt"))))
 
 
@@ -362,19 +394,46 @@ def _h_writing_task(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, 
 def _h_writing_import_chapter(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_service
     b = body or {}
+    _project = b.get("project", "")
+    if _project is not None and not isinstance(_project, str):
+        raise ServiceError("project 必须为字符串", 400)
+    _content = b.get("content", "")
+    if _content is not None and not isinstance(_content, str):
+        raise ServiceError("content 必须为字符串", 400)
+    _novel_name = b.get("novel_name")
+    if _novel_name is not None and not isinstance(_novel_name, str):
+        raise ServiceError("novel_name 必须为字符串", 400)
+    _voice = b.get("voice")
+    if _voice is not None and not isinstance(_voice, str):
+        raise ServiceError("voice 必须为字符串", 400)
+    _genre_pack = b.get("genre_pack")
+    if _genre_pack is not None and not isinstance(_genre_pack, str):
+        raise ServiceError("genre_pack 必须为字符串", 400)
     return ok(writing_service.import_chapter(
-        project=b.get("project", ""),
+        project=_project,
         chapter_no=_safe_chapter_no(b.get("chapter_no"), "chapter_no"),
-        content=b.get("content", ""), novel_name=b.get("novel_name"),
-        voice=b.get("voice"), genre_pack=b.get("genre_pack")))
+        content=_content, novel_name=_novel_name,
+        voice=_voice, genre_pack=_genre_pack))
 
 
 def _h_writing_score(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_service
     b = body or {}
+    _voice = b.get("voice", "")
+    if _voice is not None and not isinstance(_voice, str):
+        raise ServiceError("voice 必须为字符串", 400)
+    _text = b.get("text")
+    if _text is not None and not isinstance(_text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    _chapter_path = b.get("chapter_path")
+    if _chapter_path is not None and not isinstance(_chapter_path, str):
+        raise ServiceError("chapter_path 必须为字符串", 400)
+    _label = b.get("label", "")
+    if _label is not None and not isinstance(_label, str):
+        raise ServiceError("label 必须为字符串", 400)
     return ok(writing_service.score(
-        voice=b.get("voice", ""), text=b.get("text"),
-        chapter_path=b.get("chapter_path"), label=b.get("label", "")))
+        voice=_voice, text=_text,
+        chapter_path=_chapter_path, label=_label))
 
 
 def _h_writing_assemble(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
@@ -429,6 +488,10 @@ def _h_writing_outlines_reorder(_params: dict[str, Any], body: dict[str, Any]) -
         raise ServiceError("project 必须为非空字符串", 400)
     if not isinstance(order_ids, list):
         raise ServiceError("order_ids 必须为列表", 400)
+    # 细节：_safe_int callers 需拒 bool；order_ids 元素也应拒 bool/float
+    for _oid in order_ids:
+        if isinstance(_oid, bool) or isinstance(_oid, float):
+            raise ServiceError(f"order_ids 元素必须为整数: {_oid!r}", 400)
     return ok(writing_extra.reorder_outlines(project, order_ids))
 
 
@@ -440,9 +503,21 @@ def _h_writing_characters_list(params: dict[str, Any], _body: dict[str, Any]) ->
 def _h_writing_character_create(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
     b = body or {}
+    _project = b.get("project") or ""
+    if _project is not None and not isinstance(_project, str):
+        raise ServiceError("project 必须为字符串", 400)
+    _name = b.get("name") or ""
+    if _name is not None and not isinstance(_name, str):
+        raise ServiceError("name 必须为字符串", 400)
+    _role = b.get("role") or ""
+    if _role is not None and not isinstance(_role, str):
+        raise ServiceError("role 必须为字符串", 400)
+    _desc = b.get("description") or ""
+    if _desc is not None and not isinstance(_desc, str):
+        raise ServiceError("description 必须为字符串", 400)
     return ok(writing_extra.create_character(
-        b.get("project") or "", b.get("name") or "",
-        role=b.get("role") or "", description=b.get("description") or "",
+        _project, _name,
+        role=_role, description=_desc,
         extra=b.get("extra") if isinstance(b.get("extra"), dict) else None))
 
 
@@ -467,9 +542,16 @@ def _h_writing_notes_list(params: dict[str, Any], _body: dict[str, Any]) -> dict
 def _h_writing_note_create(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
     b = body or {}
-    return ok(writing_extra.create_note(
-        b.get("project") or "", title=b.get("title") or "",
-        content=b.get("content") or ""))
+    _project = b.get("project") or ""
+    if _project is not None and not isinstance(_project, str):
+        raise ServiceError("project 必须为字符串", 400)
+    _title = b.get("title") or ""
+    if _title is not None and not isinstance(_title, str):
+        raise ServiceError("title 必须为字符串", 400)
+    _content = b.get("content") or ""
+    if _content is not None and not isinstance(_content, str):
+        raise ServiceError("content 必须为字符串", 400)
+    return ok(writing_extra.create_note(_project, title=_title, content=_content))
 
 
 def _h_writing_note_update(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
@@ -501,7 +583,12 @@ def _h_writing_stats(params: dict[str, Any], _body: dict[str, Any]) -> dict[str,
 def _h_writing_export(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
     fmt = params.get("format") or params.get("fmt") or "txt"
-    return ok(writing_extra.export_project(params.get("project") or "", fmt=fmt))
+    if fmt is not None and not isinstance(fmt, str):
+        raise ServiceError("format 必须为字符串", 400)
+    _project = params.get("project") or ""
+    if _project is not None and not isinstance(_project, str):
+        raise ServiceError("project 必须为字符串", 400)
+    return ok(writing_extra.export_project(_project, fmt=fmt))
 
 
 def _h_writing_deslop(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
@@ -511,6 +598,8 @@ def _h_writing_deslop(_params: dict[str, Any], body: dict[str, Any]) -> dict[str
     if not isinstance(text, str):
         raise ServiceError("text 必须为字符串", 400)
     lang = b.get("lang", "auto")
+    if lang is not None and not isinstance(lang, str):
+        raise ServiceError("lang 必须为字符串", 400)
     return ok(deslop_service.analyze_deslop(text, lang=lang))
 
 
@@ -584,25 +673,67 @@ def _h_writing_reader_retention(_params: dict[str, Any], body: dict[str, Any]) -
 def _h_quality_check(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import quality_service
     b = body or {}
+    _target = b.get("target")
+    if _target is not None and not isinstance(_target, str):
+        raise ServiceError("target 必须为字符串", 400)
+    _text = b.get("text")
+    if _text is not None and not isinstance(_text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    _voice = b.get("voice")
+    if _voice is not None and not isinstance(_voice, str):
+        raise ServiceError("voice 必须为字符串", 400)
+    _genre_pack = b.get("genre_pack")
+    if _genre_pack is not None and not isinstance(_genre_pack, str):
+        raise ServiceError("genre_pack 必须为字符串", 400)
     return ok(quality_service.check(
-        target=b.get("target"), text=b.get("text"),
-        voice=b.get("voice"), genre_pack=b.get("genre_pack")))
+        target=_target, text=_text,
+        voice=_voice, genre_pack=_genre_pack))
 
 
 def _h_quality_book(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import quality_service
     b = body or {}
+    _target = b.get("target")
+    if _target is not None and not isinstance(_target, str):
+        raise ServiceError("target 必须为字符串", 400)
+    _text = b.get("text")
+    if _text is not None and not isinstance(_text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    _voice = b.get("voice")
+    if _voice is not None and not isinstance(_voice, str):
+        raise ServiceError("voice 必须为字符串", 400)
     return ok(quality_service.book(
-        target=b.get("target"), text=b.get("text"), voice=b.get("voice")))
+        target=_target, text=_text, voice=_voice))
 
 
 def _h_quality_qc(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import quality_service
     b = body or {}
+    _target = b.get("target")
+    if _target is not None and not isinstance(_target, str):
+        raise ServiceError("target 必须为字符串", 400)
+    _text = b.get("text")
+    if _text is not None and not isinstance(_text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    _voice = b.get("voice")
+    if _voice is not None and not isinstance(_voice, str):
+        raise ServiceError("voice 必须为字符串", 400)
+    _genre_pack = b.get("genre_pack")
+    if _genre_pack is not None and not isinstance(_genre_pack, str):
+        raise ServiceError("genre_pack 必须为字符串", 400)
+    _asset = b.get("asset")
+    if _asset is not None and not isinstance(_asset, str):
+        raise ServiceError("asset 必须为字符串", 400)
+    _book = b.get("book")
+    if _book is not None and not isinstance(_book, str):
+        raise ServiceError("book 必须为字符串", 400)
+    _novel_dir = b.get("novel_dir")
+    if _novel_dir is not None and not isinstance(_novel_dir, str):
+        raise ServiceError("novel_dir 必须为字符串", 400)
     return ok(quality_service.qc(
-        target=b.get("target"), text=b.get("text"), voice=b.get("voice"),
-        genre_pack=b.get("genre_pack"), asset=b.get("asset"), book=b.get("book"),
-        novel_dir=b.get("novel_dir"), llm_hook=bool(b.get("llm_hook"))))
+        target=_target, text=_text, voice=_voice,
+        genre_pack=_genre_pack, asset=_asset, book=_book,
+        novel_dir=_novel_dir, llm_hook=bool(b.get("llm_hook"))))
 
 
 def _h_quality_task(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
@@ -924,10 +1055,19 @@ def _h_admin_audit(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, A
     if raw_limit is None or raw_limit == "":
         limit = 100
     else:
+        if isinstance(raw_limit, bool):
+            raise ServiceError("limit 必须为整数", 400)
+        if isinstance(raw_limit, float):
+            raise ServiceError("limit 必须为整数", 400)
         try:
             limit = int(raw_limit)
         except (TypeError, ValueError) as exc:
             raise ServiceError("limit 必须为整数", 400) from exc
+    # optional string fields guard
+    for _k in ("action", "username", "since", "until"):
+        _v = params.get(_k)
+        if _v is not None and not isinstance(_v, str):
+            raise ServiceError(f"{_k} 必须为字符串", 400)
     return ok(admin.read_audit(limit,
                               action=str(params.get("action", "") or ""),
                               username=str(params.get("username", "") or ""),
@@ -962,13 +1102,26 @@ def _h_admin_session_revoke(params: dict[str, Any], _body: dict[str, Any]) -> di
 # ---------------------------------------------------------------------------
 
 def _h_tools_names(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
-    kind = str(params.get("kind", "character"))
-    style = str(params.get("style", "xianxia"))
-    gender = str(params.get("gender", "all"))
+    kind = params.get("kind", "character")
+    if kind is not None and not isinstance(kind, str):
+        raise ServiceError("kind 必须为字符串", 400)
+    kind = str(kind or "character")
+    style = params.get("style", "xianxia")
+    if style is not None and not isinstance(style, str):
+        raise ServiceError("style 必须为字符串", 400)
+    style = str(style or "xianxia")
+    gender = params.get("gender", "all")
+    if gender is not None and not isinstance(gender, str):
+        raise ServiceError("gender 必须为字符串", 400)
+    gender = str(gender or "all")
     raw_count = params.get("count")
     if raw_count is None or raw_count == "":
         count = 10
     else:
+        if isinstance(raw_count, bool):
+            raise ServiceError("count 必须为整数", 400)
+        if isinstance(raw_count, float):
+            raise ServiceError("count 必须为整数", 400)
         try:
             count = int(raw_count)
         except (TypeError, ValueError) as exc:

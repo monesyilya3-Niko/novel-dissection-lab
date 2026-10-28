@@ -5008,6 +5008,180 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '仪表盘',
     'en-US': 'Gauge Chart',
   },
+  chart_rhythm_empty: {
+    'zh-CN': '暂无数据，请先测算',
+    'en-US': 'No data yet. Run rhythm analysis.',
+  },
+  chart_rate_empty: {
+    'zh-CN': '暂无数据，请先创作',
+    'en-US': 'No writing data yet.',
+  },
+
+  // WritingExtras — 错误前缀 / 确认 / 模板 (i18n 补齐)
+  extras_err_load_projects: {
+    'zh-CN': '加载项目失败: {msg}',
+    'en-US': 'Failed to load projects: {msg}',
+  },
+  extras_err_load_templates: {
+    'zh-CN': '加载开篇模板失败: {msg}',
+    'en-US': 'Failed to load opening templates: {msg}',
+  },
+  extras_err_apply_template: {
+    'zh-CN': '应用黄金三章模板失败: {msg}',
+    'en-US': 'Failed to apply Golden Three template: {msg}',
+  },
+  extras_err_apply_template_rollback: {
+    'zh-CN': '应用黄金三章模板失败，已回滚 {count} 条已创建的大纲: {msg}',
+    'en-US': 'Failed to apply Golden Three template, rolled back {count} outlines: {msg}',
+  },
+  extras_err_load_outlines: {
+    'zh-CN': '加载大纲失败: {msg}',
+    'en-US': 'Failed to load outlines: {msg}',
+  },
+  extras_err_title_required: {
+    'zh-CN': '标题不能为空',
+    'en-US': 'Title is required',
+  },
+  extras_err_save_failed: {
+    'zh-CN': '保存失败: {msg}',
+    'en-US': 'Failed to save: {msg}',
+  },
+  extras_err_delete_failed: {
+    'zh-CN': '删除失败: {msg}',
+    'en-US': 'Failed to delete: {msg}',
+  },
+  extras_err_update_status_failed: {
+    'zh-CN': '更新状态失败: {msg}',
+    'en-US': 'Failed to update status: {msg}',
+  },
+  extras_err_reorder_failed: {
+    'zh-CN': '重排序失败: {msg}',
+    'en-US': 'Failed to reorder: {msg}',
+  },
+  extras_err_load_characters: {
+    'zh-CN': '加载人物卡失败: {msg}',
+    'en-US': 'Failed to load characters: {msg}',
+  },
+  extras_err_random_name_failed: {
+    'zh-CN': '随机起名失败: {msg}',
+    'en-US': 'Failed to generate random name: {msg}',
+  },
+  extras_err_name_required: {
+    'zh-CN': '姓名不能为空',
+    'en-US': 'Name is required',
+  },
+  extras_err_load_notes: {
+    'zh-CN': '加载便签失败: {msg}',
+    'en-US': 'Failed to load notes: {msg}',
+  },
+  extras_err_title_content_empty: {
+    'zh-CN': '标题与内容不能同时为空',
+    'en-US': 'Title and content cannot both be empty',
+  },
+  extras_err_load_dashboard: {
+    'zh-CN': '加载仪表盘统计失败: {msg}',
+    'en-US': 'Failed to load dashboard stats: {msg}',
+  },
+  extras_err_tension_failed: {
+    'zh-CN': '张力分析失败: {msg}',
+    'en-US': 'Tension analysis failed: {msg}',
+  },
+  extras_err_golden_three_failed: {
+    'zh-CN': '黄金三章比对失败: {msg}',
+    'en-US': 'Golden Three comparison failed: {msg}',
+  },
+  extras_err_retention_failed: {
+    'zh-CN': '读者留存测算失败: {msg}',
+    'en-US': 'Reader retention estimation failed: {msg}',
+  },
+  extras_confirm_delete_outline: {
+    'zh-CN': '确定删除这条大纲吗？',
+    'en-US': 'Delete this outline item?',
+  },
+  extras_confirm_delete_character: {
+    'zh-CN': '确定删除这张人物卡吗？',
+    'en-US': 'Delete this character card?',
+  },
+  extras_confirm_delete_note: {
+    'zh-CN': '确定删除这条便签吗？',
+    'en-US': 'Delete this note?',
+  },
+  extras_template_ch1_title: {
+    'zh-CN': '第1章：{name}（首章生死危机）',
+    'en-US': 'Ch 1: {name} (Opening Crisis)',
+  },
+  extras_template_ch2_title: {
+    'zh-CN': '第2章：{name}（压迫激化与转机）',
+    'en-US': 'Ch 2: {name} (Escalation & Turning Point)',
+  },
+  extras_template_ch3_title: {
+    'zh-CN': '第3章：{name}（首爽破局与爽点兑现）',
+    'en-US': 'Ch 3: {name} (First Payoff & Breakthrough)',
+  },
+  extras_template_ch1_summary: {
+    'zh-CN': '【前300字钩子】\n{first300Words}\n\n【第一章节拍】\n{beat}',
+    'en-US': '[Hook — First 300 Words]\n{first300Words}\n\n[Chapter 1 Beat]\n{beat}',
+  },
+  extras_template_ch2_summary: {
+    'zh-CN': '【第二章节拍】\n{beat}',
+    'en-US': '[Chapter 2 Beat]\n{beat}',
+  },
+  extras_template_ch3_summary: {
+    'zh-CN': '【第三章节拍】\n{beat}',
+    'en-US': '[Chapter 3 Beat]\n{beat}',
+  },
+  extras_outline_reorder_hint: {
+    'zh-CN': '支持上下微移原子重排',
+    'en-US': 'Supports fine-grained reorder via up/down moves',
+  },
+  extras_char_subtitle: {
+    'zh-CN': '支持人物阵营与人物关系网络关联',
+    'en-US': 'Supports faction alignment and character relationship network',
+  },
+  extras_char_subtitle_count: {
+    'zh-CN': '当前共 {count} 位角色 ｜ {hint}',
+    'en-US': '{count} characters ｜ {hint}',
+  },
+  extras_action_toggle_status: {
+    'zh-CN': '点击切换状态',
+    'en-US': 'Click to toggle status',
+  },
+  extras_action_move_up: {
+    'zh-CN': '上移',
+    'en-US': 'Move up',
+  },
+  extras_action_move_down: {
+    'zh-CN': '下移',
+    'en-US': 'Move down',
+  },
+  extras_action_edit: {
+    'zh-CN': '编辑',
+    'en-US': 'Edit',
+  },
+  extras_action_delete: {
+    'zh-CN': '删除',
+    'en-US': 'Delete',
+  },
+  extras_char_relation_prefix: {
+    'zh-CN': '关系：与 ',
+    'en-US': 'Relation: with ',
+  },
+  extras_char_relation_middle: {
+    'zh-CN': ' 为 ',
+    'en-US': ' as ',
+  },
+  extras_char_relation_default: {
+    'zh-CN': '关联',
+    'en-US': 'Related',
+  },
+  extras_retention_grade_label: {
+    'zh-CN': '综合评级 {grade} · {desc}',
+    'en-US': 'Grade {grade} · {desc}',
+  },
+  extras_retention_hotspot_item: {
+    'zh-CN': '[{level}] {label}（预估跳出 {pct}%）：{reason} → {fix}',
+    'en-US': '[{level}] {label} (est. drop {pct}%): {reason} → {fix}',
+  },
 }
 
 

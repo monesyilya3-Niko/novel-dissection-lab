@@ -15,6 +15,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from gui.services import ServiceError
+
 # 1. 假大空/玄虚修辞模板
 HOLLOW_RHETORIC_PATTERNS = [
     (r"这一刻[，,]?(?:时间|空气|呼吸)?仿佛(?:凝固|停止|静止)了?", "时间凝固模板", "改为描写周围人物动作的戛然而止或具体的微观声响。"),
@@ -538,6 +540,8 @@ def analyze_deslop(text: str, lang: str = "auto") -> dict[str, Any]:
     if not isinstance(text, str):
         text = str(text or "")
 
+    if not isinstance(lang, str):
+        raise ServiceError("lang 必须为字符串", 400)
     normalized_lang = (lang or "auto").strip().lower()
     cn_count = sum(1 for ch in text if "\u4e00" <= ch <= "\u9fff")
     en_words = _EN_WORD_RE.findall(text)

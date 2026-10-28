@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import EmotionWaveChart from './EmotionWaveChart'
 import RhythmRadarChart from './RhythmRadarChart'
+import { DEFAULT_METRICS } from './RhythmRadarChart'
 import CreationRateChart from './CreationRateChart'
 import BarChart from './BarChart'
 import PieChart from './PieChart'
@@ -56,10 +57,10 @@ describe('Specialized Narrative Analytics Charts & Base Charts i18n', () => {
   })
 
   describe('RhythmRadarChart', () => {
-    it('在 zh-CN 环境下渲染六维网文节奏指标与系列名', () => {
+    it('在 zh-CN 环境下 showDemo 渲染六维网文节奏指标与系列名', () => {
       render(
         <I18nProvider initialLocale="zh-CN">
-          <RhythmRadarChart />
+          <RhythmRadarChart showDemo />
         </I18nProvider>
       )
 
@@ -71,16 +72,35 @@ describe('Specialized Narrative Analytics Charts & Base Charts i18n', () => {
       ])
       expect(option.series[0].name).toBe('节奏综合评估')
       expect(option.series[0].data[0].name).toBe('网文爽感指数')
+      expect(option.series[0].data[0].value).toEqual([
+        DEFAULT_METRICS.shuangdianPacing,
+        DEFAULT_METRICS.faceSlapAnticipation,
+        DEFAULT_METRICS.infoDensity,
+        DEFAULT_METRICS.goldenFingerEvolution,
+        DEFAULT_METRICS.hookRetention,
+        DEFAULT_METRICS.conflictEscalation,
+      ])
     })
 
-    it('在 en-US 环境下正确渲染英文雷达指标', () => {
+    it('无数据时展示空态占位', () => {
+      render(
+        <I18nProvider initialLocale="zh-CN">
+          <RhythmRadarChart />
+        </I18nProvider>,
+      )
+      expect(screen.queryByTestId('base-chart')).toBeNull()
+      expect(screen.getByRole('img', { name: '爽点节奏雷达图' })).toHaveTextContent('暂无数据')
+    })
+
+    it('在 en-US 环境下 showDemo 正确渲染英文雷达指标', () => {
       render(
         <I18nProvider initialLocale="en-US">
-          <RhythmRadarChart />
+          <RhythmRadarChart showDemo />
         </I18nProvider>
       )
 
-      const chart = screen.getByTestId('base-chart')
+      const charts = screen.getAllByTestId('base-chart')
+      const chart = charts[charts.length - 1]
       expect(chart).toHaveAttribute('aria-label', 'Pacing & Climax Radar Chart')
       const option = JSON.parse(chart.getAttribute('data-option') || '{}')
       expect(option.radar.indicator.map((i: any) => i.name)).toEqual([

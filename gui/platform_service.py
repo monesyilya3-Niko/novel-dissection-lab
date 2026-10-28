@@ -532,6 +532,10 @@ def export_book_for_platform(platform_id: str, book_dir: str) -> dict[str, Any]:
 
     读取章节目录，按平台格式化并检查合规性。
     """
+    if not isinstance(platform_id, str):
+        raise ServiceError("platform_id 必须为字符串", 400)
+    if not isinstance(book_dir, str):
+        raise ServiceError("book_dir 必须为字符串", 400)
     if platform_id not in PLATFORMS:
         raise ServiceError(f"不支持的平台: {platform_id}", 400)
     p = PLATFORMS[platform_id]
@@ -709,6 +713,24 @@ def format_royalroad_chapter(
     wrap_stat_boxes: bool = True,
 ) -> str:
     """生成符合 Royal Road 规范的连载正文（支持作者说头尾注释与 BBCode 状态面板封装）。"""
+    if not isinstance(chapter_title, str):
+        raise ServiceError("chapter_title 必须为字符串", 400)
+    if not isinstance(chapter_text, str):
+        raise ServiceError("chapter_text 必须为字符串", 400)
+    if author_note_head is not None and not isinstance(author_note_head, str):
+        raise ServiceError("author_note_head 必须为字符串", 400)
+    if author_note_foot is not None and not isinstance(author_note_foot, str):
+        raise ServiceError("author_note_foot 必须为字符串", 400)
+    if wrap_stat_boxes is not None and not isinstance(wrap_stat_boxes, bool):
+        raise ServiceError("wrap_stat_boxes 必须为布尔值", 400)
+    # None is treated as "not provided" to keep backward compat with callers
+    # that may pass body.get("author_note_head") which can be None.
+    if author_note_head is None:
+        author_note_head = ""
+    if author_note_foot is None:
+        author_note_foot = ""
+    if wrap_stat_boxes is None:
+        wrap_stat_boxes = True
     body = (chapter_text or "").strip()
     if wrap_stat_boxes:
         stat_boxes = parse_stat_box(body)

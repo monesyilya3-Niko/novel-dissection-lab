@@ -136,6 +136,8 @@ def system_status() -> dict[str, Any]:
 def compliance_scan(voice: str | None = None,
                     book_path: str | None = None) -> dict[str, Any]:
     """版权合规扫描：对指定资产或全部资产做 12 字原文匹配检查。"""
+    if book_path is not None and not isinstance(book_path, str):
+        raise ServiceError("book_path 必须为字符串", 400)
     results = []
 
     if voice:

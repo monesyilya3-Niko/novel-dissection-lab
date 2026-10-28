@@ -16,9 +16,12 @@ export interface RhythmRadarChartProps {
   }
   height?: number
   ariaLabel?: string
+  showDemo?: boolean
+  /** @deprecated alias for showDemo */
+  isDemo?: boolean
 }
 
-const DEFAULT_METRICS = {
+export const DEFAULT_METRICS = {
   shuangdianPacing: 88,
   faceSlapAnticipation: 82,
   infoDensity: 74,
@@ -28,14 +31,25 @@ const DEFAULT_METRICS = {
 }
 
 export default function RhythmRadarChart({
-  metrics = DEFAULT_METRICS,
+  metrics,
   height = 260,
   ariaLabel,
+  showDemo = false,
+  isDemo,
 }: RhythmRadarChartProps) {
   const { isDark } = useThemeMode()
   const { t } = useI18n()
 
+  const effectiveMetrics = useMemo(() => {
+    if (metrics) return metrics
+    if (showDemo || isDemo) return DEFAULT_METRICS
+    return null
+  }, [metrics, showDemo, isDemo])
+
+  const isEmpty = !effectiveMetrics
+
   const option = useMemo(() => {
+    if (!effectiveMetrics) return null
     const indicators = [
       { name: t('chart_rhythm_pacing', '爽点节奏'), max: 100 },
       { name: t('chart_rhythm_faceslap', '打脸期待'), max: 100 },
@@ -45,12 +59,12 @@ export default function RhythmRadarChart({
       { name: t('chart_rhythm_conflict', '冲突升级'), max: 100 },
     ]
     const values = [
-      metrics.shuangdianPacing,
-      metrics.faceSlapAnticipation,
-      metrics.infoDensity,
-      metrics.goldenFingerEvolution,
-      metrics.hookRetention,
-      metrics.conflictEscalation,
+      effectiveMetrics.shuangdianPacing,
+      effectiveMetrics.faceSlapAnticipation,
+      effectiveMetrics.infoDensity,
+      effectiveMetrics.goldenFingerEvolution,
+      effectiveMetrics.hookRetention,
+      effectiveMetrics.conflictEscalation,
     ]
 
     return {
@@ -103,7 +117,28 @@ export default function RhythmRadarChart({
         },
       ],
     }
-  }, [metrics, isDark, t])
+  }, [effectiveMetrics, isDark, t])
 
-  return <BaseChart option={option} height={height} ariaLabel={ariaLabel ?? t('chart_rhythm_aria', '爽点节奏雷达图')} />
+  const aria = ariaLabel ?? t('chart_rhythm_aria', '爽点节奏雷达图')
+  if (isEmpty) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: isDark ? ink.moonSoft : ink.textTertiary,
+          fontSize: 14,
+        }}
+        role="img"
+        aria-label={aria}
+      >
+        {t('chart_rhythm_empty', '暂无数据，请先测算')}
+      </div>
+    )
+  }
+
+  return <BaseChart option={option!} height={height} ariaLabel={aria} />
 }

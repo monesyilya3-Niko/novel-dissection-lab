@@ -65,8 +65,8 @@ export default function WritingExtras() {
           setProject(ps[0].name)
         }
       })
-      .catch((e) => setError(`加载项目失败: ${friendlyError(e)}`))
-  }, [project])
+      .catch((e) => setError(t('extras_err_load_projects', '加载项目失败: {msg}', { msg: friendlyError(e) })))
+  }, [project, t])
 
   useEffect(() => {
     loadProjects()
@@ -163,7 +163,7 @@ function OutlinePanel({ project }: { project: string }) {
           setSelectedHook(res.hooks[0])
         }
       } catch (e) {
-        setError(`加载开篇模板失败: ${friendlyError(e)}`)
+        setError(t('extras_err_load_templates', '加载开篇模板失败: {msg}', { msg: friendlyError(e) }))
       } finally {
         setTemplateLoading(false)
       }
@@ -180,8 +180,8 @@ function OutlinePanel({ project }: { project: string }) {
       const r1 = await writingApi.createOutline({
         project,
         kind: 'chapter',
-        title: `第1章：${selectedHook.name}（首章生死危机）`,
-        summary: `【前300字钩子】\n${selectedHook.first300Words}\n\n【第一章节拍】\n${selectedHook.chapter1Beat}`,
+        title: t('extras_template_ch1_title', '第1章：{name}（首章生死危机）', { name: selectedHook.name }),
+        summary: t('extras_template_ch1_summary', '【前300字钩子】\n{first300Words}\n\n【第一章节拍】\n{beat}', { first300Words: selectedHook.first300Words, beat: selectedHook.chapter1Beat }),
         status: 'planned',
         sort_order: baseOrder,
       })
@@ -189,8 +189,8 @@ function OutlinePanel({ project }: { project: string }) {
       const r2 = await writingApi.createOutline({
         project,
         kind: 'chapter',
-        title: `第2章：${selectedHook.name}（压迫激化与转机）`,
-        summary: `【第二章节拍】\n${selectedHook.chapter2Beat}`,
+        title: t('extras_template_ch2_title', '第2章：{name}（压迫激化与转机）', { name: selectedHook.name }),
+        summary: t('extras_template_ch2_summary', '【第二章节拍】\n{beat}', { beat: selectedHook.chapter2Beat }),
         status: 'planned',
         sort_order: baseOrder + 1,
       })
@@ -198,8 +198,8 @@ function OutlinePanel({ project }: { project: string }) {
       const r3 = await writingApi.createOutline({
         project,
         kind: 'chapter',
-        title: `第3章：${selectedHook.name}（首爽破局与爽点兑现）`,
-        summary: `【第三章节拍】\n${selectedHook.chapter3Beat}`,
+        title: t('extras_template_ch3_title', '第3章：{name}（首爽破局与爽点兑现）', { name: selectedHook.name }),
+        summary: t('extras_template_ch3_summary', '【第三章节拍】\n{beat}', { beat: selectedHook.chapter3Beat }),
         status: 'planned',
         sort_order: baseOrder + 2,
       })
@@ -211,10 +211,10 @@ function OutlinePanel({ project }: { project: string }) {
         try { await writingApi.deleteOutline(id) } catch { /* best-effort rollback */ }
       }
       if (createdIds.length > 0) {
-        setError(`应用黄金三章模板失败，已回滚 ${createdIds.length} 条已创建的大纲: ${friendlyError(e)}`)
+        setError(t('extras_err_apply_template_rollback', '应用黄金三章模板失败，已回滚 {count} 条已创建的大纲: {msg}', { count: createdIds.length, msg: friendlyError(e) }))
         load()
       } else {
-        setError(`应用黄金三章模板失败: ${friendlyError(e)}`)
+        setError(t('extras_err_apply_template', '应用黄金三章模板失败: {msg}', { msg: friendlyError(e) }))
       }
     } finally {
       setIsApplyingTemplate(false)
@@ -231,9 +231,9 @@ function OutlinePanel({ project }: { project: string }) {
       })
       .catch((e) => {
         if (cur !== reqIdRef.current) return
-        setError(`加载大纲失败: ${friendlyError(e)}`)
+        setError(t('extras_err_load_outlines', '加载大纲失败: {msg}', { msg: friendlyError(e) }))
       })
-  }, [project])
+  }, [project, t])
 
   useEffect(() => {
     load()
@@ -259,7 +259,7 @@ function OutlinePanel({ project }: { project: string }) {
 
   const doSave = async () => {
     if (!title.trim()) {
-      setError('标题不能为空')
+      setError(t('extras_err_title_required', '标题不能为空'))
       return
     }
     setError('')
@@ -272,17 +272,17 @@ function OutlinePanel({ project }: { project: string }) {
       setDialogOpen(false)
       load()
     } catch (e) {
-      setError(`保存失败: ${friendlyError(e)}`)
+      setError(t('extras_err_save_failed', '保存失败: {msg}', { msg: friendlyError(e) }))
     }
   }
 
   const doDelete = async (id: number) => {
-    if (!window.confirm('确定删除这条大纲吗？')) return
+    if (!window.confirm(t('extras_confirm_delete_outline', '确定删除这条大纲吗？'))) return
     try {
       await writingApi.deleteOutline(id)
       load()
     } catch (e) {
-      setError(`删除失败: ${friendlyError(e)}`)
+      setError(t('extras_err_delete_failed', '删除失败: {msg}', { msg: friendlyError(e) }))
     }
   }
 
@@ -293,7 +293,7 @@ function OutlinePanel({ project }: { project: string }) {
       await writingApi.updateOutline(it.id, { status: next })
       load()
     } catch (e) {
-      setError(`更新状态失败: ${friendlyError(e)}`)
+      setError(t('extras_err_update_status_failed', '更新状态失败: {msg}', { msg: friendlyError(e) }))
     }
   }
 
@@ -314,7 +314,7 @@ function OutlinePanel({ project }: { project: string }) {
       load()
     } catch (e) {
       setItems(prevItems)
-      setError(`重排序失败: ${friendlyError(e)}`)
+      setError(t('extras_err_reorder_failed', '重排序失败: {msg}', { msg: friendlyError(e) }))
     } finally {
       setIsReordering(false)
     }
@@ -333,7 +333,7 @@ function OutlinePanel({ project }: { project: string }) {
           </Button>
         </Box>
         <Typography variant="caption" color="text.secondary">
-          共 {(items ?? []).filter((i) => i.kind === 'volume').length} {t('extras_outline_volume')} / {(items ?? []).filter((i) => i.kind === 'chapter').length} {t('extras_outline_chapter')} ｜ 支持上下微移原子重排
+          共 {(items ?? []).filter((i) => i.kind === 'volume').length} {t('extras_outline_volume')} / {(items ?? []).filter((i) => i.kind === 'chapter').length} {t('extras_outline_chapter')} ｜ {t('extras_outline_reorder_hint', '支持上下微移原子重排')}
         </Typography>
       </Box>
 
@@ -374,13 +374,13 @@ function OutlinePanel({ project }: { project: string }) {
                   color={OUTLINE_STATUS_COLOR[it.status] ?? 'default'}
                   onClick={() => doToggleStatus(it)}
                   sx={{ cursor: 'pointer' }}
-                  title="点击切换状态"
+                  title={t("extras_action_toggle_status", "点击切换状态")}
                 />
                 <IconButton
                   size="small"
                   disabled={idx === 0 || isReordering}
                   onClick={() => doMove(idx, 'up')}
-                  title="上移"
+                  title={t("extras_action_move_up", "上移")}
                   aria-label={t('extras_outline_move_up_aria', '上移')}
                 >
                   <ArrowUpwardIcon fontSize="small" />
@@ -389,15 +389,15 @@ function OutlinePanel({ project }: { project: string }) {
                   size="small"
                   disabled={idx === (items ?? []).length - 1 || isReordering}
                   onClick={() => doMove(idx, 'down')}
-                  title="下移"
+                  title={t("extras_action_move_down", "下移")}
                   aria-label={t('extras_outline_move_down_aria', '下移')}
                 >
                   <ArrowDownwardIcon fontSize="small" />
                 </IconButton>
-                <IconButton size="small" onClick={() => openEdit(it)} title="编辑" aria-label={t('extras_action_edit_aria', '编辑')}>
+                <IconButton size="small" onClick={() => openEdit(it)} title={t("extras_action_edit", "编辑")} aria-label={t('extras_action_edit_aria', '编辑')}>
                   <EditIcon fontSize="small" />
                 </IconButton>
-                <IconButton size="small" onClick={() => doDelete(it.id)} title="删除" aria-label={t('extras_action_delete_aria', '删除')}>
+                <IconButton size="small" onClick={() => doDelete(it.id)} title={t("extras_action_delete", "删除")} aria-label={t('extras_action_delete_aria', '删除')}>
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               </Box>
@@ -566,9 +566,9 @@ function CharacterPanel({ project }: { project: string }) {
       })
       .catch((e) => {
         if (cur !== reqIdRef.current) return
-        setError(`加载人物卡失败: ${friendlyError(e)}`)
+        setError(t('extras_err_load_characters', '加载人物卡失败: {msg}', { msg: friendlyError(e) }))
       })
-  }, [project])
+  }, [project, t])
 
   useEffect(() => {
     load()
@@ -592,7 +592,7 @@ function CharacterPanel({ project }: { project: string }) {
         setName(res.names[0])
       }
     } catch (e) {
-      setError(`随机起名失败: ${friendlyError(e)}`)
+      setError(t('extras_err_random_name_failed', '随机起名失败: {msg}', { msg: friendlyError(e) }))
     }
   }
 
@@ -616,7 +616,7 @@ function CharacterPanel({ project }: { project: string }) {
 
   const doSave = async () => {
     if (!name.trim()) {
-      setError('姓名不能为空')
+      setError(t('extras_err_name_required', '姓名不能为空'))
       return
     }
     setError('')
@@ -645,17 +645,17 @@ function CharacterPanel({ project }: { project: string }) {
       setDialogOpen(false)
       load()
     } catch (e) {
-      setError(`保存失败: ${friendlyError(e)}`)
+      setError(t('extras_err_save_failed', '保存失败: {msg}', { msg: friendlyError(e) }))
     }
   }
 
   const doDelete = async (id: number) => {
-    if (!window.confirm('确定删除这张人物卡吗？')) return
+    if (!window.confirm(t('extras_confirm_delete_character', '确定删除这张人物卡吗？'))) return
     try {
       await writingApi.deleteCharacter(id)
       load()
     } catch (e) {
-      setError(`删除失败: ${friendlyError(e)}`)
+      setError(t('extras_err_delete_failed', '删除失败: {msg}', { msg: friendlyError(e) }))
     }
   }
 
@@ -667,7 +667,7 @@ function CharacterPanel({ project }: { project: string }) {
           {t('extras_char_add_btn')}
         </Button>
         <Typography variant="caption" color="text.secondary">
-          当前共 {(items ?? []).length} 位角色 ｜ 支持人物阵营与人物关系网络关联
+          {t('extras_char_subtitle_count', '当前共 {count} 位角色 ｜ {hint}', { count: (items ?? []).length, hint: t('extras_char_subtitle', '支持人物阵营与人物关系网络关联') })}
         </Typography>
       </Box>
 
@@ -695,10 +695,10 @@ function CharacterPanel({ project }: { project: string }) {
                         {it.name}
                       </Typography>
                       {it.role && <Chip label={it.role} size="small" color="primary" variant="outlined" />}
-                      <IconButton size="small" onClick={() => openEdit(it)} title="编辑" aria-label={t('extras_action_edit_aria', '编辑')}>
+                      <IconButton size="small" onClick={() => openEdit(it)} title={t("extras_action_edit", "编辑")} aria-label={t('extras_action_edit_aria', '编辑')}>
                         <EditIcon fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" onClick={() => doDelete(it.id)} title="删除" aria-label={t('extras_action_delete_aria', '删除')}>
+                      <IconButton size="small" onClick={() => doDelete(it.id)} title={t("extras_action_delete", "删除")} aria-label={t('extras_action_delete_aria', '删除')}>
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Box>
@@ -710,8 +710,8 @@ function CharacterPanel({ project }: { project: string }) {
                           size="small"
                           sx={{
                             fontSize: 11,
-                            bgcolor: extraObj.camp.includes('反派') ? 'rgba(220,38,38,0.1)' : 'rgba(37,99,235,0.1)',
-                            color: extraObj.camp.includes('反派') ? '#DC2626' : '#2563EB',
+                            bgcolor: (extraObj.camp.includes('反派') || extraObj.camp.toLowerCase().includes('antagonist')) ? 'rgba(220,38,38,0.1)' : 'rgba(37,99,235,0.1)',
+                            color: (extraObj.camp.includes('反派') || extraObj.camp.toLowerCase().includes('antagonist')) ? '#DC2626' : '#2563EB',
                           }}
                         />
                       </Box>
@@ -721,7 +721,7 @@ function CharacterPanel({ project }: { project: string }) {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
                         <HubIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                         <Typography variant="caption" color="text.secondary">
-                          关系：与 <b>{extraObj.relationTarget}</b> 为 [{extraObj.relationType || '关联'}]
+                          {t('extras_char_relation_prefix', '关系：与 ')}<b>{extraObj.relationTarget}</b>{t('extras_char_relation_middle', ' 为 ') + '['}{extraObj.relationType || t('extras_char_relation_default', '关联')}]
                         </Typography>
                       </Box>
                     )}
@@ -826,9 +826,9 @@ function NotePanel({ project }: { project: string }) {
       })
       .catch((e) => {
         if (cur !== reqIdRef.current) return
-        setError(`加载便签失败: ${friendlyError(e)}`)
+        setError(t('extras_err_load_notes', '加载便签失败: {msg}', { msg: friendlyError(e) }))
       })
-  }, [project])
+  }, [project, t])
 
   useEffect(() => {
     load()
@@ -850,7 +850,7 @@ function NotePanel({ project }: { project: string }) {
 
   const doSave = async () => {
     if (!title.trim() && !content.trim()) {
-      setError('标题与内容不能同时为空')
+      setError(t('extras_err_title_content_empty', '标题与内容不能同时为空'))
       return
     }
     setError('')
@@ -863,17 +863,17 @@ function NotePanel({ project }: { project: string }) {
       setDialogOpen(false)
       load()
     } catch (e) {
-      setError(`保存失败: ${friendlyError(e)}`)
+      setError(t('extras_err_save_failed', '保存失败: {msg}', { msg: friendlyError(e) }))
     }
   }
 
   const doDelete = async (id: number) => {
-    if (!window.confirm('确定删除这条便签吗？')) return
+    if (!window.confirm(t('extras_confirm_delete_note', '确定删除这条便签吗？'))) return
     try {
       await writingApi.deleteNote(id)
       load()
     } catch (e) {
-      setError(`删除失败: ${friendlyError(e)}`)
+      setError(t('extras_err_delete_failed', '删除失败: {msg}', { msg: friendlyError(e) }))
     }
   }
 
@@ -906,6 +906,9 @@ function NotePanel({ project }: { project: string }) {
                   flexDirection: 'column',
                 }}
                 onClick={() => openEdit(it)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEdit(it) } }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>
@@ -917,7 +920,7 @@ function NotePanel({ project }: { project: string }) {
                       e.stopPropagation()
                       doDelete(it.id)
                     }}
-                    title="删除"
+                    title={t("extras_action_delete", "删除")}
                     aria-label={t('extras_action_delete_aria', '删除')}
                   >
                     <DeleteIcon fontSize="small" />
@@ -1015,9 +1018,9 @@ function DashboardPanel({ project }: { project: string }) {
       })
       .catch((e) => {
         if (cur !== statsReqIdRef.current) return
-        setError(`加载仪表盘统计失败: ${friendlyError(e)}`)
+        setError(t('extras_err_load_dashboard', '加载仪表盘统计失败: {msg}', { msg: friendlyError(e) }))
       })
-  }, [project, days])
+  }, [project, days, t])
 
   useEffect(() => {
     tensionSeqRef.current++
@@ -1046,7 +1049,7 @@ function DashboardPanel({ project }: { project: string }) {
       setShowTensionDialog(false)
     } catch (e) {
       if (capturedSeq !== tensionSeqRef.current) return
-      setError(`张力分析失败: ${friendlyError(e)}`)
+      setError(t('extras_err_tension_failed', '张力分析失败: {msg}', { msg: friendlyError(e) }))
     } finally {
       if (capturedSeq === tensionSeqRef.current) setTensionLoading(false)
     }
@@ -1073,7 +1076,7 @@ function DashboardPanel({ project }: { project: string }) {
       setShowGoldenThreeDialog(false)
     } catch (e) {
       if (capturedSeq !== goldenThreeSeqRef.current) return
-      setError(`黄金三章比对失败: ${friendlyError(e)}`)
+      setError(t('extras_err_golden_three_failed', '黄金三章比对失败: {msg}', { msg: friendlyError(e) }))
     } finally {
       if (capturedSeq === goldenThreeSeqRef.current) setGoldenThreeLoading(false)
     }
@@ -1100,7 +1103,7 @@ function DashboardPanel({ project }: { project: string }) {
       setShowRetentionDialog(false)
     } catch (e) {
       if (capturedSeq !== retentionSeqRef.current) return
-      setError(`读者留存测算失败: ${friendlyError(e)}`)
+      setError(t('extras_err_retention_failed', '读者留存测算失败: {msg}', { msg: friendlyError(e) }))
     } finally {
       if (capturedSeq === retentionSeqRef.current) setRetentionLoading(false)
     }
@@ -1386,7 +1389,7 @@ function DashboardPanel({ project }: { project: string }) {
                       <Chip
                         size="small"
                         color={retentionResult.overallGrade === 'S' ? 'success' : retentionResult.overallGrade === 'A' ? 'primary' : retentionResult.overallGrade === 'B' ? 'warning' : 'error'}
-                        label={`综合评级 ${retentionResult.overallGrade} · ${retentionResult.gradeDescription}`}
+                        label={t('extras_retention_grade_label', '综合评级 {grade} · {desc}', { grade: retentionResult.overallGrade, desc: retentionResult.gradeDescription })}
                         sx={{ fontWeight: 600 }}
                       />
                       <Chip
@@ -1425,7 +1428,7 @@ function DashboardPanel({ project }: { project: string }) {
                       </Typography>
                       {retentionResult.dropoffHotspots.map((h, i) => (
                         <Typography key={i} variant="caption" sx={{ display: 'block', color: 'text.secondary', mb: 0.5 }}>
-                          [{h.riskLevel}] {h.segmentLabel}（预估跳出 {h.estimatedDropPct}%）：{h.reason} → {h.fixSuggestion}
+                          {t('extras_retention_hotspot_item', '[{level}] {label}（预估跳出 {pct}%）：{reason} → {fix}', { level: h.riskLevel, label: h.segmentLabel, pct: h.estimatedDropPct, reason: h.reason, fix: h.fixSuggestion })}
                         </Typography>
                       ))}
                     </Box>
