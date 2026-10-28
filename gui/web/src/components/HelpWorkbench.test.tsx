@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import HelpWorkbench from './HelpWorkbench'
+import { JOURNEY_DEFINITIONS } from '../help/journeys'
 import { I18nProvider } from '../state/I18nContext'
 
 describe('HelpWorkbench 帮助中心与功能指南全量双语支持', () => {
@@ -26,6 +27,20 @@ describe('HelpWorkbench 帮助中心与功能指南全量双语支持', () => {
     expect(screen.getByText(/先拆书，再蒸馏，最后用资产辅助写作/)).toBeInTheDocument()
     expect(screen.getByText('四个典型工作流')).toBeInTheDocument()
     expect(screen.getByText('工作流 A：拆一本书')).toBeInTheDocument()
+  })
+
+  it('三步闭环小节与首页 JourneyStepper 同源（help/journeys.ts）', () => {
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <HelpWorkbench />
+      </I18nProvider>
+    )
+
+    expect(screen.getByText('三步闭环（与首页进度条一致）')).toBeInTheDocument()
+    // 三步用共享定义渲染，序号前缀由组件加
+    JOURNEY_DEFINITIONS.forEach((j, idx) => {
+      expect(screen.getByText(`${idx + 1}. ${j.title['zh-CN']}`)).toBeInTheDocument()
+    })
   })
 
   it('支持无缝切换到术语表、功能指南与常见问题', () => {

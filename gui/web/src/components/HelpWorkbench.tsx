@@ -34,6 +34,7 @@ export interface HelpWorkbenchProps {
 }
 
 import { GLOSSARY, type TermCategory } from '../help/glossary'
+import { JOURNEY_DEFINITIONS } from '../help/journeys'
 import { replayOnboarding } from './OnboardingWizard'
 
 // ---------------------------------------------------------------------------
@@ -717,6 +718,32 @@ function StartPanel() {
           <strong>{t('help_start_eco_summary_highlight')}</strong>
           {t('help_start_eco_summary_2')}
         </Typography>
+      </Paper>
+
+      <Typography variant="h6" sx={{ fontFamily: fontStack.serif, mb: 2, color: ink.primary }}>
+        {t('help_start_journey_title', '三步闭环（与首页进度条一致）')}
+      </Typography>
+      <Paper sx={{ p: 2.5, mb: 4, border: `1px solid ${ink.line}` }} elevation={0}>
+        <Stepper orientation="vertical" activeStep={-1}>
+          {JOURNEY_DEFINITIONS.map((j, idx) => {
+            const titleText = j.title[locale] || j.title['zh-CN']
+            const descText = j.description[locale] || j.description['zh-CN']
+            return (
+              <Step key={j.key} active>
+                <StepLabel>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {idx + 1}. {titleText}
+                  </Typography>
+                </StepLabel>
+                <StepContent>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {descText}
+                  </Typography>
+                </StepContent>
+              </Step>
+            )
+          })}
+        </Stepper>
       </Paper>
 
       <Typography variant="h6" sx={{ fontFamily: fontStack.serif, mb: 2, color: ink.primary }}>

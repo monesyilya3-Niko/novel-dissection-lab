@@ -789,6 +789,11 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '管理',
     'en-US': 'Manage',
   },
+  // 帮助中心：三步闭环小节标题（数据源为 help/journeys.ts，与首页 JourneyStepper 同源）
+  help_start_journey_title: {
+    'zh-CN': '三步闭环（与首页进度条一致）',
+    'en-US': 'The 3-Step Loop (same as the home progress bar)',
+  },
 
   // 创作扩展企划中心 (WritingExtras)
   extras_project_label: {
