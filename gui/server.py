@@ -840,8 +840,21 @@ class GuiServer:
             pass
 
     def _bind_port(self) -> tuple[str, int]:
-        """解析端口，被占用则 +1 递增（A5 决策）。"""
-        host = "127.0.0.1"
+        """解析端口，被占用则 +1 递增（A5 决策）。
+
+        绑定地址：默认 127.0.0.1（仅本机）。服务端部署时经
+        ``NOVEL_LAB_HOST`` 显式改为 0.0.0.0 / 具体网卡地址。
+
+        安全前提：改为对外监听必须同时设置 ``NOVEL_LAB_TOKEN``，
+        否则缺少令牌，任何能访问该端口的人都能读取全部数据。
+        这里在启动期硬性拦截，而不是只在文档里提醒。
+        """
+        host = config.resolve_host()
+        if host != "127.0.0.1" and not config.API_TOKEN:
+            raise RuntimeError(
+                f"拒绝在 {host} 上监听：未设置 NOVEL_LAB_TOKEN。"
+                "对外暴露服务必须同时配置访问令牌，否则任何能访问该端口的人都能读取全部数据。"
+            )
         port = config.resolve_port(self.preferred_port)
         for _ in range(100):
             try:

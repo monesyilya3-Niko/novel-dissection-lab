@@ -169,6 +169,16 @@ _ENV_PORT = os.environ.get("NOVEL_LAB_GUI_PORT", "").strip()
 API_TOKEN = os.environ.get("NOVEL_LAB_TOKEN", "").strip()
 
 
+# 监听地址（服务端部署用）：默认 127.0.0.1 仅本机可见。
+# 设为 0.0.0.0 等对外地址时，server 层会强制要求同时配置 NOVEL_LAB_TOKEN。
+_ENV_HOST = os.environ.get("NOVEL_LAB_HOST", "").strip()
+
+
+def resolve_host() -> str:
+    """解析监听地址：环境变量 > 默认 127.0.0.1（仅本机）。"""
+    return _ENV_HOST or "127.0.0.1"
+
+
 def resolve_port(preferred: int | None = None) -> int:
     """解析最终端口：参数 > 环境变量 > 默认值。L5：校验 1–65535。"""
     if preferred is not None:

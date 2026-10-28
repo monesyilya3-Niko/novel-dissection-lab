@@ -402,5 +402,59 @@ class TestHandshakeGate(unittest.TestCase):
         self.assertEqual(self._status("/"), 200, "静态入口不应受握手门禁")
 
 
+class TestBindHostGuard(unittest.TestCase):
+    """对外监听必须有令牌：服务端部署的硬性前提。
+
+    ``NOVEL_LAB_HOST=0.0.0.0`` 让服务对整个网络可见，而本项目默认无任何
+    鉴权。若允许「对外监听 + 空令牌」的组合，任何能访问该端口的人都能读取
+    全部书库与资产。这条防线必须在 ``_bind_port`` 启动期硬拦，不能只写在文档里。
+    """
+
+    def setUp(self):
+        self._orig_host = config._ENV_HOST
+        self._orig_token = config.API_TOKEN
+        self._orig_bind = None
+
+    def tearDown(self):
+        config._ENV_HOST = self._orig_host
+        config.API_TOKEN = self._orig_token
+
+    def test_external_host_without_token_is_rejected(self):
+        from gui.server import GuiServer
+
+        config._ENV_HOST = "0.0.0.0"
+        config.API_TOKEN = ""
+        srv = GuiServer(preferred_port=8911)
+        with self.assertRaises(RuntimeError) as ctx:
+            srv._bind_port()
+        msg = str(ctx.exception)
+        self.assertIn("NOVEL_LAB_TOKEN", msg)
+        self.assertIn("0.0.0.0", msg)
+
+    def test_external_host_with_token_passes_guard(self):
+        """有令牌时不再拦截（真绑 0.0.0.0 太侵入，只断言守卫放行到 socket 绑定阶段）。"""
+        from gui.server import GuiServer
+
+        config._ENV_HOST = "0.0.0.0"
+        config.API_TOKEN = "some-token"
+        srv = GuiServer(preferred_port=8912)
+        try:
+            host, _port = srv._bind_port()
+            self.assertEqual(host, "0.0.0.0")
+        except RuntimeError as exc:
+            self.fail(f"有令牌时不应被守卫拦截: {exc}")
+
+    def test_loopback_without_token_still_allowed(self):
+        """默认本机模式不受影响（免认证模型是既有行为）。"""
+        from gui.server import GuiServer
+
+        config._ENV_HOST = ""
+        config.API_TOKEN = ""
+        srv = GuiServer(preferred_port=8913)
+        host, _port = srv._bind_port()
+        self.assertEqual(host, "127.0.0.1")
+        self.assertIsNone(self._orig_bind)
+
+
 if __name__ == "__main__":
     unittest.main()

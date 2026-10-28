@@ -157,3 +157,66 @@ describe('响应字段名自动转 camelCase（typedRequest 契约）', () => {
     expect((ov.recentActivity as Record<string, unknown>[])[0].createdAt).toBe('2026-01-01')
   })
 })
+
+// ---------------------------------------------------------------------------
+// 访问令牌（NOVEL_LAB_TOKEN）：令牌在模块加载期从 URL 读取，
+// 因此每条用例必须 resetModules 后再动态 import。
+// ---------------------------------------------------------------------------
+describe('访问令牌 X-Auth-Token（服务端部署模式）', () => {
+  const setSearch = (search: string) => {
+    window.history.replaceState({}, '', `/${search}`)
+  }
+
+  afterEach(() => {
+    vi.resetModules()
+    setSearch('')
+  })
+
+  it('URL 带 ?auth= 时，普通 API 请求携带 X-Auth-Token', async () => {
+    setSearch('?auth=s3cret')
+    vi.resetModules()
+    vi.mocked(fetch).mockImplementationOnce(
+      mockFetchOnce({ code: 0, data: { total_books: 0 }, message: '' }) as never,
+    )
+    const mod = await import('./client')
+    await mod.getOverview()
+    const calls = vi.mocked(fetch).mock.calls
+    const call = calls[calls.length - 1]
+    const headers = (call[1] as RequestInit).headers as Record<string, string>
+    expect(headers['X-Auth-Token']).toBe('s3cret')
+  })
+
+  it('URL 无 ?auth= 时不发送该头（保持本机免认证模型）', async () => {
+    setSearch('')
+    vi.resetModules()
+    vi.mocked(fetch).mockImplementationOnce(
+      mockFetchOnce({ code: 0, data: { total_books: 0 }, message: '' }) as never,
+    )
+    const mod = await import('./client')
+    await mod.getOverview()
+    const calls = vi.mocked(fetch).mock.calls
+    const call = calls[calls.length - 1]
+    const headers = ((call[1] as RequestInit).headers ?? {}) as Record<string, string>
+    expect(headers['X-Auth-Token']).toBeUndefined()
+  })
+
+  it('authQuerySuffix 供 SSE 拼接 ?auth=', async () => {
+    setSearch('?auth=tok%2Bplus')
+    vi.resetModules()
+    const mod = await import('./client')
+    // 解码后重新编码，%2B 不应退化
+    expect(mod.authQuerySuffix()).toBe('&auth=tok%2Bplus')
+  })
+
+  it('authQuerySuffix 无令牌时为空串', async () => {
+    setSearch('')
+    vi.resetModules()
+    const mod = await import('./client')
+    expect(mod.authQuerySuffix()).toBe('')
+  })
+
+  it('401 令牌错误给出可操作提示，而不是原始后端文案', () => {
+    expect(friendlyError(new ApiError('缺少或非法访问令牌（NOVEL_LAB_TOKEN 已启用）', 401)))
+      .toContain('?auth=')
+  })
+})

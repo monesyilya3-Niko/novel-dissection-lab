@@ -48,6 +48,11 @@ export function friendlyError(e: unknown): string {
   if (e instanceof ApiError) {
     const msg = e.message || ''
     const lower = msg.toLowerCase()
+    // 访问令牌缺失/错误：服务端开了 NOVEL_LAB_TOKEN，客户端却没带上正确令牌。
+    // 不解释的话用户只看到「缺少或非法访问令牌」，不知道要怎么做。
+    if (e.code === 401 && (msg.includes('令牌') || lower.includes('auth token') || lower.includes('token'))) {
+      return '访问令牌无效或已过期——请在页面地址后追加 ?auth=<服务端 NOVEL_LAB_TOKEN> 后重新打开页面'
+    }
     // File too large / 100MB limit — actionable hint (backend: "文件超过 100MB 上限" / 413)
     if (lower.includes('100mb') || lower.includes('file too large') || lower.includes('exceeds') && lower.includes('size') || msg.includes('超过 100MB') || msg.includes('文件过大')) {
       return msg.includes('100MB') || msg.includes('超过') ? msg + '，请拆分后重试' : msg
@@ -140,6 +145,29 @@ function getHandshakeToken(): string | null {
 const HANDSHAKE_TOKEN: string | null = getHandshakeToken()
 
 // ---------------------------------------------------------------------------
+// 访问令牌（服务端部署模式）：后端设了 NOVEL_LAB_TOKEN 后，所有 /api/* 都要求
+// X-Auth-Token。此前前端从不发送该头，导致一旦开启令牌，整个界面立刻全 401
+// —— 即「令牌机制存在但不可用」。这里与握手 token 同源（URL 参数）取用。
+//
+// SSE（EventSource）发不了自定义头，后端已额外接受 ?auth= 查询参数；
+// 需要它的地方用 authQuerySuffix() 拼到 URL 上。
+// ---------------------------------------------------------------------------
+function getAuthToken(): string | null {
+  try {
+    const m = /[?&]auth=([^&]+)/.exec(window.location.search)
+    return m ? decodeURIComponent(m[1]) : null
+  } catch {
+    return null
+  }
+}
+const AUTH_TOKEN: string | null = getAuthToken()
+
+/** 供 EventSource 之类无法带自定义头的场景拼 ?auth= 后缀。 */
+export function authQuerySuffix(): string {
+  return AUTH_TOKEN ? `&auth=${encodeURIComponent(AUTH_TOKEN)}` : ''
+}
+
+// ---------------------------------------------------------------------------
 // 请求核心（唯一出口；post/put/del/get 是薄别名）
 // ---------------------------------------------------------------------------
 
@@ -157,6 +185,7 @@ async function typedRequest<T>(
     const headers: Record<string, string> = {}
     if (body !== undefined) headers['Content-Type'] = 'application/json'
     if (HANDSHAKE_TOKEN) headers['X-Handshake-Token'] = HANDSHAKE_TOKEN
+    if (AUTH_TOKEN) headers['X-Auth-Token'] = AUTH_TOKEN
     res = await fetch(`${BASE}${path}`, {
       method,
       headers: Object.keys(headers).length ? headers : undefined,
@@ -207,6 +236,7 @@ async function uploadRequest<T>(path: string, form: FormData): Promise<T> {
     // 注意：不手动设 Content-Type，浏览器会自动带 boundary。
     const upHeaders: Record<string, string> = {}
     if (HANDSHAKE_TOKEN) upHeaders['X-Handshake-Token'] = HANDSHAKE_TOKEN
+    if (AUTH_TOKEN) upHeaders['X-Auth-Token'] = AUTH_TOKEN
     res = await fetch(`${BASE}${path}`, { method: 'POST', body: form, signal: ctrl.signal, headers: Object.keys(upHeaders).length ? upHeaders : undefined })
   } finally {
     clearTimeout(timer)
@@ -445,6 +475,7 @@ export function subscribeEvents(bookId: string | null, onEvent: (e: ProgressEven
   if (bookId) params.set('book_id', bookId)
   // Electron 模式：EventSource 发不了自定义头，token 走查询参数（后端同样校验）。
   if (HANDSHAKE_TOKEN) params.set('handshake_token', HANDSHAKE_TOKEN)
+  if (AUTH_TOKEN) params.set('auth', AUTH_TOKEN)
   const q = params.toString() ? `?${params.toString()}` : ''
   const es = new EventSource(`${BASE}/events${q}`)
   es.onmessage = (msg) => {
@@ -789,6 +820,7 @@ export const tropeApi = {
 export function subscribeTaskEvents(taskId: string, onEvent: (e: Record<string, unknown>) => void): () => void {
   const params = new URLSearchParams({ task_id: taskId })
   if (HANDSHAKE_TOKEN) params.set('handshake_token', HANDSHAKE_TOKEN)
+  if (AUTH_TOKEN) params.set('auth', AUTH_TOKEN)
   const es = new EventSource(`${BASE}/events?${params.toString()}`)
   es.onmessage = (msg) => {
     try {
