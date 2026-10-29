@@ -729,8 +729,14 @@ def get_overview() -> dict[str, Any]:
 
 
 def list_assets(kind: str | None = None, genre: str | None = None,
-                book_id: str | None = None, offset: int = 0, limit: int = 50) -> dict[str, Any]:
-    """资产清单分页（kind/genre/book_id 可选组合筛选）。"""
+                book_id: str | None = None, offset: int = 0,
+                limit: int | None = None) -> dict[str, Any]:
+    """资产清单分页（kind/genre/book_id 可选组合筛选）。
+
+    ``limit=None`` = 返回全部（asset_index 内部有 500 硬上限）。
+    2026-10-29：默认值从 50 改为 None —— 分页是调用方的显式选择，
+    默认截断会让不传 limit 的调用方静默丢数据（管理后台资产列表即如此）。
+    """
     try:
         return asset_index.index.list_assets(kind, genre, book_id, offset, limit)
     except ValueError as exc:

@@ -551,3 +551,38 @@ class TestDefaultLimitReturnsAll(unittest.TestCase):
         res = idx.list_assets("voice", limit=20)
         self.assertEqual(res["total"], 60)
         self.assertEqual(len(res["items"]), 20, "显式 limit 仍须分页")
+
+
+class TestLimitDefaultsAcrossLayers(unittest.TestCase):
+    """三层的 limit 默认值必须同时是 None（2026-10-29）。
+
+    实际踩过的坑：只改了 asset_index.list_assets 的默认值，重装后
+    /api/assets 仍返回 50 条 —— 因为 router._h_list_assets 与
+    services.list_assets 各自还写着一个 50，把下层的新默认覆盖掉了。
+    这条测试直接断言三处签名，防止任何一层被单独改回。
+    """
+
+    def test_all_layers_default_to_none(self):
+        import inspect
+
+        from gui import asset_index, services
+        for name, fn in (
+            ("asset_index.AssetIndex.list_assets", asset_index.AssetIndex.list_assets),
+            ("services.list_assets", services.list_assets),
+        ):
+            sig = inspect.signature(fn)
+            self.assertIsNone(
+                sig.parameters["limit"].default,
+                f"{name} 的 limit 默认值应为 None（返回全部），否则会静默截断",
+            )
+
+    def test_router_handler_passes_none_when_absent(self):
+        """router 层没传 limit 时必须把 None 往下传，而不是填 50。"""
+        import inspect
+
+        from gui import router
+        src = inspect.getsource(router._h_list_assets)
+        self.assertNotIn('"50"', src,
+                         "router._h_list_assets 不应再硬编码默认 50")
+        self.assertIn("raw_limit", src,
+                      "router 应读取原始参数并区分「未传」与「传了」")

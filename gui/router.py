@@ -223,9 +223,13 @@ def _h_list_assets(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, A
     kind = params.get("kind") or None
     genre = params.get("genre") or None
     book_id = params.get("book_id") or None
+    # limit 缺省 = 不限制（内部仍受 500 硬上限）。此前这里与 asset_index 各写了一个
+    # 50 的默认值，两处都要改才能真正返回全部；只改下层会被这里的默认覆盖，
+    # 2026-10-29 实测踩过一次（改完 asset_index 后 /api/assets 仍是 50）。
     try:
         offset = int(params.get("offset", "0") or "0")
-        limit = int(params.get("limit", "50") or "50")
+        raw_limit = params.get("limit")
+        limit = int(raw_limit) if raw_limit not in (None, "") else None
     except ValueError as exc:
         raise ServiceError("offset/limit 必须为整数", 400) from exc
     return ok(services.list_assets(kind, genre, book_id, offset, limit))
