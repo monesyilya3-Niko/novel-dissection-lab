@@ -1,6 +1,6 @@
 // 首启引导向导 v2 — 4 步，可重播，感知模型是否已配置。
 // 触发条件：空库 && 未标记过 onboarded（v2 键为准，自动迁移 v1 旧键）。
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
@@ -80,12 +80,14 @@ export default function OnboardingWizard({
   const { t } = useI18n()
   const [step, setStep] = useState(0)
 
-  const finish = (go?: WorkbenchKey | unknown) => {
+  const finish = useCallback((go?: WorkbenchKey | unknown) => {
     const target = typeof go === 'string' ? (go as WorkbenchKey) : undefined
+    // Date.now() 是副作用：必须只在用户交互回调里执行，不能在渲染期跑
+    // （react-hooks 编译器规则会直接报错，且渲染期取时间确实会破坏纯函数性）。
     writeStorage(STORAGE_KEY_V2, JSON.stringify({ done: true, dismissedAt: Date.now() } satisfies OnboardState))
     onDone()
     if (target) onNavigate(target)
-  }
+  }, [onDone, onNavigate])
 
   const nextActions: NextAction[] = useMemo(() => [
     { key: 'analysis', title: t('onboarding_s4_action_analysis', '拆一本书'), desc: t('onboarding_s4_action_analysis_desc', '选一本 TXT 一键拆解'), accent: ink.cinnabar },
@@ -168,7 +170,7 @@ export default function OnboardingWizard({
         cta: { label: t('onboarding_get_started', '开始使用') },
       },
     ],
-    [t, modelConfigured, nextActions],
+    [t, modelConfigured, nextActions, finish],
   )
 
   const current = steps[step]
