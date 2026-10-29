@@ -84,8 +84,21 @@ jobs:
           # 因此上传用 ASCII 主名，中文名放进 --label 供页面显示。
           $exe = Get-ChildItem release\*-Setup-*-win64.exe | Select-Object -First 1
           if (-not $exe) { Write-Error "未找到安装包产物"; exit 1 }
-          $ver = "${{ github.ref_name }}".TrimStart('v')
-          if (-not $ver) { $ver = $env:TAG.TrimStart('v') }
+          # 版本号来源优先级：目标 tag > github.ref_name（push tag 触发时）
+          # > gui/__init__.py（workflow_dispatch 手动跑时 ref_name 是分支名，
+          #   拿它会产出「Setup-master-win64.exe」这种错误文件名）。
+          # 注意 ref_name 在 workflow_dispatch 下是 "master"，必须先判 tag 再回落到源码版本。
+          $ver = ""
+          if ($env:TAG) { $ver = $env:TAG.TrimStart('v') }
+          if (-not $ver -and "${{ github.ref_type }}" -eq "tag") {
+            $ver = "${{ github.ref_name }}".TrimStart('v')
+          }
+          if (-not $ver -or $ver -match '^(master|main|HEAD)$') {
+            $initPy = Join-Path $PWD '..\gui\__init__.py'
+            $ver = (Select-String -Path $initPy -Pattern '__version__\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          }
+          if (-not $ver) { Write-Error "无法确定版本号"; exit 1 }
+          Write-Host "安装包版本号: $ver"
           $asciiName = "novel-lab-Setup-$ver-win64.exe"
           Copy-Item $exe.FullName "release\$asciiName"
           Write-Host "上传 $asciiName ($([math]::Round($exe.Length/1MB,1)) MB) → $env:TAG"
