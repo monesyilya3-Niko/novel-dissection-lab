@@ -4,40 +4,52 @@
 
 ## [Unreleased]
 
-## [2.3.0] - 2026-10-27
+## [2.3.0] - 2026-10-29
+
+本版两大主题：**小白可用**（导航/向导/术语/写作台全面降复杂度）与**可对外部署**（访问令牌真正生效 + 服务端模式）。
 
 ### Added
-- **商业网文读者留存流失预测模型**（写作扩展工具新能力，前后端两阶段交付）：
-  - 引擎侧（PR #26）：`POST /api/writing/reader-retention`——基于黄金三章细粒度情绪张力、首章入局速度、平淡注水期密度、跨章过渡落差与末尾留钩，量化推导逐章读者留存衰减曲线，定位弃读跳出高危点（CRITICAL/HIGH/MEDIUM + 预估跳出率 + 原因 + 挽留改法），输出 S/A/B/C 综合评级与战略优化建议。
-  - 前端侧（PR #27）：创作者仪表盘新增「读者留存预测」入口与弹窗（4 类商业标杆、与黄金三章共用三章草稿、高留存/断崖失速两组示范一键测算）；`ReaderRetentionChart` 留存衰减曲线组件（S 级 68% / A 级 52% / 及格 38% 三阈值线、高危点打标、双主题双语）；结果全景面板（评级/终局留存率/累计流失 + 高危点清单 + 战略建议）。
-- **黄金三章张力曲线重叠比对**（PR #24/#25）：多章连环比对引擎 + 写作扩展工作台可视化（跨章动量诊断）。
-- PR #28：前端 `dist` 构建对齐。
+
+- **易用性专项 WS-A1~A6**（用户反馈「有些功能我都不太会用，太复杂了」）：
+  - **导航简化**：左侧导航从 10 项平铺收敛为「主创作流 4 项 + 更多工具（可折叠）+ 管理区（齿轮）」；新增 `ui.mode = simple | advanced`，空库新用户默认简洁模式，顶部常驻切换，存 `settings.json` + `localStorage` 双持久化。
+  - **摩擦清零**：新增 `EmptyState` / `DisabledTooltipButton` / `GlossaryTooltip` 三个原语；禁用按钮用 tooltip 讲清「为什么点不动」（缺文件 / 缺题材 / 缺模型）；导入错误按扩展名给出可操作提示（.pdf/.doc/.md）；`friendlyError` 扩展端口占用、100MB 上限等场景。
+  - **术语就地解释**：抽取 `help/glossary.ts`（18 条双语术语，含 deslop / poison），悬停即可看释义并跳到帮助锚点，不必再翻帮助中心。
+  - **智能默认**：新增 `utils/inferGenre.ts`，按文件名关键词自动推断题材并预选（仍可手改，后端铁律一校验不变）。
+  - **向导重做**：`OnboardingWizard` v2——4 步可达（此前第 3/4 步永远看不到）、存储升级为 `{done, dismissedAt}` 可重播、感知模型是否已配置（未配则给「去配置模型」而非死链）、末步三选一分流。
+  - **快乐路径可视化**：首页新增 `JourneyStepper` 三步闭环（配置模型 → 拆一本书 → 写一章并质检），基于 overview 推断每一步状态；帮助中心同源渲染，避免文案漂移。
+  - **可发现性**：命令面板（Cmd/Ctrl+K）从 11 条扩到 31 条，按「工作台 / 创作 / 资产 / 系统」分组，支持直达资产类筛选、写作对话框、分析子页签；`InlineGuide` 全量 i18n 并补齐去 AI 味 / 毒点避雷 / 平台适配 / 精华库四个子页。
+  - **写作台重组**：工坊流水线 9 个扁平 tab 在简洁模式下收敛为 3 组（创作 / 工具 / 管理），完整模式保持原序与原索引（不影响 `initialPipelineTab`）。
+
+- **对外部署能力**：
+  - 前端现在真正发送 `X-Auth-Token`（此前后端校验 `NOVEL_LAB_TOKEN`、前端却从不发送，一旦开启令牌整个界面立刻全 401，机制存在但不可用）；SSE 走 `?auth=` 查询参数。
+  - 新增 `NOVEL_LAB_HOST` 环境变量与 `--server` 启动模式（不弹浏览器、不生成握手令牌、不启用父进程看护），用于云服务器 / systemd / docker 部署。
 
 ### Fixed
-- **上传内存治理**：100MB 上传导入服务端 RSS 峰值从 3092MB 降至 431.5MB。
-  - `gui/router.py`：multipart 解析器重写为纯 bytes 边界扫描（替代 stdlib `email`，后者实测 10 倍瞬时放大）；缺 boundary/截断 body 返回 400（19 例回归）。
-  - `scripts/metrics.py`：`compute_metrics` 流式化——`char_ttr` 改唯一字符集+计数器（旧 33M 字符 list 约 1.6GB），句子统计改 `finditer` 单遍（旧 310 万句子 list），`bigram_freq` 改 zip 配对；与旧实现全量 JSON 数值一致性校验通过（7 例新回归锁定内存上界）。
-  - `gui/server.py` / `gui/services.py`：上传缓冲落盘后释放、metrics 算完后释放正文 str，避免导入期内存叠加。
-- **空库 Onboarding**：首访空库弹出三步引导向导（可跳过，刷新不再出现），`E2E_EMPTY_LIBRARY=1` 独立隔离 E2E 2/2；修复隔离脚本 rsync 非锚定 `--exclude='assets/'` 误伤 `gui/web/dist/assets/`。
-- **前端竞态收官**：`AppContext.selectChapter` sequence guard、`ResultPanel` 请求序列守卫与切章批次归零、`SettingsWorkbench` 即时校验/交叉阈值校验/保存重置刷新、Quality/Writing 状态中文化、ErrorBoundary 重试恢复（vitest 51/51）。
-- E2E 旅程新增真 UI 一键分析链路（导入→选合法题材→一键分析→`/api/analyze/full` 200 + task_id）。
-- CI：E2E 改用 `scripts/e2e_isolated.sh`（禁止在 checkout 上直接起服务），并新增空库 onboarding 第二次独立隔离调用。
-- **安装器原子升级与自动回滚**（`packaging/installer_template.sh` 重写安装/升级/卸载流程）：
-  - 覆盖升级：payload SHA-256 校验 → staging 目录解压 → 旧安装整体 `mv` 到带时间戳备份（`${PREFIX}.bak-YYYYmmdd-HHMMSS`）→ staging 原子 `mv` 切换（同文件系统 rename）→ 用户数据目录（`gui_state`、`gui/state`、`corpus`、`reports`、`config`、`novel`、`prompts/generated`）从备份搬回，原样保留；
-  - 任一步失败或装后自检失败 → 自动回滚到备份并以非零退出码退出（数据目录先搬回备份再整体搬回，不丢数据）；
-  - 卸载：残留检查——升级备份默认保留并报告、中断安装遗留的 staging 孤儿目录自动清理、启动器残留复核；`--uninstall --clean-backups` 可一并清理备份；
-  - `/tmp` 隔离实测：全新安装→升级（8 类数据哨兵全保留）→自检失败自动回滚（代码/标记/数据还原）→篡改 payload 被 SHA-256 拦截（exit=1，旧安装 untouched）→卸载残留报告→`--clean-backups` 零残留。
-- **版本统一到 2.0.1**：`gui/__init__.py`（canonical 单一真相源）、前端顶栏显示、前端 `package.json`、Windows 安装器 `build/installer.iss`、AGENTS.md §7 实测口径、前端 `dist/` 重建（含新版号）；新增 `tests/test_version_consistency.py` 锁定各处版本号一致，防漂移（`gui/admin.py::VERSION` 为管理员子系统独立版本，有意排除在外，不统一）。
-- `packaging/build_installer.sh`：传入版本与 `gui/__init__.py` 不一致时打印警告。
-- `.githooks/pre-commit`：工作区补可执行位（此前工作区为 644 导致 hook 实际无法运行；提交索引中已为 100755，保持不变）。
+
+- **向导第 3/4 步不可达**：s2 主按钮直接结束流程，4 步向导实际只有 2 步可用。
+- **「重看引导」点了没反应**：弹窗仍受「空库」条件限制，而想重看的人恰恰都有数据；现改为主动重播绕过空库判断。
+- **`--no-browser` 部署全 403**：该参数是 Electron 专用模式，会生成随机握手令牌并只在 stdout 打印，服务端部署无人消费 → 所有 `/api/*` 被拒。新增 `--server` 修正。
+- **`Date.now()` 在渲染期调用**（CI eslint `react-hooks` 规则）：`OnboardingWizard.finish()` 改 `useCallback` 明确为事件处理器。
+- **P0 输入校验**：`text_access` / `router` / `services` / `deslop_service` 共 10 处路径参数传非字符串时 `TypeError` 变 500，现统一 400 并指名参数。
+- **前端竞态**：`WritingExtras` 项目/章节/张力/黄金三章/留存/统计六类请求加序列守卫；`loadProjects` 陈旧响应不再覆盖当前选择。
+- **图表空态**：`ReaderRetentionChart` / `EmotionWaveChart` / `RhythmRadarChart` / `CreationRateChart` 在无数据时显示占位而非空白（此前 `ReaderRetentionChart` 还因缺失 `return` 导致 32 个 TS 错误）。
+- **国际化补全**：`WritingExtras` 24 处错误前缀、3 处确认框、模板标题、人物关系/留存评级/热点标签等全量双语化。
+- **数据库安全**：`_exec_sql_file` 改为逐语句执行并断言不在事务中，防止隐式提交（静默吞掉事务）。
+- **测试确定性**：修复文件 mtime 依赖导致的不稳定用例。
+
+### Changed
+
+- `AGENTS.md §7` 实测口径更新为：测试 **2332** / API 端点 **132** / 版本 **2.3.0**。
+- 前端构建产物重新分块（echarts / tiptap / markdown / virtual / writing-extras 独立 chunk），`WritingWorkbench` 主包从 213KB 降至 145KB。
 
 ### Verified
-- Python 1155 例全绿（3 跳过）。ruff 与 coverage 本轮未重跑（环境无 ruff），不沿用旧断言。
-- tsc 全清，ESLint 0 警告/错误，vitest 51/51，`npm run build` 成功。
-- Playwright：普通模式 12/12（2 onboarding 按设计跳过）+ 空库模式 2/2，均为隔离服务实测。
-- 性能（隔离复测，`docs/internal/perf_2026-09-28.json`）：100MB 上传 RSS 峰值 431.5MB（旧 3092MB）；20 并发读 p99 1035.6ms（nearest-rank）；10 并发上传 10 本全入库；超限 413；模型超时熔断正常。
-- npm audit 未完成（环境代理策略拒绝 `POST /-/npm/v1/security/audits/quick`，`policy_denied`），不记为通过。
-- **外部模型链路未实测**（无可用 LLM key，仅 mock/离线验证）。
+
+- 后端 **2332** 用例全绿（7 跳过），含口径守卫 `test_doc_metrics` 与版本一致性 `test_version_consistency`。
+- 前端 **69 套件 / 393 用例**全绿；`tsc --noEmit` 0 错误；`eslint` 0 error（7 warning）；`npm run build` 成功且 dist 已入库。
+- CI 五条腿全绿：Python 3.11 / 3.12 / 3.13（ubuntu）、Python 3.13（windows）、Web（build + lint + test + E2E + dist freshness）。
+- 真实服务冒烟：启动 `GuiServer` 后 `/`、`/api/status`、`/api/overview`、`/api/genres`、`/api/assets`、`/api/writing/projects` 全 200；首页引用的 5 个构建产物逐个 fetch 均 200（防 dist/index.html 不同步白屏）。
+- 令牌链路实测：无令牌 401 / 错误令牌 401 / 正确令牌（header 与 `?auth=` 两种）200 / 静态首页无令牌 200。
+- ⚠️ **外部模型链路未实测**（无可用 LLM key，仅 mock / 离线验证）；安装包未做代码签名，SmartScreen 会提示「未知发布者」。
 
 ## [2.0.0] - 2026-09-28（企业级加固 + 管理员系统 + 单文件安装器）
 
