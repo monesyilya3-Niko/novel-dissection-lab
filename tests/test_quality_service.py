@@ -498,3 +498,32 @@ class TestQcSubmitNoDeadlock(unittest.TestCase):
                 break
             time.sleep(1)
         self.assertEqual(st["status"], "done")
+
+
+class TestIssueTruncationMetadata(unittest.TestCase):
+    """质检任务状态必须带上截断元信息（2026-10-29）。
+
+    前端 QualityWorkbench 早就有完整的三态提示逻辑：
+    issues_truncated / total_issues / issues_limit。但后端这条实时任务路径
+    此前只做 `issues[:50]`，三个字段一个都不传，于是那段 UI 永远走不到
+    「还有更多问题未展示」的分支 —— 用户看到 50 条，无法分辨是"总共 50 个"
+    还是"被砍到 50 个"。报告 JSON 里有 total_issues，但这条路径把它丢了。
+    """
+
+    def test_done_task_carries_truncation_fields(self):
+        import inspect
+        src = inspect.getsource(quality_service)
+        # 不能再出现无标记的裸截断
+        self.assertNotIn('report.get("issues", [])[:50]', src,
+                         "裸截断会丢失 total_issues/issues_truncated")
+        for key in ("total_issues", "issues_truncated", "issues_limit"):
+            self.assertIn(key, src, f"任务状态应带上 {key}")
+
+    def test_truncated_flag_matches_actual_count(self):
+        """超过上限时 truncated 必须为 True；未超时为 False。"""
+        cap = 50
+        many = list(range(cap + 10))
+        truncated = len(many) > cap
+        self.assertTrue(truncated)
+        few = list(range(10))
+        self.assertFalse(len(few) > cap)

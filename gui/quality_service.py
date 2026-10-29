@@ -582,12 +582,22 @@ def _run_qc_task(task_id: str, chapter_dir: str, voice_path: str | None,
         md_fp.write_text(markdown, encoding="utf-8")
 
         with _QUALITY_LOCK:
+            all_issues = report.get("issues", []) or []
+            # 与 scripts/book_quality.py 的截断口径保持一致：最多展示 50 条，
+            # 但必须把「真实总数」和「是否被截断」一起传出去。
+            # 2026-10-29：原先这里直接 [:50] 且不带任何标记，前端看到 50 条
+            # 无法分辨"只有 50 个问题"还是"还有更多"——报告 JSON 里有总数，
+            # 但实时任务状态这条路径把它丢了。
+            _ISSUE_CAP = 50
             _QUALITY_TASKS[task_id].update({
                 "status": "done",
                 "verdict": report.get("verdict", "?"),
                 "total_score": report.get("total_score"),
                 "layers": report.get("layers", []),
-                "issues": report.get("issues", [])[:50],
+                "issues": all_issues[:_ISSUE_CAP],
+                "total_issues": report.get("total_issues", len(all_issues)),
+                "issues_truncated": bool(report.get("issues_truncated")) or len(all_issues) > _ISSUE_CAP,
+                "issues_limit": _ISSUE_CAP,
                 "meta": report.get("meta", {}),
                 "report_json": _safe_report_rel(json_fp),
                 "report_md": _safe_report_rel(md_fp),
