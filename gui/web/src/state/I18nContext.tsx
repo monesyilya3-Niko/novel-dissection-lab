@@ -3,9 +3,7 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -48,14 +46,16 @@ export function I18nProvider({
   initialLocale?: Locale
 }) {
   const [locale, setLocaleState] = useState<Locale>(() => initialLocale ?? readStoredLocale())
-  const prevInitialLocaleRef = useRef(initialLocale)
-
-  useEffect(() => {
-    if (initialLocale && initialLocale !== prevInitialLocaleRef.current) {
-      prevInitialLocaleRef.current = initialLocale
+  // prop 变化时同步（供测试/嵌入方切换 initialLocale）。用「渲染期比对上一次的 prop」
+  // 而不是 effect + setState：后者会多渲染一帧，并被 react-hooks 判为 cascading render。
+  // 手动切换语言不受影响——该分支只在 initialLocale 这个 prop 真的变了才触发。
+  const [lastInitialLocale, setLastInitialLocale] = useState(initialLocale)
+  if (initialLocale !== lastInitialLocale) {
+    setLastInitialLocale(initialLocale)
+    if (initialLocale) {
       setLocaleState(initialLocale)
     }
-  }, [initialLocale])
+  }
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l)

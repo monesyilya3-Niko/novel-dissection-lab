@@ -887,12 +887,20 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       .filter((item): item is { chain: EssenceChain; stage: string; stageName: string } => item !== null)
   }, [chains, chapterNo])
 
-  // 加载项目列表与当前项目关联信息
+  // 加载项目列表与当前项目关联信息。
+  // 依赖 currentProject：函数内读取它判断"当前选中项是否仍然存在"。
+  // 写成 [] 会捕获首次渲染的过期闭包——项目列表刷新后即使选中项已被删除，
+  // 也不会回落到第一个项目（2026-10-29 复查确认）。
+  // 用 ref 读最新值可以保住 [] 依赖的稳定性，同时消除过期闭包。
+  const currentProjectRef = useRef(currentProject)
+  currentProjectRef.current = currentProject
+
   const loadProjects = useCallback(async () => {
     try {
       const ps = await writingApi.projects()
       setProjects(ps)
-      if (ps.length > 0 && !ps.some((p) => p.name === currentProject)) {
+      const cur = currentProjectRef.current
+      if (ps.length > 0 && !ps.some((p) => p.name === cur)) {
         setCurrentProject(ps[0].name)
       }
     } catch (e) {
@@ -953,7 +961,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     if (currentProject) {
       loadProjectData(currentProject)
     }
-  }, [currentProject])
+  }, [currentProject, loadProjectData])
 
   useEffect(() => {
     loadEssenceAssets()
@@ -1166,7 +1174,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     } finally {
       setSaving(false)
     }
-  }, [content, currentProject, chapterNo, chapterTitle])
+  }, [content, currentProject, chapterNo, chapterTitle, loadProjectData])
 
   // 快捷键支持：Ctrl+S 保存入库，Alt+N 快速开启下一章
   useEffect(() => {

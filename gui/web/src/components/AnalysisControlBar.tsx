@@ -1,5 +1,5 @@
 // 一键分析控制条：题材下拉（必填，来自 /api/genres）+ 「一键分析」按钮 + 任务状态。
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
@@ -43,24 +43,39 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
   const [genres, setGenres] = useState<string[]>([])
   const [genre, setGenre] = useState('')
   const [inferredFromFilename, setInferredFromFilename] = useState<string | null>(null)
+  // 记录已经自动推断过题材的 bookId：保证「每本书只自动填一次」，
+  // 避免重新挂载时覆盖用户手动改过的选择。
+  const autoInferredForRef = useRef<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [errorKey, setErrorKey] = useState<string | null>(null)
   const [rawError, setRawError] = useState<string | null>(null)
 
   // P0-4：题材列表来自后端注册表（与后端校验同源），必填，无"未知"默认值。
+  //
+  // 依赖说明：effect 里用到书名做题材推断，所以必须把书名纳入依赖——
+  // 只依赖 bookId 会让"同一本书改名后重新推断"失效，也是 react-hooks 报
+  // missing dependency 的原因。提取成稳定字符串避免以整个 book 对象作依赖
+  // （对象引用每次刷新都变，会导致疯狂重跑）。
+  const bookId = book?.bookId
+  const bookTitleForInfer =
+    ((book as unknown as Record<string, unknown> | undefined)?.title as string)
+    || ((book as unknown as Record<string, unknown> | undefined)?.name as string)
+    || book?.sourcePath
+    || ''
+
   useEffect(() => {
     let cancelled = false
     getGenres()
       .then((list) => {
         if (cancelled) return
         setGenres(list)
-        // WS-A3：若仍未选题材，尝试从文件名自动推断（可手动覆盖）
-        if (book) {
-          const name = (book as unknown as Record<string, unknown>).title as string
-            ?? (book as unknown as Record<string, unknown>).name as string
-            ?? ''
-          const inferred = inferGenreFromFilename(name || book.sourcePath || '', list)
+        // WS-A3：从文件名自动推断题材（可手动覆盖）。
+        // 每本书只自动填一次：否则组件重新挂载（切换工作台再回来）会把用户
+        // 手动改过的题材又覆盖回推断值——2026-10-29 复查发现的实际缺陷。
+        if (bookId && autoInferredForRef.current !== bookId) {
+          const inferred = inferGenreFromFilename(bookTitleForInfer, list)
           if (inferred) {
+            autoInferredForRef.current = bookId
             setGenre(inferred)
             setInferredFromFilename(inferred)
           }
@@ -72,7 +87,7 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
     return () => {
       cancelled = true
     }
-  }, [book?.bookId])
+  }, [bookId, bookTitleForInfer])
 
   const taskStatus: TaskStatus = status?.status ?? 'idle'
   const isRunning = taskStatus === 'running'

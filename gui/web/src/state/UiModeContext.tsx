@@ -12,7 +12,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -49,21 +48,23 @@ export function UiModeProvider({
   defaultMode?: UIMode
 }) {
   const [mode, setModeState] = useState<UIMode>(() => readStored() ?? defaultMode ?? 'simple')
-  const [isHydrated, setIsHydrated] = useState(false)
 
   // 当 overview 异步就绪后，若用户从未显式选择（无 localStorage 记录），
-  // 则跟随 App 传入的 defaultMode（新手→simple）。已有存储的偏好始终优先。
-  useEffect(() => {
-    const stored = readStored()
-    if (stored === null && defaultMode && mode !== defaultMode) {
+  // 则跟随 App 传入的 defaultMode（新手→simple）。
+  //
+  // 关键：这里**不能**把 defaultMode 写进 localStorage。推断值只是初始展示，
+  // 用户一旦自己切过一次才算显式偏好。若在此写入，新手会被永久钉在 simple，
+  // 后来即使有了书也再回不到 advanced（推断逻辑再也无法生效）。
+  // 2026-10-29 实测确认这是真实缺陷；同时该 effect 里的 setState 也是
+  // react-hooks 报的 cascading render 来由。
+  const [lastDefault, setLastDefault] = useState<UIMode | undefined>(defaultMode)
+  if (defaultMode !== lastDefault) {
+    // 渲染期同步跟随（React 官方推荐用「派生 state 比对」代替 effect + setState）
+    setLastDefault(defaultMode)
+    if (defaultMode && readStored() === null && mode !== defaultMode) {
       setModeState(defaultMode)
-      writeStorage(STORAGE_KEY, defaultMode)
     }
-  }, [defaultMode, mode])
-
-  useEffect(() => {
-    setIsHydrated(true)
-  }, [])
+  }
 
   const setMode = useCallback((m: UIMode) => {
     if (!isValidMode(m)) return
@@ -75,7 +76,10 @@ export function UiModeProvider({
     })
   }, [])
 
-  const value = useMemo<UiModeState>(() => ({ mode, setMode, isHydrated }), [mode, setMode, isHydrated])
+  const value = useMemo<UiModeState>(
+    () => ({ mode, setMode, isHydrated: true }),
+    [mode, setMode],
+  )
 
   return <UiModeContext.Provider value={value}>{children}</UiModeContext.Provider>
 }
