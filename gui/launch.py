@@ -105,6 +105,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="novel-lab GUI 启动脚本")
     parser.add_argument("--port", type=int, default=None, help="指定端口（默认 8000，占用自动 +1）")
     parser.add_argument("--no-browser", action="store_true", help="启动后不自动弹浏览器")
+    parser.add_argument(
+        "--server",
+        action="store_true",
+        help="服务端部署模式：不弹浏览器、不生成握手令牌（无 Electron 消费端），"
+             "必须配合 NOVEL_LAB_TOKEN 使用；对外监听时由 NOVEL_LAB_HOST 指定地址",
+    )
     parser.add_argument("--check", action="store_true", help="只做自检，不起服务")
     args = parser.parse_args(argv)
 
@@ -118,7 +124,9 @@ def main(argv: list[str] | None = None) -> int:
     from gui.server import GuiServer
 
     # Electron 模式（--no-browser）：生成身份握手 token，防止端口被抢占伪造。
-    handshake_token = secrets.token_urlsafe(32) if args.no_browser else None
+    # 服务端部署（--server）不生成：没有 Electron 消费端去取 stdout 里的令牌，
+    # 生成了只会让所有请求 403。服务端靠 NOVEL_LAB_TOKEN 鉴权。
+    handshake_token = secrets.token_urlsafe(32) if (args.no_browser and not args.server) else None
 
     server = GuiServer(preferred_port=args.port, handshake_token=handshake_token)
     host, port = server.start()
@@ -126,13 +134,22 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[GUI] 暮冬念春 服务已启动: {url}")
     if handshake_token:
         print(f"[GUI] 握手令牌: {handshake_token}")
+    if args.server:
+        # 服务端模式：把访问方式直接打出来，免得部署者去翻文档猜 ?auth= 怎么拼。
+        from gui import config as _cfg
+
+        if _cfg.API_TOKEN:
+            print(f"[GUI] 服务端模式：请用 {url}?auth=<NOVEL_LAB_TOKEN> 访问")
+        else:
+            print("[GUI] 警告：未设置 NOVEL_LAB_TOKEN，本服务无鉴权，仅限本机使用。")
     print("[GUI] 按 Ctrl+C 停止。")
 
     # Electron 模式：看护父进程，避免主进程被强杀后成为孤儿占锁（ELE-03）。
-    if args.no_browser:
+    # 服务端模式不做看护（父进程通常就是服务管理器，看护反而会误杀）。
+    if args.no_browser and not args.server:
         _start_parent_watchdog(server)
 
-    if not args.no_browser:
+    if not args.no_browser and not args.server:
         try:
             webbrowser.open(url)
         except Exception as exc:  # noqa: BLE001 — 弹窗失败不阻断服务。

@@ -226,14 +226,19 @@ class TestParentWatchdog(unittest.TestCase):
         """看护只在 --no-browser（Electron）下启用。
 
         浏览器直连模式（用户直接跑 python gui/launch.py）没有"父进程"概念，
-        误判会杀掉正常服务。
+        误判会杀掉正常服务。服务端模式（--server）同理：其"父进程"通常是
+        systemd / docker / supervisor 之类的服务管理器，看护会把它误判成
+        "父死"直接停机（2026-10-28 引入 --server 时一并排除）。
         """
-        # 调用点（带缩进的语句，非函数定义）必须在 if args.no_browser: 之下
+        # 调用点（带缩进的语句，非函数定义）必须在看护守卫之下
         marker = "        _start_parent_watchdog(server)"
         self.assertIn(marker, self.src,
-                      "看护未被调用（或缩进变了——应位于 if args.no_browser: 块内）")
+                      "看护未被调用（或缩进变了——应位于守卫块内）")
         idx_call = self.src.index(marker)
-        idx_guard = self.src.rindex("if args.no_browser:", 0, idx_call)
+        guard = "if args.no_browser and not args.server:"
+        self.assertIn(guard, self.src,
+                      "看护守卫必须排除 --server 模式")
+        idx_guard = self.src.rindex(guard, 0, idx_call)
         self.assertLess(idx_guard, idx_call)
 
     def test_watchdog_shuts_down_server(self):
@@ -261,6 +266,20 @@ class TestParentWatchdog(unittest.TestCase):
         self.assertIn("server.shutdown()", code,
                       "看护只打印不关服务——孤儿进程问题未解决")
         self.assertIn("daemon=True", code, "看护线程必须是 daemon")
+
+    def test_server_mode_does_not_generate_handshake_token(self):
+        """``--server`` 不得生成握手令牌。
+
+        Electron 从 stdout 解析握手令牌再传给前端；服务端部署没有这个消费端。
+        若仍生成令牌，``_check_auth`` 会要求每个 /api/* 都带
+        ``X-Handshake-Token``，而浏览器端根本拿不到——结果是整个界面 403。
+        实测过：``--no-browser`` + NOVEL_LAB_TOKEN 时所有请求 403，无法使用。
+        """
+        start = self.src.index("handshake_token = secrets.token_urlsafe(32)")
+        line_end = self.src.index("\n", start)
+        line = self.src[start:line_end]
+        self.assertIn("not args.server", line,
+                      "握手令牌生成必须排除 --server（否则服务端部署全 403）")
 
     def test_watchdog_thread_is_daemon(self):
         """看护线程必须是 daemon，否则会阻止主进程退出。"""

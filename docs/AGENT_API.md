@@ -42,8 +42,9 @@ python -m gui.server --no-browser --port 8000
 
 ## 2. 安全与鉴权体系
 
-- **单机隔离**：服务严格硬绑定 `127.0.0.1`，无公网暴露。
-- **Token 鉴权**：若设置了 `NOVEL_LAB_TOKEN`，请求必须携带请求头 `X-Auth-Token: <token>` 或查询参数 `?auth=<token>`。
+- **默认单机隔离**：默认硬绑定 `127.0.0.1`，无公网暴露。
+- **对外部署（可选）**：设 `NOVEL_LAB_HOST=0.0.0.0`（或具体网卡地址）可对外监听，但**必须同时设置 `NOVEL_LAB_TOKEN`**——否则 `_bind_port` 在启动期直接拒绝，不会带着空鉴权对外跑。默认模型无任何鉴权，靠「只有本机能连」自保，所以这个组合必须硬拦。
+- **Token 鉴权**：若设置了 `NOVEL_LAB_TOKEN`，请求必须携带请求头 `X-Auth-Token: <token>` 或查询参数 `?auth=<token>`。前端从页面 URL 的 `?auth=` 读取并自动附加到所有请求；SSE（EventSource 无法自定义头）走查询参数。
 - **CSRF 纵深防御**：非 Electron 模式下，仅拦截来自外部域名的浏览器写请求；Agent（curl/urllib/requests 等无非本地 Origin 头的脚本客户端）直接通行。
 - **管理后台安全**：
   - 基于 PBKDF2-HMAC-SHA256（200,000 轮）加密密码哈希；
