@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -484,3 +485,69 @@ class TestGenreFromFile(unittest.TestCase):
         idx = asset_index.AssetIndex(ttl_seconds=5)
         item = idx._make_item("voice", p, self._tmp)
         self.assertIsNone(item["genre"])
+
+
+class TestDefaultLimitReturnsAll(unittest.TestCase):
+    """不传 limit 必须返回全部（2026-10-29）。
+
+    原默认值是 50，导致不传 limit 的调用方静默只拿到 50 条：
+    管理后台的资产列表（router._h_admin_assets 不传 limit）在资产超过 50 个时
+    （实测 107 个）就只显示前 50 个，既不报错也没有翻页入口。
+    分页应当是调用方的显式选择，不该是默认行为。
+
+    隔离纪律（AGENTS.md §4）：路径常量必须**成对** patch，DB_PATH 是
+    STATE_ROOT 的导入期快照，漏掉它会读到真实库（本测试第一版就踩了这个坑，
+    读到真实库里的 8 个资产而不是夹具的 60 个）。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from gui import db
+        cls._db = db
+        cls._tmp = Path(tempfile.mkdtemp(prefix="assetlimit_qa_"))
+        cls._orig = {k: getattr(config, k) for k in (
+            "ASSETS_ROOT", "REPORTS_DIR", "CORPUS_DIR",
+            "STATE_ROOT", "DB_PATH", "LOCK_PATH", "STATE_JSON_DIR")}
+        config.ASSETS_ROOT = cls._tmp / "assets"
+        config.REPORTS_DIR = cls._tmp / "reports"
+        config.CORPUS_DIR = cls._tmp / "corpus"
+        config.STATE_ROOT = cls._tmp / "gui_state"
+        config.DB_PATH = config.STATE_ROOT / "index.db"
+        config.LOCK_PATH = config.STATE_ROOT / ".lock"
+        config.STATE_JSON_DIR = cls._tmp / "gui_state"
+        config.ASSETS_ROOT.mkdir(parents=True)
+        config.REPORTS_DIR.mkdir()
+        config.CORPUS_DIR.mkdir()
+        config.STATE_ROOT.mkdir(parents=True)
+        # 造 60 张卡，超过旧的 50 默认上限
+        for i in range(60):
+            (config.ASSETS_ROOT / f"book{i:02d}-voice-card.json").write_text(
+                json.dumps({"meta": {"source_title": f"book{i}", "genre": "xianxia"}},
+                           ensure_ascii=False), encoding="utf-8")
+        db._reset_conn()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._db.close()
+        for k, v in cls._orig.items():
+            setattr(config, k, v)
+        cls._db._reset_conn()
+        import shutil
+        shutil.rmtree(cls._tmp, ignore_errors=True)
+
+    def test_default_returns_all_items(self):
+        from gui.asset_index import AssetIndex
+        idx = AssetIndex()
+        idx.invalidate()
+        res = idx.list_assets("voice")
+        self.assertEqual(res["total"], 60)
+        self.assertEqual(len(res["items"]), 60,
+                         "不传 limit 应返回全部，而不是静默截断到 50")
+
+    def test_explicit_limit_still_paginates(self):
+        from gui.asset_index import AssetIndex
+        idx = AssetIndex()
+        idx.invalidate()
+        res = idx.list_assets("voice", limit=20)
+        self.assertEqual(res["total"], 60)
+        self.assertEqual(len(res["items"]), 20, "显式 limit 仍须分页")

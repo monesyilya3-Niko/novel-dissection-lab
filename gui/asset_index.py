@@ -730,12 +730,18 @@ class AssetIndex:
     # ------------------------------------------------------------------
 
     def list_assets(self, kind: str | None = None, genre: str | None = None,
-                    book_id: str | None = None, offset: int = 0, limit: int = 50) -> dict[str, Any]:
+                    book_id: str | None = None, offset: int = 0,
+                    limit: int | None = None) -> dict[str, Any]:
         """资产清单分页。kind/genre/book_id 可选，缺省返回全部。
 
         兼容旧签名 ``list_assets(kind, offset, limit)``（阶段一测试/调用方）：当第 2、3
         个位置参数均为 int（而非 genre/book_id 字符串）时，视为旧式调用并平移
         ``offset``/``limit``。
+
+        ``limit=None``（默认）表示"要全部"，内部仍受 500 条硬上限约束。
+        2026-10-29 变更：原默认值是 50，导致**不传 limit 的调用方静默只拿到 50 条**
+        —— 管理后台的资产列表就这么把 107 个资产截断成 50 个，既不报错也不可翻页。
+        分页应当是调用方的显式选择，不该是默认行为。
 
         Returns:
             {"total": int, "items": [AssetItem, ...]}
@@ -748,7 +754,8 @@ class AssetIndex:
         if kind is not None and kind not in _ALL_KINDS:
             raise ValueError(f"未知资产类型: {kind}")
         offset = max(0, int(offset))
-        limit = max(1, min(int(limit), 500))
+        # None = 全量（仍受 500 硬上限保护，避免一次拉爆内存/响应体）
+        limit = 500 if limit is None else max(1, min(int(limit), 500))
 
         if self._db_ready():
             return self._list_from_db(kind, genre, book_id, offset, limit)

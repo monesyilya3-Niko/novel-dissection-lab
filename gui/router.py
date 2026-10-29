@@ -1033,7 +1033,16 @@ def _h_admin_book_delete(params: dict[str, Any], _body: dict[str, Any]) -> dict[
 def _h_admin_assets(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     kind = params.get("kind") or None
     genre = params.get("genre") or None
-    return ok(services.list_assets(kind=kind, genre=genre))
+    # 管理后台需要看到**全部**资产：此前不传 limit，落到 list_assets 的默认 50，
+    # 于是资产超过 50 个时（2026-10-29 实测 107 个）后台列表静默截断，
+    # 管理员既看不到剩余资产、也无从翻页（该端点没有 offset 参数）。
+    # 这里显式取满上限（list_assets 内部 clamp 到 500），保留分页参数以备将来。
+    try:
+        offset = int(params.get("offset", "0") or "0")
+        limit = int(params.get("limit", "500") or "500")
+    except ValueError as exc:
+        raise ServiceError("offset/limit 必须为整数", 400) from exc
+    return ok(services.list_assets(kind=kind, genre=genre, offset=offset, limit=limit))
 
 
 def _h_admin_asset_delete(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
