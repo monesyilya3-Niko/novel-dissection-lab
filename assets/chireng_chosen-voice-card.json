@@ -33,6 +33,13 @@
     "source_fingerprint": {
       "pass2_character.json": "cd749524e599957c",
       "pass3_style.json": "52365d5a5a89012d"
+    },
+    "quantitative_source": {
+      "method": "metrics.compute() on full source text",
+      "computed_at": "2026-10-29",
+      "source_chars": 26363,
+      "sentence_count": 1407,
+      "paragraph_count": 1063
     }
   },
   "narration": {
@@ -40,12 +47,16 @@
     "pov_switch_rule": "",
     "tense_feel": "贴身跟随主角，几乎无叙述者介入",
     "sentence_rhythm": {
-      "avg_length": 0,
-      "short_ratio": 0,
-      "long_ratio": 0,
+      "avg_length": 17.93,
+      "short_ratio": 0.4662,
+      "long_ratio": 0.0718,
       "burst_pattern": "主要用于人物对话中的情绪强调和互动反应，如边炀的命令语气（‘把脑袋给我露出来！’）、唐雨的结结巴巴回应。"
     },
-    "paragraph": {},
+    "paragraph": {
+      "avg_lines": 1.32,
+      "chars_per_para": 24.8,
+      "single_line_para_ratio": 0.907
+    },
     "chapter_opening_patterns": [
       {
         "pattern": "场景白描",

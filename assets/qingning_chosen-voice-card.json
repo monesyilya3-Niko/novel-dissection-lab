@@ -33,6 +33,13 @@
     "source_fingerprint": {
       "pass2_character.json": "16ddd24ac94f9a69",
       "pass3_style.json": "a6e396a3b6ffc80a"
+    },
+    "quantitative_source": {
+      "method": "metrics.compute() on full source text",
+      "computed_at": "2026-10-29",
+      "source_chars": 35714,
+      "sentence_count": 1186,
+      "paragraph_count": 547
     }
   },
   "narration": {
@@ -40,12 +47,16 @@
     "pov_switch_rule": "",
     "tense_feel": "贴身跟随主角感官，叙述者几乎不介入",
     "sentence_rhythm": {
-      "avg_length": 0,
-      "short_ratio": 0,
-      "long_ratio": 0,
+      "avg_length": 29.15,
+      "short_ratio": 0.3314,
+      "long_ratio": 0.2901,
       "burst_pattern": "叙述性段落句长稳定（平均29字），用于背景与内心铺陈。情绪或动作爆发点依赖【短句/单句成段】（如“她的心猛地一跳”、“是的，她怀孕了”），形成节奏顿挫。"
     },
-    "paragraph": {},
+    "paragraph": {
+      "avg_lines": 2.17,
+      "chars_per_para": 65.3,
+      "single_line_para_ratio": 0.4
+    },
     "chapter_opening_patterns": [
       {
         "pattern": "场景白描",

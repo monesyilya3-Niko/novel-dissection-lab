@@ -1040,3 +1040,40 @@ class TestRenderReadable(unittest.TestCase):
         self.assertEqual(len(bline), 1)
         self.assertIn("缺「爽点密度（每章）」", bline[0])
         self.assertNotIn("payoff_density", bline[0])
+
+
+class TestPlaceholderZeroNotDistilled(unittest.TestCase):
+    """占位零值不得被聚合进蒸馏规则（2026-10-29 数据污染修复）。
+
+    实测事故：campus-redemption 4 本书的 narration.sentence_rhythm.avg_length 全为 0
+    （assemble 未接 metrics 导致的数据断流），蒸馏把它们聚合成一条
+    「平均句长 = 0」的 hard 规则、books_count=4，再注入写作提示词，
+    等于指导模型写零长句子。渲染层早就有 _ZERO_MEANS_MISSING 跳过，
+    但聚合层没跳过，污染因此留在 JSON 里并被下游消费。
+    """
+
+    def test_all_zero_yields_empty_rule(self):
+        vals = dict.fromkeys(("book_a", "book_b", "book_c", "book_d"), 0)
+        rule = CORE._aggregate_field(
+            "voice-card", "narration.sentence_rhythm.avg_length",
+            vals, list(vals), "median",
+        )
+        self.assertIsNone(rule.value, "全 0 不得产出 0 值规则")
+        self.assertEqual(rule.books_count, 0)
+        self.assertNotEqual(rule.kind, "hard", "不能标成跨书一致的硬规则")
+
+    def test_real_values_still_aggregated(self):
+        vals = {"a": 20.0, "b": 22.0, "c": 24.0}
+        rule = CORE._aggregate_field(
+            "voice-card", "narration.sentence_rhythm.avg_length",
+            vals, list(vals), "median",
+        )
+        self.assertEqual(rule.value, 22)
+        self.assertEqual(rule.books_count, 3)
+
+    def test_zero_in_other_fields_is_kept(self):
+        """非占位字段的 0 是有效测量（例如对话占比 0），不得过滤。"""
+        self.assertFalse(
+            CORE._is_placeholder_zero("dialogue.dialogue_ratio", 0),
+            "白名单之外的字段，0 应视为真实值",
+        )

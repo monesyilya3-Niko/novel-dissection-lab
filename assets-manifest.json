@@ -1,30 +1,40 @@
 {
   "version": "2.3.0",
-  "generated_at": "2026-10-14T08:20:47.224042-07:00",
+  "generated_at": "2026-10-29T11:31:45.898892-07:00",
   "files": {
     "campus-redemption-commercial-obs-distilled.json": {
-      "sha256": "d0f053c82318c2e5ea10371e76ee739bb49656bedcd416f25bec9160a650af85",
-      "previous_hashes": []
+      "sha256": "9e15efac128e669657d025928dcdd6fa9ffaac5b989ef39ea151f01edfff584a",
+      "previous_hashes": [
+        "d0f053c82318c2e5ea10371e76ee739bb49656bedcd416f25bec9160a650af85"
+      ]
     },
     "campus-redemption-craft-card-distilled.json": {
-      "sha256": "24dd8d2f743c83ddbc5a6d4e015b416f44cb4412367ea32c01f00c96e991fe31",
-      "previous_hashes": []
+      "sha256": "2500cece2e5f798f98cc993e5daf0e9826e8e1f023b951b1e986b1c1ace5e292",
+      "previous_hashes": [
+        "24dd8d2f743c83ddbc5a6d4e015b416f44cb4412367ea32c01f00c96e991fe31"
+      ]
     },
     "campus-redemption-genre-pack.json": {
       "sha256": "4ce7a88f531ea1d319235a24882a70fb382656a9b1ef06a685205f268fff9985",
       "previous_hashes": []
     },
     "campus-redemption-structure-obs-distilled.json": {
-      "sha256": "5ed07becaf4196c069241ed0f374e1585cc34c722301f2297cefd30fdf0053d7",
-      "previous_hashes": []
+      "sha256": "9ca9eab4d58058679afe6ec7b057f86cfadca51af938fb938e6c2a19cd70c2b7",
+      "previous_hashes": [
+        "5ed07becaf4196c069241ed0f374e1585cc34c722301f2297cefd30fdf0053d7"
+      ]
     },
     "campus-redemption-voice-card-distilled.json": {
-      "sha256": "b4753f3d192bee7afe791dc7bcb3cb1081cd2b6168f4b512dd0fb66e82361f6b",
-      "previous_hashes": []
+      "sha256": "07fd98a91e89fba1eca5edb2bd35106cda894053a4068888c9ec9c545596ef2f",
+      "previous_hashes": [
+        "b4753f3d192bee7afe791dc7bcb3cb1081cd2b6168f4b512dd0fb66e82361f6b"
+      ]
     },
     "character-library.json": {
-      "sha256": "8acb17f2fdbfced2a9dbb5ba23f198c94060c28223c408be805567cf01b254cd",
-      "previous_hashes": []
+      "sha256": "f1ba4083f3848ee9570143c7e9e1ada000d6bb28f9e23402b9b3c7e1d3411c0d",
+      "previous_hashes": [
+        "8acb17f2fdbfced2a9dbb5ba23f198c94060c28223c408be805567cf01b254cd"
+      ]
     },
     "chireng_chosen-commercial-obs.json": {
       "sha256": "aa00313dddf2db51227b84a033df2b93537eed3f5c0435afde40223c629dffdd",
@@ -39,12 +49,16 @@
       "previous_hashes": []
     },
     "chireng_chosen-voice-card.json": {
-      "sha256": "3c6a54dc5b3edc2f25cb5382e83b1d789ca35b5eb801ca7d19450a6f4561d363",
-      "previous_hashes": []
+      "sha256": "0c914b926eed0e10f25a5aeb7b61d7839e9bbcf7624ba208b58e8e0e63f35184",
+      "previous_hashes": [
+        "3c6a54dc5b3edc2f25cb5382e83b1d789ca35b5eb801ca7d19450a6f4561d363"
+      ]
     },
     "dialogue-library.json": {
-      "sha256": "daae3847f7e9a63f4e33d05f98ad22dae19c9d8fa3bb0472a814e878329a20c3",
-      "previous_hashes": []
+      "sha256": "3a43751ca12ccc953d413da963122e156b15fb8d02661e6bc2f5e4f61d894705",
+      "previous_hashes": [
+        "daae3847f7e9a63f4e33d05f98ad22dae19c9d8fa3bb0472a814e878329a20c3"
+      ]
     },
     "dianjing-genre-pack.json": {
       "sha256": "f7d384912e22b4066ab39e23b55a02b5b3a2c16c270d9324ad70471d94d2f7e2",
@@ -79,8 +93,10 @@
       "previous_hashes": []
     },
     "emotion-library.json": {
-      "sha256": "9aeceeec96c654a2b7482e2ba00941f5b07abcc20eabe4b43713137ace44bc22",
-      "previous_hashes": []
+      "sha256": "30ac5a373d85cb752335f532caa55f0a262df1289d508017b8d8e636ee3928ae",
+      "previous_hashes": [
+        "9aeceeec96c654a2b7482e2ba00941f5b07abcc20eabe4b43713137ace44bc22"
+      ]
     },
     "genre-prose-card-genre-dianjing.json": {
       "sha256": "755a0b1c34adc2e3c066988bd3edf0837a098df0932d6676bff18faa08b0937f",
@@ -345,8 +361,10 @@
       "previous_hashes": []
     },
     "Lord_of_the_Mysteries-voice-card.json": {
-      "sha256": "f3351dfa0fd1b6edc22cb84cdf7b0d91089cff35fb5033f6989a5fc979da0950",
-      "previous_hashes": []
+      "sha256": "f26a8733cda8cc7da17c203195f5128d9e890f0554f5fdee4a4948a423ea5570",
+      "previous_hashes": [
+        "f3351dfa0fd1b6edc22cb84cdf7b0d91089cff35fb5033f6989a5fc979da0950"
+      ]
     },
     "qingning_chosen-commercial-obs.json": {
       "sha256": "92bc9218392c1e94eec46313c12cedeacb20c61ccfd3cc8198399d01d790584e",
@@ -361,8 +379,10 @@
       "previous_hashes": []
     },
     "qingning_chosen-voice-card.json": {
-      "sha256": "c7b5db5f16160cd683df444a555978dfcaf9767efdfe5f2dd80e70a3cf3656ad",
-      "previous_hashes": []
+      "sha256": "aa5217c32264f59413b07a9ea4738ec5db981d08587be067b0e68a6ba58c5d5c",
+      "previous_hashes": [
+        "c7b5db5f16160cd683df444a555978dfcaf9767efdfe5f2dd80e70a3cf3656ad"
+      ]
     },
     "realistic-romance-genre-pack.json": {
       "sha256": "d7b3ef1fa52e3654d3c68ee00f0525b7a8b61e54b586a079a596815fdd94e0ca",
@@ -381,12 +401,16 @@
       "previous_hashes": []
     },
     "sangshi_chosen-voice-card.json": {
-      "sha256": "be45d5c756cbc05d73710d4861e31d25b1e9820040ef7a53092c640d2ffbd4ea",
-      "previous_hashes": []
+      "sha256": "d8349b99582abecf799612c429448d516abc55f6d1106fae27be01ab8fad2b99",
+      "previous_hashes": [
+        "be45d5c756cbc05d73710d4861e31d25b1e9820040ef7a53092c640d2ffbd4ea"
+      ]
     },
     "shuangdian-library.json": {
-      "sha256": "aaa871eb18a0c2b9500316534a71ff2f0ad9f8ce46c58b933f7112f1ec4d4d22",
-      "previous_hashes": []
+      "sha256": "aaec078410ef36c3bd613e7f21119c629a202f63cd56722df8e4383c58c2d84b",
+      "previous_hashes": [
+        "aaa871eb18a0c2b9500316534a71ff2f0ad9f8ce46c58b933f7112f1ec4d4d22"
+      ]
     },
     "suyixinjian_chosen-commercial-obs.json": {
       "sha256": "d63af4ac886ad42c842e04317fdfe3dbcce4bde5a19c8edee39a24e5e8d48713",
@@ -401,8 +425,10 @@
       "previous_hashes": []
     },
     "suyixinjian_chosen-voice-card.json": {
-      "sha256": "10d3395e5cb9c2e0e876f77adc8e4d565d817a11953540cdcfa668ef0acd4dbd",
-      "previous_hashes": []
+      "sha256": "61361cf4b170974d5d44ab8328a8c3a546ff3486b6a65c9ae6386a43cf2d0a06",
+      "previous_hashes": [
+        "10d3395e5cb9c2e0e876f77adc8e4d565d817a11953540cdcfa668ef0acd4dbd"
+      ]
     },
     "taboo-library.json": {
       "sha256": "ccac1d9cc254d7543e405cb3574bc27816a9d80f738a3738e5d09a1979185577",
@@ -419,8 +445,10 @@
       ]
     },
     "world-library.json": {
-      "sha256": "619a087e7fe82d7645a4d557e37ef8f0c1e22ec5be1cc8164a75e2ed8b1d6a0f",
-      "previous_hashes": []
+      "sha256": "61c7696f2f66e13d9509cf79dc78252225a16ad78c85db247abd498627f196a8",
+      "previous_hashes": [
+        "619a087e7fe82d7645a4d557e37ef8f0c1e22ec5be1cc8164a75e2ed8b1d6a0f"
+      ]
     },
     "xianxia-genre-pack.json": {
       "sha256": "0872ad08447f9b172b1849101f75188ba2c36f4f3777b200fc20c368e440fa67",
@@ -457,13 +485,16 @@
       "previous_hashes": []
     },
     "暮冬念春-voice-card.json": {
-      "sha256": "f408265b5997cb80672d2ca581de84c85cc326f84f40717ee62a22f0e842cd51",
-      "previous_hashes": []
+      "sha256": "0e37d1754beb2b47ab8adb3d4bde41a5da86d7ed306ea91dcfbd6670d81fc430",
+      "previous_hashes": [
+        "f408265b5997cb80672d2ca581de84c85cc326f84f40717ee62a22f0e842cd51"
+      ]
     },
     "通用-现实言情-voice-card.json": {
-      "sha256": "4351c738ae2b017ce086549dc5b60372f8ce4ce167049e4f0cf139d219b7d3c4",
+      "sha256": "1b6359a0d63ee6938247ee01dd70248427d99962335918f7c654f76a4a660a27",
       "previous_hashes": [
-        "47dbdc48e4e40f6ea6e1be24c169d5435f529c364b22182810b2999807311fc4"
+        "47dbdc48e4e40f6ea6e1be24c169d5435f529c364b22182810b2999807311fc4",
+        "4351c738ae2b017ce086549dc5b60372f8ce4ce167049e4f0cf139d219b7d3c4"
       ]
     }
   }

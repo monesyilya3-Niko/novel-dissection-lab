@@ -596,3 +596,65 @@ class TestValidateCLIAndDataInterface(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestVoiceCardPlaceholderZero(unittest.TestCase):
+    """声线卡「量化字段全是占位 0」的校验分级（2026-10-29）。
+
+    背景：内置 7 张声线卡的 sentence_rhythm 三项恒为 0、paragraph 为空，
+    却带着 confidence 0.9 一路通过旧校验（旧实现只查"是不是数字"）。
+    真实原因是 assemble 没把 metrics 算出的句长接进卡里（数据断流）。
+
+    处置原则：
+    - 定性可用但量化缺失 → WARN（内置资产现状，不能判死让产品自带卡全红）
+    - 同时 confidence 仍标得很高 → ERR（这才是"谎报数据"，会误导注入与用户）
+    """
+
+    def _card(self, conf=0.3, gap=False):
+        meta = {
+            "source_title": "测试书", "genre": "campus-redemption",
+            "extracted_at": "2026-10-29", "sample_chapters": [1, 2, 3],
+            "confidence": conf, "human_reviewed": False,
+        }
+        if gap:
+            meta["quantitative_gap"] = "三项均未统计"
+        return {
+            "meta": meta,
+            "narration": {
+                "pov": "第三人称限知",
+                "sentence_rhythm": {
+                    "avg_length": 0, "short_ratio": 0, "long_ratio": 0,
+                    "burst_pattern": "连续三轮无引导语短问答",
+                },
+                "paragraph": {},
+            },
+            "dialogue": {"dialogue_ratio": 0.15, "character_voices": [
+                {"name": "主角", "role": "主角",
+                 "speech_signature": {"refusal_pattern": "移开视线"}}]},
+            "emotion_handling": {"mode": "动作外化式"},
+            "banned": {"never_used_words": ["绝对"]},
+            "imagery": {"high_freq_metaphor_domains": ["霜雪"]},
+            "provenance": {"contains_verbatim": False},
+        }
+
+    def test_all_zero_rhythm_with_honest_confidence_is_warn(self):
+        validate.reset()
+        validate.validate_voice_card(self._card(conf=0.3, gap=True))
+        self.assertEqual(validate.ERRORS, [], "定性可用的空壳卡不应判硬错误")
+        self.assertTrue(any("三项全为 0" in w for w in validate.WARNS))
+
+    def test_all_zero_rhythm_with_high_confidence_is_error(self):
+        validate.reset()
+        validate.validate_voice_card(self._card(conf=0.9))
+        self.assertTrue(
+            any("confidence" in e for e in validate.ERRORS),
+            "三项全 0 却标 confidence 0.9 必须报错——这是数据可靠性被高估",
+        )
+
+    def test_single_zero_is_not_flagged(self):
+        """单项为 0 可能是真实值（例如全对白章节长句比例就是 0），不得误伤。"""
+        validate.reset()
+        card = self._card(conf=0.9)
+        card["narration"]["sentence_rhythm"]["avg_length"] = 18.5
+        validate.validate_voice_card(card)
+        self.assertEqual(validate.ERRORS, [])

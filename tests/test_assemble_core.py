@@ -387,3 +387,44 @@ class TestAssembleCLIWorkflow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBackfillRhythm(unittest.TestCase):
+    """narration 数值字段以实测指标为准（2026-10-29 数据断流修复）。
+
+    旧实现把 LLM 输出的 narration 原样透传，pass3 只给定性描述时
+    sentence_rhythm 三项恒为 0、paragraph 恒为 {}，8 张内置声线卡全是空壳。
+    这些数值 metrics.compute() 本来就算得出来，不该交给 LLM 猜。
+    """
+
+    def test_backfills_from_metrics(self):
+        narr = {
+            "sentence_rhythm": {"avg_length": 0, "short_ratio": 0, "long_ratio": 0,
+                                "burst_pattern": "保留我"},
+            "paragraph": {},
+        }
+        metrics = {
+            "avg_sentence_len": 22.5, "short_ratio": 0.31, "long_ratio": 0.12,
+            "sentence_count": 500, "paragraph_count": 100, "total_chars": 20000,
+        }
+        out = assemble._backfill_rhythm(narr, metrics)
+        sr = out["sentence_rhythm"]
+        self.assertEqual(sr["avg_length"], 22.5)
+        self.assertEqual(sr["short_ratio"], 0.31)
+        self.assertEqual(sr["long_ratio"], 0.12)
+        self.assertEqual(sr["burst_pattern"], "保留我", "定性描述不得被覆盖")
+        self.assertEqual(out["paragraph"]["avg_lines"], 5.0)
+
+    def test_keeps_original_when_metrics_missing(self):
+        """metrics 没算出有效值时不得把原值改成 0（避免"没测"被写成"测出来是 0"）。"""
+        narr = {"sentence_rhythm": {"avg_length": 18.0, "burst_pattern": "x"}, "paragraph": {}}
+        out = assemble._backfill_rhythm(narr, {})
+        self.assertEqual(out["sentence_rhythm"]["avg_length"], 18.0)
+        self.assertNotIn("short_ratio", out["sentence_rhythm"])
+
+    def test_tolerates_non_dict_input(self):
+        # 空 narration + 有指标 → 应该被填上（有实测值就该用），不是原样返回空
+        out = assemble._backfill_rhythm({}, {"avg_sentence_len": 20})
+        self.assertEqual(out["sentence_rhythm"]["avg_length"], 20.0)
+        # metrics 非 dict 时原样返回，不得抛异常
+        self.assertEqual(assemble._backfill_rhythm({"a": 1}, "not-a-dict"), {"a": 1})

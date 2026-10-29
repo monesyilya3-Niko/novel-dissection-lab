@@ -128,10 +128,64 @@ def _sample_words(manifest: dict, metrics: dict) -> int:
     return metrics.get("total_chars", 0)
 
 
+def _backfill_rhythm(narration: dict, metrics: dict) -> dict:
+    """用确定性指标回填 narration 的句长/段落数值。
+
+    2026-10-29 修复的**数据断流**：`assemble_voice_card` 此前把 LLM 输出的
+    narration 原样透传，而 pass3 往往只给出定性描述（burst_pattern 有内容），
+    三项数值恒为 0、paragraph 恒为空字典。结果是 8 张声线卡全部是空壳，
+    其中 6 张还标着 confidence 0.9 —— 校验器只查"是不是数字"，不查"是不是 0"，
+    于是一路放行到用户手里。
+
+    这些数值不属于"需要 LLM 判断"的东西：`metrics.compute()` 在全书文本上
+    已经算出了 avg_sentence_len / short_ratio / long_ratio / paragraph_count。
+    凡是数值字段，一律以实测为准，LLM 只保留 burst_pattern 这类定性结论。
+
+    仅在 metrics 提供有效值（>0）时才覆盖，避免让"没算"变成"写成 0"。
+    """
+    if not isinstance(narration, dict) or not isinstance(metrics, dict):
+        return narration
+
+    avg = metrics.get("avg_sentence_len")
+    short = metrics.get("short_ratio")
+    long_ = metrics.get("long_ratio")
+    para_n = metrics.get("paragraph_count")
+    total_chars = metrics.get("total_chars") or 0
+
+    sr = narration.get("sentence_rhythm")
+    if not isinstance(sr, dict):
+        sr = {}
+        narration["sentence_rhythm"] = sr
+    # 只在实测值可用时回填；否则保留原值（可能是人工填过的）
+    if isinstance(avg, (int, float)) and avg > 0:
+        sr["avg_length"] = round(float(avg), 2)
+    if isinstance(short, (int, float)) and short > 0:
+        sr["short_ratio"] = round(float(short), 4)
+    if isinstance(long_, (int, float)) and long_ > 0:
+        sr["long_ratio"] = round(float(long_), 4)
+
+    para = narration.get("paragraph")
+    if not isinstance(para, dict):
+        para = {}
+        narration["paragraph"] = para
+    # 平均段长（按句计）：总句数 / 段落数需要 sentence_count，metrics 有
+    sent_n = metrics.get("sentence_count")
+    if isinstance(para_n, int) and para_n > 0 and isinstance(sent_n, int) and sent_n > 0:
+        if not para.get("avg_lines"):
+            para["avg_lines"] = round(sent_n / para_n, 2)
+    # 单句段占比需要段落级分布，metrics 未提供时留空而不是造假
+    if total_chars and not para.get("chars_per_para"):
+        para["chars_per_para"] = round(total_chars / para_n, 1) if isinstance(para_n, int) and para_n > 0 else 0
+
+    return narration
+
+
 def assemble_voice_card(name: str, genre: str, manifest: dict, metrics: dict,
                         voices: list, narration: dict, dialogue: dict,
                         emotion: dict, imagery: dict, banned: dict) -> dict:
     """组装 voice-card（接收归一化后的结构）。"""
+    # 数值字段以实测指标为准，不信 LLM 的 0 值（见 _backfill_rhythm 注释）
+    narration = _backfill_rhythm(narration, metrics)
     if voices and not dialogue.get("character_voices"):
         dialogue["character_voices"] = voices
     return {

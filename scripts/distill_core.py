@@ -1327,6 +1327,19 @@ def _aggregate_commercial(
     return rules
 
 
+# 占位零值：这些字段的 0 不代表"测出来是 0"，而是"根本没统计"。
+# 与 gui/asset_index.py 的 _ZERO_MEANS_MISSING、scripts/distill_render.py 的同名集合
+# 保持同一口径（三处必须一致，tests 有同步守卫）。
+# 2026-10-29 修复：此前只有渲染层跳过这些 0，聚合层照常把它们做成 hard 规则
+# （实测 campus-redemption 蒸馏产出「平均句长 = 0」的硬规则，且 books_count=4），
+# 注入写作提示词后会直接指导模型写零长句子。
+_ZERO_MEANS_MISSING_FIELDS = frozenset({
+    "narration.sentence_rhythm.avg_length",
+    "narration.sentence_rhythm.short_ratio",
+    "narration.sentence_rhythm.long_ratio",
+})
+
+
 def _is_empty(value: Any) -> bool:
     """判断值是否为空（None / 空串 / 空容器），视为缺失。"""
     if value is None:
@@ -1336,6 +1349,16 @@ def _is_empty(value: Any) -> bool:
     if isinstance(value, (list, tuple, dict)):
         return len(value) == 0
     return False
+
+
+def _is_placeholder_zero(field: str, value: Any) -> bool:
+    """该字段的 0 是否只是"从未统计"的占位，而非真实测量值。"""
+    return (
+        field in _ZERO_MEANS_MISSING_FIELDS
+        and isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and value == 0
+    )
 
 
 def _aggregate_field(
@@ -1356,7 +1379,10 @@ def _aggregate_field(
         * ``string-freq``：字符串频次（配合 explicit_value/count）；
         * ``string-freq-auto``：自然语言字段自动频次聚合。
     """
-    present = {b: v for b, v in book_vals.items() if not _is_empty(v)}
+    present = {
+        b: v for b, v in book_vals.items()
+        if not _is_empty(v) and not _is_placeholder_zero(field, v)
+    }
     missing_books = [b for b in books if b not in present]
     count = explicit_count if explicit_count is not None else len(present)
 

@@ -46,6 +46,9 @@ FIELD_LABELS: dict[str, str] = {
     "narration.sentence_rhythm.short_ratio": "短句占比",
     "narration.sentence_rhythm.long_ratio": "长句占比",
     "narration.sentence_rhythm.burst_pattern": "短句爆发模式",
+    "narration.paragraph.avg_lines": "平均每段句数",
+    "narration.paragraph.single_line_para_ratio": "单句成段占比",
+    "narration.paragraph.chars_per_para": "平均段长（字）",
     # voice-card · 对白
     "dialogue.dialogue_ratio": "对白占比",
     "dialogue.character_voices": "人物语言特征",

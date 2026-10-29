@@ -183,6 +183,29 @@ def validate_voice_card(d):
             for f in ("avg_length", "short_ratio", "long_ratio"):
                 if f in sr and not is_num(sr[f]):
                     err(f"应为数字，实际 {sr[f]!r}", f"narration.sentence_rhythm.{f}")
+            # 2026-10-29：原实现只校验"是不是数字"，于是 {avg_length:0, short_ratio:0,
+            # long_ratio:0} 这种「全部没算出来」的空壳能一路通过，还带着 confidence 0.9。
+            #
+            # 但这里**不能直接判硬错误**：内置资产里有 7 张卡属于"定性有效、量化缺失"
+            # （角色声线/POV/短句爆发都有，只有句长三项为 0，且原始语料已删除无法重算）。
+            # 判 ERR 会让产品自带资产全部校验失败。正确姿态是：
+            #   - 降为 WARN 并在文案里写清缺什么；
+            #   - 若同时 confidence 仍标得很高，则升级为 ERR —— 那才是真正的"谎报数据"。
+            rhythm_vals = [sr.get(f) for f in ("avg_length", "short_ratio", "long_ratio")]
+            all_zero = all(
+                v is not None and is_num(v) and float(v) == 0 for v in rhythm_vals
+            )
+            if all_zero:
+                conf = (d.get("meta") or {}).get("confidence")
+                confident = is_num(conf) and float(conf) > 0.5
+                msg = (
+                    "sentence_rhythm 三项全为 0（句长/短句/长句均未统计）；"
+                    "定性描述仍可用，但量化注入会缺失"
+                )
+                if confident:
+                    err(msg + f"，却标 confidence={conf} —— 数据可靠性被高估", "narration.sentence_rhythm")
+                else:
+                    warn(msg, "narration.sentence_rhythm")
             if not isinstance(sr.get("burst_pattern", ""), str) or len(sr.get("burst_pattern", "")) < 4:
                 warn("burst_pattern 缺失或过短——这是最能指导写作的字段", "narration.sentence_rhythm.burst_pattern")
         para = narr.get("paragraph")
@@ -190,6 +213,13 @@ def validate_voice_card(d):
             for f in ("avg_lines", "single_line_para_ratio"):
                 if f in para and not is_num(para[f]):
                     err("应为数字", f"narration.paragraph.{f}")
+            # 同上：paragraph 整块为空说明段落统计没跑。与句长同理，降为 warn
+            # （内置资产里确实是空的，且语料已不在）；仅在硬错误级别才拦的是"造假"。
+            if not para and d.get("meta", {}).get("quantitative_gap") is None:
+                warn(
+                    "narration.paragraph 为空——段落长度与单句段占比未统计",
+                    "narration.paragraph",
+                )
 
     dlg = d.get("dialogue")
     if check_obj(dlg, "dialogue"):

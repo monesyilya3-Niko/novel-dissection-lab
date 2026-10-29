@@ -38,6 +38,13 @@
     "source_fingerprint": {
       "pass2_character.json": "f3aeb864a555b5a0",
       "pass3_style.json": "36b33cbfdd9056a5"
+    },
+    "quantitative_source": {
+      "method": "metrics.compute() on full source text",
+      "computed_at": "2026-10-29",
+      "source_chars": 328658,
+      "sentence_count": 24374,
+      "paragraph_count": 10765
     }
   },
   "narration": {
@@ -45,12 +52,16 @@
     "pov_switch_rule": "",
     "tense_feel": "镜头贴在日常动作与器物表面，叙述者不解释、不抒情、不替人物下结论，情绪靠停顿与留白让出位置",
     "sentence_rhythm": {
-      "avg_length": 0,
-      "short_ratio": 0,
-      "long_ratio": 0,
+      "avg_length": 12.64,
+      "short_ratio": 0.6528,
+      "long_ratio": 0.0155,
       "burst_pattern": "两类短句爆发：①对话区连续三到五轮无引导语的极短问答互掷，用来推关系或划边界；②抒情收束前先铺一段较长排比，再用两三字短句落地，把前面的问句原样复现后作答"
     },
-    "paragraph": {},
+    "paragraph": {
+      "avg_lines": 2.26,
+      "single_line_para_ratio": 0.503,
+      "chars_per_para": 30.5
+    },
     "chapter_opening_patterns": [
       {
         "pattern": "场景白描",

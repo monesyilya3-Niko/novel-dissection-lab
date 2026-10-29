@@ -38,6 +38,13 @@
     "source_fingerprint": {
       "pass2_character.json": "8c421169bb7fa724",
       "pass3_style.json": "ff19ed2a3d584265"
+    },
+    "quantitative_source": {
+      "method": "metrics.compute() on full source text",
+      "computed_at": "2026-10-29",
+      "source_chars": 46876,
+      "sentence_count": 2882,
+      "paragraph_count": 2089
     }
   },
   "narration": {
@@ -45,12 +52,16 @@
     "pov_switch_rule": "",
     "tense_feel": "近距离、慢镜头式的凝视感，叙述贴着主角的感官走，像一部长镜头",
     "sentence_rhythm": {
-      "avg_length": 0,
-      "short_ratio": 0,
-      "long_ratio": 0,
+      "avg_length": 15.51,
+      "short_ratio": 0.5923,
+      "long_ratio": 0.0746,
       "burst_pattern": "情绪爆发（崩溃、对峙、心动）时连续使用3-5个极短句或单句成段，制造停顿与冲击；日常铺陈时句子稍长且平稳"
     },
-    "paragraph": {},
+    "paragraph": {
+      "avg_lines": 1.38,
+      "chars_per_para": 22.4,
+      "single_line_para_ratio": 0.859
+    },
     "chapter_opening_patterns": [
       {
         "pattern": "场景白描",

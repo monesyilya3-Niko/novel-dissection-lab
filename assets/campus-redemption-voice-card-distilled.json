@@ -4,7 +4,7 @@
     "schema_version": "1.0",
     "dimension": "voice-card",
     "genre": "campus-redemption",
-    "distilled_at": "2026-09-18T00:47:01",
+    "distilled_at": "2026-10-29T11:26:51",
     "source_books": [
       "chireng_chosen",
       "qingning_chosen",
@@ -140,51 +140,51 @@
       "field": "narration.sentence_rhythm.avg_length",
       "kind": "hard",
       "books_count": 4,
-      "value": 0,
+      "value": 18.42,
       "sources": [
         {
           "book": "chireng_chosen",
-          "value": 0
+          "value": 17.93
         },
         {
           "book": "qingning_chosen",
-          "value": 0
+          "value": 29.15
         },
         {
           "book": "sangshi_chosen",
-          "value": 0
+          "value": 18.91
         },
         {
           "book": "suyixinjian_chosen",
-          "value": 0
+          "value": 15.51
         }
       ],
       "evidence": [
         {
           "source_chapter": "",
           "source_book": "chireng_chosen",
-          "quote": "0",
+          "quote": "17.93",
           "confidence": 0.2,
           "dimension": "voice-card"
         },
         {
           "source_chapter": "",
           "source_book": "qingning_chosen",
-          "quote": "0",
+          "quote": "29.15",
           "confidence": 0.2,
           "dimension": "voice-card"
         },
         {
           "source_chapter": "",
           "source_book": "sangshi_chosen",
-          "quote": "0",
+          "quote": "18.91",
           "confidence": 0.2,
           "dimension": "voice-card"
         },
         {
           "source_chapter": "",
           "source_book": "suyixinjian_chosen",
-          "quote": "0",
+          "quote": "15.51",
           "confidence": 0.2,
           "dimension": "voice-card"
         }
@@ -200,51 +200,51 @@
       "field": "narration.sentence_rhythm.short_ratio",
       "kind": "hard",
       "books_count": 4,
-      "value": 0,
+      "value": 0.501,
       "sources": [
         {
           "book": "chireng_chosen",
-          "value": 0
+          "value": 0.4662
         },
         {
           "book": "qingning_chosen",
-          "value": 0
+          "value": 0.3314
         },
         {
           "book": "sangshi_chosen",
-          "value": 0
+          "value": 0.5358
         },
         {
           "book": "suyixinjian_chosen",
-          "value": 0
+          "value": 0.5923
         }
       ],
       "evidence": [
         {
           "source_chapter": "",
           "source_book": "chireng_chosen",
-          "quote": "0",
+          "quote": "0.4662",
           "confidence": 0.2,
           "dimension": "voice-card"
         },
         {
           "source_chapter": "",
           "source_book": "qingning_chosen",
-          "quote": "0",
+          "quote": "0.3314",
           "confidence": 0.2,
           "dimension": "voice-card"
         },
         {
           "source_chapter": "",
           "source_book": "sangshi_chosen",
-          "quote": "0",
+          "quote": "0.5358",
           "confidence": 0.2,
           "dimension": "voice-card"
         },
         {
           "source_chapter": "",
           "source_book": "suyixinjian_chosen",
-          "quote": "0",
+          "quote": "0.5923",
           "confidence": 0.2,
           "dimension": "voice-card"
         }
@@ -260,51 +260,51 @@
       "field": "narration.sentence_rhythm.long_ratio",
       "kind": "hard",
       "books_count": 4,
-      "value": 0,
+      "value": 0.1063,
       "sources": [
         {
           "book": "chireng_chosen",
-          "value": 0
+          "value": 0.0718
         },
         {
           "book": "qingning_chosen",
-          "value": 0
+          "value": 0.2901
         },
         {
           "book": "sangshi_chosen",
-          "value": 0
+          "value": 0.138
         },
         {
           "book": "suyixinjian_chosen",
-          "value": 0
+          "value": 0.0746
         }
       ],
       "evidence": [
         {
           "source_chapter": "",
           "source_book": "chireng_chosen",
-          "quote": "0",
+          "quote": "0.0718",
           "confidence": 0.2,
           "dimension": "voice-card"
         },
         {
           "source_chapter": "",
           "source_book": "qingning_chosen",
-          "quote": "0",
+          "quote": "0.2901",
           "confidence": 0.2,
           "dimension": "voice-card"
         },
         {
           "source_chapter": "",
           "source_book": "sangshi_chosen",
-          "quote": "0",
+          "quote": "0.138",
           "confidence": 0.2,
           "dimension": "voice-card"
         },
         {
           "source_chapter": "",
           "source_book": "suyixinjian_chosen",
-          "quote": "0",
+          "quote": "0.0746",
           "confidence": 0.2,
           "dimension": "voice-card"
         }
@@ -371,6 +371,186 @@
       ],
       "confidence": 0.7,
       "conflict": true,
+      "over_generalized": false,
+      "blindspot_books": []
+    },
+    {
+      "id": "voice-card-narration-paragraph-avg_lines-0001",
+      "dimension": "voice-card",
+      "field": "narration.paragraph.avg_lines",
+      "kind": "hard",
+      "books_count": 4,
+      "value": 1.4449999999999998,
+      "sources": [
+        {
+          "book": "chireng_chosen",
+          "value": 1.32
+        },
+        {
+          "book": "qingning_chosen",
+          "value": 2.17
+        },
+        {
+          "book": "sangshi_chosen",
+          "value": 1.51
+        },
+        {
+          "book": "suyixinjian_chosen",
+          "value": 1.38
+        }
+      ],
+      "evidence": [
+        {
+          "source_chapter": "",
+          "source_book": "chireng_chosen",
+          "quote": "1.32",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        },
+        {
+          "source_chapter": "",
+          "source_book": "qingning_chosen",
+          "quote": "2.17",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        },
+        {
+          "source_chapter": "",
+          "source_book": "sangshi_chosen",
+          "quote": "1.51",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        },
+        {
+          "source_chapter": "",
+          "source_book": "suyixinjian_chosen",
+          "quote": "1.38",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        }
+      ],
+      "confidence": 0.8,
+      "conflict": false,
+      "over_generalized": false,
+      "blindspot_books": []
+    },
+    {
+      "id": "voice-card-narration-paragraph-chars_per_para-0001",
+      "dimension": "voice-card",
+      "field": "narration.paragraph.chars_per_para",
+      "kind": "hard",
+      "books_count": 4,
+      "value": 27.25,
+      "sources": [
+        {
+          "book": "chireng_chosen",
+          "value": 24.8
+        },
+        {
+          "book": "qingning_chosen",
+          "value": 65.3
+        },
+        {
+          "book": "sangshi_chosen",
+          "value": 29.7
+        },
+        {
+          "book": "suyixinjian_chosen",
+          "value": 22.4
+        }
+      ],
+      "evidence": [
+        {
+          "source_chapter": "",
+          "source_book": "chireng_chosen",
+          "quote": "24.8",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        },
+        {
+          "source_chapter": "",
+          "source_book": "qingning_chosen",
+          "quote": "65.3",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        },
+        {
+          "source_chapter": "",
+          "source_book": "sangshi_chosen",
+          "quote": "29.7",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        },
+        {
+          "source_chapter": "",
+          "source_book": "suyixinjian_chosen",
+          "quote": "22.4",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        }
+      ],
+      "confidence": 0.8,
+      "conflict": false,
+      "over_generalized": false,
+      "blindspot_books": []
+    },
+    {
+      "id": "voice-card-narration-paragraph-single_line_para_ratio-0001",
+      "dimension": "voice-card",
+      "field": "narration.paragraph.single_line_para_ratio",
+      "kind": "hard",
+      "books_count": 4,
+      "value": 0.81,
+      "sources": [
+        {
+          "book": "chireng_chosen",
+          "value": 0.907
+        },
+        {
+          "book": "qingning_chosen",
+          "value": 0.4
+        },
+        {
+          "book": "sangshi_chosen",
+          "value": 0.761
+        },
+        {
+          "book": "suyixinjian_chosen",
+          "value": 0.859
+        }
+      ],
+      "evidence": [
+        {
+          "source_chapter": "",
+          "source_book": "chireng_chosen",
+          "quote": "0.907",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        },
+        {
+          "source_chapter": "",
+          "source_book": "qingning_chosen",
+          "quote": "0.4",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        },
+        {
+          "source_chapter": "",
+          "source_book": "sangshi_chosen",
+          "quote": "0.761",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        },
+        {
+          "source_chapter": "",
+          "source_book": "suyixinjian_chosen",
+          "quote": "0.859",
+          "confidence": 0.2,
+          "dimension": "voice-card"
+        }
+      ],
+      "confidence": 0.8,
+      "conflict": false,
       "over_generalized": false,
       "blindspot_books": []
     },
@@ -2071,8 +2251,8 @@
   ],
   "blindspots": [],
   "stats": {
-    "total_rules": 21,
-    "hard_rules": 20,
+    "total_rules": 24,
+    "hard_rules": 23,
     "soft_rules": 1,
     "personal_styles": 2,
     "conflicts": 9,

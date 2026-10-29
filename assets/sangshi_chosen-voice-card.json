@@ -33,6 +33,13 @@
     "source_fingerprint": {
       "pass2_character.json": "a539ebd27155d73f",
       "pass3_style.json": "a00023d7764b5514"
+    },
+    "quantitative_source": {
+      "method": "metrics.compute() on full source text",
+      "computed_at": "2026-10-29",
+      "source_chars": 33899,
+      "sentence_count": 1717,
+      "paragraph_count": 1140
     }
   },
   "narration": {
@@ -40,12 +47,16 @@
     "pov_switch_rule": "",
     "tense_feel": "贴身跟随主角感官，叙述者几乎不介入",
     "sentence_rhythm": {
-      "avg_length": 0,
-      "short_ratio": 0,
-      "long_ratio": 0,
+      "avg_length": 18.91,
+      "short_ratio": 0.5358,
+      "long_ratio": 0.138,
       "burst_pattern": "叙述段落中句长波动较大，平均句长18.91字。对话和内心活动多用短句（如“走！”、“总分”），用于制造节奏的突然变化和口语感。"
     },
-    "paragraph": {},
+    "paragraph": {
+      "avg_lines": 1.51,
+      "chars_per_para": 29.7,
+      "single_line_para_ratio": 0.761
+    },
     "chapter_opening_patterns": [
       {
         "pattern": "场景白描",
