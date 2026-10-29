@@ -2,7 +2,7 @@
  "meta": {
   "version": "1.2",
   "updated_at": "2026-09-30",
-  "total_count": 170,
+  "total_count": 176,
   "contributing_books": [
    "chireng_chosen",
    "qingning_chosen",
@@ -10522,6 +10522,323 @@
     "把等儿子换成老人想重开停了二十年的早餐摊：主角帮他圆的是手艺梦。",
     "儿子最后没回来：信被退回，但整栋楼成了爷爷的家人，遗憾但温暖。"
    ]
+  },
+  {
+   "id": "T-CR-001",
+   "name": "暴力介入·代价式救援",
+   "category": "危机",
+   "genre_scope": "campus-redemption",
+   "applicable_genres": [
+    "campus-redemption",
+    "校园",
+    "救赎"
+   ],
+   "skeleton": {
+    "setup": "主角在校园暴力现场，掌握的信息与能力都不占优，冲动介入会让自己也付出代价。",
+    "escalation": [
+     "欺凌公开发生，围观者漠视形成压力，主角的犹豫被看见。",
+     "主角以笨拙但有代价的方式介入（挡伤、挨打、留下把柄），不是碾压式英雄救美。",
+     "冲突升级到校方/家长层面，主角的介入反而带来新的麻烦。"
+    ],
+    "payoff": "被救者第一次抬头或开口，关系从「无关」变为「有账」；但代价同时落在主角身上。",
+    "aftermath": "两人都留下未解决的问题（伤口、处分、被记恨），为后续互助与救赎铺路。"
+   },
+   "abstraction_level": "structural",
+   "parameters": [
+    {
+     "name": "介入方式",
+     "options": [
+      "挡伤",
+      "举报",
+      "私下交涉",
+      "公开对峙"
+     ]
+    },
+    {
+     "name": "代价类型",
+     "options": [
+      "身体受伤",
+      "被记过",
+      "被反噬",
+      "失去声誉"
+     ]
+    }
+   ],
+   "effectiveness": {
+    "payoff_strength": 8,
+    "word_cost": 2800,
+    "reader_fatigue_risk": "medium",
+    "min_interval_chapters": 4
+   },
+   "variations": [
+    "让救援失败一次，主角反而因此获得被救者的信任",
+    "被救者自己也参与反击，两人共同承担代价"
+   ],
+   "provenance_note": "依据：仓库内 4 本校园救赎题材（chireng/qingning/sangshi/suyixinjian）蒸馏所得的真实章末钩子组合"
+  },
+  {
+   "id": "T-CR-002",
+   "name": "无声物件·相处契约",
+   "category": "情感",
+   "genre_scope": "campus-redemption",
+   "applicable_genres": [
+    "campus-redemption",
+    "校园",
+    "暗恋"
+   ],
+   "skeleton": {
+    "setup": "两人分处孤立状态，谁都不愿先开口，但存在一个可共享的日常空间（同桌、值日、同一趟车）。",
+    "escalation": [
+     "一方先放下物件（笔、橡皮、创可贴），不做解释。",
+     "另一方接受并回以物件，形成「互不追问」的默契。",
+     "物件被第三方发现或误解，默契第一次受到考验。"
+    ],
+    "payoff": "通过物件交换，两人建立起无需解释的契约感；读者获得细节层面的情感兑付。",
+    "aftermath": "契约成为后续所有关系的底色；一旦某一方停止交换，即是关系危机的信号。"
+   },
+   "abstraction_level": "structural",
+   "parameters": [
+    {
+     "name": "物件类型",
+     "options": [
+      "文具",
+      "食物",
+      "创可贴/药",
+      "作业本"
+     ]
+    },
+    {
+     "name": "考验来源",
+     "options": [
+      "同学起哄",
+      "老师介入",
+      "家长发现",
+      "误解"
+     ]
+    }
+   ],
+   "effectiveness": {
+    "payoff_strength": 6,
+    "word_cost": 1500,
+    "reader_fatigue_risk": "low",
+    "min_interval_chapters": 2
+   },
+   "variations": [
+    "把契约可视化——物件数量/位置变化成为关系刻度",
+    "第三方也送来同类物件，制造三角张力"
+   ],
+   "provenance_note": "依据：仓库内 4 本校园救赎题材（chireng/qingning/sangshi/suyixinjian）蒸馏所得的真实章末钩子组合"
+  },
+  {
+   "id": "T-CR-003",
+   "name": "创伤揭露·反向救赎",
+   "category": "危机",
+   "genre_scope": "campus-redemption",
+   "applicable_genres": [
+    "campus-redemption",
+    "救赎",
+    "成长"
+   ],
+   "skeleton": {
+    "setup": "被救者的创伤根源（原生家庭/长期霸凌）被推到明面，此前一直在救人的一方发现对方也有崩塌的痕迹。",
+    "escalation": [
+     "创伤以具体事件爆发（家暴、失联、自伤），不再是背景描述。",
+     "救人者发现自己无力解决，甚至暴露出自己的伤口。",
+     "双方的角色短暂反转：被救者反过来给出一句/一个动作，稳住对方。"
+    ],
+    "payoff": "救赎由单向变为双向；读者获得「不只是可怜」的情绪深度。",
+    "aftermath": "两人共同面对根源问题（维权、转学、治疗），把救赎落到可执行的具体路径。"
+   },
+   "abstraction_level": "structural",
+   "parameters": [
+    {
+     "name": "创伤类型",
+     "options": [
+      "原生家庭暴力",
+      "长期霸凌",
+      "丧失至亲",
+      "经济困境"
+     ]
+    },
+    {
+     "name": "反转动作",
+     "options": [
+      "一句话",
+      "一次陪伴",
+      "一个物件",
+      "共同逃离"
+     ]
+    }
+   ],
+   "effectiveness": {
+    "payoff_strength": 9,
+    "word_cost": 4000,
+    "reader_fatigue_risk": "high",
+    "min_interval_chapters": 6
+   },
+   "variations": [
+    "让创伤揭露失败，两人关系因此断裂一章再修复",
+    "第三人（老师/亲戚）介入，成为真正解决问题的外部力量"
+   ],
+   "provenance_note": "依据：仓库内 4 本校园救赎题材（chireng/qingning/sangshi/suyixinjian）蒸馏所得的真实章末钩子组合"
+  },
+  {
+   "id": "T-RR-001",
+   "name": "日常器物·创伤侧写",
+   "category": "情感",
+   "genre_scope": "realistic-romance",
+   "applicable_genres": [
+    "realistic-romance",
+    "现实言情",
+    "救赎"
+   ],
+   "skeleton": {
+    "setup": "角色处于难以言说的创伤状态（不敢回家、害怕某种声音），但拒绝直陈。",
+    "escalation": [
+     "用一个日常动作的异常暴露状态（反复擦同一处、听见某声音就僵住）。",
+     "另一方注意到但不点破，只改变自己的行为配合。",
+     "异常被第三方撞见，角色被迫解释或逃跑。"
+    ],
+    "payoff": "创伤被「看见」而非被「说出」；读者从细节自行读出重量，情绪兑付更沉。",
+    "aftermath": "配合行为成为两人关系的隐性基础；日后这个动作本身成为亲密标记。"
+   },
+   "abstraction_level": "structural",
+   "parameters": [
+    {
+     "name": "异常动作",
+     "options": [
+      "反复擦拭",
+      "僵住",
+      "绕路",
+      "沉默变长"
+     ]
+    },
+    {
+     "name": "配合方式",
+     "options": [
+      "改变路线",
+      "调低声音",
+      "留下空间",
+      "递物件"
+     ]
+    }
+   ],
+   "effectiveness": {
+    "payoff_strength": 7,
+    "word_cost": 1200,
+    "reader_fatigue_risk": "low",
+    "min_interval_chapters": 2
+   },
+   "variations": [
+    "让配合方式失效一次，暴露另一方的无力",
+    "角色主动解释一次，反而削弱张力——慎用"
+   ],
+   "provenance_note": "依据：《暮冬念春》（157 章）structure-obs 实测钩子与骨架"
+  },
+  {
+   "id": "T-RR-002",
+   "name": "信息断点·异地线索链",
+   "category": "危机",
+   "genre_scope": "realistic-romance",
+   "applicable_genres": [
+    "realistic-romance",
+    "现实言情",
+    "慢热"
+   ],
+   "skeleton": {
+    "setup": "两人被迫分离（异地、失联、家庭阻力），其中一方长期不在场。",
+    "escalation": [
+     "线索以旧址、书信、他人转述等间接方式抵达，不给即时画面。",
+     "每次线索刷新都改变一个认知（他还活着→他过得不好→他一直在找）。",
+     "线索断裂，主角误判，做出错误决定。"
+    ],
+    "payoff": "分离期由「信息刷新」替代「情感兑付」，读者靠拼图获得满足感。",
+    "aftermath": "重逢时所有碎片拼合，早期线索获得回收；误判成为必须解释的旧账。"
+   },
+   "abstraction_level": "structural",
+   "parameters": [
+    {
+     "name": "线索载体",
+     "options": [
+      "书信",
+      "旧址",
+      "他人转述",
+      "遗物"
+     ]
+    },
+    {
+     "name": "误判后果",
+     "options": [
+      "错过约定",
+      "另作选择",
+      "断绝联系"
+     ]
+    }
+   ],
+   "effectiveness": {
+    "payoff_strength": 8,
+    "word_cost": 2200,
+    "reader_fatigue_risk": "medium",
+    "min_interval_chapters": 8
+   },
+   "variations": [
+    "让线索本身是假的/被篡改，揭示有人在中间阻断",
+    "线索以倒叙方式先给结果再给过程"
+   ],
+   "provenance_note": "依据：《暮冬念春》（157 章）structure-obs 实测钩子与骨架"
+  },
+  {
+   "id": "T-RR-003",
+   "name": "自立推进·救赎落地",
+   "category": "情感",
+   "genre_scope": "realistic-romance",
+   "applicable_genres": [
+    "realistic-romance",
+    "成长",
+    "治愈"
+   ],
+   "skeleton": {
+    "setup": "创伤根源（施害者、制度障碍）仍在，主角已具备一定行动能力但尚不足对抗。",
+    "escalation": [
+     "主角用具体手段维权/求职/就医，过程笨拙且有挫败。",
+     "外部阻力升级（施害者反扑、制度推诿、经济枯竭）。",
+     "另一人以非拯救者的身份提供关键支持（信息、资源、陪伴），主角自己完成突破。"
+    ],
+    "payoff": "救赎从「被拯救」转为「自立」，读者获得成长型满足而非解气型爽感。",
+    "aftermath": "生活归于日常（复诊、买菜、走亲），救赎落到可持续的具体生活；旧物回收最早的伏笔。"
+   },
+   "abstraction_level": "structural",
+   "parameters": [
+    {
+     "name": "行动类型",
+     "options": [
+      "法律维权",
+      "职场自立",
+      "就医治疗",
+      "搬离"
+     ]
+    },
+    {
+     "name": "阻力类型",
+     "options": [
+      "施害者反扑",
+      "程序推诿",
+      "经济压力",
+      "舆论"
+     ]
+    }
+   ],
+   "effectiveness": {
+    "payoff_strength": 7,
+    "word_cost": 3500,
+    "reader_fatigue_risk": "medium",
+    "min_interval_chapters": 10
+   },
+   "variations": [
+    "让突破失败一次，主角退回原点但有新的认知",
+    "支持者撤走，主角不得不独自面对"
+   ],
+   "provenance_note": "依据：《暮冬念春》（157 章）structure-obs 实测钩子与骨架"
   }
  ]
 }

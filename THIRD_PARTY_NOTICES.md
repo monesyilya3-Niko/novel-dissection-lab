@@ -101,6 +101,28 @@
 | `assets/genre-prose-card-genre-zhongtian.json` | `genre-zhongtian` | 种田文 | 2026-09-30T01:50:00+08:00 |
 | `assets/genre-prose-card-genre-dianjing.json` | `genre-dianjing` | 电竞文 | 2026-09-30T01:50:00+08:00 |
 
+### 3.1 由仓库内拆书数据推导的题材卡（2026-10-29，2 张）
+
+这两张卡与 §3 的"AI 原创种子卡"有本质区别：**内容不是凭空写的，而是从仓库内已拆解书籍的实测数据提炼**。
+沿用同一 `provenance.source`（`novel-lab-agent-authored`）是因为它们同样不含任何第三方原文片段，
+但置信度与证据强度不同，故单列说明，避免与 seed 卡混为一谈。
+
+| 资产文件 | meta.id | 题材 | 数据来源 | 置信度 |
+| --- | --- | --- | --- | --- |
+| `assets/genre-prose-card-genre-campus-redemption.json` | `genre-campus-redemption` | 校园救赎 | 4 本已拆书蒸馏（chireng / qingning / sangshi / suyixinjian） | 0.75 |
+| `assets/genre-prose-card-genre-realistic-romance.json` | `genre-realistic-romance` | 现实言情 | 《暮冬念春》单书完整拆解（32.9 万字 / 157 章） | 0.72 |
+
+**与 seed 卡的差异**：
+
+- **置信度更高**（0.72–0.75 vs 0.4）：因为有原始语料支撑，`meta.provenance.evidence` 逐项列出实测值而非"未经实测"。
+- **量化字段可追溯**：平均句长、短句占比、单句成段率、爽点密度、伏笔跨度等均标注了具体数值与来源书目。
+- **`meta.upgrade_status = "upgraded"`**（seed 卡为 `"seed"`），表示已从"推测"升级为"有据"。
+- **单书卡有明确局限**：`realistic-romance` 仅一部样本，个别作者偏好可能被误当题材规律，
+  `evidence` 中已写明该风险；`campus-redemption` 为 4 本蒸馏，风险相对低但仍非全题材普查。
+
+**不含原文**：两卡的正文均为写作指导性描述（"写什么、怎么组织、避免什么"），
+未复述任何小说的具体情节、对白或句子。原始语料本身也不入库（见 §6）。
+
 ## 4. 修改说明
 
 上游内容进入本仓库时经过结构与语义转换，非原样复制：

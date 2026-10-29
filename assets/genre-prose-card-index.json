@@ -1,34 +1,102 @@
 {
   "_description": "题材文风卡索引：题材中文名 → id / 落库文件名。",
-  "_count": 32,
+  "_count": 48,
   "cards": {
-    "东方仙侠": {
-      "id": "genre-xianxia",
-      "file": "genre-prose-card-genre-xianxia.json"
+    "校园救赎": {
+      "id": "genre-campus-redemption",
+      "file": "genre-prose-card-genre-campus-redemption.json"
     },
-    "传统玄幻": {
-      "id": "genre-xuanhuan",
-      "file": "genre-prose-card-genre-xuanhuan.json"
+    "电竞文": {
+      "id": "genre-dianjing",
+      "file": "genre-prose-card-genre-dianjing.json"
     },
-    "历史古代": {
-      "id": "genre-lishi",
-      "file": "genre-prose-card-genre-lishi.json"
+    "都市兵王": {
+      "id": "genre-dushi-bingwang",
+      "file": "genre-prose-card-genre-dushi-bingwang.json"
     },
-    "历史脑洞": {
-      "id": "genre-lishi-naodong",
-      "file": "genre-prose-card-genre-lishi-naodong.json"
+    "都市高武": {
+      "id": "genre-dushi-gaowu",
+      "file": "genre-prose-card-genre-dushi-gaowu.json"
     },
-    "双男主": {
-      "id": "genre-shuangnan",
-      "file": "genre-prose-card-genre-shuangnan.json"
+    "都市脑洞": {
+      "id": "genre-dushi-naodong",
+      "file": "genre-prose-card-genre-dushi-naodong.json"
+    },
+    "都市日常": {
+      "id": "genre-dushi-richang",
+      "file": "genre-prose-card-genre-dushi-richang.json"
+    },
+    "都市神医": {
+      "id": "genre-dushi-shenyi",
+      "file": "genre-prose-card-genre-dushi-shenyi.json"
+    },
+    "都市系统": {
+      "id": "genre-dushi-xitong",
+      "file": "genre-prose-card-genre-dushi-xitong.json"
+    },
+    "都市修真": {
+      "id": "genre-dushi-xiuzhen",
+      "file": "genre-prose-card-genre-dushi-xiuzhen.json"
+    },
+    "都市种田": {
+      "id": "genre-dushi-zhongtian",
+      "file": "genre-prose-card-genre-dushi-zhongtian.json"
+    },
+    "宫斗宅斗": {
+      "id": "genre-gongdou",
+      "file": "genre-prose-card-genre-gongdou.json"
+    },
+    "古风世情": {
+      "id": "genre-gufeng-shiqing",
+      "file": "genre-prose-card-genre-gufeng-shiqing.json"
     },
     "古言脑洞": {
       "id": "genre-guyan-naodong",
       "file": "genre-prose-card-genre-guyan-naodong.json"
     },
-    "古风世情": {
-      "id": "genre-gufeng-shiqing",
-      "file": "genre-prose-card-genre-gufeng-shiqing.json"
+    "豪门总裁": {
+      "id": "genre-haomen-zongcai",
+      "file": "genre-prose-card-genre-haomen-zongcai.json"
+    },
+    "抗战谍战": {
+      "id": "genre-kangzhan-diezhan",
+      "file": "genre-prose-card-genre-kangzhan-diezhan.json"
+    },
+    "科幻末世": {
+      "id": "genre-kehuan-moshi",
+      "file": "genre-prose-card-genre-kehuan-moshi.json"
+    },
+    "科幻星际": {
+      "id": "genre-kehuan-xingji",
+      "file": "genre-prose-card-genre-kehuan-xingji.json"
+    },
+    "快穿": {
+      "id": "genre-kuaichuan",
+      "file": "genre-prose-card-genre-kuaichuan.json"
+    },
+    "历史穿越": {
+      "id": "genre-lishi-chuanyue",
+      "file": "genre-prose-card-genre-lishi-chuanyue.json"
+    },
+    "历史脑洞": {
+      "id": "genre-lishi-naodong",
+      "file": "genre-prose-card-genre-lishi-naodong.json"
+    },
+    "历史古代": {
+      "id": "genre-lishi",
+      "file": "genre-prose-card-genre-lishi.json"
+    },
+    "美食文": {
+      "id": "genre-meishi",
+      "file": "genre-prose-card-genre-meishi.json"
+    },
+    "民国言情": {
+      "id": "genre-minguo-yanqing",
+      "file": "genre-prose-card-genre-minguo-yanqing.json"
+    },
+    "年代": {
+      "id": "genre-niandai",
+      "file": "genre-prose-card-genre-niandai.json"
     },
     "女频悬疑": {
       "id": "genre-nvpin-xuanyi",
@@ -38,45 +106,45 @@
       "id": "genre-nvpin-zhongtian",
       "file": "genre-prose-card-genre-nvpin-zhongtian.json"
     },
-    "宫斗宅斗": {
-      "id": "genre-gongdou",
-      "file": "genre-prose-card-genre-gongdou.json"
+    "青春甜宠": {
+      "id": "genre-qingchun-tianchong",
+      "file": "genre-prose-card-genre-qingchun-tianchong.json"
     },
-    "年代": {
-      "id": "genre-niandai",
-      "file": "genre-prose-card-genre-niandai.json"
+    "青春校园": {
+      "id": "genre-qingchun-xiaoyuan",
+      "file": "genre-prose-card-genre-qingchun-xiaoyuan.json"
     },
-    "快穿": {
-      "id": "genre-kuaichuan",
-      "file": "genre-prose-card-genre-kuaichuan.json"
+    "现实言情": {
+      "id": "genre-realistic-romance",
+      "file": "genre-prose-card-genre-realistic-romance.json"
     },
-    "悬疑灵异": {
-      "id": "genre-xuanyi-lingyi",
-      "file": "genre-prose-card-genre-xuanyi-lingyi.json"
+    "双男主": {
+      "id": "genre-shuangnan",
+      "file": "genre-prose-card-genre-shuangnan.json"
     },
-    "悬疑脑洞": {
-      "id": "genre-xuanyi-naodong",
-      "file": "genre-prose-card-genre-xuanyi-naodong.json"
+    "传统武侠": {
+      "id": "genre-wuxia-chuantong",
+      "file": "genre-prose-card-genre-wuxia-chuantong.json"
     },
-    "战神赘婿": {
-      "id": "genre-zhanshen-zhuixu",
-      "file": "genre-prose-card-genre-zhanshen-zhuixu.json"
+    "无限流": {
+      "id": "genre-wuxianliu",
+      "file": "genre-prose-card-genre-wuxianliu.json"
     },
-    "抗战谍战": {
-      "id": "genre-kangzhan-diezhan",
-      "file": "genre-prose-card-genre-kangzhan-diezhan.json"
+    "东方仙侠": {
+      "id": "genre-xianxia",
+      "file": "genre-prose-card-genre-xianxia.json"
+    },
+    "现言脑洞": {
+      "id": "genre-xianyan-naodong",
+      "file": "genre-prose-card-genre-xianyan-naodong.json"
+    },
+    "西方奇幻": {
+      "id": "genre-xifang-qihuan",
+      "file": "genre-prose-card-genre-xifang-qihuan.json"
     },
     "星光璀璨": {
       "id": "genre-xingguang",
       "file": "genre-prose-card-genre-xingguang.json"
-    },
-    "民国言情": {
-      "id": "genre-minguo-yanqing",
-      "file": "genre-prose-card-genre-minguo-yanqing.json"
-    },
-    "游戏体育": {
-      "id": "genre-youxi-tiyu",
-      "file": "genre-prose-card-genre-youxi-tiyu.json"
     },
     "玄幻脑洞": {
       "id": "genre-xuanhuan-naodong",
@@ -86,49 +154,45 @@
       "id": "genre-xuanhuan-yanqing",
       "file": "genre-prose-card-genre-xuanhuan-yanqing.json"
     },
-    "现言脑洞": {
-      "id": "genre-xianyan-naodong",
-      "file": "genre-prose-card-genre-xianyan-naodong.json"
+    "传统玄幻": {
+      "id": "genre-xuanhuan",
+      "file": "genre-prose-card-genre-xuanhuan.json"
     },
-    "科幻末世": {
-      "id": "genre-kehuan-moshi",
-      "file": "genre-prose-card-genre-kehuan-moshi.json"
+    "悬疑盗墓": {
+      "id": "genre-xuanyi-daomu",
+      "file": "genre-prose-card-genre-xuanyi-daomu.json"
+    },
+    "悬疑灵异": {
+      "id": "genre-xuanyi-lingyi",
+      "file": "genre-prose-card-genre-xuanyi-lingyi.json"
+    },
+    "悬疑脑洞": {
+      "id": "genre-xuanyi-naodong",
+      "file": "genre-prose-card-genre-xuanyi-naodong.json"
+    },
+    "悬疑刑侦": {
+      "id": "genre-xuanyi-xingzhen",
+      "file": "genre-prose-card-genre-xuanyi-xingzhen.json"
+    },
+    "游戏体育": {
+      "id": "genre-youxi-tiyu",
+      "file": "genre-prose-card-genre-youxi-tiyu.json"
+    },
+    "游戏网游": {
+      "id": "genre-youxi-wangyou",
+      "file": "genre-prose-card-genre-youxi-wangyou.json"
+    },
+    "战神赘婿": {
+      "id": "genre-zhanshen-zhuixu",
+      "file": "genre-prose-card-genre-zhanshen-zhuixu.json"
     },
     "职场婚恋": {
       "id": "genre-zhichang-hunlian",
       "file": "genre-prose-card-genre-zhichang-hunlian.json"
     },
-    "西方奇幻": {
-      "id": "genre-xifang-qihuan",
-      "file": "genre-prose-card-genre-xifang-qihuan.json"
-    },
-    "豪门总裁": {
-      "id": "genre-haomen-zongcai",
-      "file": "genre-prose-card-genre-haomen-zongcai.json"
-    },
-    "都市修真": {
-      "id": "genre-dushi-xiuzhen",
-      "file": "genre-prose-card-genre-dushi-xiuzhen.json"
-    },
-    "都市日常": {
-      "id": "genre-dushi-richang",
-      "file": "genre-prose-card-genre-dushi-richang.json"
-    },
-    "都市种田": {
-      "id": "genre-dushi-zhongtian",
-      "file": "genre-prose-card-genre-dushi-zhongtian.json"
-    },
-    "都市脑洞": {
-      "id": "genre-dushi-naodong",
-      "file": "genre-prose-card-genre-dushi-naodong.json"
-    },
-    "都市高武": {
-      "id": "genre-dushi-gaowu",
-      "file": "genre-prose-card-genre-dushi-gaowu.json"
-    },
-    "青春甜宠": {
-      "id": "genre-qingchun-tianchong",
-      "file": "genre-prose-card-genre-qingchun-tianchong.json"
+    "种田文": {
+      "id": "genre-zhongtian",
+      "file": "genre-prose-card-genre-zhongtian.json"
     }
   }
 }
