@@ -4,18 +4,29 @@ name: 构建 Windows 安装包
 # 真正的 .exe 安装器只能在 Windows 上构建。本 workflow 在云端 Windows runner
 # 上跑 `npm run dist`，产物为 NSIS 安装器。
 #
-# 触发：推送到 feat/enterprise-hardening 分支即自动构建；
-# 也可在 Actions 页面手动 Run workflow（需 workflow 已合入默认分支）。
+# 触发：手动 Run workflow，或推送 v* tag（发版时自动出安装包并挂 Release）。
+#
+# 关于产物去向（2026-10-29 改造）：
+#   旧流程是「上传 artifact → 再手动跑 attach-installer 从 artifact 挂到 Release」，
+#   两步且强依赖 Actions artifact 存储。实测该存储曾因历史 89MB 安装包堆积
+#   触及账号配额（"Artifact storage quota has been hit"），整条发版链随之断开
+#   ——包能构建出来却传不上去。
+#   现改为：**构建完直接挂到 Release**（GitHub Releases 与 Actions artifact 是
+#   两套独立配额），artifact 上传降级为可选（continue-on-error），配额满时只
+#   告警不影响发版。
 
 on:
-  # 手动触发（workflow 合并进默认分支后可用）
   workflow_dispatch:
-  # 推送到本分支即自动构建安装器
+    inputs:
+      tag:
+        description: '要挂载的 Release tag（留空则只构建不上传）'
+        required: false
+        default: ''
   push:
-    branches: [feat/enterprise-hardening]
+    tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-installer:
@@ -48,7 +59,44 @@ jobs:
         # 手抄的数字立刻过期，sync_backend.py 运行时会自己打印实际数量。
         run: npm run dist
 
-      - name: 上传安装器
+      - name: 解析目标 tag
+        id: target
+        shell: pwsh
+        working-directory: .
+        run: |
+          $tag = "${{ inputs.tag }}"
+          if (-not $tag -and "${{ github.ref_type }}" -eq "tag") {
+            $tag = "${{ github.ref_name }}"
+          }
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "目标 Release tag: [$tag]"
+
+      - name: 上传到 Release
+        if: steps.target.outputs.tag != ''
+        shell: pwsh
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          # GitHub Release 资产名只支持 ASCII：中文名会被服务端剥掉
+          # （实测「暮冬念春-Setup-2.0.2-win64.exe」变成「-Setup-2.0.2-win64.exe」）。
+          # 因此上传用 ASCII 主名，中文名放进 --label 供页面显示。
+          $exe = Get-ChildItem release\*-Setup-*-win64.exe | Select-Object -First 1
+          if (-not $exe) { Write-Error "未找到安装包产物"; exit 1 }
+          $ver = "${{ github.ref_name }}".TrimStart('v')
+          if (-not $ver) { $ver = $env:TAG.TrimStart('v') }
+          $asciiName = "novel-lab-Setup-$ver-win64.exe"
+          Copy-Item $exe.FullName "release\$asciiName"
+          Write-Host "上传 $asciiName ($([math]::Round($exe.Length/1MB,1)) MB) → $env:TAG"
+          gh release upload $env:TAG "release\$asciiName" --clobber
+          Write-Host "SHA256:"
+          Get-FileHash $exe.FullName -Algorithm SHA256 | Format-List
+
+      - name: 上传安装器（artifact，可选）
+        # 配额满时不再中断发版：以上「直挂 Release」为主路径，artifact 仅作 CI 内
+        # 二次分发用（例如 attach-installer 或人工下载对比哈希）。
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: windows-installer
