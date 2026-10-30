@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import gzip
 import hmac
 import json
 import mimetypes
@@ -424,7 +425,6 @@ class _Handler(BaseHTTPRequestHandler):
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
         for k, v in (extra_headers or {}).items():
             self.send_header(k, v)
         # 【修复 M8】不再无条件返回 `Access-Control-Allow-Origin: *`。
@@ -436,8 +436,36 @@ class _Handler(BaseHTTPRequestHandler):
         if origin and self._is_same_host_origin(origin):
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
+        body = self._maybe_compress(data)
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(data)
+        self.wfile.write(body)
+
+    # 低于该体积不压缩：小响应的 gzip 头（约 20B）+ CPU 成本 > 收益。
+    _GZIP_MIN_BYTES = 1024
+
+    def _maybe_compress(self, data: bytes) -> bytes:
+        """大 JSON 响应按客户端能力 gzip。
+
+        2026-10-30：/api/tropes 返回 176 条桥段的完整骨架，实测 369KB 明文，
+        而前端打开「桥段灵感」面板就要等它。gzip 后约 1/5，且纯 CPU、
+        无额外依赖（标准库 gzip）。小响应直接跳过，避免压缩头反而变大。
+        """
+        if len(data) < self._GZIP_MIN_BYTES:
+            return data
+        accepts = (self.headers.get("Accept-Encoding") or "").lower()
+        if "gzip" not in accepts:
+            return data
+        try:
+            compressed = gzip.compress(data, compresslevel=6)
+        except Exception:  # noqa: BLE001 — 压缩失败就发明文，绝不因优化而失败
+            return data
+        # 只有确实更小才用（极少数高熵内容可能压不动）
+        if len(compressed) >= len(data):
+            return data
+        self.send_header("Content-Encoding", "gzip")
+        self.send_header("Vary", "Accept-Encoding")
+        return compressed
 
     def _handle_sse(self, query: dict) -> None:
         """SSE 长连接：订阅 broker，持续推送 progress 事件直到客户端断开。
