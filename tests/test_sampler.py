@@ -66,6 +66,47 @@ All ends well.
         self.assertEqual(chaps[3][0], "Chapter 3 The Journey")
         self.assertEqual(chaps[4][0], "CHAPTER 4 Epilogue")
 
+    def test_split_chapters_special_titles(self):
+        """楔子/番外/序章等非编号标题必须识别（2026-11-01）。
+
+        实测事故：一本「楔子 + 10 章 + 番外一」的稿子，12 段只识别出 11 章 ——
+        楔子被吞成"无标题开头"，番外被并进最后一章，拆书时章节结构失真。
+        番外/楔子/序章/尾声是网文标准结构，不能漏。
+         """
+        text = """楔子
+风起于青萍之末。
+第1章 初见
+她推门而入。
+序章
+很久以前。
+第2章 重逢
+他抬头。
+尾声
+故事结束了。
+番外一
+多年以后。
+番外二
+另一个人。
+"""
+        chaps = sampler.split_chapters(text)
+        titles = [c[0] for c in chaps]
+        self.assertEqual(titles, ["楔子", "第1章 初见", "序章", "第2章 重逢",
+                                  "尾声", "番外一", "番外二"])
+
+    def test_special_title_words_in_body_not_split(self):
+        """正文里出现"番外""楔子"字样不得误切（它们不在行首或以叙述形式出现）。"""
+        text = """第1章 开始
+他翻到番外篇的目录。
+这里提到楔子两个字。
+前言说明文字在这里。
+第2章 继续
+正文。
+"""
+        chaps = sampler.split_chapters(text)
+        self.assertEqual([c[0] for c in chaps], ["第1章 开始", "第2章 继续"])
+        self.assertIn("番外篇", chaps[0][1])
+        self.assertIn("前言说明文字", chaps[0][1])
+
     def test_split_chapters_filters_empty(self):
         text = """
 第1章 有内容
