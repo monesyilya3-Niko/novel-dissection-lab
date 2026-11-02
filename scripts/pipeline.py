@@ -75,15 +75,76 @@ def load_prompt(kind: str) -> tuple:
 # LLM 输出 → JSON（剥离 ```json 围栏 / 前后废话）
 # --------------------------------------------------------------------------
 
+def _balanced_json_span(raw: str, start: int) -> int | None:
+    """从 ``raw[start]`` 处的 ``{`` 起，找与之配对的 ``}`` 的下标。
+
+    按字符串状态扫描（识别 ``"`` 转义），因此正文里出现的花括号、
+    markdown 反引号、甚至形如 JSON 的片段都不会打乱配对。
+
+    返回配对 ``}`` 的下标；未闭合（输出被截断）时返回 None。
+    """
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(start, len(raw)):
+        ch = raw[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return i
+    return None
+
+
 def extract_json(raw: str) -> dict:
-    raw = raw.strip()
-    m = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw, re.S)
-    if m:
-        raw = m.group(1)
-    start, end = raw.find("{"), raw.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError(f"输出中找不到 JSON: {raw[:200]}")
-    return json.loads(raw[start:end + 1])
+    """从模型输出中提取第一个**完整**的 JSON 对象。
+
+    2026-11-02 重写。旧实现是
+        start, end = raw.find("{"), raw.rfind("}")
+        json.loads(raw[start:end+1])
+    有三个实测会挂的形态（本轮 pass3 在 3 次调用里挂了 2 次）：
+
+    1. 输出里出现**两个** JSON 块（先给一版再给一版）→
+       ``find("{")`` 取第一个、``rfind("}")`` 取最后一个，
+       中间夹着两块的正文 → ``Extra data``。
+    2. JSON 的字符串值里含代码块反引号 → 先用 `````json`` 正则剥壳时被贪婪
+       匹配破坏 → 内容损坏。
+    3. 结尾有额外花括号（模板串、示例片段）→ ``rfind("}")`` 落在错误的
+       括号上 → ``Extra data``。
+
+    新实现：从左到右找每个 ``{``，用括号配平（跳过字符串内部）确定它的
+    结束位置，逐个尝试解析，返回第一个能解析成 dict 的。这样上面三种
+    情况都只取到真正的第一个对象。
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        raise ValueError("输出为空，无 JSON 可提取")
+
+    # 逐个候选起点尝试。括号配平保证不会跨块拼接。
+    pos = raw.find("{")
+    while pos != -1:
+        end = _balanced_json_span(raw, pos)
+        if end is not None:
+            candidate = raw[pos:end + 1]
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+        pos = raw.find("{", pos + 1)
+
+    raise ValueError(f"输出中找不到 JSON: {raw[:200]}")
 
 
 # --------------------------------------------------------------------------

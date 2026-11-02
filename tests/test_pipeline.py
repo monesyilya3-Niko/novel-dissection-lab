@@ -520,3 +520,44 @@ class TestRunPassModelRefusal(unittest.TestCase):
         self.assertFalse(pipeline_mod._has_payload({"characters": []}))
         self.assertTrue(pipeline_mod._has_payload({"error": "x", "characters": [{"n": 1}]}))
         self.assertTrue(pipeline_mod._has_payload({"aggregate": {"k": 1}}))
+
+
+class TestExtractJsonRobustness(unittest.TestCase):
+    """JSON 提取必须容忍真实模型输出的三种形态（2026-11-02）。
+
+    实测：pass3 在 3 次调用里挂了 2 次，报 ``Extra data: line 24 column 1``。
+    旧实现是 find("{") + rfind("}") + json.loads(整段)，三种情况必挂：
+
+    1. 输出里有两个 JSON 块 → 首尾括号取自不同块，中间夹正文
+    2. JSON 字符串值里含代码块反引号 → 先按 ```json 剥壳会破坏内容
+    3. 结尾有额外花括号（模板串/示例）→ rfind 落在错误的括号上
+
+    新实现按括号配平（跳过字符串内部）逐个候选起点尝试解析。
+    """
+
+    def test_two_json_blocks_returns_first(self):
+        raw = '分析如下\n```json\n{"a": 1}\n```\n\n补充说明\n\n```json\n{"b": 2}\n```'
+        self.assertEqual(pipeline_mod.extract_json(raw), {"a": 1})
+
+    def test_backticks_inside_string_value_survive(self):
+        payload = {"code": "```py\nprint(1)\n```", "x": 2}
+        raw = json.dumps(payload, ensure_ascii=False)
+        self.assertEqual(pipeline_mod.extract_json(raw), payload)
+
+    def test_trailing_braces_ignored(self):
+        raw = '{"a": {"b": 1}} 以上 {不是JSON}'
+        self.assertEqual(pipeline_mod.extract_json(raw), {"a": {"b": 1}})
+
+    def test_preamble_and_epilogue(self):
+        raw = '# 文风分析报告\n\n说明文字\n\n{"k": "v"}\n\n以上是结果。'
+        self.assertEqual(pipeline_mod.extract_json(raw), {"k": "v"})
+
+    def test_truncated_json_raises(self):
+        """被截断的输出不能返回半个对象。"""
+        with self.assertRaises(ValueError):
+            pipeline_mod.extract_json('{"a": 1, "b":')
+
+    def test_non_dict_json_rejected(self):
+        """顶层是数组/标量时不算合格的 pass 输出。"""
+        with self.assertRaises(ValueError):
+            pipeline_mod.extract_json('[1, 2, 3]')
