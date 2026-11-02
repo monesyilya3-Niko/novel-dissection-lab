@@ -22,7 +22,7 @@
     "逆袭",
     "重生",
     "职场",
-    "仙侠"
+    "xianxia"
    ],
    "skeleton": {
     "setup": "主角处于被轻视、被污蔑或被认为无能的弱势位置，且手中握有尚未亮出的、足以推翻对方判断的硬事实或真实能力。",
@@ -90,7 +90,7 @@
     "重生",
     "马甲流",
     "权谋",
-    "仙侠"
+    "xianxia"
    ],
    "skeleton": {
     "setup": "主角隐藏了足以改变他人认知的真实身份或背景，长期以普通、弱势或伪装的面貌示人。",
@@ -154,10 +154,10 @@
    "genre_scope": "universal",
    "applicable_genres": [
     "campus-redemption",
-    "都市",
-    "悬疑",
-    "末世",
-    "仙侠"
+    "dushi-richang",
+    "xuanyi-xingzhen",
+    "kehuan-moshi",
+    "xianxia"
    ],
    "skeleton": {
     "setup": "主角或主角阵营陷入一个自身力量无法当场化解的突发危机，局面迅速恶化、退路被切断。",
@@ -223,9 +223,9 @@
    "applicable_genres": [
     "campus-redemption",
     "暗恋",
-    "都市情感",
+    "realistic-romance",
     "治愈",
-    "仙侠"
+    "xianxia"
    ],
    "skeleton": {
     "setup": "主角长期处于压抑、隐忍或不被理解的情绪状态，真实感受被外部压力或个人性格强行压下。",
@@ -291,7 +291,7 @@
    "applicable_genres": [
     "campus-redemption",
     "逆袭",
-    "修仙",
+    "xianxia",
     "竞技",
     "职场"
    ],
@@ -359,9 +359,9 @@
    "applicable_genres": [
     "campus-redemption",
     "治愈",
-    "都市情感",
-    "末世",
-    "仙侠"
+    "realistic-romance",
+    "kehuan-moshi",
+    "xianxia"
    ],
    "skeleton": {
     "setup": "一方因受伤、受挫或虚弱而陷入需要被照料的处境，另一方（或主角）以看似平常的照料介入，双方关系由此被拉近。",
@@ -427,9 +427,9 @@
    "applicable_genres": [
     "campus-redemption",
     "暗恋",
-    "都市情感",
+    "realistic-romance",
     "治愈",
-    "甜宠"
+    "qingchun-tianchong"
    ],
    "skeleton": {
     "setup": "一方为某个契机（纪念日、日常约定、一场心意）精心准备，却因安排或巧合，最终变成与关键对象的意外独处。",
@@ -496,7 +496,7 @@
     "权谋",
     "逆袭",
     "群像",
-    "仙侠"
+    "xianxia"
    ],
    "skeleton": {
     "setup": "主角与某个关键角色分处对立或相互试探的阵营，彼此立场暧昧、关系处于临界状态。",
@@ -2129,7 +2129,7 @@
    "applicable_genres": [
     "dushi-gaowu",
     "dushi-xiuzhen",
-    "都市神医"
+    "dushi-shenyi"
    ],
    "skeleton": {
     "setup": "主角以神医（或隐世医门传人）身份初入都市权贵圈，被当成江湖骗子；手中握有失传诊脉术，能一眼断人生死、看出连仪器都查不出的隐疾。",
@@ -2259,7 +2259,7 @@
    "applicable_genres": [
     "dushi-gaowu",
     "dushi-richang",
-    "都市神医"
+    "dushi-shenyi"
    ],
    "skeleton": {
     "setup": "权威名医（或西医专家）公开否定中医／主角医术，约定以疑难病人为题当场赌斗，输者封针／退圈。",
@@ -2324,8 +2324,7 @@
    "genre_scope": "zhanshen-zhuixu",
    "applicable_genres": [
     "zhanshen-zhuixu",
-    "dushi-gaowu",
-    "赘婿"
+    "dushi-gaowu"
    ],
    "skeleton": {
     "setup": "战神主角隐姓埋名入赘，受尽岳母与亲戚白眼；恰逢岳母寿宴，众人攀比贺礼，主角的贺礼被当众嘲笑为寒酸。",
@@ -2519,8 +2518,7 @@
    "genre_scope": "gongdou",
    "applicable_genres": [
     "gongdou",
-    "guyan-naodong",
-    "宫斗"
+    "guyan-naodong"
    ],
    "skeleton": {
     "setup": "新人（新封妃嫔／穿越女主）首次给皇后／贵妃请安，对方设局刁难：罚跪、敬烫茶、言语羞辱，意在立威。",
@@ -2650,8 +2648,7 @@
    "genre_scope": "gongdou",
    "applicable_genres": [
     "gongdou",
-    "guyan-naodong",
-    "宫斗"
+    "guyan-naodong"
    ],
    "skeleton": {
     "setup": "女主盛宠遭合围，或察觉皇帝宠爱背后另有算计，主动称病避宠、闭宫不出，把「争」变成「不争」。",
@@ -2715,9 +2712,7 @@
    "category": "试炼",
    "genre_scope": "xianxia",
    "applicable_genres": [
-    "xianxia",
-    "xianxia",
-    "仙侠"
+    "xianxia"
    ],
    "skeleton": {
     "setup": "主角修为到瓶颈，必须渡劫破境；天劫威力远超寻常（身负大气运／业力／异宝遭天妒），九死一生。",
@@ -2782,8 +2777,7 @@
    "genre_scope": "xianxia",
    "applicable_genres": [
     "xianxia",
-    "xuanhuan",
-    "仙侠"
+    "xuanhuan"
    ],
    "skeleton": {
     "setup": "主角跌落山崖／误入遗迹，遇到上古大能残魂；残魂设下考验，择心性合者传其衣钵。",
@@ -2848,8 +2842,7 @@
    "genre_scope": "xianxia",
    "applicable_genres": [
     "xianxia",
-    "xuanhuan-naodong",
-    "仙侠"
+    "xuanhuan-naodong"
    ],
    "skeleton": {
     "setup": "上古老怪／心魔趁主角虚弱夺舍，元神入侵识海；外界看主角如中邪／走火入魔，无人能帮。",
@@ -2915,7 +2908,6 @@
    "applicable_genres": [
     "xuanhuan",
     "xuanhuan-yanqing",
-    "玄幻",
     "退婚流"
    ],
    "skeleton": {
@@ -2981,8 +2973,7 @@
    "genre_scope": "xuanhuan",
    "applicable_genres": [
     "xuanhuan",
-    "xianxia",
-    "玄幻"
+    "xianxia"
    ],
    "skeleton": {
     "setup": "主角在拍卖会／地摊发现蒙尘异宝（残破兵器、无字天书、枯死灵药），无人识货，低价捡漏。",
@@ -3048,8 +3039,7 @@
    "genre_scope": "xuanhuan",
    "applicable_genres": [
     "xuanhuan",
-    "xuanhuan-naodong",
-    "玄幻"
+    "xuanhuan-naodong"
    ],
    "skeleton": {
     "setup": "上古秘境开启，各方涌入夺宝；主角与临时队伍结盟，实则各怀鬼胎，黑吃黑一触即发。",
@@ -3114,9 +3104,7 @@
    "genre_scope": "haomen-zongcai",
    "applicable_genres": [
     "haomen-zongcai",
-    "zhichang-hunlian",
-    "豪门",
-    "先婚后爱"
+    "zhichang-hunlian"
    ],
    "skeleton": {
     "setup": "为利益（冲喜／联姻／应付长辈）签订契约婚姻，约法三章、互不干涉；同居生活从相看两厌开始。",
@@ -3182,7 +3170,6 @@
    "applicable_genres": [
     "haomen-zongcai",
     "guyan-naodong",
-    "豪门",
     "替身"
    ],
    "skeleton": {
@@ -3249,7 +3236,6 @@
    "applicable_genres": [
     "haomen-zongcai",
     "xingguang",
-    "豪门",
     "萌宝"
    ],
    "skeleton": {
@@ -3315,8 +3301,7 @@
    "genre_scope": "kuaichuan",
    "applicable_genres": [
     "kuaichuan",
-    "nvpin-zhongtian",
-    "快穿"
+    "nvpin-zhongtian"
    ],
    "skeleton": {
     "setup": "主角穿成原剧情里的炮灰（恶毒女配／早死原配／背景板），按原剧情必死无疑；她决定不走剧情，反杀所有看不起她的人。",
@@ -3381,8 +3366,7 @@
    "genre_scope": "kuaichuan",
    "applicable_genres": [
     "kuaichuan",
-    "xianyan-naodong",
-    "快穿"
+    "xianyan-naodong"
    ],
    "skeleton": {
     "setup": "任务：攻略黑化值爆表的反派，黑化值清零则任务完成；反派偏执、敏感，动辄黑化值飙升。",
@@ -3447,8 +3431,7 @@
    "genre_scope": "kuaichuan",
    "applicable_genres": [
     "kuaichuan",
-    "nvpin-xuanyi",
-    "快穿"
+    "nvpin-xuanyi"
    ],
    "skeleton": {
     "setup": "主角穿进注定BE（悲剧结局）的世界：原主将死／所爱之人必死／世界即将崩塌，任务就是改写结局。",
@@ -3513,8 +3496,7 @@
    "genre_scope": "xuanyi-lingyi",
    "applicable_genres": [
     "xuanyi-lingyi",
-    "xuanyi-naodong",
-    "悬疑灵异"
+    "xuanyi-naodong"
    ],
    "skeleton": {
     "setup": "主角为钱（或受委托）入住凶宅试睡，房东留下「午夜规则」：十二点后不要开门、不要回应敲门声、镜子不要照。",
@@ -3578,8 +3560,7 @@
    "genre_scope": "xuanyi-lingyi",
    "applicable_genres": [
     "xuanyi-lingyi",
-    "nvpin-xuanyi",
-    "悬疑灵异"
+    "nvpin-xuanyi"
    ],
    "skeleton": {
     "setup": "主角（或至亲）命格有缺、寿数将尽，有人以纸人替命、借寿续命之术续命，代价是纸人需要「养料」。",
@@ -3645,7 +3626,7 @@
    "applicable_genres": [
     "xuanyi-lingyi",
     "xuanyi-naodong",
-    "盗墓探险"
+    "xuanyi-daomu"
    ],
    "skeleton": {
     "setup": "探险小队深入古墓，队中有内鬼／向导另有所图；墓主人机关算尽，盗墓者机关算尽，结果都被更深的局算计。",
@@ -3710,8 +3691,7 @@
    "genre_scope": "youxi-tiyu",
    "applicable_genres": [
     "youxi-tiyu",
-    "tiyu-dianjing",
-    "电竞"
+    "dianjing"
    ],
    "skeleton": {
     "setup": "BO5决胜局，主角战队0:2落后，濒临淘汰；对手拿到赛点，全场都以为大局已定。",
@@ -3777,8 +3757,7 @@
    "genre_scope": "youxi-tiyu",
    "applicable_genres": [
     "youxi-tiyu",
-    "tiyu-dianjing",
-    "电竞"
+    "dianjing"
    ],
    "skeleton": {
     "setup": "主力受伤／心态崩盘／被禁赛，关键战前无人可用；饮水机管理员（替补）临危受命，全队都不看好。",
@@ -3843,8 +3822,7 @@
    "genre_scope": "youxi-tiyu",
    "applicable_genres": [
     "youxi-tiyu",
-    "tiyu-dianjing",
-    "电竞"
+    "dianjing"
    ],
    "skeleton": {
     "setup": "传奇老将因伤／年龄／心魔退役，多年后为救主（战队解散危机／后辈相邀／未竟的冠军梦）复出，状态成谜。",
@@ -3910,7 +3888,6 @@
    "applicable_genres": [
     "kehuan-moshi",
     "dushi-naodong",
-    "科幻末世",
     "重生"
    ],
    "skeleton": {
@@ -3976,8 +3953,7 @@
    "category": "危机",
    "genre_scope": "kehuan-moshi",
    "applicable_genres": [
-    "kehuan-moshi",
-    "科幻末世"
+    "kehuan-moshi"
    ],
    "skeleton": {
     "setup": "尸潮（或兽潮）围城，防线将破，大部队必须撤离；需要有人断后，断后等于赴死。",
@@ -4042,8 +4018,7 @@
    "genre_scope": "kehuan-moshi",
    "applicable_genres": [
     "kehuan-moshi",
-    "xuanhuan",
-    "科幻末世"
+    "xuanhuan"
    ],
    "skeleton": {
     "setup": "末世初期主角是无异能的普通人（或废异能），受尽白眼；在生死一线／至亲遇险时二次觉醒，异能震惊全场。",
@@ -4243,7 +4218,7 @@
    "applicable_genres": [
     "qingchun-tianchong",
     "campus-redemption",
-    "青春校园"
+    "qingchun-xiaoyuan"
    ],
    "skeleton": {
     "setup": "学霸与学渣被迫成为同桌，立下契约：成绩对赌，输者答应对方一个条件；从互相嫌弃到暗生情愫。",
@@ -4309,7 +4284,7 @@
    "applicable_genres": [
     "qingchun-tianchong",
     "campus-redemption",
-    "青春校园"
+    "qingchun-xiaoyuan"
    ],
    "skeleton": {
     "setup": "校运会，主角为暗恋对象／对象加油；递水、呐喊、冲线拥抱，青春的荷尔蒙在赛场上引爆。",
@@ -4374,9 +4349,7 @@
    "genre_scope": "dushi-richang",
    "applicable_genres": [
     "dushi-richang",
-    "meishi",
-    "都市日常",
-    "美食"
+    "meishi"
    ],
    "skeleton": {
     "setup": "主角经营一家深夜小店（或摆摊），食客带着各自的故事而来；一碗吃食，治愈一个深夜。",
@@ -4442,9 +4415,7 @@
    "genre_scope": "dushi-richang",
    "applicable_genres": [
     "dushi-richang",
-    "meishi",
-    "都市日常",
-    "美食"
+    "meishi"
    ],
    "skeleton": {
     "setup": "主角凭一手绝活摆摊（或开小店），起初无人问津；第一个食客被惊艳后，口碑裂变，摊位前排起长队。",
@@ -10689,7 +10660,6 @@
    "genre_scope": "realistic-romance",
    "applicable_genres": [
     "realistic-romance",
-    "现实言情",
     "救赎"
    ],
    "skeleton": {
@@ -10742,7 +10712,6 @@
    "genre_scope": "realistic-romance",
    "applicable_genres": [
     "realistic-romance",
-    "现实言情",
     "慢热"
    ],
    "skeleton": {

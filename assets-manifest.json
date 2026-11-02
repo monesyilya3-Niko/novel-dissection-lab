@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generated_at": "2026-11-01T22:45:40.317825-08:00",
+  "generated_at": "2026-11-01T23:22:25.097517-08:00",
   "files": {
     "campus-redemption-commercial-obs-distilled.json": {
       "sha256": "9e15efac128e669657d025928dcdd6fa9ffaac5b989ef39ea151f01edfff584a",
@@ -447,7 +447,7 @@
       "previous_hashes": []
     },
     "trope-library.json": {
-      "sha256": "41ceeabfed03d705f779f8ffa02845986830643b1f7e0527b237d160cab589c0",
+      "sha256": "f09a07d95a1c51ad09f829ab3453c12456b6bacd0ad316d7ddc3da1df5ae6170",
       "previous_hashes": [
         "4b83423a9a5f598861b192a83fff1c569256f764f338e029d7c2badddb38da95",
         "b4a4650b168b18c8a8d030600f65b6270687815e7dcbf753b8b5b0cdb0a6a965",

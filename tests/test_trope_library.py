@@ -213,3 +213,40 @@ class TestTropeLibrary(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestApplicableGenresNormalized(unittest.TestCase):
+    """桥段的 applicable_genres 必须是题材 slug 或明确的检索标签（2026-11-01）。
+
+    实测事故：176 条桥段里有 41 种非 slug 写法混用——「仙侠」「修仙」既是
+    中文名又没有 slug 对应，而 canonical 是 xianxia。genre_scope 过滤保证
+    了隔离正确性（铁律一不受影响），但 applicable_genres 参与的是检索打分，
+    中文名与 slug 混用会让「查 xianxia 命中不到写着仙侠的桥段」。
+
+    允许保留的只有检索标签集（逆袭/重生/职场…），它们是意图词而非题材。
+    """
+
+    TAGS = {"逆袭", "重生", "职场", "救赎", "暗恋", "成长", "治愈", "慢热",
+            "权谋", "竞技", "群像", "萌宝", "替身", "隐婚", "马甲流", "退婚流",
+            "校园", "悬疑脑洞", "兵王", "快穿"}
+
+    def test_all_applicable_genres_are_slug_or_tag(self):
+        import genre_registry as gr
+        known = gr.known_genres()
+        lib = json.loads((ROOT / "assets" / "trope-library.json").read_text(encoding="utf-8"))
+        bad = set()
+        for t in lib["tropes"]:
+            for g in t.get("applicable_genres") or []:
+                if g not in known and g not in self.TAGS:
+                    bad.add(g)
+        self.assertEqual(bad, set(),
+                         f"applicable_genres 出现非 slug 非标签的值: {sorted(bad)}")
+
+    def test_no_duplicates_after_normalization(self):
+        lib = json.loads((ROOT / "assets" / "trope-library.json").read_text(encoding="utf-8"))
+        dup = []
+        for t in lib["tropes"]:
+            ag = t.get("applicable_genres") or []
+            if len(ag) != len(set(ag)):
+                dup.append(t["id"])
+        self.assertEqual(dup, [], f"归一化后仍有重复: {dup}")
