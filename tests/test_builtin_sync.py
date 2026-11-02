@@ -394,7 +394,7 @@ class TestRealWorldExpansion(unittest.TestCase):
         db._reset_conn()
         db.init_schema()
         shipped = sorted((ROOT / "assets").glob("*.json"))
-        assert len(shipped) == 107, f"随包资产应为 107 个，实测 {len(shipped)}"
+        assert len(shipped) == 138, f"随包资产应为 138 个，实测 {len(shipped)}"
         import shutil
         for p in shipped[:65]:
             shutil.copy2(p, config.ASSETS_ROOT / p.name)
@@ -407,9 +407,9 @@ class TestRealWorldExpansion(unittest.TestCase):
         db._reset_conn()
         _isolation.remove_tree(self._tmp)
 
-    def test_65_to_107(self):
+    def test_65_to_138(self):
         r = builtin_sync.diff()
-        self.assertEqual(r["shipped_total"], 107)
+        self.assertEqual(r["shipped_total"], 138)
         self.assertEqual(r["runtime_total"], 65)
         self.assertEqual(r["missing"], self._expected_missing)
         self.assertEqual(r["modified"], [])
@@ -417,12 +417,12 @@ class TestRealWorldExpansion(unittest.TestCase):
         self.assertEqual(r["manifest_version"], __import__("gui").__version__)
         r2 = builtin_sync.sync()
         self.assertEqual(r2["copied"], self._expected_missing)
-        # 107 个全部就位。
-        self.assertEqual(len(sorted(config.ASSETS_ROOT.glob("*.json"))), 107)
-        # SQLite 同步可见：42 个新行。
+        # 138 个全部就位。
+        self.assertEqual(len(sorted(config.ASSETS_ROOT.glob("*.json"))), 138)
+        # SQLite 同步可见：73 个新行。
         conn = db.get_conn()
         n = int(conn.execute("SELECT COUNT(*) AS n FROM assets").fetchone()["n"])
-        self.assertEqual(n, 42)
+        self.assertEqual(n, 73)
 
 
 if __name__ == "__main__":

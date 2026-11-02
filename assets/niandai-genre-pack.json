@@ -1,0 +1,214 @@
+{
+ "meta": {
+  "id": "genre-niandai",
+  "name": "年代",
+  "sub_tags": [
+   "年代",
+   "年代文",
+   "七零",
+   "八零",
+   "随军",
+   "重生年代"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.5,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-niandai",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-niandai（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-niandai.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-niandai.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
+  },
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用票证、粮食、工位、知青点、家属院或婚姻安排压出现实缺口。",
+    "中期：让熟人社会评价、钱粮周转、工位名额和亲友站队反复卡主角，收益要朴素可见。",
+    "后期：把分配、调令、家属关系和时代机会合并结算，结尾落到新指标、新票证或亲友选择。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章至少解决或加重一个现实账：钱票、住处、工作、婚姻、名声、孩子安全。低压生活章也要让日子往好或往坏挪一步。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
+    },
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
+    },
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
+    },
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
+    }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 用分家、相亲/婚约、下乡返城、随军、票据粮食、工作名额、亲戚欺负、旧伤委屈切入。\n- 第一场要让读者知道主角缺什么：钱、名声、住处、婚姻自主、孩子安全或工作机会。\n- 若有重生/空间/系统，先服务眼前生活账。",
+   "chapter_end_hook": "适合用亲戚上门、干部通知、婚约变化、工作名额、票据/物证出现、旧人重逢收尾。"
+  },
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
+  },
+  "conflict_engine": "时代规则 + 家庭人情账 + 主角改命意志。压迫可以慢半拍，但每章要推动一个现实账或关系账。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
+    },
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
+    },
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
+    },
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
+    }
+   ]
+  },
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "释放方式是当场还回去、名声扭转、资源到手、长辈/组织态度变化、家庭位置改变。爽点要符合时代流程，别像现代网暴打脸。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 用分家、相亲/婚约、下乡返城、随军、票据粮食、工作名额、亲戚欺负、旧伤委屈切入。\n- 第一场要让读者知道主角缺什么：钱、名声、住处、婚姻自主、孩子安全或工作机会。\n- 若有重生/空间/系统，先服务眼前生活账。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "用现代网感冲掉年代感",
+    "堆物件清单",
+    "让金手指替主角做人情账",
+    "只写极品吵架不推进现实收益"
+   ]
+  }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要用现代网感冲掉年代感",
+    "rationale": "该题材的常见失手点：用现代网感冲掉年代感",
+    "good_example": "落在具体场景与人物选择上，而非用现代网感冲掉年代感。",
+    "bad_example": "通篇用现代网感冲掉年代感，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要堆物件清单",
+    "rationale": "该题材的常见失手点：堆物件清单",
+    "good_example": "落在具体场景与人物选择上，而非堆物件清单。",
+    "bad_example": "通篇堆物件清单，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让金手指替主角做人情账",
+    "rationale": "该题材的常见失手点：让金手指替主角做人情账",
+    "good_example": "落在具体场景与人物选择上，而非让金手指替主角做人情账。",
+    "bad_example": "通篇让金手指替主角做人情账，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要只写极品吵架不推进现实收益",
+    "rationale": "该题材的常见失手点：只写极品吵架不推进现实收益",
+    "good_example": "落在具体场景与人物选择上，而非只写极品吵架不推进现实收益。",
+    "bad_example": "通篇只写极品吵架不推进现实收益，读者读不到实际推进。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要用现代网感冲掉年代感",
+   "不要堆物件清单",
+   "不要让金手指替主角做人情账",
+   "不要只写极品吵架不推进现实收益"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "称呼和分寸很重要。长辈、邻里、干部、军人、亲戚说话方式要不同。现代网络梗慎用，主角可以清醒，但不能像现代嘴替乱冲制度。",
+  "drift_guard": "不要用现代网感冲掉年代感；不要堆物件清单；不要让金手指替主角做人情账；不要只写极品吵架不推进现实收益。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "多写粮票、布票、介绍信、搪瓷缸、供销社、筒子楼、家属院、炕桌、缝纫机、工作名额和亲戚饭桌。年代感来自物件和办事流程。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
+}

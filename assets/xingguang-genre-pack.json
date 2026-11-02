@@ -1,0 +1,213 @@
+{
+ "meta": {
+  "id": "genre-xingguang",
+  "name": "星光璀璨",
+  "sub_tags": [
+   "星光璀璨",
+   "娱乐圈",
+   "文娱",
+   "影后",
+   "综艺"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.5,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-xingguang",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-xingguang（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-xingguang.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-xingguang.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
+  },
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用试镜、热搜、合同、综艺现场或经纪人催促压出职业低谷和舆论误判。",
+    "中期：让作品机会、公众评价、粉丝反馈和对手操作反复变化，爽点落在资源转向和能力被看见。",
+    "后期：把榜单、奖项、偷拍视频或角色邀约放到明面上见结果，结尾留新通告或更大舆论风险。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章至少推进两环：被质疑，展示，反响，资源变化。爽点之后要给资源后果，不只写全网震惊。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
+    },
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
+    },
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
+    },
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
+    }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "高考/试镜/节目开录、黑热搜、合约争议、对家挑衅、镜头事故、公开问答都适合切入。",
+   "chapter_end_hook": "用热搜发酵、下一轮节目、业内邀约、合同变化、对家反击、家人/身份公开收尾。"
+  },
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
+  },
+  "conflict_engine": "公开评价 + 资源竞争 + 才华被看见。主角要拿出具体作品或操作，别只让网友震惊。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
+    },
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
+    },
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
+    },
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
+    }
+   ]
+  },
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "释放来自舞台表现、镜头反应、热搜反转、业内评价、资源升级、黑粉失算。才华必须通过公开场面被看见。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "高考/试镜/节目开录、黑热搜、合约争议、对家挑衅、镜头事故、公开问答都适合切入。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "只写网友震惊",
+    "才华展示没有具体内容",
+    "忽略经纪资源和舆论后果",
+    "把娱乐圈写成校园换皮"
+   ]
+  }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要只写网友震惊",
+    "rationale": "该题材的常见失手点：只写网友震惊",
+    "good_example": "落在具体场景与人物选择上，而非只写网友震惊。",
+    "bad_example": "通篇只写网友震惊，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要才华展示没有具体内容",
+    "rationale": "该题材的常见失手点：才华展示没有具体内容",
+    "good_example": "落在具体场景与人物选择上，而非才华展示没有具体内容。",
+    "bad_example": "通篇才华展示没有具体内容，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要忽略经纪资源和舆论后果",
+    "rationale": "该题材的常见失手点：忽略经纪资源和舆论后果",
+    "good_example": "落在具体场景与人物选择上，而非忽略经纪资源和舆论后果。",
+    "bad_example": "通篇忽略经纪资源和舆论后果，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要把娱乐圈写成校园换皮",
+    "rationale": "该题材的常见失手点：把娱乐圈写成校园换皮",
+    "good_example": "落在具体场景与人物选择上，而非把娱乐圈写成校园换皮。",
+    "bad_example": "通篇把娱乐圈写成校园换皮，读者读不到实际推进。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要只写网友震惊",
+   "不要才华展示没有具体内容",
+   "不要忽略经纪资源和舆论后果",
+   "不要把娱乐圈写成校园换皮"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "经纪人重资源，导演/制片重利益，粉丝/网友情绪化，艺人台词要有镜头感和自保意识。别让所有人像营销号。",
+  "drift_guard": "不要只写网友震惊；不要才华展示没有具体内容；不要忽略经纪资源和舆论后果；不要把娱乐圈写成校园换皮。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "用直播间、热搜截图、试镜房、录音棚、舞台灯、通告单、合同、粉丝评论、剧组现场承载娱乐圈反馈。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
+}

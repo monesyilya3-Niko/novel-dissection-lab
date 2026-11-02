@@ -1,0 +1,227 @@
+{
+ "meta": {
+  "id": "genre-youxi-wangyou",
+  "name": "游戏网游",
+  "sub_tags": [
+   "游戏网游",
+   "网游",
+   "全息游戏",
+   "公会",
+   "竞技",
+   "升级",
+   "虚拟现实"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.4,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-youxi-wangyou",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-youxi-wangyou（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-youxi-wangyou.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-youxi-wangyou.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
+  },
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用建号、首杀、被大公会挖角立住“高手”人设，组建固定队。",
+    "中期：围绕公会战、跨服赛、隐藏职业/神器推进，装备和名声同步升级。",
+    "后期：把世界大赛、终极BOSS、现实阴谋推到明面上见结果，结尾留新资料片或功成身退。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章一场战斗或一次开荒，游戏线和现实线交替推进。副本、公会战、现实不要断成互不相关的清单。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
+    },
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
+    },
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
+    },
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
+    }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 用开服、网吧、出租屋、游戏头盔切入。\n- 先给主角的现实困境，再给游戏里的第一次惊艳。\n- 游戏设定只给当前玩法需要的部分，不要开篇写设定集。",
+   "chapter_end_hook": "适合用隐藏BOSS刷新、神秘玩家现身、公会宣战、现实身份被怀疑收尾。"
+  },
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
+  },
+  "conflict_engine": "公会争霸 + 现实身份反差 + 游戏内外的双线危机。旁人按“菜鸟/代练/穷学生”误判主角，主角以神级操作、副本攻略和指挥艺术打破判断。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
+    },
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
+    },
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
+    },
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
+    }
+   ]
+  },
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "首杀/首通要有观众：公会频道、世界频道、直播间。装备掉落要有仪式感：金光、公告、全服震动。公会战胜利靠指挥和兄弟，不是靠主角一个人开无双。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 用开服、网吧、出租屋、游戏头盔切入。\n- 先给主角的现实困境，再给游戏里的第一次惊艳。\n- 游戏设定只给当前玩法需要的部分，不要开篇写设定集。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "把网游写成单机，公会、情缘、对手缺一不可",
+    "让数值膨胀失控，版本更新要有节奏",
+    "把NPC写成背景板",
+    "让现实线彻底消失，双线呼应才是特色"
+   ]
+  }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要把网游写成单机，公会、情缘、对手缺一不可",
+    "rationale": "该题材的常见失手点：把网游写成单机，公会、情缘、对手缺一不可",
+    "good_example": "落在具体场景与人物选择上，而非把网游写成单机，公会、情缘、对手缺一不可。",
+    "bad_example": "通篇把网游写成单机，公会、情缘、对手缺一不可，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让数值膨胀失控，版本更新要有节奏",
+    "rationale": "该题材的常见失手点：让数值膨胀失控，版本更新要有节奏",
+    "good_example": "落在具体场景与人物选择上，而非让数值膨胀失控，版本更新要有节奏。",
+    "bad_example": "通篇让数值膨胀失控，版本更新要有节奏，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要把NPC写成背景板",
+    "rationale": "该题材的常见失手点：把NPC写成背景板",
+    "good_example": "落在具体场景与人物选择上，而非把NPC写成背景板。",
+    "bad_example": "通篇把NPC写成背景板，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让现实线彻底消失，双线呼应才是特色",
+    "rationale": "该题材的常见失手点：让现实线彻底消失，双线呼应才是特色",
+    "good_example": "落在具体场景与人物选择上，而非让现实线彻底消失，双线呼应才是特色。",
+    "bad_example": "通篇让现实线彻底消失，双线呼应才是特色，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要把网游写成单机，主角再强也需要队友，公会、情缘、对手缺一不可",
+    "rationale": "该题材的常见失手点：把网游写成单机，主角再强也需要队友，公会、情缘、对手缺一不可",
+    "good_example": "落在具体场景与人物选择上，而非把网游写成单机，主角再强也需要队友，公会、情缘、对手缺一不可。",
+    "bad_example": "通篇把网游写成单机，主角再强也需要队友，公会、情缘、对手缺一不可，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让数值膨胀失控，版本更新、装备迭代要有节奏",
+    "rationale": "该题材的常见失手点：让数值膨胀失控，版本更新、装备迭代要有节奏",
+    "good_example": "落在具体场景与人物选择上，而非让数值膨胀失控，版本更新、装备迭代要有节奏。",
+    "bad_example": "通篇让数值膨胀失控，版本更新、装备迭代要有节奏，读者读不到实际推进。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要把网游写成单机，主角再强也需要队友，公会、情缘、对手缺一不可",
+   "不要让数值膨胀失控，版本更新、装备迭代要有节奏",
+   "不要把NPC写成背景板，智能NPC、有故事的BOSS才是网游的魂",
+   "不要让现实线彻底消失，游戏内外的双线呼应才是网游文的特色"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "主角在游戏里可以骚话连篇，现实里可能社恐，反差是萌点；公会兄弟斗嘴要热闹；对手挑衅要有水平。世界频道的喊话要有网感。别让所有人只会刷“666”。",
+  "drift_guard": "不要把网游写成单机，公会、情缘、对手缺一不可；不要让数值膨胀失控，版本更新要有节奏；不要把NPC写成背景板；不要让现实线彻底消失，双线呼应才是特色。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "用头盔的启动音、主城的人潮、副本的雾气、拍卖行的竞价、深夜网吧的泡面、比赛现场的灯光承载网游的热血与日常。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
+}

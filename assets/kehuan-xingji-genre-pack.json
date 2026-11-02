@@ -1,0 +1,227 @@
+{
+ "meta": {
+  "id": "genre-kehuan-xingji",
+  "name": "科幻星际",
+  "sub_tags": [
+   "科幻星际",
+   "星际",
+   "机甲",
+   "星舰",
+   "异星文明",
+   "宇宙战争",
+   "硬科幻"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.4,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-kehuan-xingji",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-kehuan-xingji（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-kehuan-xingji.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-kehuan-xingji.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
+  },
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用废船打捞、机甲首战、海盗遭遇战立住“天才指挥/机师”人设，组建初始班底。",
+    "中期：围绕舰队战争、异星遗迹、联邦阴谋推进，科技树和舰队规模同步升级。",
+    "后期：把文明决战、终极真相推到明面上见结果，结尾留深空远航或新纪元。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章一场战斗或一次发现，战争线和探索线交替推进。战斗、升级、阴谋不要断成互不相关的清单。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
+    },
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
+    },
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
+    },
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
+    }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 用废船坟场、空间站底层、机甲训练场、殖民星球切入。\n- 先给主角的卑微处境，再给一场意外：遗迹、求救信号、战争爆发。\n- 科技名词只给当前场景需要的部分，第一次出现配人话解释。",
+   "chapter_end_hook": "适合用遗迹新发现、联邦密令、异星文明主动接触、舰队叛变收尾。"
+  },
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
+  },
+  "conflict_engine": "文明存续危机 + 联邦内斗 + 未知异星威胁。旁人按“边缘人/逃兵/平民”误判主角，主角以指挥天赋、科技奇点和置之死地的勇气打破判断。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
+    },
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
+    },
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
+    },
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
+    }
+   ]
+  },
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "科技碾压要有观众：敌对文明、联邦议会、船员。胜利要讲谋略：不是火力洗地，而是跃迁伏击、信息战、斩首行动。文明存续的重量感，是星际题材独有的爽点。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 用废船坟场、空间站底层、机甲训练场、殖民星球切入。\n- 先给主角的卑微处境，再给一场意外：遗迹、求救信号、战争爆发。\n- 科技名词只给当前场景需要的部分，第一次出现配人话解释。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "把科幻写成披着星舰皮的玄幻，科技要有自洽的规则和代价",
+    "让主角光环代替舰队战术，星际战争是体系对抗",
+    "堆砌名词不解释，第一次出现要给人话版解释",
+    "让外星文明全是人类翻版"
+   ]
+  }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要把科幻写成披着星舰皮的玄幻，科技要有自洽的规则和代价",
+    "rationale": "该题材的常见失手点：把科幻写成披着星舰皮的玄幻，科技要有自洽的规则和代价",
+    "good_example": "落在具体场景与人物选择上，而非把科幻写成披着星舰皮的玄幻，科技要有自洽的规则和代价。",
+    "bad_example": "通篇把科幻写成披着星舰皮的玄幻，科技要有自洽的规则和代价，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让主角光环代替舰队战术，星际战争是体系对抗",
+    "rationale": "该题材的常见失手点：让主角光环代替舰队战术，星际战争是体系对抗",
+    "good_example": "落在具体场景与人物选择上，而非让主角光环代替舰队战术，星际战争是体系对抗。",
+    "bad_example": "通篇让主角光环代替舰队战术，星际战争是体系对抗，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要堆砌名词不解释，第一次出现要给人话版解释",
+    "rationale": "该题材的常见失手点：堆砌名词不解释，第一次出现要给人话版解释",
+    "good_example": "落在具体场景与人物选择上，而非堆砌名词不解释，第一次出现要给人话版解释。",
+    "bad_example": "通篇堆砌名词不解释，第一次出现要给人话版解释，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让外星文明全是人类翻版",
+    "rationale": "该题材的常见失手点：让外星文明全是人类翻版",
+    "good_example": "落在具体场景与人物选择上，而非让外星文明全是人类翻版。",
+    "bad_example": "通篇让外星文明全是人类翻版，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要堆砌名词不解释，跃迁、曲率、戴森球第一次出现要给人话版解释",
+    "rationale": "该题材的常见失手点：堆砌名词不解释，跃迁、曲率、戴森球第一次出现要给人话版解释",
+    "good_example": "落在具体场景与人物选择上，而非堆砌名词不解释，跃迁、曲率、戴森球第一次出现要给人话版解释。",
+    "bad_example": "通篇堆砌名词不解释，跃迁、曲率、戴森球第一次出现要给人话版解释，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让外星文明全是人类翻版，异质感是科幻的灵魂",
+    "rationale": "该题材的常见失手点：让外星文明全是人类翻版，异质感是科幻的灵魂",
+    "good_example": "落在具体场景与人物选择上，而非让外星文明全是人类翻版，异质感是科幻的灵魂。",
+    "bad_example": "通篇让外星文明全是人类翻版，异质感是科幻的灵魂，读者读不到实际推进。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要把科幻写成披着星舰皮的玄幻，科技要有自洽的规则和代价",
+   "不要让主角光环代替舰队战术，星际战争是体系对抗",
+   "不要堆砌名词不解释，跃迁、曲率、戴森球第一次出现要给人话版解释",
+   "不要让外星文明全是人类翻版，异质感是科幻的灵魂"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "舰长/指挥官说话简短决断，命令式；科学家话多但要有真东西；AI可以有个性，别写成复读机。战斗通讯要短促，日常可以有人味。别让所有人都只会喊“开火”。",
+  "drift_guard": "不要把科幻写成披着星舰皮的玄幻，科技要有自洽的规则和代价；不要让主角光环代替舰队战术，星际战争是体系对抗；不要堆砌名词不解释，第一次出现要给人话版解释；不要让外星文明全是人类翻版。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "用舰桥的全息星图、机甲的液压声、空间站的舷窗、跃迁时的蓝光、船员舱的合影承载星际的浪漫与残酷。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
+}

@@ -1,0 +1,220 @@
+{
+ "meta": {
+  "id": "genre-shuangnan",
+  "name": "双男主",
+  "sub_tags": [
+   "双男主",
+   "双男主纯爱",
+   "BL",
+   "纯爱",
+   "耽美"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.5,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-shuangnan",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-shuangnan（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-shuangnan.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-shuangnan.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
+  },
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用同处压力、公开误会、手机消息或危险场面把两人的目标差异推到台前。",
+    "中期：围绕替对方承担后果、限制试探、外人误判和关系证据做拉扯，不靠空泛暧昧。",
+    "后期：把私下偏袒推到公开选择，结尾留身份暴露、证据被看见或另一方反过来护短。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章主线压力和关系压力至少各有一个小变化。高压章用行动推进感情，低压章也要埋一个外部代价或未说破的误会。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
+    },
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
+    },
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
+    },
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
+    }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 优先从危险/异常、被迫同处、公开误会、手机消息、资源交换、师门/校园/职场围观切入。\n- 两位主角一出场就要有差异：行动速度、说话方式、情绪露出方式不能相同。\n- 糖点不要裸放，最好前面带一点风险或误判。",
+   "chapter_end_hook": "适合用身份暴露、危险逼近、误会被第三方放大、其中一人替对方背锅、暧昧证据被围观收尾。钩子要让读者期待关系下一步变化。"
+  },
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
+  },
+  "conflict_engine": "外部压力逼近 + 两人目标不完全一致 + 彼此读错。关系线不能脱离主线，主线压力也不能吃掉关系反应。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
+    },
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
+    },
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
+    },
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
+    }
+   ]
+  },
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "释放来自“他本可以不管，但还是管了”“他嘴上否认，行动已经站队”“外人误判他们关系，结果被事实打脸”。甜要带克制，虐要给下一步安全感。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 优先从危险/异常、被迫同处、公开误会、手机消息、资源交换、师门/校园/职场围观切入。\n- 两位主角一出场就要有差异：行动速度、说话方式、情绪露出方式不能相同。\n- 糖点不要裸放，最好前面带一点风险或误判。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "把两位主角写成同一种腔",
+    "只靠外貌互夸",
+    "让关系线吞掉事件线",
+    "用工业撒糖代替选择"
+   ]
+  }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要把两位主角写成同一种腔",
+    "rationale": "该题材的常见失手点：把两位主角写成同一种腔",
+    "good_example": "落在具体场景与人物选择上，而非把两位主角写成同一种腔。",
+    "bad_example": "通篇把两位主角写成同一种腔，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要只靠外貌互夸",
+    "rationale": "该题材的常见失手点：只靠外貌互夸",
+    "good_example": "落在具体场景与人物选择上，而非只靠外貌互夸。",
+    "bad_example": "通篇只靠外貌互夸，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让关系线吞掉事件线",
+    "rationale": "该题材的常见失手点：让关系线吞掉事件线",
+    "good_example": "落在具体场景与人物选择上，而非让关系线吞掉事件线。",
+    "bad_example": "通篇让关系线吞掉事件线，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要用工业撒糖代替选择",
+    "rationale": "该题材的常见失手点：用工业撒糖代替选择",
+    "good_example": "落在具体场景与人物选择上，而非用工业撒糖代替选择。",
+    "bad_example": "通篇用工业撒糖代替选择，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要把攻受功能位写死",
+    "rationale": "该题材的常见失手点：把攻受功能位写死",
+    "good_example": "落在具体场景与人物选择上，而非把攻受功能位写死。",
+    "bad_example": "通篇把攻受功能位写死，读者读不到实际推进。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要把两位主角写成同一种腔",
+   "不要只靠外貌互夸",
+   "不要让关系线吞掉事件线",
+   "不要用工业撒糖代替选择",
+   "不要把攻受功能位写死"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "一个人可以冷、毒、端着，另一个人可以混、直、嘴欠、装乖，但不要脸谱化。对话允许答非所问、被动作打断、半句咽回去，重点是两人对同一压力的反应差异。",
+  "drift_guard": "不要把两位主角写成同一种腔；不要只靠外貌互夸；不要让关系线吞掉事件线；不要用工业撒糖代替选择；不要把攻受功能位写死。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "关系变化要落到手腕、外套、座位距离、聊天记录、挡刀站位、同住空间、公开称呼和第三方误会。不要只写眼神和心跳。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
+}

@@ -1,0 +1,227 @@
+{
+ "meta": {
+  "id": "genre-wuxianliu",
+  "name": "无限流",
+  "sub_tags": [
+   "无限流",
+   "主神",
+   "轮回",
+   "副本",
+   "求生",
+   "智战",
+   "团队"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.4,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-wuxianliu",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-wuxianliu（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-wuxianliu.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-wuxianliu.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
+  },
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用被选中、第一个副本、第一次减员立住“智者/求生者”人设，组建初始小队。",
+    "中期：围绕高难副本、团战、主神秘密推进，兑换体系和团队默契同步升级。",
+    "后期：把最终副本、主神真相推到明面上见结果，结尾留脱离轮回或新的轮回。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章一个危机或一次布局，副本线和主神线交替推进。求生、布局、减员不要断成互不相关的清单。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
+    },
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
+    },
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
+    },
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
+    }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 用车祸、猝死、午夜梦回、电脑弹窗切入。\n- 先给主角的死亡/绝境，再给“愿意付出一切代价，换一次真正活下去的机会吗”的选择。\n- 轮回规则只给当前副本需要的部分，不要开篇写主神说明书。",
+   "chapter_end_hook": "适合用副本规则突变、队友行为异常、主神发布隐藏任务、资深者小队现身收尾。"
+  },
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
+  },
+  "conflict_engine": "副本生死局 + 轮回小队内斗/减员 + 主神的隐藏规则。旁人按“新人炮灰”误判主角，主角以智谋、布局和置之死地的勇气打破判断。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
+    },
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
+    },
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
+    },
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
+    }
+   ]
+  },
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "通关要有观众：主神空间的排行榜、其他轮回小队、直播间的“观众”。布局获胜要有仪式感：BOSS倒下的那一刻，所有伏笔同时回收。团灭边缘的翻盘，是无限流最顶级的爽点。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 用车祸、猝死、午夜梦回、电脑弹窗切入。\n- 先给主角的死亡/绝境，再给“愿意付出一切代价，换一次真正活下去的机会吗”的选择。\n- 轮回规则只给当前副本需要的部分，不要开篇写主神说明书。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "把副本写成无脑刷怪，每个世界要有规则、主题和悲剧内核",
+    "让主角靠光环通关，智谋、布局、牺牲才是魂",
+    "让队友沦为炮灰",
+    "让主神沦为发任务的机器"
+   ]
+  }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要把副本写成无脑刷怪，每个世界要有规则、主题和悲剧内核",
+    "rationale": "该题材的常见失手点：把副本写成无脑刷怪，每个世界要有规则、主题和悲剧内核",
+    "good_example": "落在具体场景与人物选择上，而非把副本写成无脑刷怪，每个世界要有规则、主题和悲剧内核。",
+    "bad_example": "通篇把副本写成无脑刷怪，每个世界要有规则、主题和悲剧内核，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让主角靠光环通关，智谋、布局、牺牲才是魂",
+    "rationale": "该题材的常见失手点：让主角靠光环通关，智谋、布局、牺牲才是魂",
+    "good_example": "落在具体场景与人物选择上，而非让主角靠光环通关，智谋、布局、牺牲才是魂。",
+    "bad_example": "通篇让主角靠光环通关，智谋、布局、牺牲才是魂，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让队友沦为炮灰",
+    "rationale": "该题材的常见失手点：让队友沦为炮灰",
+    "good_example": "落在具体场景与人物选择上，而非让队友沦为炮灰。",
+    "bad_example": "通篇让队友沦为炮灰，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让主神沦为发任务的机器",
+    "rationale": "该题材的常见失手点：让主神沦为发任务的机器",
+    "good_example": "落在具体场景与人物选择上，而非让主神沦为发任务的机器。",
+    "bad_example": "通篇让主神沦为发任务的机器，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要把副本写成无脑刷怪，每个世界要有自己的规则、主题和悲剧内核",
+    "rationale": "该题材的常见失手点：把副本写成无脑刷怪，每个世界要有自己的规则、主题和悲剧内核",
+    "good_example": "落在具体场景与人物选择上，而非把副本写成无脑刷怪，每个世界要有自己的规则、主题和悲剧内核。",
+    "bad_example": "通篇把副本写成无脑刷怪，每个世界要有自己的规则、主题和悲剧内核，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让主角靠主角光环通关，智谋、布局、牺牲才是无限流的魂",
+    "rationale": "该题材的常见失手点：让主角靠主角光环通关，智谋、布局、牺牲才是无限流的魂",
+    "good_example": "落在具体场景与人物选择上，而非让主角靠主角光环通关，智谋、布局、牺牲才是无限流的魂。",
+    "bad_example": "通篇让主角靠主角光环通关，智谋、布局、牺牲才是无限流的魂，读者读不到实际推进。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要把副本写成无脑刷怪，每个世界要有自己的规则、主题和悲剧内核",
+   "不要让主角靠主角光环通关，智谋、布局、牺牲才是无限流的魂",
+   "不要让队友沦为炮灰，每个队员的死都要有重量",
+   "不要让主神沦为发任务的机器，主神的秘密本身就是最大的悬念"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "主角（智者）说话冷静，布局时条理分明；莽夫队友话糙但讲义气；新人负责问出规则，方便读者理解。生死关头的话要短，越短越有力。别让所有人只会喊“主神，给我兑换”。",
+  "drift_guard": "不要把副本写成无脑刷怪，每个世界要有规则、主题和悲剧内核；不要让主角靠光环通关，智谋、布局、牺牲才是魂；不要让队友沦为炮灰；不要让主神沦为发任务的机器。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "用主神的光球、腕表的倒计时、副本世界的天空、队友的遗物、主神空间的广场承载无限流的诡异与悲壮。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
+}

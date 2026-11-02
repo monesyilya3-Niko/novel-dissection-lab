@@ -1,0 +1,227 @@
+{
+ "meta": {
+  "id": "genre-xuanyi-xingzhen",
+  "name": "悬疑刑侦",
+  "sub_tags": [
+   "悬疑刑侦",
+   "刑侦",
+   "法医",
+   "连环命案",
+   "推理",
+   "悬疑",
+   "破案"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.4,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-xuanyi-xingzhen",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-xuanyi-xingzhen（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-xuanyi-xingzhen.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-xuanyi-xingzhen.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
+  },
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用第一具尸体、专案组成立、第一次勘查立住“神探/法医”人设，铺开案件线。",
+    "中期：围绕连环案升级、真凶挑衅、内部阻力推进，证据链逐步收紧。",
+    "后期：把终极对决、真凶身份推到明面上见结果，结尾留新的悬案或主角的心结。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章一个证据或一次反转，案件线和人物线交替推进。勘查、推理、抓捕不要断成互不相关的清单。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
+    },
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
+    },
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
+    },
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
+    }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 用晨跑者发现尸体、报警电话、解剖室、案发现场切入。\n- 先给尸体的冲击力，再给第一个反常细节。\n- 专业术语只给当前勘查需要的部分，不要开篇上法医学课。",
+   "chapter_end_hook": "适合用新的物证出现、嫌疑人不在场证明被推翻、真凶主动联系警方、专案组内部泄密收尾。"
+  },
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
+  },
+  "conflict_engine": "连环命案 + 真凶逍遥法外 + 警队内部压力/内鬼。旁人按“菜鸟/书呆子”误判主角，主角以缜密的逻辑、专业的法医/刑侦技术和不服输的韧劲打破判断。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
+    },
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
+    },
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
+    },
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
+    }
+   ]
+  },
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "破案要有观众：受害者家属、媒体、凶手本人。真相揭晓要有仪式感：证据链一条一条摆出来，凶手的心理防线一层一层剥开。高潮是审讯室里的对峙，不是枪战。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 用晨跑者发现尸体、报警电话、解剖室、案发现场切入。\n- 先给尸体的冲击力，再给第一个反常细节。\n- 专业术语只给当前勘查需要的部分，不要开篇上法医学课。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "让主角靠灵感破案，每条推理都要有证据支撑",
+    "把法医/刑技写成摆设，专业细节是立身之本",
+    "让凶手降智送人头",
+    "消费真实案件，虚构要有边界感"
+   ]
+  }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要让主角靠灵感破案，每条推理都要有证据支撑",
+    "rationale": "该题材的常见失手点：让主角靠灵感破案，每条推理都要有证据支撑",
+    "good_example": "落在具体场景与人物选择上，而非让主角靠灵感破案，每条推理都要有证据支撑。",
+    "bad_example": "通篇让主角靠灵感破案，每条推理都要有证据支撑，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要把法医/刑技写成摆设，专业细节是立身之本",
+    "rationale": "该题材的常见失手点：把法医/刑技写成摆设，专业细节是立身之本",
+    "good_example": "落在具体场景与人物选择上，而非把法医/刑技写成摆设，专业细节是立身之本。",
+    "bad_example": "通篇把法医/刑技写成摆设，专业细节是立身之本，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让凶手降智送人头",
+    "rationale": "该题材的常见失手点：让凶手降智送人头",
+    "good_example": "落在具体场景与人物选择上，而非让凶手降智送人头。",
+    "bad_example": "通篇让凶手降智送人头，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要消费真实案件，虚构要有边界感",
+    "rationale": "该题材的常见失手点：消费真实案件，虚构要有边界感",
+    "good_example": "落在具体场景与人物选择上，而非消费真实案件，虚构要有边界感。",
+    "bad_example": "通篇消费真实案件，虚构要有边界感，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要把法医/刑技写成摆设，专业细节是刑侦文的立身之本",
+    "rationale": "该题材的常见失手点：把法医/刑技写成摆设，专业细节是刑侦文的立身之本",
+    "good_example": "落在具体场景与人物选择上，而非把法医/刑技写成摆设，专业细节是刑侦文的立身之本。",
+    "bad_example": "通篇把法医/刑技写成摆设，专业细节是刑侦文的立身之本，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让凶手降智送人头，高智商对决才好看",
+    "rationale": "该题材的常见失手点：让凶手降智送人头，高智商对决才好看",
+    "good_example": "落在具体场景与人物选择上，而非让凶手降智送人头，高智商对决才好看。",
+    "bad_example": "通篇让凶手降智送人头，高智商对决才好看，读者读不到实际推进。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要让主角靠灵感破案，每条推理都要有证据支撑",
+   "不要把法医/刑技写成摆设，专业细节是刑侦文的立身之本",
+   "不要让凶手降智送人头，高智商对决才好看",
+   "不要消费真实案件，虚构案件要有虚构的边界感"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "主角（刑警/法医）专业冷静，汇报案情时条理分明；老刑警有生活气，说话带糙劲；凶手平时越正常，暴露时反差越大。审讯对话要短兵相接。别让所有人都只会喊“凶手太残忍了”。",
+  "drift_guard": "不要让主角靠灵感破案，每条推理都要有证据支撑；不要把法医/刑技写成摆设，专业细节是立身之本；不要让凶手降智送人头；不要消费真实案件，虚构要有边界感。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "用警戒线、勘查灯、物证袋、解剖台的冷光、审讯室的单面镜、深夜办公室的泡面承载刑侦的真实与疲惫。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
+}

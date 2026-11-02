@@ -1,0 +1,212 @@
+{
+ "meta": {
+  "id": "genre-gufeng-shiqing",
+  "name": "古风世情",
+  "sub_tags": [
+   "古风世情",
+   "古代世情",
+   "古风家宅",
+   "古代婚恋世情"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.5,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-gufeng-shiqing",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-gufeng-shiqing（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-gufeng-shiqing.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-gufeng-shiqing.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
+  },
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用家宴席位、账册、婚书、库房钥匙或邻里流言立住名分和人情账。",
+    "中期：让证据、长辈态度、亲戚算盘和钱产分配反复拉扯，每个小场都要改变关系位置。",
+    "后期：把婚产、名声、宗族和官面结果推到一处结算，结尾用新物证或长辈召见续局。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章推进一笔人情账、名声账或财产账。低压章也要让一个人重新站队，或让一件物证改变后续局面。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
+    },
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
+    },
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
+    },
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
+    }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "婚约变故、家宴发难、亲戚争产、账册物证、族老公堂、邻里流言都适合切入。",
+   "chapter_end_hook": "用新物证、长辈召见、婚约变化、族中判罚、恶人反咬收尾。"
+  },
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
+  },
+  "conflict_engine": "名分规矩 + 家族利益 + 人证物证。主角不能只靠嘴硬，要拿得出能改变场面的证据或策略。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
+    },
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
+    },
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
+    },
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
+    }
+   ]
+  },
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "释放来自证据摆出、长辈改口、婚约/产业/名声变化、恶人被人情账反咬。情绪不靠大喊，靠场内位置和众人态度变化。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "婚约变故、家宴发难、亲戚争产、账册物证、族老公堂、邻里流言都适合切入。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "只写辞藻",
+    "现代价值观硬喊口号",
+    "无证据硬撕",
+    "让规矩只约束反派不约束主角"
+   ]
+  }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要只写辞藻",
+    "rationale": "该题材的常见失手点：只写辞藻",
+    "good_example": "落在具体场景与人物选择上，而非只写辞藻。",
+    "bad_example": "通篇只写辞藻，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要现代价值观硬喊口号",
+    "rationale": "该题材的常见失手点：现代价值观硬喊口号",
+    "good_example": "落在具体场景与人物选择上，而非现代价值观硬喊口号。",
+    "bad_example": "通篇现代价值观硬喊口号，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要无证据硬撕",
+    "rationale": "该题材的常见失手点：无证据硬撕",
+    "good_example": "落在具体场景与人物选择上，而非无证据硬撕。",
+    "bad_example": "通篇无证据硬撕，读者读不到实际推进。"
+   },
+   {
+    "rule": "不要让规矩只约束反派不约束主角",
+    "rationale": "该题材的常见失手点：让规矩只约束反派不约束主角",
+    "good_example": "落在具体场景与人物选择上，而非让规矩只约束反派不约束主角。",
+    "bad_example": "通篇让规矩只约束反派不约束主角，读者读不到实际推进。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要只写辞藻",
+   "不要现代价值观硬喊口号",
+   "不要无证据硬撕",
+   "不要让规矩只约束反派不约束主角"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "亲戚说话多绕弯、长辈重面子、晚辈要顾名分。主角可以锋利，但要借规矩、证据、人情说话。",
+  "drift_guard": "不要只写辞藻；不要现代价值观硬喊口号；不要无证据硬撕；不要让规矩只约束反派不约束主角。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "抓家宴席位、族谱、婚书、账册、库房钥匙、邻里传话、祠堂、公堂、聘礼嫁妆。世情味来自办事流程和人情往来。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
+}
