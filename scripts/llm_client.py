@@ -30,6 +30,57 @@ CONFIG_DIR = ROOT_DIR / "config"
 MODELS_FILE = CONFIG_DIR / "models.json"
 SECRETS_FILE = CONFIG_DIR / ".secrets.json"
 
+
+def user_config_dir() -> Path:
+    """用户数据目录下的 config/（模型与密钥的**权威**位置，2026-11-02）。
+
+    为什么需要它：配置属于用户数据，不是程序的一部分。放在 ``ROOT/config``
+    时有两个实际问题——
+      1. 装新版会连配置一起覆盖，用户刚配好的模型没了；
+      2. 源码运行读 ``ROOT/config``、安装版读 ``resources/backend/config``，
+         同一台机器上两份配置各读各的，改一份另一份不知道。
+    统一到用户目录后，两种运行方式读同一份，升级也不碰它。
+
+    ``ROOT/config`` 保留为**模板**：用户目录没有 models.json 时回落到它
+    （全新安装、未配置模型的开箱状态）。
+
+    路径在**函数内实时求值**，不做模块级快照——AGENTS.md §4 记录过导入期
+    快照无法被 patch 重定向的事故（system_service 的 _SETTINGS_FILE）。
+
+    与 gui/config.py::_user_data_dir() 同口径，但 scripts/ 不得 import gui/
+    （依赖方向禁令），故此处独立实现；支持 XUAN_DATA_DIR 覆盖供测试隔离。
+    """
+    import os
+    import sys as _sys
+
+    override = os.environ.get("XUAN_DATA_DIR", "").strip()
+    if override:
+        return Path(override) / "config"
+    if _sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+        return Path(base) / "暮冬念春" / "config"
+    if _sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "暮冬念春" / "config"
+    return Path.home() / ".local" / "share" / "暮冬念春" / "config"
+
+
+def resolve_models_file() -> Path:
+    """模型配置的最终路径：用户目录优先，回落仓库模板（实时求值）。"""
+    user = user_config_dir() / "models.json"
+    if user.exists():
+        return user
+    return MODELS_FILE
+
+
+def resolve_secrets_dir() -> Path:
+    """密钥目录：用户目录优先；那里还没有密钥时回落到仓库 config（兼容旧布局）。"""
+    user = user_config_dir()
+    if (user / ".secrets.bin").exists() or (user / ".secrets.json").exists():
+        return user
+    if (CONFIG_DIR / ".secrets.bin").exists() or (CONFIG_DIR / ".secrets.json").exists():
+        return CONFIG_DIR
+    return user  # 都没有 → 新密钥写入用户目录
+
 # 任务默认路由。抽取类任务用便宜模型，判断类任务用强模型
 DEFAULT_ROUTES = {
     "pass1_structure": "cheap",
@@ -118,11 +169,15 @@ def any_model_configured() -> bool:
 
 
 def load_models() -> dict:
-    """读取模型配置。文件不存在或损坏时返回空骨架"""
-    if not MODELS_FILE.exists():
+    """读取模型配置。文件不存在或损坏时返回空骨架。
+
+    路径经 ``resolve_models_file()`` 实时求值（用户目录优先，回落仓库模板）。
+    """
+    path = resolve_models_file()
+    if not path.exists():
         return {"version": 1, "models": {}, "roles": {}, "routes": dict(DEFAULT_ROUTES)}
     try:
-        with open(MODELS_FILE, encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             cfg = json.load(f)
         if not isinstance(cfg, dict):
             raise ValueError("models.json 顶层不是对象")
@@ -135,19 +190,21 @@ def load_models() -> dict:
 
 
 def save_models(cfg: dict):
-    _ensure_config_dir()
-    with open(MODELS_FILE, "w", encoding="utf-8") as f:
+    """写模型配置到**用户目录**（配置属于用户数据，不进程序目录）。"""
+    d = user_config_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    with open(d / "models.json", "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
 
 def load_secrets() -> dict:
     import secret_store
-    return secret_store.load_secrets()
+    return secret_store.load_secrets(resolve_secrets_dir())
 
 
 def save_secrets(secrets: dict):
     import secret_store
-    secret_store.save_secrets(secrets)
+    secret_store.save_secrets(secrets, resolve_secrets_dir())
 
 
 def resolve_api_key(model_id: str, model: dict) -> str:

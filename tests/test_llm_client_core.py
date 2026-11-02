@@ -470,30 +470,63 @@ class TestLoadAndSaveModels(unittest.TestCase):
     """load_models 与 save_models 配置持久化测试。"""
 
     def setUp(self):
+        # 2026-11-02：配置改到用户目录后，patch MODELS_FILE 常量不再生效
+        # （load_models 走 resolve_models_file() 实时求值）。改用 XUAN_DATA_DIR
+        # 隔离——它同时覆盖 models.json 与密钥目录，也贴近真实部署形态。
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.orig_models_file = llm_client.MODELS_FILE
-        self.orig_config_dir = llm_client.CONFIG_DIR
-        llm_client.CONFIG_DIR = Path(self.temp_dir.name)
-        llm_client.MODELS_FILE = llm_client.CONFIG_DIR / "models.json"
+        self._orig_env = os.environ.get("XUAN_DATA_DIR")
+        os.environ["XUAN_DATA_DIR"] = self.temp_dir.name
+        self.cfg_dir = Path(self.temp_dir.name) / "config"
+        self.cfg_dir.mkdir(parents=True, exist_ok=True)
+        self.cfg_file = self.cfg_dir / "models.json"
 
     def tearDown(self):
-        llm_client.MODELS_FILE = self.orig_models_file
-        llm_client.CONFIG_DIR = self.orig_config_dir
+        if self._orig_env is None:
+            os.environ.pop("XUAN_DATA_DIR", None)
+        else:
+            os.environ["XUAN_DATA_DIR"] = self._orig_env
         self.temp_dir.cleanup()
 
     def test_load_models_when_file_not_exist(self):
+        """用户目录无配置时回落到仓库模板（2026-11-02 起的行为）。
+
+        改配置到用户目录后，"文件不存在"不再等于"空骨架"——仓库
+        config/models.json 作为模板被回落，让全新安装也有一份可参照的
+        结构。要测"完全无模型"应使用 NOVEL_LAB_FORCE_NO_MODEL=1
+        （test_write_chapter 就是这么做的）。
+        """
         cfg = llm_client.load_models()
         self.assertEqual(cfg["version"], 1)
-        self.assertEqual(cfg["models"], {})
         self.assertIn("pass1_structure", cfg["routes"])
+        # 回落模板时至少结构完整；具体模型取决于仓库模板内容
+        self.assertIsInstance(cfg["models"], dict)
+        self.assertIsInstance(cfg["roles"], dict)
+
+    def test_no_models_file_anywhere_yields_empty(self):
+        """用户目录与仓库都没有配置文件 → 空骨架。"""
+        import shutil
+        backup = self.cfg_file
+        # 临时把仓库模板也挪走
+        repo_cfg = llm_client.MODELS_FILE
+        hidden = repo_cfg.with_suffix(".json.testbak")
+        moved = False
+        if repo_cfg.exists():
+            shutil.move(str(repo_cfg), str(hidden))
+            moved = True
+        try:
+            cfg = llm_client.load_models()
+            self.assertEqual(cfg["models"], {}, "两处都无配置时应返回空骨架")
+        finally:
+            if moved:
+                shutil.move(str(hidden), str(repo_cfg))
 
     def test_load_models_corrupt_json(self):
-        llm_client.MODELS_FILE.write_text("{bad json...", encoding="utf-8")
+        self.cfg_file.write_text("{bad json...", encoding="utf-8")
         cfg = llm_client.load_models()
         self.assertEqual(cfg["models"], {})
 
     def test_load_models_not_dict(self):
-        llm_client.MODELS_FILE.write_text("[\"list\"]", encoding="utf-8")
+        self.cfg_file.write_text("[\"list\"]", encoding="utf-8")
         cfg = llm_client.load_models()
         self.assertEqual(cfg["models"], {})
 
