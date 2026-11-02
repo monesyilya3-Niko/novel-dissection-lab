@@ -58,7 +58,7 @@ export default function ResultPanel() {
       if (seq === loadSeq.current) setAsset(data)
     } catch (e) {
       if (seq === loadSeq.current) {
-        setError((e as Error).message)
+        setError(api.friendlyError(e))
         setAsset(null)
       }
     } finally {

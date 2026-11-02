@@ -9,7 +9,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Chip from '@mui/material/Chip'
 import Divider from '@mui/material/Divider'
 import { useApp } from '../state/AppContext'
-import { listSamples, type SampleInfo } from '../api/client'
+import { friendlyError, listSamples, type SampleInfo } from '../api/client'
 import { useI18n } from '../state/I18nContext'
 
 interface Props {
@@ -48,7 +48,7 @@ export default function ImportPanel({ compact }: Props) {
       try {
         await uploadBook(file)
       } catch (e) {
-        setError((e as Error).message)
+        setError(friendlyError(e))
       } finally {
         setLoading(false)
       }
@@ -167,7 +167,7 @@ function SampleList({ onImported }: { onImported: () => void }) {
       await importSampleBook(name)
       onImported()
     } catch (e) {
-      setError((e as Error).message)
+      setError(friendlyError(e))
     } finally {
       setImporting(null)
     }

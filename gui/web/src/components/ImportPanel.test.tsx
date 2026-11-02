@@ -20,6 +20,10 @@ vi.mock('../state/AppContext', () => ({
 
 vi.mock('../api/client', () => ({
   listSamples: () => mockListSamples(),
+  // 保留真实 friendlyError 的行为契约：错误一律归一成可读文案。
+  // 2026-11-02：此项此前缺失，导致组件里直接显示 (e as Error).message
+  // 也没人发现——这正是本测试要守的回归点。
+  friendlyError: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }))
 
 describe('ImportPanel 导入面板组件', () => {
@@ -127,3 +131,19 @@ describe('ImportPanel 导入面板组件', () => {
     })
   })
 })
+
+  it('导入失败时错误文案走 friendlyError（而非裸 e.message）', async () => {
+    // friendlyError 会把后端原始消息转成可操作提示；这里用带提示的文案模拟。
+    mockUploadBook.mockRejectedValueOnce(new Error('文件超过 100MB 上限，请拆分后重试'))
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <ImportPanel />
+      </I18nProvider>,
+    )
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    const file = new File(['x'], 'big.txt', { type: 'text/plain' })
+    fireEvent.change(input, { target: { files: [file] } })
+    await waitFor(() => {
+      expect(screen.getByText(/100MB/)).toBeInTheDocument()
+    })
+  })
