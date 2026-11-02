@@ -208,12 +208,22 @@ def render_emotion(e: dict) -> str:
 def render_imagery(img: dict) -> str:
     if not img:
         return "（无意象数据）"
+    if not isinstance(img, dict):
+        return f"- {img}"
     lines = []
     if img.get("high_freq_metaphor_domains"):
         lines.append(f"- 比喻取材领域：{'、'.join(img['high_freq_metaphor_domains'])}")
     sp = img.get("sensory_preference") or {}
-    if sp:
-        order = sorted(sp.items(), key=lambda x: -x[1]) if any(isinstance(v, (int, float)) for v in sp.values()) else list(sp.items())
+    # 2026-11-02：sensory_preference 在部分资产里是**自由文本**而非
+    # {感官: 权重} 字典（实测 通用-现实言情-voice-card 写的是
+    # "触觉+听觉优先，视觉白描"）。旧实现直接 sp.values() → AttributeError，
+    # 整个注入接口 500。两种形态都要能渲染。
+    if isinstance(sp, str):
+        if sp.strip():
+            lines.append(f"- 感官偏重：{sp.strip()}")
+    elif isinstance(sp, dict) and sp:
+        numeric = [v for v in sp.values() if isinstance(v, (int, float))]
+        order = sorted(sp.items(), key=lambda x: -x[1]) if numeric else list(sp.items())
         lines.append("- 感官偏重：" + "、".join(f"{k}({v})" for k, v in order[:3]))
     return "\n".join(lines)
 

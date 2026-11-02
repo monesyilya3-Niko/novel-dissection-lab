@@ -228,3 +228,28 @@ class TestModelConnectivity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestModelIdVersionDots(unittest.TestCase):
+    """模型 ID 允许版本点号（2026-11-02）。
+
+    实测事故：配置好的 deepseek-4.1-flash 能正常调用，但
+    POST /api/models/deepseek-4.1-flash/test 报「模型 ID 只允许字母/数字/
+    下划线/连字符」400。真实模型 ID 普遍带版本点（gpt-4.1 / claude-opus-5-5），
+    原白名单把这类 ID 全部判非法，按 ID 寻址的端点因此不可用，
+    报错还把排查方向引向"ID 填错"而非"校验过严"。
+    """
+
+    def test_version_dots_accepted(self):
+        for mid in ("deepseek-4.1-flash", "gpt-4.1", "claude-opus-5-5", "a.b.c"):
+            self.assertEqual(model_service._validate_model_id(mid), mid)
+
+    def test_dots_do_not_weaken_traversal_guard(self):
+        for bad in ("../evil", "..", "a..b/", "a/../b"):
+            with self.assertRaises(ServiceError, msg=bad):
+                model_service._validate_model_id(bad)
+
+    def test_whitespace_and_control_still_rejected(self):
+        for bad in ("a b", "a\tb", "a\nb", "a\x00b"):
+            with self.assertRaises(ServiceError, msg=bad):
+                model_service._validate_model_id(bad)

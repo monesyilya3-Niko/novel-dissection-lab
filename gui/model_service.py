@@ -25,14 +25,26 @@ def _model_has_key(secrets: dict[str, Any], model_id: str, model: dict[str, Any]
 
 
 def _validate_model_id(model_id: str) -> str:
-    """校验模型 ID：非空、无路径分隔符。"""
+    """校验模型 ID：非空、无路径分隔符。
+
+    2026-11-02：允许点号。真实模型 ID 普遍带版本点（``deepseek-4.1-flash``、
+    ``claude-opus-5-5``、``gpt-4.1``），原来的 ``[A-Za-z0-9_-]+`` 把它们
+    一律判 400——配好的模型能正常调用，但 /api/models/{id}/test 这类
+    按 ID 寻址的端点直接不可用，报错还说是"ID 非法"，指向错误的排查方向。
+
+    安全边界不变：路径分隔符、``..``、空白、控制字符仍全部拒绝。
+    点号本身不构成路径风险（``..`` 已在上一道检查里拦掉）。
+    """
     if not isinstance(model_id, str) or not model_id.strip():
         raise ServiceError("模型 ID 不能为空", 400)
     mid = model_id.strip()
-    if any(ch in mid for ch in ("/", "\\", "..", "\x00", "\n", "\r", " ")):
+    if any(ch in mid for ch in ("/", "\\", "\x00", "\n", "\r", " ")):
         raise ServiceError(f"非法模型 ID: {model_id!r}", 400)
-    if not re.fullmatch(r"[A-Za-z0-9_\-]+", mid):
-        raise ServiceError(f"模型 ID 只允许字母/数字/下划线/连字符: {model_id!r}", 400)
+    if ".." in mid:
+        raise ServiceError(f"非法模型 ID: {model_id!r}", 400)
+    if not re.fullmatch(r"[A-Za-z0-9_\-.]+", mid):
+        raise ServiceError(
+            f"模型 ID 只允许字母/数字/下划线/连字符/点号: {model_id!r}", 400)
     return mid
 
 
