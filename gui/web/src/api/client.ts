@@ -21,6 +21,8 @@ import type {
   StatusInfo,
 } from '../types'
 
+import { tGlobal } from '../i18n/translations'
+
 const BASE = '/api'
 const DEFAULT_TIMEOUT_MS = 30_000
 
@@ -53,24 +55,27 @@ export function friendlyError(e: unknown): string {
     if (e.code === 401 && (msg.includes('令牌') || lower.includes('auth token') || lower.includes('token'))) {
       return '访问令牌无效或已过期——请在页面地址后追加 ?auth=<服务端 NOVEL_LAB_TOKEN> 后重新打开页面'
     }
-    // File too large / 100MB limit — actionable hint (backend: "文件超过 100MB 上限" / 413)
-    if (lower.includes('100mb') || lower.includes('file too large') || lower.includes('exceeds') && lower.includes('size') || msg.includes('超过 100MB') || msg.includes('文件过大')) {
-      return msg.includes('100MB') || msg.includes('超过') ? msg + '，请拆分后重试' : msg
+    // 以下提示走 i18n：此前是硬编码中文，英文界面下错误提示仍是中文。
+    if (lower.includes('100mb') || lower.includes('file too large')
+        || (lower.includes('exceeds') && lower.includes('size'))
+        || msg.includes('超过 100MB') || msg.includes('文件过大')) {
+      return tGlobal('error_action_file_too_large', msg)
     }
-    // Symlink — not actionable beyond message, pass through with hint
     if (lower.includes('symlink') || msg.includes('符号链接')) {
-      return msg
+      return tGlobal('error_action_symlink_rejected', msg)
     }
-    // Port busy / EADDRINUSE — actionable hint
-    if (lower.includes('eaddrinuse') || lower.includes('address already in use') || lower.includes('port') && lower.includes('already') || lower.includes('port') && lower.includes('in use') || msg.includes('端口') && msg.includes('占用')) {
-      return msg + '，请关闭占用程序或更换端口后重试'
+    if (lower.includes('eaddrinuse') || lower.includes('address already in use')
+        || (lower.includes('port') && lower.includes('already'))
+        || (lower.includes('port') && lower.includes('in use'))
+        || (msg.includes('端口') && msg.includes('占用'))) {
+      return tGlobal('error_action_port_busy', msg)
     }
     return msg
   }
   if (e instanceof DOMException && e.name === 'AbortError') return '请求超时，请重试'
   if (e instanceof TypeError) {
     const m = e.message.toLowerCase()
-    if (m.includes('eaddrinuse') || m.includes('address already in use')) return '端口被占用，请关闭占用程序或更换端口后重试'
+    if (m.includes('eaddrinuse') || m.includes('address already in use')) return tGlobal('error_action_port_busy')
     return '无法连接服务——请确认暮冬念春正在运行'
   }
   if (e instanceof Error && e.message) {

@@ -5514,7 +5514,26 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   },
 }
 
+// ---------------------------------------------------------------------------
+// Context-free translation accessor（2026-11-02）
+//
+// 非 React 组件里的纯函数需要按当前语言取文案（典型：api/client.ts 的
+// friendlyError）。这些地方拿不到 useI18n()，过去只能硬编码中文，导致英文
+// 界面下错误提示仍是中文。I18nProvider 在 locale 变化时调 setActiveLocale 同步。
+// ---------------------------------------------------------------------------
+let activeLocale: Locale = 'zh-CN'
 
+export function setActiveLocale(locale: Locale): void {
+  activeLocale = locale
+}
 
+export function getActiveLocale(): Locale {
+  return activeLocale
+}
 
-
+/** 按当前激活语言取词条；缺条目回落到 fallback，再回落到 key 本身。 */
+export function tGlobal(key: string, fallback?: string): string {
+  const entry = TRANSLATIONS[key]
+  const raw = entry && entry[activeLocale] !== undefined ? entry[activeLocale] : (fallback ?? key)
+  return raw
+}

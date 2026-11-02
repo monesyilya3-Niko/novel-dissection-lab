@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { readStorage, writeStorage } from '../safeStorage'
-import { TRANSLATIONS, type Locale } from '../i18n/translations'
+import { TRANSLATIONS, setActiveLocale, type Locale } from '../i18n/translations'
 export type { Locale }
 
 const STORAGE_KEY = 'novellab.locale'
@@ -66,6 +66,10 @@ export function I18nProvider({
     const next: Locale = locale === 'zh-CN' ? 'en-US' : 'zh-CN'
     setLocale(next)
   }, [locale, setLocale])
+
+  // 把当前语言同步到模块级快照，供 api/client.ts 等纯函数读取。
+  // 放在 useState 之后、t 定义之前，保证同一次渲染里 friendlyError 看到的是新语言。
+  setActiveLocale(locale)
 
   const t = useCallback(
     (key: string, fallback?: string, params?: TranslationParams): string => {
