@@ -4,6 +4,7 @@
 ensure_novel_structure / save_chapter 只碰磁盘（tmp 目录隔离），不依赖 LLM。
 """
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -98,11 +99,16 @@ class TestWriteCliGuards(unittest.TestCase):
     """
 
     def _run(self, *extra: str, cwd: Path) -> subprocess.CompletedProcess:
+        # NOVEL_LAB_FORCE_NO_MODEL=1：本文件断言的是「无外部模型」路径
+        # （无模型接管清单 + 目录结构先建）。开发机配好模型后若不屏蔽，
+        # write.py 会真的去调 LLM 并 60s 超时 —— 结果取决于机器状态。
+        env = dict(os.environ)
+        env["NOVEL_LAB_FORCE_NO_MODEL"] = "1"
         return subprocess.run(
             [sys.executable, str(ROOT / "scripts" / "write.py"),
              "--prompt", str(cwd / "prompt.md"), "--task", "测试要点", *extra],
             cwd=str(cwd), capture_output=True, text=True,
-            encoding="utf-8", errors="replace", timeout=60,
+            encoding="utf-8", errors="replace", timeout=60, env=env,
         )
 
     def _prep(self, tmp: str) -> Path:

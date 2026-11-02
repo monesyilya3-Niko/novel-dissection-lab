@@ -98,7 +98,19 @@ def _ensure_config_dir():
 
 
 def any_model_configured() -> bool:
-    """是否配置了至少一个外部模型。无模型时 pipeline 走 WorkBuddy 内置智能模式。"""
+    """是否配置了至少一个外部模型。无模型时 pipeline 走 WorkBuddy 内置智能模式。
+
+    环境变量 ``NOVEL_LAB_FORCE_NO_MODEL=1`` 强制视为「无模型」。
+    2026-11-02：测试需要在**有模型配置的开发机上**验证无模型降级路径
+    （write.py 的无模型接管清单、pipeline 的任务生成分支）。此前这些
+    测试直接读真实 config/models.json，于是开发机配好模型后它们会真的
+    去调 LLM 并超时——测试结果取决于机器状态，不可复现。
+    有了这个开关，测试显式声明"我要无模型"，与真实配置解耦。
+    """
+    import os
+
+    if os.environ.get("NOVEL_LAB_FORCE_NO_MODEL") == "1":
+        return False
     try:
         return bool(load_models().get("models"))
     except Exception:
