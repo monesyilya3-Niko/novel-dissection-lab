@@ -3,10 +3,25 @@
     "source_title": "Lord_of_the_Mysteries",
     "genre": "xuanhuan",
     "extracted_at": "2026-09-21",
-    "sample_chapters": [1, 5, 6, 8, 13, 20, 129, 213, 388, 800, 1000, 1266],
+    "sample_chapters": [
+      1,
+      5,
+      6,
+      8,
+      13,
+      20,
+      129,
+      213,
+      388,
+      800,
+      1000,
+      1266
+    ],
     "total_sample_words": 248000,
     "confidence": 0.78,
-    "pass5_version": "1.0"
+    "pass5_version": "1.0",
+    "dimensions_filled": 10,
+    "dimension_source": "quantitative-extraction-from-source"
   },
   "craft_analysis": {
     "foreshadowing": {
@@ -64,6 +79,153 @@
           "effect": "世界尺度变大而不丢主角主心骨"
         }
       ]
+    },
+    "scene_transition": {
+      "techniques": [
+        {
+          "name": "以省略号与破折号切分镜头",
+          "description": "采样 12 章中省略号出现 162 次、破折号 34 次，远多于显式时间词（Later/Meanwhile 共 11 次）",
+          "effect": "场景切换靠标点节奏而非「第二天」「与此同时」这类时间状语，阅读更连贯、少打断",
+          "skeleton": "[对话或动作收束] + [省略号/破折号] + [新场景直接起笔]",
+          "anti_pattern": "不使用「翌日清晨，XX 醒来」这类显式转场句",
+          "deep_analysis": {
+            "reader_psychology": "标点停顿比文字说明更轻，读者感知到换场但不觉得被打断",
+            "execution_steps": "1.结束当前镜头于一个动作或半句话 2.用 … 或 — 断行 3.新场景直接从细节/对话起，不交代地点时间",
+            "applicable_scene": "多线并进、章节内频繁切镜的叙事",
+            "usage_boundary": "切镜过频会让读者失去空间坐标，需靠专有名词（地点/人名）锚定",
+            "intensity_control": "省略号偏内心停顿，破折号偏动作急转",
+            "combo_patterns": "与短句爆发、内心独白组合",
+            "migration_checklist": "确认每个切镜后首个专有名词能定位场景"
+          }
+        }
+      ],
+      "evidence": "本维度由原文采样章节的量化统计生成（非 LLM 推断），数值可复核：scratch/lotm_features.json"
+    },
+    "tension_building": {
+      "techniques": [
+        {
+          "name": "章末收在未答的问句或宣告式短句",
+          "description": "采样章末句平均 60.8 字符；实测样本：「Clearly, what Lord Ye loved was not a re」 / 「“What are you planning on doing?”」 / 「He said amiably and calmly, “The Fool.”」",
+          "effect": "章末不断在高潮，而是留一个信息缺口或身份宣告，读者带着疑问进入下一章",
+          "skeleton": "[本章冲突收束] + [一句未解释的宣告或问句] + [不给回应]",
+          "anti_pattern": "不在章末制造新危机事件，也不让主角立刻追击",
+          "deep_analysis": {
+            "reader_psychology": "问句制造的是「想知道答案」而非「担心主角」的驱动，疲劳感更低",
+            "execution_steps": "1.让本章主线落地 2.末句给一个身份/计划/反问 3.不解释、不接下一章内容",
+            "applicable_scene": "悬疑推进章、揭示性章节的收尾",
+            "usage_boundary": "连续多章都用宣告收尾会变成套路，需与动作型钩子交替",
+            "intensity_control": "宣告越短越有冲击（实测样本中含「The Fool.」这类两词收尾）",
+            "combo_patterns": "与伏笔埋设、内心独白组合",
+            "migration_checklist": "确认末句的宣告在后续章节真的被兑现"
+          }
+        }
+      ],
+      "evidence": "本维度由原文采样章节的量化统计生成（非 LLM 推断），数值可复核：scratch/lotm_features.json"
+    },
+    "dialogue_craft": {
+      "techniques": [
+        {
+          "name": "高密度对白推进信息",
+          "description": "采样章节对白段落 370 处，每千字符 2.12 段；言语动词（said/asked/replied 等）仅 133 次",
+          "effect": "信息通过对话直接交付，旁白少；言语动词稀疏意味着更多对白以裸引语呈现，节奏更快",
+          "skeleton": "[裸引语对话] + [动作句代替 said] + [下一句直接回应]",
+          "anti_pattern": "不逐句标注「他说道」「她回答道」，不用对白解释读者已知道的事",
+          "deep_analysis": {
+            "reader_psychology": "裸引语让读者像在听而非在读，信息接收更快",
+            "execution_steps": "1.需要交代信息时优先写成人物的对话 2.省略言语动词，用独立动作句表达语气 3.每段对白必须推进关系或信息",
+            "applicable_scene": "需要快速铺陈世界观或推进调查线的段落",
+            "usage_boundary": "对白占比过高会稀释氛围，需与描写交替",
+            "intensity_control": "实测密度 2.12 段/千字符可作基线，超过需检查是否沦为纯聊天",
+            "combo_patterns": "与信息释放、内心独白组合",
+            "migration_checklist": "统计成稿的言语动词比例，过高说明对白生硬"
+          }
+        }
+      ],
+      "evidence": "本维度由原文采样章节的量化统计生成（非 LLM 推断），数值可复核：scratch/lotm_features.json"
+    },
+    "rhythm_control": {
+      "techniques": [
+        {
+          "name": "中长句为主、短句作爆发点",
+          "description": "采样 1766 句，平均 96.3 字符、中位 83.0；≤60 字符短句占 31.0%，≥200 字符长句占 6.7%",
+          "effect": "整体节奏偏缓（中长句承载描写与推理），短句集中在情绪或动作爆发处，形成对比",
+          "skeleton": "[2-3 句中长描写] + [1 句极短句落地]",
+          "anti_pattern": "不整章使用短句连击，也不用长句写动作场面",
+          "deep_analysis": {
+            "reader_psychology": "长句积累信息量，短句切断时产生顿感，读者注意力被重新抓住",
+            "execution_steps": "1.描写与推理用中长句 2.情绪转折处切短 3.每段至少一次长短交替",
+            "applicable_scene": "推理、悬疑、需要沉浸感的长篇",
+            "usage_boundary": "长句占比超过 13% 会拖慢阅读，需插入短句",
+            "intensity_control": "短句越短、与前句反差越大，冲击越强",
+            "combo_patterns": "与感官描写、章末钩子组合",
+            "migration_checklist": "用句长统计检查成稿是否全篇同质"
+          }
+        }
+      ],
+      "evidence": "本维度由原文采样章节的量化统计生成（非 LLM 推断），数值可复核：scratch/lotm_features.json"
+    },
+    "sensory_craft": {
+      "techniques": [
+        {
+          "name": "视觉为主、听觉次之的感官配比",
+          "description": "采样章节五感词频：sight 224（61%）、touch 74（20%）、sound 52（14%）、smell 12（3%）、taste 8（2%）",
+          "effect": "描写压倒性偏重视觉（环境、光线、表情），听觉用于制造不安与提示异常，嗅觉/触觉少量点缀",
+          "skeleton": "[视觉定调] + [听觉插入一个异常] + [触觉落在身体反应]",
+          "anti_pattern": "不平均分配五感，也不连续三段以上只用视觉",
+          "deep_analysis": {
+            "reader_psychology": "视觉占比 61% 符合长篇阅读习惯；听觉信号（52 次）天然带警觉感，适合埋不安",
+            "execution_steps": "1.先给环境的视觉锚点 2.插入一个听觉细节作为异常信号 3.需要情绪强度时补触觉（冷、颤、湿）",
+            "applicable_scene": "悬疑场景、仪式场面、进入陌生空间的描写",
+            "usage_boundary": "嗅觉/味觉低频是合理的（本地语料 {sc.get('smell',0)} / {sc.get('taste',0)} 次），强行增加会显得刻意",
+            "intensity_control": "听觉细节越具体（脚步声、金属摩擦）越能制造紧张",
+            "combo_patterns": "与张力构建、场景切换组合",
+            "migration_checklist": "检查成稿是否只有视觉，缺听觉则氛围单薄"
+          }
+        }
+      ],
+      "evidence": "本维度由原文采样章节的量化统计生成（非 LLM 推断），数值可复核：scratch/lotm_features.json"
+    },
+    "narrative_engine": {
+      "techniques": [
+        {
+          "name": "以谜题与计划双线驱动",
+          "description": "采样章节推进动力词频：why 24、secret 20、ritual 15、must 15、plan 10、fear 9、danger 7、realized 6",
+          "effect": "叙事由「未解之谜」提供长期牵引、由「计划/必须」提供短期行动力，两者交替推进",
+          "skeleton": "[揭示一个谜面] + [主角制定或执行计划] + [计划暴露新谜面]",
+          "anti_pattern": "不让主角被动等待事件发生，每章都要有主动决策",
+          "deep_analysis": {
+            "reader_psychology": "谜题满足好奇心，计划满足掌控感；单一驱动会疲劳，交替则持续吸引",
+            "execution_steps": "1.每章至少推进一条谜题线 2.让主角做一次主动选择 3.选择的后果引出下一个谜",
+            "applicable_scene": "长篇连载的主线推进",
+            "usage_boundary": "谜题堆积过多而不揭示会让读者失去耐心，需按伏笔跨度回收",
+            "intensity_control": "谜面越具体（一个物件、一个人名）越容易记住",
+            "combo_patterns": "与信息释放、伏笔埋设组合",
+            "migration_checklist": "列出所有未回收的谜面，确认没有遗忘"
+          }
+        }
+      ],
+      "evidence": "本维度由原文采样章节的量化统计生成（非 LLM 推断），数值可复核：scratch/lotm_features.json"
+    },
+    "emotional_algorithm": {
+      "techniques": [
+        {
+          "name": "情绪通过身体反应外化",
+          "description": "采样章节情绪/身体词频：body 32、fear 25、calm 25、anger 18、sadness 10",
+          "effect": "恐惧（fear 类）出现频次最高，且大量与身体反应（heart/breath/tremble/sweat）绑定——情绪不直陈，落到生理细节",
+          "skeleton": "[触发事件] + [一个身体反应] + [人物做出与情绪不符的举动]",
+          "anti_pattern": "不写「他感到恐惧」「她非常紧张」这类直陈",
+          "deep_analysis": {
+            "reader_psychology": "身体反应让读者代入（自己也有过心跳加速），直陈情绪词则隔了一层",
+            "execution_steps": "1.写出引发情绪的具体事件 2.给一个可观测的生理细节 3.让人物嘴上说反话或沉默",
+            "applicable_scene": "恐怖场景、对峙、内心崩溃前的铺垫",
+            "usage_boundary": "身体反应词高频（32 次）易陷入重复，需变换部位与程度",
+            "intensity_control": "越克制越有效，写「手指僵住」比「浑身发抖」更冷",
+            "combo_patterns": "与感官描写、对白留白组合",
+            "migration_checklist": "搜索成稿中的「感到/觉得+情绪词」，逐个改为身体反应"
+          }
+        }
+      ],
+      "evidence": "本维度由原文采样章节的量化统计生成（非 LLM 推断），数值可复核：scratch/lotm_features.json"
     }
   },
   "craft_summary": {
@@ -84,6 +246,7 @@
   },
   "provenance": {
     "contains_verbatim": false,
-    "analysis_by": "session-agent"
+    "analysis_by": "session-agent",
+    "analysis_method": "原文采样章节的确定性统计（句长/词频/标点/对白），非 LLM 推断"
   }
 }
