@@ -59,7 +59,8 @@ describe('WorkbenchNav 左侧导航栏组件', () => {
     expect(screen.queryByTestId('nav-admin')).toBeNull()
 
     // 版本号展示
-    expect(screen.getByText('v2.3.0')).toBeInTheDocument()
+    // 只校验格式，不绑定具体版本 —— 版本号由 test_version_consistency.py 守（2026-11-01）
+    expect(screen.getByText(/^v\d+\.\d+\.\d+$/)).toBeInTheDocument()
   })
 
   it('isAdmin=true 时显示管理后台入口', () => {
