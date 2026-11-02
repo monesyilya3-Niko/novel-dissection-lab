@@ -464,3 +464,59 @@ class TestPipelineMainCLI(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRunPassModelRefusal(unittest.TestCase):
+    """模型用合法 JSON 表达拒绝时不得静默当成功（2026-11-02）。
+
+    实测事故：一本无对白的稿子跑拆书，pass2 每批都返回
+        {"error": "未收到对话切片文本，无法提取声线特征", "detail": ...}
+    这是合法 JSON，旧实现原样返回 → services 把批次标成功并写盘 →
+    用户看到"分析完成"，但 voice-card 里没有角色声线，全程零错误提示。
+
+    新行为：顶层 error 且无实质载荷 → 重试（改说法再问）；用尽仍拒绝 → 抛错，
+    让批次落 failed、原因可见。同时保留「既报 error 又给部分结果」的通路。
+    """
+
+    def setUp(self):
+        self.slices = {"pass2_character": {"chapters": [{"title": "第1章", "text": "…" * 50}]}}
+        self.metrics = {"total_chars": 500}
+
+    def _res(self, payload):
+        return {
+            "text": json.dumps(payload, ensure_ascii=False),
+            "model_id": "test-model",
+            "prompt_tokens": 10, "completion_tokens": 5,
+            "cost": 0.0, "elapsed": 0.1,
+        }
+
+    def test_pure_refusal_raises_after_retries(self):
+        refusal = self._res({"error": "未收到对话切片文本", "detail": "零样本",
+                             "next_step": "请粘贴对话切片"})
+        with mock.patch.object(pipeline_mod.llm_client, "chat", return_value=refusal):
+            with self.assertRaises(pipeline_mod.PassRefused):
+                pipeline_mod.run_pass("pass2_character", self.slices, self.metrics,
+                                      dry_run=False, model_id=None, user_override="对话切片：A：你好")
+
+    def test_refusal_then_success_recovers(self):
+        refusal = self._res({"error": "未收到对话切片文本"})
+        ok = self._res({"voices": [{"name": "主角"}, {"name": "配角"}]})
+        with mock.patch.object(pipeline_mod.llm_client, "chat", side_effect=[refusal, ok]):
+            out = pipeline_mod.run_pass("pass2_character", self.slices, self.metrics,
+                                        dry_run=False, model_id=None, user_override="对话切片：A：你好")
+        self.assertIn("voices", out)
+        self.assertNotIn("error", out)
+
+    def test_error_with_payload_is_not_treated_as_refusal(self):
+        """既报 error 又给了有效载荷 → 视为部分成功，不重试、不抛错。"""
+        partial = self._res({"error": "部分角色无法判定", "voices": [{"name": "A"}, {"name": "B"}]})
+        with mock.patch.object(pipeline_mod.llm_client, "chat", return_value=partial):
+            out = pipeline_mod.run_pass("pass2_character", self.slices, self.metrics,
+                                        dry_run=False, model_id=None, user_override="对话切片：A：你好")
+        self.assertIn("voices", out)
+
+    def test_has_payload_helper(self):
+        self.assertFalse(pipeline_mod._has_payload({"error": "x", "detail": "y"}))
+        self.assertFalse(pipeline_mod._has_payload({"characters": []}))
+        self.assertTrue(pipeline_mod._has_payload({"error": "x", "characters": [{"n": 1}]}))
+        self.assertTrue(pipeline_mod._has_payload({"aggregate": {"k": 1}}))

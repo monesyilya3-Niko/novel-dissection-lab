@@ -131,6 +131,35 @@ def build_user_input(kind: str, slices: dict, metrics: dict) -> str:
     raise ValueError(f"未知 Pass: {kind}")
 
 
+class PassRefused(RuntimeError):
+    """模型用合法 JSON 明确拒绝本次 pass（拿不到必要素材）。
+
+    与「JSON 解析失败」区分开：后者值得存原始输出并改写提示重试，
+    前者是素材缺失，重试只是礼貌性再问一次，最终要抛出可读原因，
+    而不是混进"输出不是合法 JSON"的日志里误导排查。
+    """
+
+
+def _has_payload(out: dict) -> bool:
+    """该 pass 输出里是否含**实质内容**（而非只有 error 说明）。
+
+    有些模型会在同一份 JSON 里既报 error 又给出部分结果，这种不该判失败。
+    判据：除 error/detail/next_step/_meta 外，还有任何非空的顶层键。
+    """
+    if not isinstance(out, dict):
+        return False
+    meta = {"error", "detail", "next_step", "_meta"}
+    for k, v in out.items():
+        if k in meta:
+            continue
+        if v is None:
+            continue
+        if isinstance(v, (list, dict, str)) and len(v) == 0:
+            continue
+        return True
+    return False
+
+
 def run_pass(kind: str, slices: dict, metrics: dict, dry_run: bool,
              model_id: str | None, user_override: str | None = None) -> dict:
     system, template = load_prompt(kind)
@@ -149,6 +178,28 @@ def run_pass(kind: str, slices: dict, metrics: dict, dry_run: bool,
         print(f"      → tokens {r['prompt_tokens']}+{r['completion_tokens']}, 花费 ¥{r['cost']}, {r['elapsed']}s")
         try:
             out = extract_json(r["text"])
+            # 2026-11-02：LLM 有时会**用合法 JSON 表达拒绝**，例如
+            #   {"error": "未收到对话切片文本，无法提取声线特征", "detail": ...}
+            # 这是合法 JSON，旧实现原样返回，上层 services 便把它当成功写盘并
+            # 标记批次 success —— 用户看到"分析完成"，但 voice-card 里没有角色声线，
+            # 且没有任何错误提示。实测一本无对白的稿子，pass2 每批都在拒绝，
+            # 全程静默。
+            #
+            # 处理：识别顶层 error 键 → 视为该 pass 失败。
+            #   - 有 characters/dialogue 等有效载荷时不算失败（部分模型会同时给）
+            #   - 纯拒绝则重试（换个说法再问一次）
+            #   - 重试用尽仍拒绝 → 抛错，让批次标记 failed，用户能看到原因
+            if isinstance(out, dict) and out.get("error") and not _has_payload(out):
+                refusal = str(out.get("error"))[:200]
+                print(f"      ⚠ 模型拒绝本 pass：{refusal}")
+                if attempt < 2:
+                    system = system + (
+                        "\n\n【重要】上一次你返回了 error 而不是结果。"
+                        "若输入确实缺少必要素材，请仍然输出 JSON 对象，"
+                        "并在需要素材的字段填 null，不要整体返回 error。"
+                    )
+                    continue
+                raise PassRefused(f"{kind} 连续被模型拒绝：{refusal}")
             # Pass2 质量门禁：角色数不足（<2）时重试——Pass2 是最不稳定的输出
             if kind == "pass2_character":
                 n = len(normalize_mod.normalize_pass2(out))
@@ -164,7 +215,7 @@ def run_pass(kind: str, slices: dict, metrics: dict, dry_run: bool,
                 "elapsed": r["elapsed"],
             }
             return out
-        except (ValueError, json.JSONDecodeError) as e:
+        except (ValueError, json.JSONDecodeError) as e:  # noqa: PERF203
             # 存原始输出便于诊断，然后带纠错提示重试
             debug_dir = ROOT / "corpus" / "debug"
             debug_dir.mkdir(parents=True, exist_ok=True)
