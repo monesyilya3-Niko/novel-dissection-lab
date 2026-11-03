@@ -491,7 +491,13 @@ def render_genre_prose_card(card: dict) -> str:
 
 
 def render_commercial_obs(co: dict) -> str:
-    """商业观测：爽点密度 / 前3章拆解 / 卡点（如果存在）。"""
+    """商业观测：爽点密度 / 前3章拆解 / 卡点 / 更新节奏 / 留存风险 / 常见失误。
+
+    2026-11-03：此前只渲染 payoff_density 与 opening_analysis 两项，
+    而资产里还写着 paywall / update_rhythm / retention_risk_points /
+    common_mistakes / payoff_density_note——用户和拆书流程写的内容有一半
+    进不了 prompt。
+    """
     if not co:
         return "（无商业观测）"
     parts = []
@@ -507,6 +513,12 @@ def render_commercial_obs(co: dict) -> str:
             for t in pts[:5]:
                 if isinstance(t, dict) and t.get("type"):
                     parts.append(f"- {t['type']}（占比 {t.get('ratio', '?')}）铺垫 {t.get('buildup_length', '?')} 字")
+
+    # 数据可信度声明：模型不该把「估计值」当成实测结论
+    note = co.get("payoff_density_note")
+    if isinstance(note, str) and note.strip():
+        parts.append(f"> 数据说明：{note.strip()}")
+
     oa = co.get("opening_analysis")
     if isinstance(oa, dict):
         c1 = oa.get("chapter_1")
@@ -515,6 +527,52 @@ def render_commercial_obs(co: dict) -> str:
                 parts.append(f"- 开篇300字任务：{c1['first_300_words_task']}")
             if c1.get("hook_position"):
                 parts.append(f"- 首个钩子位置：第 {c1['hook_position']} 字")
+        if oa.get("chapter_2_3_task"):
+            parts.append(f"- 第2-3章任务：{oa['chapter_2_3_task']}")
+
+    # 付费卡点
+    pw = co.get("paywall")
+    if isinstance(pw, dict):
+        block = []
+        if pw.get("position_chapter"):
+            block.append(f"第 {pw['position_chapter']} 章")
+        if pw.get("cliffhanger_technique"):
+            block.append(f"卡点手法：{pw['cliffhanger_technique']}")
+        if pw.get("pre_paywall_buildup"):
+            block.append(f"前置蓄势：{pw['pre_paywall_buildup']}")
+        if block:
+            parts.append("- 付费卡点：" + "；".join(block))
+
+    # 更新节奏
+    ur = co.get("update_rhythm")
+    if isinstance(ur, dict):
+        block = []
+        cpd = ur.get("chapters_per_day")
+        if isinstance(cpd, int) and not isinstance(cpd, bool):
+            block.append(f"每日 {cpd} 更")
+        elif isinstance(cpd, str) and cpd.strip():
+            # 有的资产把节奏写成一段话（"Webnovel 连载节奏，多为稳定日更"），
+            # 直接拼接会把「…日更」变成「…日更 更」
+            block.append(cpd.strip())
+        if ur.get("burst_timing"):
+            block.append(str(ur["burst_timing"]).strip())
+        if block:
+            parts.append("- 更新节奏：" + "；".join(block))
+
+    # 留存风险点
+    rr = co.get("retention_risk_points")
+    if isinstance(rr, list) and rr:
+        parts.append("### 留存风险点（这些地方读者会流失）")
+        for x in rr[:6]:
+            parts.append(f"- {x if isinstance(x, str) else json.dumps(x, ensure_ascii=False)}")
+
+    # 常见失误
+    cm = co.get("common_mistakes")
+    if isinstance(cm, list) and cm:
+        parts.append("### 常见失误（写这本时最容易犯）")
+        for x in cm[:6]:
+            parts.append(f"- {x if isinstance(x, str) else json.dumps(x, ensure_ascii=False)}")
+
     return "\n".join(parts)
 
 

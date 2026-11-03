@@ -465,3 +465,53 @@ class TestGenrePackDialogueStyleRendered(unittest.TestCase):
         out = inject.render_genre_pack({"language_rules": {}})
         self.assertNotIn("### 对话风格", out)
         self.assertNotIn("### 禁止漂移", out)
+
+
+class TestCommercialObsRendersAllFields(unittest.TestCase):
+    """商业观测的可信度声明与留存风险必须进 prompt（2026-11-03 补）。
+
+    背景：render_commercial_obs 只渲染 payoff_density 与 opening_analysis，
+    资产里写着的 paywall / update_rhythm / retention_risk_points /
+    common_mistakes / payoff_density_note 全部被丢弃。
+    其中 payoff_density_note 是**数据可信度声明**（"估计值，非全书统计"），
+    丢了等于让模型把估算当实测。
+    """
+
+    def test_confidence_note_rendered(self):
+        from scripts import inject
+        co = {"payoff_density_note": "估计值：基于采样章类型学，非全书统计。"}
+        out = inject.render_commercial_obs(co)
+        self.assertIn("数据说明", out)
+        self.assertIn("估计值", out)
+
+    def test_paywall_rendered(self):
+        from scripts import inject
+        co = {"paywall": {"position_chapter": 12,
+                          "cliffhanger_technique": "关系升温未确立处断章"}}
+        out = inject.render_commercial_obs(co)
+        self.assertIn("付费卡点", out)
+        self.assertIn("第 12 章", out)
+        self.assertIn("关系升温未确立处断章", out)
+
+    def test_update_rhythm_string_not_doubled(self):
+        """数字写成字符串时不能拼出「日更 更」。"""
+        from scripts import inject
+        co = {"update_rhythm": {"chapters_per_day": "多为稳定日更"}}
+        out = inject.render_commercial_obs(co)
+        self.assertIn("多为稳定日更", out)
+        self.assertNotIn("日更 更", out)
+
+    def test_update_rhythm_int_formats_as_count(self):
+        from scripts import inject
+        out = inject.render_commercial_obs({"update_rhythm": {"chapters_per_day": 2}})
+        self.assertIn("每日 2 更", out)
+
+    def test_retention_and_mistakes_rendered(self):
+        from scripts import inject
+        co = {"retention_risk_points": ["多视角章连续超2章易掉主频"],
+              "common_mistakes": ["开篇倒叙生平"]}
+        out = inject.render_commercial_obs(co)
+        self.assertIn("留存风险点", out)
+        self.assertIn("多视角章连续超2章易掉主频", out)
+        self.assertIn("常见失误", out)
+        self.assertIn("开篇倒叙生平", out)
