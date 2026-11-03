@@ -405,12 +405,26 @@ def generate_title_names(style: str = "xianxia", count: int = 10) -> list[str]:
                 conn = "："
             if conn == "：我" and twist.startswith("我"):
                 conn = "："
+            # 2026-11-03：identity 与 twist 都可能以「开局」开头
+            # （各题材 identities 有 1~2 条、twists 有 0~1 条以它起头），
+            # 直接拼接会出「开局开局镇压…」这类重复词。
+            # 两者都以「开局」起头时，把 twist 里重复的前缀去掉。
+            # 注意：identity 不以「开局」开头、但 twist 以它开头时也可能重复——
+            # 连接符本身是「：开局」的话，会出现「…：开局开局继承…」。
+            _twist = twist
+            if identity.startswith("开局") and _twist.startswith("开局"):
+                _twist = _twist[len("开局"):].lstrip("，、 ")
+            elif conn.endswith("开局") and _twist.startswith("开局"):
+                conn = "："  # 连接符已含「开局」，去掉 twist 前缀
+                _twist = _twist[len("开局"):].lstrip("，、 ")
+            if not _twist:
+                continue
 
             # 两种经典格式：冒号卖点型 or 逗号直接型
             if random.random() < 0.65:
-                raw_title = f"{identity}{conn}{twist}{hook}"
+                raw_title = f"{identity}{conn}{_twist}{hook}"
             else:
-                raw_title = f"{identity}，{twist}{hook}"
+                raw_title = f"{identity}，{_twist}{hook}"
 
             # 清理可能出现的标点重复
             clean_title = raw_title.replace("，，", "，").replace("：：", "：").replace("，：", "：")
