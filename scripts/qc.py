@@ -672,6 +672,18 @@ def to_markdown(report: QCReport) -> str:
     if sev:
         lines.append("- 严重度分布: " + " / ".join(
             f"{k} {v}" for k, v in sorted(sev.items(), key=lambda kv: ["critical", "high", "medium", "low"].index(kv[0]) if kv[0] in ["critical", "high", "medium", "low"] else 9)))
+    # 覆盖率（2026-11-03 补）：meta.coverage 记录哪些维度**真的检查了**。
+    # 报告里只有「问题数 0」时，读者无法分辨"查了没问题"与"压根没查"。
+    cov = m.get("coverage")
+    if isinstance(cov, dict) and cov:
+        def _cov_text(v):
+            if isinstance(v, dict):
+                if v.get("checked") is False:
+                    return "未检查" + (f"（{v['reason']}）" if v.get("reason") else "")
+                return "已检查"
+            return "已检查" if v else "未检查"
+        pairs = [f"{name} {_cov_text(v)}" for name, v in cov.items()]
+        lines.append("- 检测覆盖: " + " / ".join(pairs))
     lines.append("")
     lines.append("## 四层十二维")
     lines.append("")

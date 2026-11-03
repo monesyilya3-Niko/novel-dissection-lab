@@ -92,5 +92,38 @@ class TestQcReportTimestamps(unittest.TestCase):
                          "列表未按时间倒序（仍按文件名排序）")
 
 
+
+class TestQcMarkdownCoverage(unittest.TestCase):
+    """质检 Markdown 报告必须写明检测覆盖率（2026-11-03 补）。
+
+    meta.coverage 记录哪些维度真的检查了。报告只写「问题数: 0」时，
+    读者无法分辨「查过了没问题」与「压根没查」——两者结论截然不同。
+    """
+
+    def _report(self, coverage):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import qc as qc_mod
+        return qc_mod.QCReport(book_title="T", total_score=90, verdict="PASS",
+                               layers=[], issues=[], meta={"coverage": coverage})
+
+    def test_unchecked_dimension_is_labelled(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import qc as qc_mod
+        md = qc_mod.to_markdown(self._report({
+            "logic": {"checked": False, "reason": "无实体表"},
+            "setting": {"checked": True},
+        }))
+        self.assertIn("检测覆盖", md)
+        self.assertIn("logic 未检查", md)
+        self.assertIn("无实体表", md)
+        self.assertIn("setting 已检查", md)
+
+    def test_no_coverage_block_adds_no_line(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import qc as qc_mod
+        rep = qc_mod.QCReport(book_title="T", total_score=90, verdict="PASS",
+                              layers=[], issues=[], meta={})
+        self.assertNotIn("检测覆盖", qc_mod.to_markdown(rep))
+
 if __name__ == "__main__":
     unittest.main()
