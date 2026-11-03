@@ -38,7 +38,15 @@
    "场景颗粒",
    "禁止漂移",
    "证据摘要"
-  ]
+  ],
+  "calibration": {
+   "dialogue_optimal": {
+    "method": "实测对话占比 28% ± 8 个百分点",
+    "measured_pct": 28,
+    "source": "genre-prose-card-genre-xingguang.json",
+    "evidence": "文风卡 provenance.evidence 记录的抽样实测（24 本 × 前中后各 24 段）"
+   }
+  }
  },
  "structure": {
   "chapter_word_range": {
@@ -206,8 +214,8 @@
   "pass": 75,
   "warn": 60,
   "dialogue_optimal": {
-   "min": 0.15,
-   "max": 0.35
+   "min": 0.2,
+   "max": 0.36
   }
  }
 }
