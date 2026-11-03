@@ -82,6 +82,24 @@ class TestDesktopPackagingManifest(unittest.TestCase):
         self.assertIn("sync_backend.py", predist, "package.json 缺少 predist 同步钩子")
         self.assertIn("fetch-python-win.py", predist, "package.json predist 未准备 python-win")
 
+    def test_secrets_never_packaged(self):
+        """密钥文件不得进安装包（2026-11-03 审计发现）。
+
+        sync_backend.py 把仓库根 config/ 整个复制进 backend/，而
+        config/.secrets.bin 是本机 API 密钥的 DPAPI 密文。它虽绑定当前
+        Windows 用户、换机解不开，但分发物里根本不该出现；更实际的危害是
+        scripts/llm_client.resolve_secrets_dir() 会回落到随包 config/，
+        形成「用户目录 / 安装目录」第二真相源。
+
+        models.json 是模型配置模板，必须保留（安装版首次运行据此迁移）。
+        """
+        secrets = [p for p in BACKEND.rglob("*") if p.is_file()
+                   and p.name.startswith(".secrets")]
+        self.assertEqual(secrets, [], f"安装包内出现密钥文件: {secrets}")
+        # 模板仍要在：漏了它安装版永远显示「未配置模型」
+        self.assertTrue((BACKEND / "config" / "models.json").is_file(),
+                        "安装包内缺失 config/models.json 模板")
+
     def test_dev_files_excluded(self):
         """背景3（2026-09-29 安装包开箱审计）：云端 exe 经解剖发现
         gui/web/src（前端源码）、gui/web/e2e、vite/eslint 等构建配置、

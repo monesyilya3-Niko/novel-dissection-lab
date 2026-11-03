@@ -47,7 +47,15 @@ EXCLUDE_REL_DIRS = {
     Path("gui/web/src"),
     Path("gui/web/e2e"),
 }
+# 密钥文件绝不能进安装包：`sync_dir` 会把 config/ 整个复制进 backend/，
+# 而 config/.secrets.bin 是本机 API 密钥的 DPAPI 密文。DPAPI 虽与本机用户
+# 绑定、换机器解不开，但它仍不该出现在分发物里（一旦别人拿到同用户上下文
+# 即可解密），且 scripts/llm_client.resolve_secrets_dir() 会回落到随包
+# config/ 目录——等于制造第二真相源。安装版首次运行会迁移内置 config/ 到
+# 用户数据目录，models.json 作为模板需要保留，密钥必须排除。
 EXCLUDE_REL_FILES = {
+    Path("config/.secrets.bin"),
+    Path("config/.secrets.json"),
     Path("gui/web/package.json"),
     Path("gui/web/package-lock.json"),
     Path("gui/web/vite.config.ts"),
@@ -74,6 +82,10 @@ EXCLUDE_REL_DIRS_FROM_PROMPTS = {Path("generated")}
 def _excluded(rel_from_root: Path) -> bool:
     """rel_from_root 为相对仓库根的路径；命中排除表则不进安装包。"""
     if rel_from_root in EXCLUDE_REL_FILES:
+        return True
+    # 兜底：任何位置的密钥文件都不随包（含未来新增的 config/*.secrets*、
+    # 旧版明文 .secrets.json）。显式表易漏，这里按文件名前缀再拦一次。
+    if rel_from_root.name.startswith(".secrets"):
         return True
     return any(d in rel_from_root.parents for d in EXCLUDE_REL_DIRS)
 
