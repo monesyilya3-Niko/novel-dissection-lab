@@ -1248,19 +1248,80 @@ def _read_chapter(fp: Path) -> str:
             f"章节文件编码无法识别（仅支持 UTF-8 / GBK）：{fp.name}", 400) from exc
 
 
+#: 章节文件名的可识别模式（2026-11-03 扩展）。
+#: 此前只认 ``chapter-001.txt`` 一种，实测用户按自己习惯命名的稿子
+#: （``001.txt`` / ``第1章.txt`` / ``chapter_001.txt`` / ``.md``）全部被
+#: 静默忽略——导出时会凭空少章，用户不知道原因。
+#: 模式只负责取「章节号」；取不到数字的文件不按章节处理。
+_CHAPTER_NAME_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"^chapter[-_ ]?(\d+)$", re.IGNORECASE),   # chapter-001 / chapter_001 / Chapter 1
+    re.compile(r"^ch[-_ ]?(\d+)$", re.IGNORECASE),        # ch1 / ch-001
+    re.compile(r"^第\s*(\d+)\s*[章回节]$"),                # 第1章 / 第 12 回
+    re.compile(r"^(\d+)$"),                                # 001 / 12
+    re.compile(r"^(\d+)[-_. ].+$"),                        # 001-开端 / 12_标题
+)
+
+#: 视为正文的扩展名（与 text_access.TEXT_SUFFIXES 同口径）
+_CHAPTER_SUFFIXES = frozenset({".txt", ".md"})
+
+
+def _chapter_no_from_name(stem: str) -> int | None:
+    """从文件名（不含扩展名）解析章节号；不匹配返回 None。"""
+    for pat in _CHAPTER_NAME_PATTERNS:
+        m = pat.match(stem)
+        if m:
+            try:
+                n = int(m.group(1))
+            except (TypeError, ValueError):
+                return None
+            return n if n > 0 else None
+    return None
+
+
 def _iter_chapter_files(project: str) -> list[tuple[int, Path]]:
-    """按章节号排序列出章节文件。"""
+    """按章节号排序列出章节文件。
+
+    同一章号出现多个文件时（如 ``001.txt`` 与 ``第1章.txt`` 并存），
+    保留文件名排序靠后的那个并告警——静默丢弃比重复更糟。
+    """
     novel_dir = _novel_dir(project)
     chapters_dir = novel_dir / "chapters"
-    out: list[tuple[int, Path]] = []
     if not chapters_dir.is_dir():
-        return out
-    for fp in chapters_dir.rglob("chapter-*.txt"):
-        m = re.fullmatch(r"chapter-(\d+)\.txt", fp.name)
-        if m:
-            out.append((int(m.group(1)), fp))
-    out.sort(key=lambda t: t[0])
-    return out
+        return []
+    found: dict[int, Path] = {}
+    #: 同一章号多文件时的取舍优先级：显式带「chapter」前缀的最可信，
+    #: 其次是「第N章」，再次是纯数字（纯数字最可能是临时文件或备份）
+    def _priority(fp: Path) -> tuple[int, int, str]:
+        s = fp.stem.lower()
+        if s.startswith("chapter") or s.startswith("ch"):
+            rank = 0
+        elif s.startswith("第"):
+            rank = 1
+        else:
+            rank = 2
+        # rank 越小越优先；同 rank 保留文件名较长者（通常信息更全，如 001-开端）
+        return (rank, -len(fp.stem), fp.name)
+
+    duplicates: list[str] = []
+    for fp in sorted(chapters_dir.rglob("*")):
+        if not fp.is_file() or fp.suffix.lower() not in _CHAPTER_SUFFIXES:
+            continue
+        no = _chapter_no_from_name(fp.stem)
+        if no is None:
+            continue
+        prev = found.get(no)
+        if prev is not None:
+            if _priority(fp) < _priority(prev):
+                duplicates.append(f"{prev.name}（被 {fp.name} 取代）")
+                found[no] = fp
+            else:
+                duplicates.append(f"{fp.name}（保留 {prev.name}）")
+            continue
+        found[no] = fp
+    if duplicates:
+        _log.warning("项目 %s 存在重复章号文件（已保留先出现的）：%s",
+                     project, "；".join(duplicates))
+    return sorted(found.items())
 
 
 def get_chapter_words(project: str, chapter_no: int) -> int | None:

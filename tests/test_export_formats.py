@@ -144,5 +144,77 @@ class TestExportFormats(unittest.TestCase):
             writing_extra.get_project_meta = orig
 
 
+
+class TestChapterFilenameCompat(unittest.TestCase):
+    """章节文件命名兼容（2026-11-03）。
+
+    背景：此前只认 ``chapter-001.txt`` 一种命名，实测 9 种常见写法里
+    只有 1 种被识别，其余全部静默忽略——导出会凭空少章，用户不知道原因。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls._iso = _isolation.isolate_paths(Path(cls._tmp.name))
+        cls._iso.__enter__()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._iso.__exit__(None, None, None)
+        cls._tmp.cleanup()
+
+    def _proj(self, names: list[str]) -> str:
+        from gui import config
+        proj = "命名测试"
+        base = Path(config.NOVEL_DIR) / proj / "chapters" / "arc-1"
+        if base.exists():
+            for fp in base.iterdir():
+                fp.unlink()
+        base.mkdir(parents=True, exist_ok=True)
+        for n in names:
+            (base / n).write_text("正文内容。", encoding="utf-8")
+        return proj
+
+    def test_common_naming_written_by_users(self):
+        """用户常见的 8 种命名都应被识别。"""
+        # 章号各不相同，避免去重干扰（同章号并存另有专门用例）
+        cases = {
+            "chapter-001.txt": 1,
+            "002.txt": 2,
+            "第3章.txt": 3,
+            "第004章.txt": 4,
+            "chapter_005.txt": 5,
+            "Chapter 6.txt": 6,
+            "ch7.md": 7,
+            "8.txt": 8,
+        }
+        proj = self._proj(list(cases))
+        from gui import writing_extra
+        got = {fp.name: no for no, fp in writing_extra._iter_chapter_files(proj)}
+        for name, expected in cases.items():
+            with self.subTest(name=name):
+                self.assertEqual(got.get(name), expected,
+                                 f"{name} 未被识别或章号错误")
+
+    def test_non_chapter_files_ignored(self):
+        proj = self._proj(["第1章.txt", "前言.txt", "大纲.md", "notes.txt"])
+        from gui import writing_extra
+        got = [fp.name for _, fp in writing_extra._iter_chapter_files(proj)]
+        self.assertEqual(got, ["第1章.txt"])
+
+    def test_duplicate_chapter_keeps_most_explicit(self):
+        """同章号多文件时优先保留带 chapter 前缀的那份。"""
+        proj = self._proj(["001.txt", "第1章.txt", "chapter-001.txt"])
+        from gui import writing_extra
+        files = writing_extra._iter_chapter_files(proj)
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0][1].name, "chapter-001.txt")
+
+    def test_sorted_by_chapter_number(self):
+        proj = self._proj(["第10章.txt", "第2章.txt", "第1章.txt"])
+        from gui import writing_extra
+        nos = [no for no, _ in writing_extra._iter_chapter_files(proj)]
+        self.assertEqual(nos, [1, 2, 10], "章节未按数字序排列")
+
 if __name__ == "__main__":
     unittest.main()
