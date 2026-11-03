@@ -320,6 +320,22 @@ def _safe_int(value: Any, default: int, field: str) -> int:
         raise ServiceError(f"{field} 必须为整数", 400) from exc
 
 
+def _safe_int_or_none(value: Any, field: str) -> int | None:
+    """同 _safe_int，但 None 原样返回（让调用方决定默认值来自哪里）。
+
+    2026-11-03：写作参数 words / target_score 的默认值应来自设置页，
+    不是路由层写死的 2400 / 90。因此这里不能替调用方补默认值。
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ServiceError(f"{field} 必须为整数", 400)
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ServiceError(f"{field} 必须为整数", 400) from exc
+
+
 def _safe_chapter_no(value: Any, field: str) -> int:
     """章节序号必须是**精确整数**。
 
@@ -384,8 +400,12 @@ def _h_writing_generate(_params: dict[str, Any], body: dict[str, Any]) -> dict[s
         chapter_no=_safe_chapter_no(b.get("chapter_no"), "chapter_no"),
         task=_task,
         novel_name=_novel_name, prompt=_prompt,
-        genre_pack=_genre_pack, words=_safe_int(_raw_words, 2400, "words"),
-        target_score=_safe_int(_raw_target_score, 90, "target_score"),
+        # 2026-11-03：words / target_score 未指定时传 None，由 writing_service
+        # 取设置页的 default_words / consistency_target（此前这里写死 2400/90，
+        # 导致设置页的两项形同虚设）。
+        genre_pack=_genre_pack,
+        words=_safe_int_or_none(_raw_words, "words"),
+        target_score=_safe_int_or_none(_raw_target_score, "target_score"),
         quality_target=_raw_quality_target,
         save_prompt=bool(b.get("save_prompt"))))
 

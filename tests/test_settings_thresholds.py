@@ -107,3 +107,60 @@ class TestSettingsThresholdsTakeEffect(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestWritingDefaultsFromSettings(unittest.TestCase):
+    """设置页的写作默认值（default_words / consistency_target）必须真的被用上。
+
+    2026-11-03：这两项此前只存不读——生成章节时用的是函数签名里写死的
+    2400 / 90，用户改了设置没有任何效果。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls._iso = _isolation.isolate_paths(Path(cls._tmp.name))
+        cls._iso.__enter__()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._iso.__exit__(None, None, None)
+        cls._tmp.cleanup()
+
+    def _write(self, payload: dict) -> None:
+        from gui import system_service
+        path = system_service._settings_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    def setUp(self) -> None:
+        from gui import system_service
+        path = system_service._settings_file()
+        if path.exists():
+            path.unlink()
+
+    def test_defaults_when_no_settings(self):
+        from gui import writing_service
+        self.assertEqual(writing_service._settings_defaults(),
+                         {"words": 2400, "target_score": 90})
+
+    def test_settings_override_defaults(self):
+        from gui import writing_service
+        self._write({"writing": {"default_words": 3500},
+                     "thresholds": {"consistency_target": 95}})
+        self.assertEqual(writing_service._settings_defaults(),
+                         {"words": 3500, "target_score": 95})
+
+    def test_out_of_range_settings_fall_back(self):
+        from gui import writing_service
+        self._write({"writing": {"default_words": 999999},
+                     "thresholds": {"consistency_target": 150}})
+        self.assertEqual(writing_service._settings_defaults(),
+                         {"words": 2400, "target_score": 90})
+
+    def test_router_passes_none_so_service_can_decide(self):
+        """路由层不得再用写死的 2400/90 覆盖设置。"""
+        from gui import router
+        self.assertIsNone(router._safe_int_or_none(None, "words"))
+        self.assertIsNone(router._safe_int_or_none(None, "target_score"))
+        self.assertEqual(router._safe_int_or_none(3000, "words"), 3000)

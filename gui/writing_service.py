@@ -504,12 +504,51 @@ def assemble_candidates() -> list[dict[str, Any]]:
 # W12 长任务：generate / task_state / import_chapter
 # ---------------------------------------------------------------------------
 
+def _settings_defaults() -> dict[str, int]:
+    """设置页的写作默认值（2026-11-03 修复孤岛配置）。
+
+    此前 ``settings.json`` 里的 ``default_words`` / ``consistency_target``
+    能存能读，但生成章节时用的是函数签名里写死的 2400 / 90，用户改了没反应。
+    scripts/write.py 不能 import gui/（分层铁律），所以由这一层取出来再传下去。
+
+    读取失败一律退回原默认值，不能让设置文件损坏阻断写作。
+    """
+    defaults = {"words": 2400, "target_score": 90}
+    try:
+        from gui import system_service
+        saved = system_service._load_settings_file()
+    except Exception:  # noqa: BLE001 - 设置不可读不应影响写作
+        return defaults
+    writing = saved.get("writing") if isinstance(saved, dict) else None
+    thresholds = saved.get("thresholds") if isinstance(saved, dict) else None
+
+    def _int_or(v: Any, fallback: int, lo: int, hi: int) -> int:
+        if isinstance(v, int) and not isinstance(v, bool) and lo <= v <= hi:
+            return v
+        return fallback
+
+    if isinstance(writing, dict):
+        defaults["words"] = _int_or(writing.get("default_words"), 2400, 100, 20000)
+    if isinstance(thresholds, dict):
+        defaults["target_score"] = _int_or(thresholds.get("consistency_target"), 90, 0, 100)
+    return defaults
+
+
 def generate(voice: str, project: str, chapter_no: int, task: str,
              novel_name: str | None = None, prompt: str | None = None,
-             genre_pack: str | None = None, words: int = 2400,
-             target_score: int = 90, quality_target: int | None = None,
+             genre_pack: str | None = None, words: int | None = None,
+             target_score: int | None = None, quality_target: int | None = None,
              save_prompt: bool = False) -> dict[str, Any]:
-    """开始写作任务。无模型时同步返回降级指引；有模型时后台线程跑改写循环。"""
+    """开始写作任务。无模型时同步返回降级指引；有模型时后台线程跑改写循环。
+
+    words / target_score 传 None 表示「未指定」，此时取设置页的默认值
+    （default_words / consistency_target），再退回 2400 / 90。
+    """
+    defaults = _settings_defaults()
+    if words is None:
+        words = defaults["words"]
+    if target_score is None:
+        target_score = defaults["target_score"]
     project = _sanitize_project(project)
     if chapter_no < 1:
         raise ServiceError("chapter_no 必须 ≥ 1", 400)
