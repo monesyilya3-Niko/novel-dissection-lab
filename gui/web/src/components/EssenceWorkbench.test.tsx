@@ -19,6 +19,7 @@ const mockCreateChain = vi.fn()
 const mockDeleteChain = vi.fn()
 const mockAdoptBook = vi.fn()
 const mockProjects = vi.fn()
+const mockGetStats = vi.fn()
 
 vi.mock('../api/client', () => ({
   essenceApi: {
@@ -36,6 +37,7 @@ vi.mock('../api/client', () => ({
     listChains: (...args: any[]) => mockListChains(...args),
     createChain: (...args: any[]) => mockCreateChain(...args),
     deleteChain: (...args: any[]) => mockDeleteChain(...args),
+    getStats: (...args: any[]) => mockGetStats(...args),
   },
   writingApi: {
     projects: () => mockProjects(),
@@ -47,6 +49,11 @@ describe('EssenceWorkbench', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockProjects.mockResolvedValue([{ name: '测试创作项目', dir: 'p1' }])
+    mockGetStats.mockResolvedValue({
+      totalBooks: 1, totalChars: 5300000, totalChapters: 1640,
+      totalAssets: 5, totalChains: 2,
+      genreDistribution: { '玄幻': 1 }, categoryDistribution: { outline: 1 },
+    })
     mockListAssets.mockResolvedValue({
       assets: [
         {

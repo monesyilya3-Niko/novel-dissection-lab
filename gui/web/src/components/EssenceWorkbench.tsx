@@ -40,6 +40,7 @@ import {
   type EssenceAsset,
   type EssenceMacroAnalysisResult,
   type EssenceChain,
+  type EssenceStats,
 } from '../api/client'
 import type { WritingProject } from '../types'
 import InlineGuide from './InlineGuide'
@@ -722,16 +723,21 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
+  // 库级总览（2026-11-03）：后端 /api/essence/stats 一直提供总书数/总字数/
+  // 分类分布，但没有任何 UI 消费它——用户看不到整个精华库的规模。
+  const [stats, setStats] = useState<EssenceStats | null>(null)
 
   const loadBooks = async () => {
     setLoading(true)
     setError('')
     try {
-      const [res, projs] = await Promise.all([
+      const [res, projs, st] = await Promise.all([
         essenceApi.listBooks(),
         writingApi.projects().catch(() => []),
+        essenceApi.getStats().catch(() => null),
       ])
       setBooks(res.books || [])
+      setStats(st)
       const validProjects = (projs || []).filter((p: WritingProject) => !p.readOnly && p.name !== 'default' && p.id !== 'default')
       const projNames = validProjects.map((p: WritingProject) => p.name)
       setProjects(projNames)
@@ -824,6 +830,27 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
           {t('essence_books_btn_refresh')}
         </Button>
       </Box>
+
+      {/* 库级总览：/api/essence/stats 之前无人消费，用户看不到整库规模 */}
+      {stats && stats.totalBooks > 0 ? (
+        <Paper variant="outlined" sx={{ p: 1.5 }}>
+          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+            {[
+              [t('essence_stats_books', '精读著作'), stats.totalBooks],
+              [t('essence_stats_chars', '总字数'), stats.totalChars.toLocaleString()],
+              [t('essence_stats_assets', '五维资产'), stats.totalAssets],
+              [t('essence_stats_chains', '伏笔暗线'), stats.totalChains],
+            ].map(([label, value]) => (
+              <Box key={String(label)}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  {label}
+                </Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{value}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      ) : null}
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>

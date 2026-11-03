@@ -1133,8 +1133,10 @@ export interface EssenceBook {
   aiSlopScore: number
   summary: string
   meta: Record<string, unknown>
-  createdAt: number
-  updatedAt: number
+  // 2026-11-03：后端返回 ISO 字符串（如 "2026-10-11T18:05:47+00:00"），
+  // 此前声明为 number，与事实不符——按数字比较/格式化的代码会静默出错。
+  createdAt: string
+  updatedAt: string
 }
 
 export interface EssenceAsset {
@@ -1149,8 +1151,9 @@ export interface EssenceAsset {
   platform: string
   rating: number
   userNote: string
-  createdAt: number
-  updatedAt: number
+  // 同 EssenceBook：后端返回 ISO 字符串，不是时间戳数字
+  createdAt: string
+  updatedAt: string
 }
 
 export interface EssenceMacroAnalysisResult {

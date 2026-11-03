@@ -2207,6 +2207,23 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '宪法正典审查',
     'en-US': 'Canon Guard & Constitution',
   },
+  // 精华库总览（书籍页顶部四项指标）
+  essence_stats_books: {
+    'zh-CN': '精读著作',
+    'en-US': 'Studied Books',
+  },
+  essence_stats_chars: {
+    'zh-CN': '总字数',
+    'en-US': 'Total Characters',
+  },
+  essence_stats_assets: {
+    'zh-CN': '五维资产',
+    'en-US': 'Five-Axis Assets',
+  },
+  essence_stats_chains: {
+    'zh-CN': '伏笔暗线',
+    'en-US': 'Foreshadow Chains',
+  },
 
   // 五维分类
   essence_cat_all: {
