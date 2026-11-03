@@ -1242,10 +1242,15 @@ def _read_chapter(fp: Path) -> str:
     用户根本不知道是哪一章坏了。
     """
     try:
-        return engine_adapter.read_chapter_text(fp)
+        text = engine_adapter.read_chapter_text(fp)
     except UnicodeError as exc:
         raise ServiceError(
-            f"章节文件编码无法识别（仅支持 UTF-8 / GBK）：{fp.name}", 400) from exc
+            f"章节文件编码无法识别（支持 UTF-8 / GBK / GB18030 / UTF-16）：{fp.name}", 400) from exc
+    # 统一换行（2026-11-03）：Windows 稿子是 CRLF，原样返回会让导出的
+    # txt/md 每行末尾留着 \r——用记事本/编辑器打开正常，但任何按行处理的
+    # 下游（Word 导入、Git diff、脚本）都会踩到。此处统一成 \n。
+    # 同时去掉 UTF-8 BOM 残留（read_chapter_text 用 utf-8-sig 已剥，双保险）。
+    return text.replace("\r\n", "\n").replace("\r", "\n").lstrip("﻿")
 
 
 #: 章节文件名的可识别模式（2026-11-03 扩展）。

@@ -250,5 +250,66 @@ class TestChapterTitleSplitting(unittest.TestCase):
         chs = self._split("第1章 开端\n\n第2章开始了。主角走进门。\n\n正文")
         self.assertEqual(len(chs), 1)
 
+
+class TestLineEndingNormalisation(unittest.TestCase):
+    """导出内容统一 LF（2026-11-03）。
+
+    背景：Windows 稿子是 CRLF，原样导出会让 txt/md 每行末尾留着回车符——
+    记事本里看着正常，但 Word 导入、Git diff、按行处理的脚本都会踩到。
+    """
+
+    CR = chr(13)
+    LF = chr(10)
+    CRLF = CR + LF
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls._iso = _isolation.isolate_paths(Path(cls._tmp.name))
+        cls._iso.__enter__()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._iso.__exit__(None, None, None)
+        cls._tmp.cleanup()
+
+    def _write(self, data: bytes) -> None:
+        from gui import config
+        base = Path(config.NOVEL_DIR) / "换行测试" / "chapters" / "arc-1"
+        base.mkdir(parents=True, exist_ok=True)
+        (base / "chapter-001.txt").write_bytes(data)
+
+    def _crlf_doc(self) -> str:
+        nl = self.CRLF
+        return ("第一章" + nl + nl + "第一段。" + nl + nl
+                + "第二段。" + nl)
+
+    def _lf_doc(self) -> str:
+        nl = self.LF
+        return ("第一章" + nl + nl + "第一段。" + nl + nl
+                + "第二段。" + nl)
+
+    def test_txt_has_no_carriage_return(self):
+        from gui import writing_extra
+        self._write(self._crlf_doc().encode("utf-8"))
+        r = writing_extra.export_project("换行测试", "txt")
+        self.assertNotIn(self.CR, r["content"], "导出内容仍含回车符")
+        self.assertIn("第一段。", r["content"])
+
+    def test_md_has_no_carriage_return(self):
+        from gui import writing_extra
+        self._write(self._crlf_doc().encode("utf-8"))
+        r = writing_extra.export_project("换行测试", "md")
+        self.assertNotIn(self.CR, r["content"])
+
+    def test_crlf_and_lf_produce_same_text(self):
+        from gui import writing_extra
+        self._write(self._crlf_doc().encode("utf-8"))
+        crlf = writing_extra.export_project("换行测试", "txt")["content"]
+        self._write(self._lf_doc().encode("utf-8"))
+        lf = writing_extra.export_project("换行测试", "txt")["content"]
+        self.assertEqual(crlf, lf, "CRLF 与 LF 稿子导出结果应一致")
+
+
 if __name__ == "__main__":
     unittest.main()
