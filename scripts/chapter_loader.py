@@ -276,15 +276,30 @@ def read_text_file(path: Path) -> str:
         data = path.read_bytes()
     except OSError as exc:
         raise OSError(f"正文文件读取失败: {path} — {exc}") from exc
+    # 2026-11-03：解码顺序扩展为 UTF-8(BOM) → GB18030 → GBK → UTF-16。
+    #
+    # - GB18030 是 GBK 的超集（多覆盖生僻字与 4 字节区），国内老稿子里
+    #   确实存在；先试 GB18030 再退 GBK，对纯 GBK 文件结果完全一致。
+    # - UTF-16 由 Windows 记事本「Unicode」另存产生，带 BOM（FF FE / FE FF），
+    #   没有 BOM 的 UTF-16 无法可靠识别，故只认带 BOM 的。
+    # 顺序理由：UTF-8 严格（非法字节即失败），不会误吞其它编码；
+    # GB18030/GBK 几乎任何字节序列都能"解出"东西，所以放最后且前面已排除。
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        try:
+            return data.decode("utf-16")
+        except UnicodeError:
+            pass  # 带 BOM 但内容非法，继续往下走
     try:
         return data.decode("utf-8-sig")   # utf-8-sig 解普通 UTF-8 同样正确，仅额外剥 BOM
     except UnicodeError:
+        pass
+    for enc in ("gb18030", "gbk"):
         try:
-            # GBK 无 BOM 概念；但少数编辑器会给 GBK 文件加 UTF-16 BOM，此处不处理。
-            return data.decode("gbk")
-        except UnicodeError as exc:
-            raise UnicodeError(
-                f"正文文件编码无法识别（仅支持 UTF-8 / GBK）: {path} — {exc}") from exc
+            return data.decode(enc)
+        except UnicodeError:
+            continue
+    raise UnicodeError(
+        f"正文文件编码无法识别（支持 UTF-8 / GBK / GB18030 / UTF-16）: {path}")
 
 
 def _first_alias(aliases: dict):
