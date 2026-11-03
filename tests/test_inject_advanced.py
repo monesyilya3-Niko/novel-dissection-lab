@@ -515,3 +515,46 @@ class TestCommercialObsRendersAllFields(unittest.TestCase):
         self.assertIn("多视角章连续超2章易掉主频", out)
         self.assertIn("常见失误", out)
         self.assertIn("开篇倒叙生平", out)
+
+
+class TestStructureObsRendersParams(unittest.TestCase):
+    """结构观测的节奏参数必须进 prompt（2026-11-03 补）。
+
+    背景：此前 render_structure_obs 只输出章节功能分布、3 条钩子骨架、钩子频次
+    和伏笔平均跨度；钩子最小间隔 / 高潮周期 / 并发伏笔上限 / 常见结构失误
+    全被丢弃——而"按这本书的节奏写"恰恰依赖这些数字。
+    """
+
+    def test_all_rhythm_params_rendered(self):
+        from scripts import inject
+        so = {"aggregate": {
+            "hook_min_interval": 2,
+            "climax_cycle": 15,
+            "foreshadow_avg_span": 40,
+            "foreshadow_max_span": 120,
+            "foreshadow_concurrent_open": 3,
+        }}
+        out = inject.render_structure_obs(so)
+        for token in ("钩子最小间隔 2 章", "高潮周期 15 章",
+                      "伏笔平均跨度 40 章", "伏笔最长跨度 120 章",
+                      "同时未回收伏笔上限 3 条"):
+            self.assertIn(token, out)
+
+    def test_common_mistakes_rendered(self):
+        from scripts import inject
+        so = {"common_mistakes": ["每章都堆钩子导致疲劳"]}
+        out = inject.render_structure_obs(so)
+        self.assertIn("常见结构失误", out)
+        self.assertIn("每章都堆钩子导致疲劳", out)
+
+    def test_notes_rendered(self):
+        from scripts import inject
+        so = {"aggregate": {"notes": "样本来自开篇、中段与终局附近，非全量"}}
+        out = inject.render_structure_obs(so)
+        self.assertIn("结构说明", out)
+        self.assertIn("非全量", out)
+
+    def test_empty_aggregate_adds_no_heading(self):
+        from scripts import inject
+        out = inject.render_structure_obs({"aggregate": {}})
+        self.assertNotIn("### 结构参数", out)

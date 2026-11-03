@@ -266,8 +266,35 @@ def render_structure_obs(so: dict) -> str:
         if agg.get("hook_type_freq"):
             parts.append("### 钩子频次")
             parts.append(json.dumps(agg["hook_type_freq"], ensure_ascii=False))
+        # 2026-11-03：结构参数此前只渲染了伏笔平均跨度，其余全丢。
+        # 这些是「按这本书的节奏写」最关键的数字，写了不渲染等于没拆。
+        params = []
+        if agg.get("hook_min_interval"):
+            params.append(f"钩子最小间隔 {agg['hook_min_interval']} 章")
+        if agg.get("climax_cycle"):
+            params.append(f"高潮周期 {agg['climax_cycle']} 章")
         if agg.get("foreshadow_avg_span"):
-            parts.append(f"- 伏笔平均跨度：{agg['foreshadow_avg_span']} 章")
+            params.append(f"伏笔平均跨度 {agg['foreshadow_avg_span']} 章")
+        if agg.get("foreshadow_max_span"):
+            params.append(f"伏笔最长跨度 {agg['foreshadow_max_span']} 章")
+        if agg.get("foreshadow_concurrent_open"):
+            params.append(f"同时未回收伏笔上限 {agg['foreshadow_concurrent_open']} 条")
+        if params:
+            parts.append("### 结构参数")
+            parts.append("；".join(params))
+        rm = agg.get("role_mix_estimate")
+        if isinstance(rm, dict) and rm:
+            parts.append("### 章节功能配比")
+            parts.append("、".join(f"{k}≈{v}" for k, v in rm.items()))
+        if agg.get("notes"):
+            parts.append(f"> 结构说明：{agg['notes']}")
+
+    # 常见结构失误（拆书时总结的，写作时最该避开）
+    cm = so.get("common_mistakes")
+    if isinstance(cm, list) and cm:
+        parts.append("### 常见结构失误")
+        for x in cm[:6]:
+            parts.append(f"- {x if isinstance(x, str) else json.dumps(x, ensure_ascii=False)}")
     return "\n\n".join(parts)
 
 
