@@ -586,14 +586,63 @@ def save_chapter(novel_dir: str, chapter_no: int, content: str) -> Path:
 
 # --- 打分 / 检查（consistency.py / chapter_check.py）---
 
+def _with_user_thresholds(genre_pack: dict | None) -> dict | None:
+    """把设置页的质量阈值合并进 genre_pack，作为 scripts 侧的输入。
+
+    2026-11-03 修复（孤岛配置）：设置页的 ``quality_pass_line`` /
+    ``quality_warn_line`` 一直被保存，却没有任何质检代码读取——用户在设置里
+    改「质量及格线」，检查结果纹丝不动。而 scripts/ 不能 import gui/
+    （分层铁律），所以由这一层（唯一能读设置的出口）负责合并。
+
+    优先级：题材包显式配置 > 用户设置 > 默认 75/60。
+    题材包若已写 pass/warn，说明是针对该题材的专门标定，不应被全局值盖掉。
+    """
+    from gui import system_service
+
+    try:
+        saved = system_service._load_settings_file()
+    except Exception:  # 设置读取失败不能影响质检
+        saved = {}
+    thresholds = saved.get("thresholds") if isinstance(saved, dict) else None
+    if not isinstance(thresholds, dict):
+        return genre_pack
+
+    user_pass = thresholds.get("quality_pass_line")
+    user_warn = thresholds.get("quality_warn_line")
+    if not isinstance(user_pass, int) or isinstance(user_pass, bool):
+        return genre_pack
+    if not isinstance(user_warn, int) or isinstance(user_warn, bool):
+        return genre_pack
+    if not (0 <= user_warn <= user_pass <= 100):
+        return genre_pack
+
+    pack = dict(genre_pack) if isinstance(genre_pack, dict) else {}
+    existing = pack.get("quality_thresholds")
+    if isinstance(existing, dict) and (existing.get("pass") is not None
+                                       or existing.get("warn") is not None):
+        return pack
+    merged = dict(existing) if isinstance(existing, dict) else {}
+    merged.setdefault("pass", user_pass)
+    merged.setdefault("warn", user_warn)
+    pack["quality_thresholds"] = merged
+    return pack
+
+
 def chapter_check(text: str, genre_pack: dict | None = None) -> dict[str, Any]:
-    """章节质量 12 维检查（chapter_check.chapter_check）。"""
-    return _get_chapter_check().chapter_check(text, genre_pack)
+    """章节质量 12 维检查（chapter_check.chapter_check）。
+
+    阈值先合并用户设置（见 _with_user_thresholds），再交给 scripts 侧判定。
+    """
+    pack = _with_user_thresholds(genre_pack)
+    return _get_chapter_check().chapter_check(text, pack)
 
 
 def resolve_thresholds(genre_pack: dict | None = None) -> tuple[int, int]:
-    """解析质量阈值 (pass_line, warn_line)（chapter_check.resolve_thresholds）。"""
-    return _get_chapter_check().resolve_thresholds(genre_pack)
+    """解析质量阈值 (pass_line, warn_line)（chapter_check.resolve_thresholds）。
+
+    同样先合并用户设置，保证「检查」与「取阈值」两条路径看到同一个值。
+    """
+    return _get_chapter_check().resolve_thresholds(_with_user_thresholds(genre_pack))
 
 
 # --- 章节扫描口径（单一来源：scripts/chapter_loader）---
