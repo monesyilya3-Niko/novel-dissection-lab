@@ -165,6 +165,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--voice", help="voice-card 路径（用于一致性打分，可选）")
     ap.add_argument("--genre-pack", help="题材包路径（用于附加质量检查，可选）")
     ap.add_argument("--target-score", type=int, default=90, help="一致性目标分（默认 90，未达标自动改写）")
+    ap.add_argument("--max-attempts", type=int, default=3,
+                    help="最多生成轮数（1 初稿 + N-1 改写，默认 3；GUI 侧取设置页 writing.max_attempts）")
     ap.add_argument("--quality-target", type=int, default=None, help="章节质量目标分（可选；缺省时按题材包 quality_thresholds 回退，再回退 75）")
     ap.add_argument("--dry-run", action="store_true", help="只打印将调用的内容，不调 LLM")
     args = ap.parse_args(argv)
@@ -275,8 +277,9 @@ def main(argv: list[str] | None = None) -> int:
 
     # ---- 生成 + 自检 + 改写循环（目标 ≥ target_score）----
     target_score = getattr(args, "target_score", 90)
+    max_attempts = getattr(args, "max_attempts", 3) or 3
     content = ""
-    for attempt in range(1, 4):  # 最多 3 轮（1 初稿 + 2 改写）
+    for attempt in range(1, max_attempts + 1):  # 1 初稿 + (N-1) 改写
         print(f"[2/4] 生成 (第{attempt}稿): task='{args.task[:40]}...'")
         try:
             r = llm_client.chat(user=user, system=system, task="writing",
@@ -332,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
         if consistency_ok and quality_ok:
             print("      ✅ 双维度达标，无需改写")
             break
-        if attempt < 3:
+        if attempt < max_attempts:
             # 提取扣分点作为改写指令（一致性 + 质量双维度）
             issues = [l.strip() for l in details if ("命中" in l or "→" in l) and "✓" not in l]
             # 加入质量扣分点

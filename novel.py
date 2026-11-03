@@ -365,6 +365,8 @@ def main():
     p5.add_argument("--novel-name", default="新书")
     p5.add_argument("--words", type=int, default=2400)
     p5.add_argument("--target-score", type=int, default=90)
+    p5.add_argument("--max-attempts", type=int, default=3,
+                    help="最多生成轮数（1 初稿 + N-1 改写，默认 3）")
     p5.add_argument("--dry-run", action="store_true")
 
     p6 = sub.add_parser("打分", help="章节一致性打分")
@@ -750,7 +752,8 @@ def main():
             "--prompt", prompt, "--chapter", args.chapter, "--task", args.task,
             "--novel-dir", args.novel_dir, "--novel-name", args.novel_name,
             "--words", args.words, "--voice", args.voice,
-            "--target-score", args.target_score] + (["--dry-run"] if args.dry_run else []))
+            "--target-score", args.target_score,
+            "--max-attempts", args.max_attempts] + (["--dry-run"] if args.dry_run else []))
     if args.cmd == "打分":
         return run_script("consistency.py", [args.voice, args.chapter])
     if args.cmd == "报告":

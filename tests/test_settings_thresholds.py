@@ -142,21 +142,21 @@ class TestWritingDefaultsFromSettings(unittest.TestCase):
     def test_defaults_when_no_settings(self):
         from gui import writing_service
         self.assertEqual(writing_service._settings_defaults(),
-                         {"words": 2400, "target_score": 90})
+                         {"words": 2400, "target_score": 90, "max_attempts": 3})
 
     def test_settings_override_defaults(self):
         from gui import writing_service
-        self._write({"writing": {"default_words": 3500},
+        self._write({"writing": {"default_words": 3500, "max_attempts": 5},
                      "thresholds": {"consistency_target": 95}})
         self.assertEqual(writing_service._settings_defaults(),
-                         {"words": 3500, "target_score": 95})
+                         {"words": 3500, "target_score": 95, "max_attempts": 5})
 
     def test_out_of_range_settings_fall_back(self):
         from gui import writing_service
-        self._write({"writing": {"default_words": 999999},
+        self._write({"writing": {"default_words": 999999, "max_attempts": 99},
                      "thresholds": {"consistency_target": 150}})
         self.assertEqual(writing_service._settings_defaults(),
-                         {"words": 2400, "target_score": 90})
+                         {"words": 2400, "target_score": 90, "max_attempts": 3})
 
     def test_router_passes_none_so_service_can_decide(self):
         """路由层不得再用写死的 2400/90 覆盖设置。"""

@@ -513,7 +513,7 @@ def _settings_defaults() -> dict[str, int]:
 
     读取失败一律退回原默认值，不能让设置文件损坏阻断写作。
     """
-    defaults = {"words": 2400, "target_score": 90}
+    defaults = {"words": 2400, "target_score": 90, "max_attempts": 3}
     try:
         from gui import system_service
         saved = system_service._load_settings_file()
@@ -529,6 +529,7 @@ def _settings_defaults() -> dict[str, int]:
 
     if isinstance(writing, dict):
         defaults["words"] = _int_or(writing.get("default_words"), 2400, 100, 20000)
+        defaults["max_attempts"] = _int_or(writing.get("max_attempts"), 3, 1, 10)
     if isinstance(thresholds, dict):
         defaults["target_score"] = _int_or(thresholds.get("consistency_target"), 90, 0, 100)
     return defaults
@@ -610,6 +611,9 @@ def generate(voice: str, project: str, chapter_no: int, task: str,
             "novel_name": novel_name or project, "genre_pack": genre_pack,
             "words": words, "target_score": target_score,
             "quality_target": quality_target or pass_line, "pass_line": pass_line,
+            # 最多改写轮数来自设置页（writing.max_attempts）；此前写死 3，
+            # 用户在设置里改「最大改写轮数」没有任何效果。
+            "max_attempts": defaults["max_attempts"],
         }
         _WRITING_TASKS[task_id] = {
             "task_id": task_id, "status": "running", "mode": "llm",
@@ -712,7 +716,7 @@ def _run_generate(task_id: str, voice_data: dict, system: str, req: dict) -> Non
     chapter_no = req["chapter_no"]
     target_score = req["target_score"]
     pass_line = req["pass_line"]
-    max_attempts = 3  # 1 初稿 + 2 改写
+    max_attempts = req.get("max_attempts") or 3  # 1 初稿 + (N-1) 改写
 
     try:
         user = f"请写第{chapter_no}章。{req['task']}\n目标字数约{req['words']}字。"
