@@ -9,6 +9,7 @@ import json
 import threading
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -424,23 +425,33 @@ def book(target: str | None = None, text: str | None = None,
 
 
 def list_qc_reports() -> list[dict[str, Any]]:
-    """列出 reports/qc/ 下的历史报告。"""
+    """列出 reports/qc/ 下的历史报告（按时间倒序）。
+
+    2026-11-03：``created_at`` 此前只从报告 JSON 的 meta 里读，而 qc.py
+    从未写入该键，列表里的时间永远是空。现在优先读 meta.created_at，
+    缺失时回退到文件 mtime（历史报告没有这个字段）。
+    """
     qc_dir = config.REPORTS_DIR / "qc"
     reports = []
     if qc_dir.is_dir():
-        for fp in sorted(qc_dir.glob("*.json"), reverse=True):
+        for fp in qc_dir.glob("*.json"):
             try:
                 data = json.loads(fp.read_text(encoding="utf-8"))
+                created = (data.get("meta") or {}).get("created_at")
+                if not created:
+                    created = datetime.fromtimestamp(fp.stat().st_mtime).isoformat(timespec="seconds")
                 reports.append({
                     "name": fp.stem,
                     "path": _safe_report_rel(fp),
                     "verdict": data.get("verdict", "?"),
                     "total_score": data.get("total_score"),
-                    "created_at": data.get("meta", {}).get("created_at"),
+                    "created_at": created,
                 })
             except (json.JSONDecodeError, OSError) as exc:
                 _log.warning(f"跳过无法解析的质检报告 {fp.name}: {exc}")
                 continue
+    # 按时间倒序：文件名不再能代表先后（GUI 落盘带 task_id，CLI 不带）
+    reports.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     return reports
 
 

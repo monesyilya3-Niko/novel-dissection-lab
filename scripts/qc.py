@@ -43,6 +43,7 @@ import json
 import re
 import sys
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -560,6 +561,9 @@ def run_qc(chapter_dir: str, *, voice_card_path: str = None, genre_pack_path: st
             "logic": logic_check.logic_coverage(texts, entities),
             "setting": setting_check.setting_coverage(texts, entities),
         },
+        # 2026-11-03：报告落盘后，GUI 的「历史质检报告」列表要读 meta.created_at
+        # 来显示时间；该键此前从未写入，列表里的时间永远是空。
+        "created_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
     }
 
     return QCReport(
