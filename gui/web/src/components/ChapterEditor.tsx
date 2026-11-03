@@ -43,6 +43,14 @@ interface ChapterEditorProps {
   enableDeslopCheck?: boolean
   /** 是否启用底栏快捷设定与宪法审查（默认启用） */
   enableConstitutionCheck?: boolean
+  /**
+   * 自定义宪法规则（预留）。
+   *
+   * 2026-11-03 核查：仓库内**没有任何调用点传这两个 prop**，后端也没有
+   * 宪法规则的持久化存储（只有 essence_service.DEFAULT_CONSTITUTION_RULES
+   * 三条内置默认）。因此章节编辑器的宪法审查目前只能查默认规则。
+   * 保留类型是为了将来的项目级规则配置；传值前请先给后端加存储。
+   */
   constitutionRules?: any[]
   charactersForbidden?: Record<string, string[]>
 }
