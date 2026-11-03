@@ -82,6 +82,10 @@ export default function PlatformPanel() {
   const [loading, setLoading] = useState(false)
   const [diagnosing, setDiagnosing] = useState(false)
   const [error, setError] = useState('')
+  // 整书导出（2026-11-03 补，此前端点与封装都在、UI 无入口）
+  const [bookDir, setBookDir] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [exportResult, setExportResult] = useState<Record<string, unknown> | null>(null)
 
   // Tab 1: LitRPG 属性面板与海外排版
   const [litrpgTitle, setLitrpgTitle] = useState('Chapter 1: The Descent into the Red Dungeon')
@@ -137,6 +141,20 @@ export default function PlatformPanel() {
       setError(friendlyError(e))
     } finally {
       setDiagnosing(false)
+    }
+  }
+
+  const doExportBook = async () => {
+    setExporting(true)
+    setError('')
+    setExportResult(null)
+    try {
+      const data = await platformApi.export({ platform_id: selected, book_dir: bookDir.trim() })
+      setExportResult(data as Record<string, unknown>)
+    } catch (e) {
+      setError(friendlyError(e))
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -260,6 +278,44 @@ export default function PlatformPanel() {
               {diagnosing ? <CircularProgress size={20} /> : t('platform_diagnose_action', '🎯 签约过稿深度诊断')}
             </Button>
           </Stack>
+
+          {/* 整书导出（2026-11-03 补）：/api/platform/export 与前端封装一直在，
+              但没有任何 UI 入口——用户没法把整本稿子按平台规范导出。 */}
+          <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              {t('platform_export_book_title', '整书按平台规范导出')}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              {t('platform_export_book_hint', '选一个章节目录，按当前平台规则逐章排版并检查合规，导出合并稿。稿子可以在任何目录（支持 GBK 编码）。')}
+            </Typography>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <TextField
+                size="small"
+                fullWidth
+                label={t('platform_export_book_dir', '章节目录')}
+                value={bookDir}
+                onChange={(e) => setBookDir(e.target.value)}
+                placeholder={t('platform_export_book_dir_ph', '例如 D:\\稿件\\我的书\\chapters')}
+              />
+              <Button
+                variant="outlined"
+                onClick={doExportBook}
+                disabled={!bookDir.trim() || exporting}
+                sx={{ whiteSpace: 'nowrap' }}
+              >
+                {exporting ? <CircularProgress size={20} /> : t('platform_export_book_action', '导出')}
+              </Button>
+            </Stack>
+            {exportResult ? (
+              <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+                {t('platform_export_book_done', '已导出 {n} 章 / {chars} 字，不合规 {bad} 章', {
+                  n: String(exportResult.totalChapters ?? 0),
+                  chars: String(exportResult.totalChars ?? 0),
+                  bad: String(exportResult.nonCompliantChapters ?? 0),
+                })}
+              </Typography>
+            ) : null}
+          </Paper>
 
           {result && (
             <Paper sx={{ p: 2, mb: 2 }}>

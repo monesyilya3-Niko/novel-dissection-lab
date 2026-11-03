@@ -304,6 +304,31 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '🎯 签约过稿深度诊断',
     'en-US': '🎯 Submission Readiness Audit',
   },
+  // 整书按平台规范导出（2026-11-03 补 UI 入口）
+  platform_export_book_title: {
+    'zh-CN': '整书按平台规范导出',
+    'en-US': 'Export Whole Book for This Platform',
+  },
+  platform_export_book_hint: {
+    'zh-CN': '选一个章节目录，按当前平台规则逐章排版并检查合规，导出合并稿。稿子可以在任何目录（支持 GBK 编码）。',
+    'en-US': 'Pick a chapter directory; each chapter is formatted and checked against the selected platform, then merged into one export. The folder can live anywhere (GBK supported).',
+  },
+  platform_export_book_dir: {
+    'zh-CN': '章节目录',
+    'en-US': 'Chapter directory',
+  },
+  platform_export_book_dir_ph: {
+    'zh-CN': '例如 D:\\稿件\\我的书\\chapters',
+    'en-US': 'e.g. D:\\manuscripts\\my-book\\chapters',
+  },
+  platform_export_book_action: {
+    'zh-CN': '导出',
+    'en-US': 'Export',
+  },
+  platform_export_book_done: {
+    'zh-CN': '已导出 {n} 章 / {chars} 字，不合规 {bad} 章',
+    'en-US': 'Exported {n} chapters / {chars} characters; {bad} non-compliant',
+  },
   platform_parse_stat_box: {
     'zh-CN': '解析属性面板',
     'en-US': 'Parse Stat Box',
