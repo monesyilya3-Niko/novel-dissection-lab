@@ -1190,59 +1190,61 @@ def invalidate_library_cache() -> None:
     _LIB_CACHE.clear()
 
 
+def _library_payload(filename: str, items_key: str) -> dict[str, Any]:
+    """统一工具库响应形状：``{total_count, <items_key>, meta?}``。
+
+    2026-11-03 修复：正常路径直接返回库文件原样（``{meta, goldfingers}``，
+    total_count 埋在 meta 里），文件缺失时却返回 ``{total_count: 0, ...}``
+    ——两种形状不一致。前端类型声明的是 ``{totalCount, items}``（经
+    deepToCamel），拿不到 totalCount，计数徽标永远是空。
+
+    现在两条路径统一把 ``total_count`` 提到顶层（meta 原样保留）。
+    """
+    data = _load_library(filename)
+    if not isinstance(data, dict):
+        return {"total_count": 0, items_key: []}
+    items = data.get(items_key)
+    if not isinstance(items, list):
+        items = []
+    meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+    total = meta.get("total_count", data.get("total_count", len(items)))
+    if not isinstance(total, int) or isinstance(total, bool):
+        total = len(items)
+    out: dict[str, Any] = {"total_count": total, items_key: items}
+    if meta:
+        out["meta"] = meta
+    return out
+
+
 def get_goldfingers() -> dict[str, Any]:
-    data = _load_library("goldfinger-library.json")
-    if data is None:
-        return {"total_count": 0, "goldfingers": []}
-    return data
+    return _library_payload("goldfinger-library.json", "goldfingers")
 
 
 def get_hooks() -> dict[str, Any]:
-    data = _load_library("hook-library.json")
-    if data is None:
-        return {"total_count": 0, "hooks": []}
-    return data
+    return _library_payload("hook-library.json", "hooks")
 
 
 def get_taboos() -> dict[str, Any]:
-    data = _load_library("taboo-library.json")
-    if data is None:
-        return {"total_count": 0, "taboos": []}
-    return data
+    return _library_payload("taboo-library.json", "taboos")
 
 
 def get_shuangdians() -> dict[str, Any]:
-    data = _load_library("shuangdian-library.json")
-    if data is None:
-        return {"total_count": 0, "shuangdians": []}
-    return data
+    return _library_payload("shuangdian-library.json", "shuangdians")
 
 
 def get_worlds() -> dict[str, Any]:
-    data = _load_library("world-library.json")
-    if data is None:
-        return {"total_count": 0, "worlds": []}
-    return data
+    return _library_payload("world-library.json", "worlds")
 
 
 def get_dialogues() -> dict[str, Any]:
-    data = _load_library("dialogue-library.json")
-    if data is None:
-        return {"total_count": 0, "dialogues": []}
-    return data
+    return _library_payload("dialogue-library.json", "dialogues")
 
 
 def get_characters() -> dict[str, Any]:
-    data = _load_library("character-library.json")
-    if data is None:
-        return {"total_count": 0, "characters": []}
-    return data
+    return _library_payload("character-library.json", "characters")
 
 
 def get_emotions() -> dict[str, Any]:
-    data = _load_library("emotion-library.json")
-    if data is None:
-        return {"total_count": 0, "emotions": []}
-    return data
+    return _library_payload("emotion-library.json", "emotions")
 
 
