@@ -426,3 +426,42 @@ class TestMainCLI(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestGenrePackDialogueStyleRendered(unittest.TestCase):
+    """题材包的对话风格与漂移护栏必须进 prompt（2026-11-03 补）。
+
+    背景：45 个题材包都写了 ``language_rules.dialogue_style``，但
+    ``render_genre_pack`` 从未渲染它——用户/资产作者写的对话要求
+    对生成结果毫无影响。drift_guard 同理。
+    """
+
+    def test_string_form_dialogue_style(self):
+        from scripts import inject  # noqa: F401  (import 由 conftest 保证)
+        gp = {"language_rules": {"dialogue_style": "主角台词短硬，反派有身份感。"}}
+        out = inject.render_genre_pack(gp)
+        self.assertIn("### 对话风格", out)
+        self.assertIn("主角台词短硬", out)
+
+    def test_dict_form_dialogue_style(self):
+        gp = {"language_rules": {"dialogue_style": {
+            "dominant_subtype": "极致冲突短平快",
+            "note": "对白短促有力",
+        }}}
+        from scripts import inject
+        out = inject.render_genre_pack(gp)
+        self.assertIn("极致冲突短平快", out)
+        self.assertIn("对白短促有力", out)
+
+    def test_drift_guard_rendered(self):
+        from scripts import inject
+        gp = {"language_rules": {"drift_guard": "不要把电竞写成玄幻。"}}
+        out = inject.render_genre_pack(gp)
+        self.assertIn("### 禁止漂移", out)
+        self.assertIn("不要把电竞写成玄幻", out)
+
+    def test_empty_values_add_no_heading(self):
+        from scripts import inject
+        out = inject.render_genre_pack({"language_rules": {}})
+        self.assertNotIn("### 对话风格", out)
+        self.assertNotIn("### 禁止漂移", out)

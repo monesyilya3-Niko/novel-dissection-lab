@@ -305,6 +305,26 @@ def render_genre_pack(gp: dict) -> str:
         parts.append("### 疲劳词限额（全章出现次数上限）")
         parts.append("、".join(f"{x.get('word','?')}≤{x.get('max_per_chapter','?')}次" for x in fw))
 
+    # 2b. 对话风格（2026-11-03 补）
+    # 45 个题材包都写了 dialogue_style，此前 here 从未渲染，等于白写。
+    # 值有两种形态：字符串（多数）与 {dominant_subtype, note} 对象（少数），都认。
+    ds = lr.get("dialogue_style")
+    if isinstance(ds, str) and ds.strip():
+        parts.append("### 对话风格")
+        parts.append(ds.strip())
+    elif isinstance(ds, dict):
+        sub = str(ds.get("dominant_subtype") or "").strip()
+        note = str(ds.get("note") or "").strip()
+        if sub or note:
+            parts.append("### 对话风格")
+            parts.append("；".join(x for x in (sub, note) if x))
+
+    # 2c. 漂移护栏（题材跑偏的典型表现）
+    dg_text = lr.get("drift_guard")
+    if isinstance(dg_text, str) and dg_text.strip():
+        parts.append("### 禁止漂移")
+        parts.append(dg_text.strip())
+
     # 3. 结构：章节角色分布 + 钩子 + 伏笔
     st = gp.get("structure") or {}
     roles = st.get("chapter_roles")
