@@ -6,6 +6,7 @@
 // 下拉读写同一份 state，文案即事实。
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { assetApi } from '../api/client'
+import { useI18n } from '../state/I18nContext'
 
 export interface AssetOption {
   id: string
@@ -44,13 +45,22 @@ export interface WritingAssetSelection {
   mismatches: GenreMismatch[]
 }
 
-const KIND_LABEL: Record<string, string> = {
-  genre_pack: 'genre-pack（题材规则）',
-  craft: 'craft-card（笔法技巧）',
+// 「题材不一致」警告里对资产种类的称呼。kind → i18n key，渲染方按当前语言取值；
+// 保留一份中文兜底，未挂载 I18nProvider 时文案仍然可读。
+const KIND_LABEL_KEY: Record<string, string> = {
+  genre_pack: 'gen_kind_genre_pack',
+  craft: 'gen_kind_craft',
+  distilled: 'gen_kind_distilled',
+}
+
+const KIND_LABEL_FALLBACK: Record<string, string> = {
+  genre_pack: '题材包',
+  craft: '笔法卡',
   distilled: '蒸馏规则',
 }
 
 export function useWritingAssets(): WritingAssetSelection {
+  const { t } = useI18n()
   const [assets, setAssets] = useState<AssetOption[]>([])
   const [distilledAssets, setDistilledAssets] = useState<AssetOption[]>([])
   const [voice, setVoice] = useState('')
@@ -99,7 +109,13 @@ export function useWritingAssets(): WritingAssetSelection {
     const check = (kind: string, id: string) => {
       if (!id) return
       const g = genreOf(id)
-      if (g && g !== voiceGenre) out.push({ kind, label: KIND_LABEL[kind] ?? kind, genre: g })
+      if (g && g !== voiceGenre) {
+        out.push({
+          kind,
+          label: t(KIND_LABEL_KEY[kind] ?? kind, KIND_LABEL_FALLBACK[kind] ?? kind),
+          genre: g,
+        })
+      }
     }
     check('genre_pack', genrePack)
     check('craft', craft)
@@ -107,7 +123,7 @@ export function useWritingAssets(): WritingAssetSelection {
     // prose_card 豁免：文风卡是风格参照物，允许跨题材选用（后端同理）。
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceGenre, genrePack, craft, distilled, assets, distilledAssets])
+  }, [voiceGenre, genrePack, craft, distilled, assets, distilledAssets, t])
 
   return {
     assets, distilledAssets,

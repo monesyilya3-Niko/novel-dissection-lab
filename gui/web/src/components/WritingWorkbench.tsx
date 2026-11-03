@@ -84,6 +84,21 @@ const WRITING_STATUS_LABELS: Record<string, string> = {
 }
 const writingStatusLabel = (s: string | null | undefined) => (s ? WRITING_STATUS_LABELS[s] ?? s : s)
 
+/**
+ * 题材包按「与声线卡同题材优先」排序。
+ *
+ * 2026-11-02：题材包已扩充到 51 个，平铺下拉时用户很难找到不会触发铁律一
+ * 拒绝（400）的那一个。同题材的排在最前，调用方再给它们加「（同题材）」标注。
+ * 声线卡题材未知（历史资产缺 meta.genre）时保持后端原序，不做任何猜测。
+ */
+function sortGenrePacks<T extends { genre?: string }>(packs: T[], voiceGenre?: string): T[] {
+  if (!voiceGenre) return packs
+  return [
+    ...packs.filter((a) => a.genre === voiceGenre),
+    ...packs.filter((a) => a.genre !== voiceGenre),
+  ]
+}
+
 export interface WritingWorkbenchProps {
   initialMode?: 'studio' | 'pipeline'
   initialPipelineTab?: number
@@ -272,6 +287,13 @@ function InjectPanel({ sel }: { sel: WritingAssetSelection }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // 2026-11-02：51 个题材包平铺时用户很难找到能用的那个。
+  // 与声线卡同题材的排在最前并加标注——它们才是不会被铁律一拒绝的选项。
+  const sortedGenrePacks = useMemo(
+    () => sortGenrePacks(byKind('genre_pack'), sel.voiceGenre),
+    [sel.voiceGenre, byKind],
+  )
+
   const doInject = async () => {
     setLoading(true)
     setError('')
@@ -297,37 +319,44 @@ function InjectPanel({ sel }: { sel: WritingAssetSelection }) {
         tips={[t('guide_inject_tip_1'), t('guide_inject_tip_2'), t('guide_inject_tip_3')]}
       />
       {assets.length === 0 && (
-        <Alert severity="info" sx={{ mb: 2 }}>暂无可用资产，请先在「分析」工作台完成拆书</Alert>
+        <Alert severity="info" sx={{ mb: 2 }}>{t('gen_no_assets_hint', '暂无可用资产，请先在「分析」工作台完成拆书')}</Alert>
       )}
       {sel.mismatches.length > 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          题材不一致（铁律一：禁止跨题材污染）：voice 为「{sel.voiceGenre}」，{
-            sel.mismatches.map((m) => `${m.label}为「${m.genre}」`).join('、')
-          }。提交会被后端拒绝（400），请换成同题材资产，或将题材未知的一侧留空。
+          {t('gen_genre_mismatch_prefix', '题材不一致（铁律一：禁止跨题材污染）：声线卡为「{voice}」，', { voice: sel.voiceGenre ?? '' })}
+          {sel.mismatches.map((m) => `${m.label}为「${m.genre}」`).join('、')}
+          {t('gen_genre_mismatch_suffix', '。提交会被后端拒绝（400），请换成同题材资产，或将题材未知的一侧留空。')}
         </Alert>
       )}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-        <TextField select label="voice-card（必选）" value={voice} onChange={(e) => setVoice(e.target.value)} sx={{ minWidth: 220 }} size="small">
+        <TextField select label={t('gen_voice_label', '声线卡（必选）')} value={voice} onChange={(e) => setVoice(e.target.value)} sx={{ minWidth: 220 }} size="small">
           {byKind('voice').map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
         </TextField>
-        <TextField select label="genre-pack（可选）" value={genrePack} onChange={(e) => setGenrePack(e.target.value)} sx={{ minWidth: 220 }} size="small">
-          <MenuItem value="">无</MenuItem>
-          {byKind('genre_pack').map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
+        <TextField select label={t('gen_genre_pack_label', '题材包（可选）')} value={genrePack} onChange={(e) => setGenrePack(e.target.value)} sx={{ minWidth: 240 }} size="small">
+          <MenuItem value="">{t('gen_none_option', '无')}</MenuItem>
+          {sortedGenrePacks.map((a) => (
+            <MenuItem key={a.id} value={a.id}>
+              {a.name}
+              {sel.voiceGenre && a.genre === sel.voiceGenre
+                ? t('gen_same_genre_tag', '（同题材）')
+                : ''}
+            </MenuItem>
+          ))}
         </TextField>
-        <TextField select label="craft-card（可选）" value={craft} onChange={(e) => setCraft(e.target.value)} sx={{ minWidth: 220 }} size="small">
-          <MenuItem value="">无</MenuItem>
+        <TextField select label={t('gen_craft_label', '笔法卡（可选）')} value={craft} onChange={(e) => setCraft(e.target.value)} sx={{ minWidth: 220 }} size="small">
+          <MenuItem value="">{t('gen_none_option', '无')}</MenuItem>
           {byKind('craft').map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
         </TextField>
-        <TextField select label="蒸馏规则（可选）" value={distilled} onChange={(e) => setDistilled(e.target.value)} sx={{ minWidth: 220 }} size="small">
-          <MenuItem value="">无</MenuItem>
+        <TextField select label={t('gen_distilled_label', '蒸馏规则（可选）')} value={distilled} onChange={(e) => setDistilled(e.target.value)} sx={{ minWidth: 220 }} size="small">
+          <MenuItem value="">{t('gen_none_option', '无')}</MenuItem>
           {distilledAssets.map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
         </TextField>
-        <TextField select label="prose-card（文风参照，可选）" value={proseCard} onChange={(e) => setProseCard(e.target.value)} sx={{ minWidth: 220 }} size="small">
-          <MenuItem value="">无</MenuItem>
+        <TextField select label={t('gen_prose_card_label', '文风参照卡（可选）')} value={proseCard} onChange={(e) => setProseCard(e.target.value)} sx={{ minWidth: 220 }} size="small">
+          <MenuItem value="">{t('gen_none_option', '无')}</MenuItem>
           {byKind('prose_card').map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
         </TextField>
         <Button variant="contained" onClick={doInject} disabled={!voice || loading}>
-          {loading ? <CircularProgress size={20} /> : '生成 Prompt'}
+          {loading ? <CircularProgress size={20} /> : t('gen_generate_prompt', '生成 Prompt')}
         </Button>
       </Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -471,9 +500,9 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
       />
       {sel.mismatches.length > 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          题材不一致（铁律一：禁止跨题材污染）：voice 为「{sel.voiceGenre}」，{
-            sel.mismatches.map((m) => `${m.label}为「${m.genre}」`).join('、')
-          }。提交会被后端拒绝（400），请换成同题材资产。
+          {t('gen_genre_mismatch_prefix', '题材不一致（铁律一：禁止跨题材污染）：声线卡为「{voice}」，', { voice: sel.voiceGenre ?? '' })}
+          {sel.mismatches.map((m) => `${m.label}为「${m.genre}」`).join('、')}
+          {t('gen_genre_mismatch_suffix', '。提交会被后端拒绝（400），请换成同题材资产，或将题材未知的一侧留空。')}
         </Alert>
       )}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
@@ -506,17 +535,24 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
         </Dialog>
         <TextField label="章节号" type="number" value={chapterNo} onChange={(e) => setChapterNo(Math.max(1, Math.round(Number(e.target.value) || 1)))} sx={{ width: 100 }} size="small" />
         <GlossaryTooltip term="声线卡">
-          <TextField select label="声线卡（voice-card）" value={voice} onChange={(e) => setVoice(e.target.value)} sx={{ minWidth: 200 }} size="small">
+          <TextField select label={t('gen_voice_label', '声线卡（必选）')} value={voice} onChange={(e) => setVoice(e.target.value)} sx={{ minWidth: 200 }} size="small">
             {byKind('voice').map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
           </TextField>
         </GlossaryTooltip>
         <GlossaryTooltip term="题材包">
-          <TextField select label="题材包（genre-pack，可选）" value={genrePack} onChange={(e) => setGenrePack(e.target.value)} sx={{ minWidth: 200 }} size="small">
-            <MenuItem value="">无</MenuItem>
-            {byKind('genre_pack').map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
+          <TextField select label={t('gen_genre_pack_label', '题材包（可选）')} value={genrePack} onChange={(e) => setGenrePack(e.target.value)} sx={{ minWidth: 200 }} size="small">
+            <MenuItem value="">{t('gen_none_option', '无')}</MenuItem>
+            {sortGenrePacks(byKind('genre_pack'), sel.voiceGenre).map((a) => (
+              <MenuItem key={a.id} value={a.id}>
+                {a.name}
+                {sel.voiceGenre && a.genre === sel.voiceGenre
+                  ? t('gen_same_genre_tag', '（同题材）')
+                  : ''}
+              </MenuItem>
+            ))}
           </TextField>
         </GlossaryTooltip>
-        <TextField label="写作要点" value={task} onChange={(e) => setTask(e.target.value)} sx={{ minWidth: 250 }} size="small" />
+        <TextField label={t('gen_task_label', '写作要点')} value={task} onChange={(e) => setTask(e.target.value)} sx={{ minWidth: 250 }} size="small" />
         {(() => {
           const missing: string[] = []
           if (!project) missing.push('写作项目')
@@ -2086,7 +2122,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
                     select
                     size="small"
                     fullWidth
-                    label="voice-card 声线"
+                    label={t('gen_voice_label', '声线卡（必选）')}
                     value={sel.voice}
                     onChange={(e) => sel.setVoice(e.target.value)}
                   >
@@ -2100,14 +2136,17 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
                     select
                     size="small"
                     fullWidth
-                    label="genre-pack 题材包"
+                    label={t('gen_genre_pack_label', '题材包（可选）')}
                     value={sel.genrePack}
                     onChange={(e) => sel.setGenrePack(e.target.value)}
                   >
-                    <MenuItem value="">无</MenuItem>
-                    {sel.byKind('genre_pack').map((a) => (
+                    <MenuItem value="">{t('gen_none_option', '无')}</MenuItem>
+                    {sortGenrePacks(sel.byKind('genre_pack'), sel.voiceGenre).map((a) => (
                       <MenuItem key={a.id} value={a.id}>
                         {a.name}
+                        {sel.voiceGenre && a.genre === sel.voiceGenre
+                          ? t('gen_same_genre_tag', '（同题材）')
+                          : ''}
                       </MenuItem>
                     ))}
                   </TextField>

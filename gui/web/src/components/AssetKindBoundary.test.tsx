@@ -109,7 +109,7 @@ describe('注入面板 kind 边界', () => {
     render(<WritingWorkbench />)
     await screen.findByLabelText('蒸馏规则（可选）')
 
-    expect(openSelectOptions('voice-card（必选）')).toEqual(['voice-A'])
+    expect(openSelectOptions('声线卡（必选）')).toEqual(['voice-A'])
   })
 
   it('蒸馏卡走独立的「蒸馏规则」下拉', async () => {

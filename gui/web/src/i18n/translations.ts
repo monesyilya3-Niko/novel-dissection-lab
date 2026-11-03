@@ -4587,6 +4587,77 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   cmd_system_help_guides: { 'zh-CN': '打开帮助 — 功能指南', 'en-US': 'Open Help — Guides' },
   cmd_system_help_faq: { 'zh-CN': '打开帮助 — 常见问题', 'en-US': 'Open Help — FAQ' },
 
+
+  // ==========================================
+  // 写作注入 / 生成 表单标签（2026-11-02）
+  // ==========================================
+  gen_voice_label: {
+    'zh-CN': '声线卡（必选）',
+    'en-US': 'Voice Card (required)',
+  },
+  gen_genre_pack_label: {
+    'zh-CN': '题材包（可选）',
+    'en-US': 'Genre Pack (optional)',
+  },
+  gen_craft_label: {
+    'zh-CN': '笔法卡（可选）',
+    'en-US': 'Craft Card (optional)',
+  },
+  gen_task_label: {
+    'zh-CN': '写作要点',
+    'en-US': 'Writing Brief',
+  },
+  gen_none_option: {
+    'zh-CN': '无',
+    'en-US': 'None',
+  },
+  gen_genre_pack_hint: {
+    'zh-CN': '题材包决定注入的结构与商业约束；与声线卡题材不一致时后端会拒绝',
+    'en-US': 'The genre pack governs structure and commercial constraints; a mismatch with the voice card genre will be rejected',
+  },
+
+
+  gen_distilled_label: {
+    'zh-CN': '蒸馏规则（可选）',
+    'en-US': 'Distilled Rules (optional)',
+  },
+  gen_prose_card_label: {
+    'zh-CN': '文风参照卡（可选）',
+    'en-US': 'Style Reference Card (optional)',
+  },
+  gen_generate_prompt: {
+    'zh-CN': '生成 Prompt',
+    'en-US': 'Build Prompt',
+  },
+  gen_no_assets_hint: {
+    'zh-CN': '暂无可用资产，请先在「分析」工作台完成拆书',
+    'en-US': 'No assets available yet — run a book analysis first',
+  },
+  gen_genre_mismatch_prefix: {
+    'zh-CN': '题材不一致（铁律一：禁止跨题材污染）：声线卡为「{voice}」，',
+    'en-US': 'Genre mismatch (iron law 1 — no cross-genre mixing): voice card is "{voice}", ',
+  },
+  gen_genre_mismatch_suffix: {
+    'zh-CN': '。提交会被后端拒绝（400），请换成同题材资产，或将题材未知的一侧留空。',
+    'en-US': '. The backend will reject this (400). Pick same-genre assets, or leave the unknown side empty.',
+  },
+  gen_same_genre_tag: {
+    'zh-CN': '（同题材）',
+    'en-US': ' (same genre)',
+  },
+  gen_kind_genre_pack: {
+    'zh-CN': '题材包',
+    'en-US': 'Genre Pack',
+  },
+  gen_kind_craft: {
+    'zh-CN': '笔法卡',
+    'en-US': 'Craft Card',
+  },
+  gen_kind_distilled: {
+    'zh-CN': '蒸馏规则',
+    'en-US': 'Distilled Rules',
+  },
+
   // ==========================================
   // 首启引导 (OnboardingWizard)
   // ==========================================
