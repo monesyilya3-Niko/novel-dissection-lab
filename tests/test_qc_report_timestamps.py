@@ -125,5 +125,45 @@ class TestQcMarkdownCoverage(unittest.TestCase):
                               layers=[], issues=[], meta={})
         self.assertNotIn("检测覆盖", qc_mod.to_markdown(rep))
 
+
+class TestReportFilenameReadable(unittest.TestCase):
+    """质检报告文件名必须人类可读（2026-11-03）。
+
+    背景：落盘名此前是 display_target 把 / 和 \ 换成下划线，
+    外部路径会变成 ``_Users_monesy_AppData_Local_Temp_mudong_qc_txt-q-31f0ed77``。
+    用户在「历史质检报告」列表里完全看不出是哪本书。
+    """
+
+    def test_external_file_path_uses_filename(self):
+        from gui.quality_service import _readable_target_name
+        self.assertEqual(
+            _readable_target_name(r"C:\Users\m\AppData\Local\Temp\mudong_qc.txt"),
+            "mudong_qc")
+
+    def test_generic_dir_falls_back_to_parent(self):
+        from gui.quality_service import _readable_target_name
+        self.assertEqual(
+            _readable_target_name(r"C:\books\诡秘之主\chapters"), "诡秘之主")
+        self.assertEqual(
+            _readable_target_name(r"C:\books\诡秘之主\正文"), "诡秘之主")
+
+    def test_chinese_book_name_preserved(self):
+        from gui.quality_service import _readable_target_name
+        self.assertEqual(_readable_target_name(r"C:\books\暮冬念春"), "暮冬念春")
+
+    def test_empty_or_blank_returns_default(self):
+        from gui.quality_service import _readable_target_name
+        self.assertEqual(_readable_target_name(""), "qc")
+        self.assertEqual(_readable_target_name("   "), "qc")
+
+    def test_traversal_segments_stripped(self):
+        from gui.quality_service import _readable_target_name
+        name = _readable_target_name(r"C:\books\..\..\evil")
+        self.assertNotIn("..", name)
+
+    def test_length_capped(self):
+        from gui.quality_service import _readable_target_name
+        self.assertLessEqual(len(_readable_target_name("x" * 200)), 40)
+
 if __name__ == "__main__":
     unittest.main()

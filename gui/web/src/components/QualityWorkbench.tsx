@@ -407,6 +407,9 @@ function QcPanel() {
           <Typography variant="subtitle2" gutterBottom>{t('quality_qc_history_title')}</Typography>
           {reports.slice(0, 10).map((r) => (
             <Typography key={r.name} variant="body2" sx={{ fontSize: 12 }}>
+              {/* 2026-11-03：以前只显示名称/判定/分数，后端返回的 createdAt
+                  从未渲染——历史报告排在一起无法分辨哪份是最新的。 */}
+              {r.createdAt ? `${r.createdAt.replace('T', ' ').slice(0, 16)} ` : ''}
               {r.name} — {r.verdict} {r.totalScore != null ? `(${r.totalScore.toFixed(1)})` : ''}
             </Typography>
           ))}

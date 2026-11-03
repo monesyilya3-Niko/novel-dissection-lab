@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 import uuid
@@ -424,6 +425,36 @@ def book(target: str | None = None, text: str | None = None,
         _cleanup_external_copy(external_fp)  # P1-5：外部隔离副本用后即删
 
 
+def _readable_target_name(display_target: str) -> str:
+    """把质检目标转成人类可读的报告文件名主体。
+
+    2026-11-03：此前直接把 display_target 里的 / 和 \\ 换成下划线，外部路径
+    会变成 ``_Users_monesy_AppData_Local_Temp_mudong_qc_txt-q-31f0ed77``——
+    用户在「历史质检报告」里完全看不出这是哪本书。
+
+    现在取**最后一段**的名字（目录取 dir 名、文件取 stem），只保留安全字符，
+    并限制长度。同一目标的多次质检仍靠 task_id 区分。
+    """
+    raw = (display_target or "").strip().rstrip("/\\")
+    if not raw:
+        return "qc"
+    # 统一分隔符后分段
+    parts = [p for p in raw.replace("\\", "/").split("/") if p and p not in (".", "..")]
+    if not parts:
+        return "qc"
+    tail = parts[-1]
+    # 文件名去掉扩展名，目录名原样
+    is_file = "." in tail and not tail.startswith(".")
+    if is_file:
+        tail = tail.rsplit(".", 1)[0]
+    # 通用目录名没有辨识度（chapters / text / qc）：上溯一级取书/项目名
+    generic = {"chapters", "chapter", "text", "txt", "content", "body", "正文", "章节"}
+    if not is_file and tail.lower() in generic and len(parts) >= 2:
+        tail = parts[-2]
+    safe = re.sub(r"[^\w一-鿿.-]+", "_", tail).strip("._")
+    return (safe or "qc")[:40]
+
+
 def list_qc_reports() -> list[dict[str, Any]]:
     """列出 reports/qc/ 下的历史报告（按时间倒序）。
 
@@ -585,7 +616,7 @@ def _run_qc_task(task_id: str, chapter_dir: str, voice_path: str | None,
         # 落盘报告
         qc_dir = config.REPORTS_DIR / "qc"
         qc_dir.mkdir(parents=True, exist_ok=True)
-        safe_name = display_target.replace("/", "_").replace("\\", "_").replace("..", "")[:60]
+        safe_name = _readable_target_name(display_target)
         # MEDIUM：文件名加 task_id 防止并发同名覆盖
         json_fp = qc_dir / f"{safe_name}-{task_id}-qc.json"
         md_fp = qc_dir / f"{safe_name}-{task_id}-qc.md"
