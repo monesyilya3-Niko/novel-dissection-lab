@@ -707,9 +707,12 @@ export interface ExportResult {
   filename: string
   content?: string
   contentBase64?: string
-  format: 'txt' | 'md' | 'docx'
+  // 后端实际支持 5 种；原先只声明 3 种，epub/shunn 走的是 any 通道
+  format: 'txt' | 'md' | 'docx' | 'epub' | 'shunn'
   chapters: number
   words: number
+  /** Shunn 投稿稿专用：作者名/联系方式仍为占位符时为 true */
+  authorMissing?: boolean
 }
 
 export interface DeslopIssue {

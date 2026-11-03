@@ -1698,7 +1698,13 @@ function ExportPanel({ project }: { project: string }) {
         const blob = new Blob([res.content || ''], { type: 'text/plain;charset=utf-8' })
         triggerDownload(blob, res.filename)
       }
-      setInfo(t('extras_export_success', '成功导出 {chapters} 章、约 {words} 字：{filename}', { chapters: res.chapters, words: res.words.toLocaleString(), filename: res.filename }))
+      setInfo(
+        res.authorMissing
+          ? t('extras_export_shunn_no_author',
+              '已导出 {chapters} 章：{filename}。注意：作者名与联系方式仍是占位符（Author Name / author@example.com），投稿前请先在企划中心填写。',
+              { chapters: res.chapters, filename: res.filename })
+          : t('extras_export_success', '成功导出 {chapters} 章、约 {words} 字：{filename}', { chapters: res.chapters, words: res.words.toLocaleString(), filename: res.filename }),
+      )
     } catch (e) {
       setError(t('extras_export_error', '导出失败: {error}', { error: friendlyError(e) }))
     } finally {

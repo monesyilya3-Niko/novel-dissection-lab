@@ -1371,6 +1371,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '成功导出 {chapters} 章、约 {words} 字：{filename}',
     'en-US': 'Successfully exported {chapters} chapters, ~{words} words: {filename}',
   },
+  extras_export_shunn_no_author: {
+    'zh-CN': '已导出 {chapters} 章：{filename}。注意：作者名与联系方式仍是占位符（Author Name / author@example.com），投稿前请先在企划中心填写。',
+    'en-US': 'Exported {chapters} chapters: {filename}. Note: author name and contact are still placeholders (Author Name / author@example.com) — fill them in before submitting.',
+  },
   extras_export_error: {
     'zh-CN': '导出失败: {error}',
     'en-US': 'Export failed: {error}',

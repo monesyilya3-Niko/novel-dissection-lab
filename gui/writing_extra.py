@@ -1673,11 +1673,31 @@ def export_project_epub(project: str) -> dict[str, Any]:
 
 def export_project_shunn(
     project: str,
-    author_name: str = "Author Name",
-    contact_info: str = "author@example.com",
+    author_name: str | None = None,
+    contact_info: str | None = None,
 ) -> dict[str, Any]:
-    """导出全书为 William Shunn 国际标准文稿投稿格式（Standard Manuscript Format）。"""
+    """导出全书为 William Shunn 国际标准文稿投稿格式（Standard Manuscript Format）。
+
+    2026-11-03：author_name / contact_info 此前默认写死
+    "Author Name" / "author@example.com"，而 export_project 调用时从不传参——
+    用户导出的投稿稿永远带着占位符，直接投出去会被退稿。
+    现在默认从项目元数据的 meta.author / meta.contact 读取（可在企划中心填），
+    仍为空时才用占位符，并在返回值里给出 author_missing 标记供 UI 提示。
+    """
     project = _require_project(project)
+    if author_name is None or contact_info is None:
+        meta = (get_project_meta(project).get("meta") or {})
+        if not isinstance(meta, dict):
+            meta = {}
+        if author_name is None:
+            author_name = str(meta.get("author") or "").strip()
+        if contact_info is None:
+            contact_info = str(meta.get("contact") or "").strip()
+    author_missing = not author_name
+    if not author_name:
+        author_name = "Author Name"
+    if not contact_info:
+        contact_info = "author@example.com"
     files = _iter_chapter_files(project)
     if not files:
         raise ServiceError(f"项目尚无章节可导出: {project}", 404)
@@ -1712,7 +1732,10 @@ def export_project_shunn(
     lines.append(f"About {approx_words:,} words\n\n\n\n")
 
     # Title Block
-    lines.append(f"{project.upper()}\n\nby {author_name}\n\n\n")
+    # 书名：Shunn 体裁要求标题大写，但 .upper() 对中文无意义（原样返回），
+    # 只对含拉丁字母的名字生效，避免把「我的书」变成奇怪形式。
+    title_line = project.upper() if any(c.isascii() and c.isalpha() for c in project) else project
+    lines.append(f"{title_line}\n\nby {author_name}\n\n\n")
 
     # Chapters
     for i, (ch_title, ch_body) in enumerate(chapter_contents):
@@ -1732,6 +1755,8 @@ def export_project_shunn(
         "format": "shunn",
         "chapters": len(files),
         "words": total_words,
+        # UI 据此提示「作者信息未填，稿件仍含占位符」
+        "author_missing": author_missing,
     }
 
 
@@ -1750,12 +1775,21 @@ def export_project(project: str, fmt: str = "txt") -> dict[str, Any]:
 
 
 def get_project_meta(project: str) -> dict[str, Any]:
-    """获取项目的平台生态、题材与企划元数据。"""
+    """获取项目的平台生态、题材与企划元数据。
+
+    2026-11-03：表不存在时（旧库、未跑迁移、测试沙盒）原先直接抛
+    sqlite3.OperationalError，导致依赖它的导出（Shunn 读作者信息）整个失败。
+    元数据缺失属于"没有就退回默认预设"，不该阻断导出，故捕获后按无记录处理。
+    """
     proj = _require_project(project)
-    conn = db.get_conn()
-    row = conn.execute(
-        "SELECT * FROM writing_projects_meta WHERE project = ?", (proj,)
-    ).fetchone()
+    try:
+        conn = db.get_conn()
+        row = conn.execute(
+            "SELECT * FROM writing_projects_meta WHERE project = ?", (proj,)
+        ).fetchone()
+    except Exception as exc:  # noqa: BLE001 - 表缺失/库损坏都按"无元数据"处理
+        _log.warning("读取项目元数据失败，使用默认预设: %s", exc)
+        row = None
     if row:
         d = dict(row)
         try:
