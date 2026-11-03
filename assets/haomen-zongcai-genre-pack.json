@@ -1,254 +1,220 @@
 {
-  "meta": {
-    "id": "genre-haomen-zongcai",
-    "name": "豪门总裁",
-    "sub_tags": [
-      "豪门世家",
-      "真假千金",
-      "马甲掉落",
-      "全员团宠",
-      "甜宠爽文"
-    ],
-    "target_platform": "长篇通用",
-    "scope": "genre-generalized",
-    "confidence": 0.6,
-    "note": "通用题材包：豪门总裁/真千金归来/全能马甲/顶级团宠/极致护短",
-    "source_books": [
-      {
-        "title": "豪门总裁标杆代表作一",
-        "platform": "番茄",
-        "performance": "千万级爆款",
-        "voice_card_ref": "haomen-zongcai_ref1"
-      },
-      {
-        "title": "豪门总裁热门畅销作二",
-        "platform": "番茄",
-        "performance": "高追读榜首",
-        "voice_card_ref": "haomen-zongcai_ref2"
-      },
-      {
-        "title": "豪门总裁经典完结作三",
-        "platform": "番茄",
-        "performance": "高评分必读",
-        "voice_card_ref": "haomen-zongcai_ref3"
-      }
-    ]
+ "meta": {
+  "id": "genre-haomen-zongcai",
+  "name": "豪门总裁",
+  "sub_tags": [
+   "豪门总裁",
+   "霸总",
+   "京圈",
+   "先婚后爱",
+   "契约婚姻"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.5,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-haomen-zongcai",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-haomen-zongcai（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-haomen-zongcai.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-haomen-zongcai.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
   },
-  "commercial": {
-    "opening_analysis": {
-      "chapter_1": {
-        "first_300_words_task": "真千金从乡下被接回豪门，假千金茶言茶语陷害，亲生父母偏心鄙夷，开局遭遇退婚/赶出家门",
-        "hook_position": 400,
-        "conflict_intro_position": 700,
-        "protagonist_intro_method": "看似乡巴佬实则顶级神医/黑客/科研巨擘，绝美清冷，气场两米八",
-        "golden_finger_reveal": "全球顶级隐世马甲（神医鬼手、黑客Q、著名设计师、财阀幕后金主）"
-      },
-      "chapter_2_3_task": "第2章假千金炫耀顶级请柬，主角随手拿出黑金特权卡；第3章京圈第一权势大佬公开护短，向全城宣布非主角不娶，偏心父母全员震惊",
-      "common_mistakes": [
-        "真千金窝囊忍让讨好偏心父母",
-        "假千金手段低级像泼妇骂街",
-        "男主眼瞎认错人虐女虐半本书"
-      ]
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用合同、医院、宴会、热搜、家族饭桌或电梯偶遇压关系分寸和阶层差。",
+    "中期：围绕契约条款、家族施压、旧情回归和私下失控推进，每章让关系明确前进或后退。",
+    "后期：把公开身份、协议变更和家族站队推到结算，章尾继续压关系风险，不只制造新误会。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章至少让关系状态前进或后退一步：误会加深、分寸确认、公开维护、旧伤暴露、契约反噬。不要连续只堆暧昧。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
     },
-    "payoff_density": {
-      "per_thousand_words": 0.5,
-      "dry_spell_tolerance": 5,
-      "payoff_types": [
-        {
-          "type": "打脸",
-          "ratio": 0.45,
-          "buildup_length": 3,
-          "skeleton": "众人疯狂追捧的国际顶级大佬当场对主角鞠躬尊称老师，全场下巴脱臼"
-        },
-        {
-          "type": "打脸",
-          "ratio": 0.3,
-          "buildup_length": 4,
-          "skeleton": "亲生父母得知真千金身份后痛哭流涕求原谅，主角绝情拉黑断绝关系"
-        },
-        {
-          "type": "打脸",
-          "ratio": 0.25,
-          "buildup_length": 2,
-          "skeleton": "禁欲系京圈太子爷只对女主一人低头弯腰系鞋带，霸气宣告谁动她谁死"
-        }
-      ]
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
     },
-    "paywall": {
-      "cliffhanger_technique": "全球顶级峰会上，假千金意图当众揭露主角伪造学历，幕后主持大佬微笑着走下台将麦克风递给主角",
-      "pre_paywall_buildup": "主角最大的第一王牌马甲即将当着全京城顶流的面轰然揭开"
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
     },
-    "retention_risk_points": [
-      {
-        "position": "中期发展",
-        "reason": "马甲掉落过多产生重复感",
-        "mitigation": "引入跨国世家世仇、女主母亲留下的惊天遗产秘密与科研突破主线"
-      }
-    ],
-    "update_rhythm": {
-      "chapters_per_day": 2,
-      "burst_timing": "大型宴会掉马或世纪婚礼加更"
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
     }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 优先用家庭逼迫、婚约契约、酒店医院、相亲宴会、手机热搜、公司公开场切入。\n- 第一场要有关系压力，别先写豪门陈设。\n- 男强女强或强弱差都可以，但弱位一方要有选择和反击，不做纯被摆布道具。",
+   "chapter_end_hook": "适合用身份暴露、旧人出现、热搜爆料、家族电话、契约条款反噬、男主公开站队收尾。钩子要继续压关系，别只换一个新误会。"
   },
-  "language_rules": {
-    "banned_phrases": [
-      "恐怖如斯",
-      "老朽",
-      "桀桀桀",
-      "纳命来"
-    ],
-    "fatigue_words": [
-      {
-        "word": "瞳孔骤缩",
-        "max_per_chapter": 2
-      },
-      {
-        "word": "不屑一顾",
-        "max_per_chapter": 2
-      }
-    ],
-    "dialogue_style": {
-      "dominant_subtype": "名门雅致与锋芒毕露",
-      "note": "绿茶假千金楚楚可怜，偏心父母道貌岸然，女主角毒舌冷艳一语封喉"
-    },
-    "iron_rules": [
-      {
-        "rule": "马甲必有实锤见证：每一次打脸都要在名流云集的高级公开场合当众兑现。",
-        "bad_example": "主角偷偷给假千金发了个微信说我是大黑客，假千金就害怕了。",
-        "good_example": "宴会大屏幕突然亮起，国际黑客联盟理事长的授权签名下，赫然印着主角的大头照，假千金手中的香槟杯当场砸碎在地上。",
-        "rationale": "豪门爽文的快感在于阶层身份的彻底反转与众人众目睽睽下的顶礼膜拜。"
-      }
-    ],
-    "forbidden_elements": [
-      "女主受尽虐待还认贼作父",
-      "男主中药后认错女二当白月光",
-      "女主被赶出家门流落街头吃土"
-    ],
-    "required_elements": [
-      "全能神级马甲",
-      "京圈顶流男主无底线宠溺",
-      "偏心家族全员悔恨",
-      "手撕绿茶假千金"
-    ]
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
   },
-  "quality_thresholds": {
-    "dialogue_optimal": {
-      "min": 0.35,
-      "max": 0.55
+  "conflict_engine": "亲密需求 + 身份/资源不对等 + 信息差。误会不能靠一句解释解决，要有面子、家族、舆论、合同或旧伤作为阻力。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
     },
-    "pass": 75,
-    "warn": 60
-  },
-  "structure": {
-    "arc_rhythm": {
-      "chapters_per_arc": 25,
-      "climax_position": 0.8,
-      "arc_template": [
-        "真千金归来断绝关系",
-        "宴会初次掉马惊艳四座",
-        "京圈太子爷霸道求婚",
-        "层层剥落马甲权倾京城",
-        "假千金伏法世纪盛宴"
-      ]
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
     },
-    "chapter_roles": [
-      {
-        "role": "铺垫",
-        "ratio": 0.25,
-        "typical_position": "设局陷害",
-        "beats": [
-          "假千金设套",
-          "偏心父母逼迫",
-          "宾客冷嘲热讽"
-        ]
-      },
-      {
-        "role": "推进",
-        "ratio": 0.35,
-        "typical_position": "反击准备",
-        "beats": [
-          "女主淡定看戏",
-          "男主暗中撑腰",
-          "关键证人就位"
-        ]
-      },
-      {
-        "role": "爆发",
-        "ratio": 0.2,
-        "typical_position": "高光时刻",
-        "beats": [
-          "马甲当场掀开",
-          "反派身败名裂",
-          "男主宣告所有权"
-        ]
-      },
-      {
-        "role": "缓冲",
-        "ratio": 0.1,
-        "typical_position": "甜蜜日常",
-        "beats": [
-          "太子爷撒娇吃醋",
-          "数钱数到手软"
-        ]
-      },
-      {
-        "role": "转折",
-        "ratio": 0.1,
-        "typical_position": "新危机",
-        "beats": [
-          "上一辈身世血仇浮现"
-        ]
-      }
-    ],
-    "chapter_word_range": {
-      "min": 2000,
-      "max": 3000,
-      "typical": 2400
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
     },
-    "foreshadow_pattern": {
-      "concurrent_open": 3,
-      "avg_span": 20,
-      "max_span": 50,
-      "plant_technique": [
-        "女主旧书包里随便塞着的诺贝尔提名推荐信",
-        "男主书房保险柜里珍藏多年的半张泛黄照片"
-      ]
-    },
-    "hook_system": {
-      "anti_repetition_rule": "每个马甲类型不同（医圣、黑客、画家、车神、财阀执掌人）。",
-      "hook_density_curve": [
-        "开局断绝关系痛快爽",
-        "中局连续掉马震撼全城",
-        "尾声世纪婚礼万人朝拜"
-      ],
-      "hook_types": [
-        {
-          "type": "悬念揭示",
-          "strength": 0.9,
-          "frequency": 0.45,
-          "skeleton": "主持人颤抖着念出第一名名字，镜头给到了正在台下吃蛋糕的主角。"
-        },
-        {
-          "type": "悬念揭示",
-          "strength": 0.9,
-          "frequency": 0.35,
-          "skeleton": "全城豪门逼迫女主道歉，男主直接带着保镖封锁全场：谁敢让我夫人受委屈？"
-        }
-      ]
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
     }
+   ]
   },
-  "world_conventions": {
-    "iron_laws": [
-      "血缘比不过真情",
-      "顶级才华无视阶层壁垒",
-      "男主双标专一原则"
-    ],
-    "power_system_type": "马甲威望等级 + 京圈豪门社会地位",
-    "progression_granularity": "从乡下孤女到京城顶流再到全球财阀唯一话事人",
-    "naming_conventions": [
-      "豪门世家姓氏（陆、霍、傅、顾）",
-      "马甲代号（鬼医、Q、无名）",
-      "顶级私立学院与会所名"
-    ]
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "女频爽点常来自当众维护、分寸确认、恶意者失算、资源转向女主、男主从冷到偏爱。释放时写动作和场内反应，少用“安全感拉满”这类总结。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 优先用家庭逼迫、婚约契约、酒店医院、相亲宴会、手机热搜、公司公开场切入。\n- 第一场要有关系压力，别先写豪门陈设。\n- 男强女强或强弱差都可以，但弱位一方要有选择和反击，不做纯被摆布道具。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "只堆品牌和豪宅",
+    "让霸总成为命令机器",
+    "所有矛盾都靠“听我解释”消失",
+    "把女主主动性写没"
+   ]
   }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要只堆品牌和豪宅",
+    "rationale": "该题材的正确写法：写豪门总裁时，核心放在亲密关系里的权力差、误会、契约、公开身份和安全感。",
+    "good_example": "写豪门总裁时，核心放在亲密关系里的权力差、误会、契约、公开身份和安全感。 奢侈品只做能改变局势的抓手。（而不是只堆品牌和豪宅）",
+    "bad_example": "只堆品牌和豪宅；关系里的权力差、误会、契约这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要让霸总成为命令机器",
+    "rationale": "该题材的正确写法：写豪门总裁时，核心放在亲密关系里的权力差、误会、契约、公开身份和安全感。",
+    "good_example": "每章要让关系发生可见变化：靠近、退开、试探、护短、吃醋、揭身份、把分寸说清或旧误会加深。 甜点和虐点都要落到具体场景。（而不是让霸总成为命令机器）",
+    "bad_example": "让霸总成为命令机器；关系里的权力差、误会、契约这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要所有矛盾都靠“听我解释”消失",
+    "rationale": "该题材的正确写法：关系压力落到合同、戒指、病历、热搜、家族电话、董事会、酒店门卡、车内空间、公开座位和转账记录。",
+    "good_example": "关系压力落到合同、戒指、病历、热搜、家族电话、董事会、酒店门卡、车内空间、公开座位和转账记录。 豪门感靠资源如何改变局面。（而不是所有矛盾都靠“听我解释”消失）",
+    "bad_example": "所有矛盾都靠“听我解释”消失；系压力落到合同、戒指、病历这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要把女主主动性写没",
+    "rationale": "该题材的正确写法：写豪门总裁时，核心放在亲密关系里的权力差、误会、契约、公开身份和安全感。",
+    "good_example": "亲密需求 + 身份/资源不对等 + 信息差。 误会不能靠一句解释解决，要有面子、家族、舆论、合同或旧伤作为阻力。（而不是把女主主动性写没）",
+    "bad_example": "把女主主动性写没；要有面子、家族、舆论这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要用成人式油腻台词替代真实拉扯",
+    "rationale": "该题材的正确写法：霸总可以短、稳、克制，但不能只会命令。",
+    "good_example": "霸总可以短、稳、克制，但不能只会命令。 女主台词要有自尊和限制。（而不是用成人式油腻台词替代真实拉扯）",
+    "bad_example": "用成人式油腻台词替代真实拉扯，通篇没有一个具体场面承接。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要只堆品牌和豪宅",
+   "不要让霸总成为命令机器",
+   "不要所有矛盾都靠“听我解释”消失",
+   "不要把女主主动性写没",
+   "不要用成人式油腻台词替代真实拉扯"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "霸总可以短、稳、克制，但不能只会命令。女主台词要有自尊和限制。亲密戏对话重潜台词：不全说破，用停顿、转移话题、反问、嘴硬承接情绪。",
+  "drift_guard": "不要只堆品牌和豪宅；不要让霸总成为命令机器；不要所有矛盾都靠“听我解释”消失；不要把女主主动性写没；不要用成人式油腻台词替代真实拉扯。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "关系压力落到合同、戒指、病历、热搜、家族电话、董事会、酒店门卡、车内空间、公开座位和转账记录。豪门感靠资源如何改变局面。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
 }

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generated_at": "2026-11-02T06:25:22.261909-08:00",
+  "generated_at": "2026-11-03T03:40:33.211285-08:00",
   "files": {
     "campus-redemption-commercial-obs-distilled.json": {
       "sha256": "9e15efac128e669657d025928dcdd6fa9ffaac5b989ef39ea151f01edfff584a",
@@ -61,9 +61,10 @@
       ]
     },
     "dianjing-genre-pack.json": {
-      "sha256": "f7d384912e22b4066ab39e23b55a02b5b3a2c16c270d9324ad70471d94d2f7e2",
+      "sha256": "3d704185582c6216ad8530e2f1853c49135892c2463d7f78eb57295c2f9d0afb",
       "previous_hashes": [
-        "93b8d3180b16b447ce70f44d6a8a90c8f1098c4517bd05c4b132be9cc81d2bd5"
+        "93b8d3180b16b447ce70f44d6a8a90c8f1098c4517bd05c4b132be9cc81d2bd5",
+        "f7d384912e22b4066ab39e23b55a02b5b3a2c16c270d9324ad70471d94d2f7e2"
       ]
     },
     "duanju-shuangwen-genre-pack.json": {
@@ -73,47 +74,57 @@
       ]
     },
     "dushi-bingwang-genre-pack.json": {
-      "sha256": "61fc6ba0195c08cb4e5ec1941d098663ce86b0e6062e26789696ff20891212e9",
+      "sha256": "67548a820181b6a269c1fcd65b21171103db182cabadaf051cda37d9dee42521",
       "previous_hashes": [
-        "a35beab40969c1df34f137508db8c49875f60f9f43b5bd458efb2ab7c3fbc902"
+        "a35beab40969c1df34f137508db8c49875f60f9f43b5bd458efb2ab7c3fbc902",
+        "61fc6ba0195c08cb4e5ec1941d098663ce86b0e6062e26789696ff20891212e9"
       ]
     },
     "dushi-gaowu-genre-pack.json": {
-      "sha256": "81cd8f958c6b2b134deda4c6eeb9147c30590ef18b0ce2bc90dcb4806c2ba7ba",
+      "sha256": "be20690af67d61f8a699d1696a07295dc86f30ed9f475c3537600d8d22bc6137",
       "previous_hashes": [
-        "783e0fa3a2545c65c057aeeb0c5880e52d235c11a0f6b792841f5274cb7d5ec3"
+        "783e0fa3a2545c65c057aeeb0c5880e52d235c11a0f6b792841f5274cb7d5ec3",
+        "81cd8f958c6b2b134deda4c6eeb9147c30590ef18b0ce2bc90dcb4806c2ba7ba"
       ]
     },
     "dushi-naodong-genre-pack.json": {
-      "sha256": "10069316f4a58f1ab0a798004a0d26e93738e6904ff03b87b61f39d57973e541",
-      "previous_hashes": []
+      "sha256": "408eff53434dcffe80d8d44d904128014bb1182fd7b21c91bc994f725ec20f35",
+      "previous_hashes": [
+        "10069316f4a58f1ab0a798004a0d26e93738e6904ff03b87b61f39d57973e541"
+      ]
     },
     "dushi-richang-genre-pack.json": {
-      "sha256": "2d61171bd0fecff4764129af6cfb1439bb4683e20ee84e1e64fb46f7187f892c",
+      "sha256": "fc05670bc5e7f0fabc7a4c89b2c23a2264651859ee023917ae64dbfb9ca5a3e5",
       "previous_hashes": [
-        "93e015dea53bddcdbd44127eddcf62d2e09f7fccd63b4dd6f2568a84587465de"
+        "93e015dea53bddcdbd44127eddcf62d2e09f7fccd63b4dd6f2568a84587465de",
+        "2d61171bd0fecff4764129af6cfb1439bb4683e20ee84e1e64fb46f7187f892c"
       ]
     },
     "dushi-shenyi-genre-pack.json": {
-      "sha256": "adb34575d6c85dc7630000ecbfabad6a68b869d0da6c2fddda14a5ff69af1786",
+      "sha256": "6adff6758d16a7435243ef51a17279dac716d26803498028a193d0c4d834e5f1",
       "previous_hashes": [
-        "e19b34d90596fda3625aa800097fb7835f7080de62df30aa56e314a8d2985362"
+        "e19b34d90596fda3625aa800097fb7835f7080de62df30aa56e314a8d2985362",
+        "adb34575d6c85dc7630000ecbfabad6a68b869d0da6c2fddda14a5ff69af1786"
       ]
     },
     "dushi-xitong-genre-pack.json": {
-      "sha256": "702969370cee4b664e97babdf1d1d37c2070481070d1be13b3c970926ad6de2d",
+      "sha256": "072b5e8800e4eabfce7f0a0322f6042e2951286ebd59c6632609d009b11fe3b8",
       "previous_hashes": [
-        "38e3ec2301e11b944a975d566c2bed810106c9714622224cb40cb9c712c6934b"
+        "38e3ec2301e11b944a975d566c2bed810106c9714622224cb40cb9c712c6934b",
+        "702969370cee4b664e97babdf1d1d37c2070481070d1be13b3c970926ad6de2d"
       ]
     },
     "dushi-xiuzhen-genre-pack.json": {
-      "sha256": "8076832812072fdca29b45fcd67fe6daa1f94a5f13006b91186c5f3ceaaa3915",
-      "previous_hashes": []
+      "sha256": "cd4819cdaefdfa47c2cb42229be6e956ac20cccb8f2dea803e40f8083bef1db1",
+      "previous_hashes": [
+        "8076832812072fdca29b45fcd67fe6daa1f94a5f13006b91186c5f3ceaaa3915"
+      ]
     },
     "dushi-zhongtian-genre-pack.json": {
-      "sha256": "53c4bb289bd9321a858daab42d7eb366006949b031a2793fff7ff8dfc5683436",
+      "sha256": "11ec97a26814394e2182ea01dcfe96df1f4eaacb7c70d3b9f2dccb779d3f6bd8",
       "previous_hashes": [
-        "00f0acf09c9dbfe89714a9940c7f12eb52b0093ed8f7482011f5c6e7c901b143"
+        "00f0acf09c9dbfe89714a9940c7f12eb52b0093ed8f7482011f5c6e7c901b143",
+        "53c4bb289bd9321a858daab42d7eb366006949b031a2793fff7ff8dfc5683436"
       ]
     },
     "emotion-library.json": {
@@ -339,9 +350,10 @@
       "previous_hashes": []
     },
     "gongdou-genre-pack.json": {
-      "sha256": "ae3c925e50b0e8bfca6e59f26acf04c53cef93cca42c595b326cb9c613741205",
+      "sha256": "5881d658623ece8cc3e12f5f93cd0d20112a86b56f6356ed8b24d0e03861d3c4",
       "previous_hashes": [
-        "b45b034923f63bd76fc26b4e9e3056d5705873c74d1a7a64b12003e520f6eefd"
+        "b45b034923f63bd76fc26b4e9e3056d5705873c74d1a7a64b12003e520f6eefd",
+        "ae3c925e50b0e8bfca6e59f26acf04c53cef93cca42c595b326cb9c613741205"
       ]
     },
     "goudai-changsheng-genre-pack.json": {
@@ -351,9 +363,10 @@
       ]
     },
     "gufeng-shiqing-genre-pack.json": {
-      "sha256": "9b198baf3e07fbf504df2093f49eb6f4da75bb9024a9ea2008b0255077ad29d8",
+      "sha256": "86cd619638d53cfb9d1a81c8a3b90edaef643d3e3a6ff89cadb1f12be7c9d62c",
       "previous_hashes": [
-        "176391de73cc7850bdbc8a80809d563d81ea9d848ed1f30ceb977183659f3698"
+        "176391de73cc7850bdbc8a80809d563d81ea9d848ed1f30ceb977183659f3698",
+        "9b198baf3e07fbf504df2093f49eb6f4da75bb9024a9ea2008b0255077ad29d8"
       ]
     },
     "guize-guaitan-genre-pack.json": {
@@ -363,13 +376,16 @@
       ]
     },
     "guyan-naodong-genre-pack.json": {
-      "sha256": "44fd615545101f215a54a798076c6394dbecade74d127f5de897766c14d7ca51",
-      "previous_hashes": []
+      "sha256": "5ff1e89a80342e893ae40c40b95fc3d23fa39ea31da886cedbfacb81d6c2455b",
+      "previous_hashes": [
+        "44fd615545101f215a54a798076c6394dbecade74d127f5de897766c14d7ca51"
+      ]
     },
     "haomen-zongcai-genre-pack.json": {
-      "sha256": "7f8620ef8aed39a5b4965e19f60b9efc50b6f80e0791a85d4f4d6dc97aec6aa8",
+      "sha256": "d23c423fea76fa4c26a5b805f35fb8c1eb223d0c8c8d5e30ec495330904ae1bd",
       "previous_hashes": [
-        "4786f17ff1f3871b02ff28c5125dcd2069e734c78b0dfee225b9023ac463c683"
+        "4786f17ff1f3871b02ff28c5125dcd2069e734c78b0dfee225b9023ac463c683",
+        "7f8620ef8aed39a5b4965e19f60b9efc50b6f80e0791a85d4f4d6dc97aec6aa8"
       ]
     },
     "hook-library.json": {
@@ -377,45 +393,52 @@
       "previous_hashes": []
     },
     "kangzhan-diezhan-genre-pack.json": {
-      "sha256": "644a668885762d17dcc1509948d263416c39091b8a1f24ef8676700e4729119b",
+      "sha256": "e48107dcba3a1ec19208d79ebf8ad14de0e5b4817568ccf1b9bd74c137a92204",
       "previous_hashes": [
-        "f4684186fce849325c5b9271d7a18ff9e958c5e5f1f745c98313a347d5f2c153"
+        "f4684186fce849325c5b9271d7a18ff9e958c5e5f1f745c98313a347d5f2c153",
+        "644a668885762d17dcc1509948d263416c39091b8a1f24ef8676700e4729119b"
       ]
     },
     "kehuan-moshi-genre-pack.json": {
-      "sha256": "54a5efdbdf316993836fede9669bed36f1053505a0fca1a81305a9f38099ba85",
+      "sha256": "b304727860ad0fa94c29f88085469623aed3f12d161cb6c5e6ef104ee21d1d97",
       "previous_hashes": [
-        "a65c2e3222f2e1f2d3a25b11b7f18918c41eb61d580e1a24ffb74ca8f50b2e14"
+        "a65c2e3222f2e1f2d3a25b11b7f18918c41eb61d580e1a24ffb74ca8f50b2e14",
+        "54a5efdbdf316993836fede9669bed36f1053505a0fca1a81305a9f38099ba85"
       ]
     },
     "kehuan-xingji-genre-pack.json": {
-      "sha256": "86e81979e1c9445a7bd26c3dd3ef181a6f9eca60cf91806b846fb1d609a3163e",
+      "sha256": "86974171556a8035c5291caba61b430542e22c3377a9409c36bbe75a40deedd2",
       "previous_hashes": [
-        "c5b754cc23814d730eb865bea193a42ef44f1a4916e52f016c3d96801b138a7f"
+        "c5b754cc23814d730eb865bea193a42ef44f1a4916e52f016c3d96801b138a7f",
+        "86e81979e1c9445a7bd26c3dd3ef181a6f9eca60cf91806b846fb1d609a3163e"
       ]
     },
     "kuaichuan-genre-pack.json": {
-      "sha256": "23606fe7dfb952b6e5c669ed94f4bf3ca25e4ce12df5ae8b28024bfde66b43c3",
+      "sha256": "e542747494c1c7276e0001580bb24d875135093d299107a29883e9bedd623bf7",
       "previous_hashes": [
-        "289d8e20a3922feace1910619f0f24185a59e29fe12ae9cc4de08bed7cdbea67"
+        "289d8e20a3922feace1910619f0f24185a59e29fe12ae9cc4de08bed7cdbea67",
+        "23606fe7dfb952b6e5c669ed94f4bf3ca25e4ce12df5ae8b28024bfde66b43c3"
       ]
     },
     "lishi-chuanyue-genre-pack.json": {
-      "sha256": "aaf09bb8565045cd7474c70a37e71c9116f3f7cd7feec2589335fb4221690f98",
+      "sha256": "f01f99e76f25e7b19ba54d2da9477f6d70ced27b5d8663338f46aac173fd3eef",
       "previous_hashes": [
-        "d38e18507e9067954922959370c71ae0105c5eb27ef361e64cf6850f975f082e"
+        "d38e18507e9067954922959370c71ae0105c5eb27ef361e64cf6850f975f082e",
+        "aaf09bb8565045cd7474c70a37e71c9116f3f7cd7feec2589335fb4221690f98"
       ]
     },
     "lishi-genre-pack.json": {
-      "sha256": "c58849b8ee8b6d780db3ab253279c01a024acf80768517d1d6c053e7434ab6e9",
+      "sha256": "722ceed8fef76a3bc6a3781aecbc251ef28bad29c01e91c53e6d27759f7f56ca",
       "previous_hashes": [
-        "eb1468fee0c816dc98f492868ceb4decd918f26716df4f8c9bfaa9b070c3a02b"
+        "eb1468fee0c816dc98f492868ceb4decd918f26716df4f8c9bfaa9b070c3a02b",
+        "c58849b8ee8b6d780db3ab253279c01a024acf80768517d1d6c053e7434ab6e9"
       ]
     },
     "lishi-naodong-genre-pack.json": {
-      "sha256": "525ba1d48278e650a7d32518310ab7d0a595b77e25a06acce09b4e97a4059735",
+      "sha256": "7f765604d3be4227da378e481b862234a3f033aa13581351a93266f1620c97b2",
       "previous_hashes": [
-        "aeb83b918e9d620ca6cffdcc057ddad73d6d89916995dde1a18df95927ab7e52"
+        "aeb83b918e9d620ca6cffdcc057ddad73d6d89916995dde1a18df95927ab7e52",
+        "525ba1d48278e650a7d32518310ab7d0a595b77e25a06acce09b4e97a4059735"
       ]
     },
     "Lord_of_the_Mysteries-commercial-obs.json": {
@@ -439,45 +462,52 @@
       ]
     },
     "meishi-genre-pack.json": {
-      "sha256": "a757e6749d88d573dacbbddc3b8dd64a6d733d4d797cfea273d3024ab74df206",
+      "sha256": "50b8d4174df99cda10946a1c15344f0e6a09f180766d6424b8d3557f963f9f62",
       "previous_hashes": [
-        "2bbcb781336e509b4fb0fe24bf9336406739909b3e876ff8ba612b456a955925"
+        "2bbcb781336e509b4fb0fe24bf9336406739909b3e876ff8ba612b456a955925",
+        "a757e6749d88d573dacbbddc3b8dd64a6d733d4d797cfea273d3024ab74df206"
       ]
     },
     "minguo-yanqing-genre-pack.json": {
-      "sha256": "bd7d4d1769239c768f73caa68a65a1e3914db71593800764b0a670de94a9c24a",
+      "sha256": "8c1b0b2794e5385a25b7c208efb776ad74aca7a2cd408a339e9501268ae52940",
       "previous_hashes": [
-        "442688bc64619dc89cf51fd8313fc05470d987296eb0bc0cfed8bb6b6dd876df"
+        "442688bc64619dc89cf51fd8313fc05470d987296eb0bc0cfed8bb6b6dd876df",
+        "bd7d4d1769239c768f73caa68a65a1e3914db71593800764b0a670de94a9c24a"
       ]
     },
     "niandai-genre-pack.json": {
-      "sha256": "65d71090922de9b7f1ae54ad6e909541fda2dc3d51b54dd56f0b799ddba49038",
+      "sha256": "3514000272ed1a01556ec8f98c10ef8746aec67dd80b96b2a4cb4a2251e20e9e",
       "previous_hashes": [
-        "b35b85b7ec3fa63412255526ecdbf731e2855559a5b5917db2d0f74a10437a4a"
+        "b35b85b7ec3fa63412255526ecdbf731e2855559a5b5917db2d0f74a10437a4a",
+        "65d71090922de9b7f1ae54ad6e909541fda2dc3d51b54dd56f0b799ddba49038"
       ]
     },
     "nvpin-xuanyi-genre-pack.json": {
-      "sha256": "091e79dc02b02c7f495943eb98b0422be7381532f5cc4d6681805c3e1572d3cd",
+      "sha256": "bc384568a0b834d76fea1060e95114280f4ba5727edbfa1513678ce0b8e2bd19",
       "previous_hashes": [
-        "1468df5066a9607501759fce8ebd14cb8a75bd6fbb141fc1bafce4993a320153"
+        "1468df5066a9607501759fce8ebd14cb8a75bd6fbb141fc1bafce4993a320153",
+        "091e79dc02b02c7f495943eb98b0422be7381532f5cc4d6681805c3e1572d3cd"
       ]
     },
     "nvpin-zhongtian-genre-pack.json": {
-      "sha256": "121a35889f797393bb210a538c4e1fcbc03d0876b9120b35b45d760f7d986a00",
+      "sha256": "119ae712e692d9fb0b15c5547db0261670eb45eb248b957410f88dc2ee6fba3b",
       "previous_hashes": [
-        "c74c89ef24c7504d7227786f4e224db582a22058303b14287f0d9c34ee63e829"
+        "c74c89ef24c7504d7227786f4e224db582a22058303b14287f0d9c34ee63e829",
+        "121a35889f797393bb210a538c4e1fcbc03d0876b9120b35b45d760f7d986a00"
       ]
     },
     "qingchun-tianchong-genre-pack.json": {
-      "sha256": "5940b5da9b98ecc5582badb6662c411e2a7c8a65065a3f431e66747904109b84",
+      "sha256": "c40851c1e6316dec7171c1fb2c90e267a33f08024d0ae2631047bbc07e259cb8",
       "previous_hashes": [
-        "395364331f1a4e906b875a908a1c2bffdfdbc66012ba61ab6967a0f6204e8efd"
+        "395364331f1a4e906b875a908a1c2bffdfdbc66012ba61ab6967a0f6204e8efd",
+        "5940b5da9b98ecc5582badb6662c411e2a7c8a65065a3f431e66747904109b84"
       ]
     },
     "qingchun-xiaoyuan-genre-pack.json": {
-      "sha256": "ea69d130b20e893edc96d2d5906f3108173f07ebb655e16c3ea2df75747c8fdb",
+      "sha256": "cb9c02f27814f955a1dde3a44b122f81d7f716ea3308ae27d612e8f2fa00c720",
       "previous_hashes": [
-        "545ee9bc2228302af347f690418cf28b05d7816f3dca059edcfe326811275f77"
+        "545ee9bc2228302af347f690418cf28b05d7816f3dca059edcfe326811275f77",
+        "ea69d130b20e893edc96d2d5906f3108173f07ebb655e16c3ea2df75747c8fdb"
       ]
     },
     "qingning_chosen-commercial-obs.json": {
@@ -527,9 +557,10 @@
       ]
     },
     "shuangnan-genre-pack.json": {
-      "sha256": "85505101c89a10d3983cf7935b3e7f08ba6dac779a56d30e347f71ccb6a2f619",
+      "sha256": "8e2e6a39a4c64212e379d71a4bfaa60ccbc77a415a093b1a1d0ca1b60b95c84d",
       "previous_hashes": [
-        "db8c188a23b5a43344002156e27eb46e6ebfab4b610098ba3df410bc1a76b8bb"
+        "db8c188a23b5a43344002156e27eb46e6ebfab4b610098ba3df410bc1a76b8bb",
+        "85505101c89a10d3983cf7935b3e7f08ba6dac779a56d30e347f71ccb6a2f619"
       ]
     },
     "suyixinjian_chosen-commercial-obs.json": {
@@ -575,37 +606,44 @@
       ]
     },
     "wuxia-chuantong-genre-pack.json": {
-      "sha256": "1f134815c67c5a5373b274b125e3dac8b6f0f98181142b647a0adcba88b07e3a",
+      "sha256": "fcec772d5785e342c2ff9f812d3750624c843165d939f21d86b0e52a1dfaf64a",
       "previous_hashes": [
-        "d4750124944fbfb9266a12696400204d2963a9e0005b8ab7d706594d02ac4437"
+        "d4750124944fbfb9266a12696400204d2963a9e0005b8ab7d706594d02ac4437",
+        "1f134815c67c5a5373b274b125e3dac8b6f0f98181142b647a0adcba88b07e3a"
       ]
     },
     "wuxianliu-genre-pack.json": {
-      "sha256": "4d9938b39af87f4d667c108430744e954d29c9bb84c46bef4814922f8578b900",
+      "sha256": "39f9d50f060c8afff6bfeded43b4534d860eab6eced72b416ed1c1502b3a1f8a",
       "previous_hashes": [
-        "5152f72d1b95472240f519744f32e090179b8de7162fcae744d566964a01d206"
+        "5152f72d1b95472240f519744f32e090179b8de7162fcae744d566964a01d206",
+        "4d9938b39af87f4d667c108430744e954d29c9bb84c46bef4814922f8578b900"
       ]
     },
     "xianxia-genre-pack.json": {
-      "sha256": "0872ad08447f9b172b1849101f75188ba2c36f4f3777b200fc20c368e440fa67",
-      "previous_hashes": []
+      "sha256": "10602426785deec182e3e2dbbc6782fcf4e0d4c4998182394d2239b65961f927",
+      "previous_hashes": [
+        "0872ad08447f9b172b1849101f75188ba2c36f4f3777b200fc20c368e440fa67"
+      ]
     },
     "xianyan-naodong-genre-pack.json": {
-      "sha256": "c39bec466b65e1d3842a2423f7ed9d9fc663ac12d02d87a30871971be14dbeb0",
+      "sha256": "b334616b47323adbb9ba6bedd7d9519161141c0f12b2b0ae892166476c6339c9",
       "previous_hashes": [
-        "7f18296998922b0efa87c1fbb1c16a221414222048aa4cdc0261ef45218b7a48"
+        "7f18296998922b0efa87c1fbb1c16a221414222048aa4cdc0261ef45218b7a48",
+        "c39bec466b65e1d3842a2423f7ed9d9fc663ac12d02d87a30871971be14dbeb0"
       ]
     },
     "xifang-qihuan-genre-pack.json": {
-      "sha256": "f4989023043659d9990a4c4aa2e0c62e210b4eaafedabd414f478cf8a3420722",
+      "sha256": "42c59d5517b916da31f9868e27426b6fc120e7f3856224ab0f3b9c4f37682998",
       "previous_hashes": [
-        "ca2f599e82b4a27bc1eff7d504983a9e97d79831ab05763fefaeae2b1729a02c"
+        "ca2f599e82b4a27bc1eff7d504983a9e97d79831ab05763fefaeae2b1729a02c",
+        "f4989023043659d9990a4c4aa2e0c62e210b4eaafedabd414f478cf8a3420722"
       ]
     },
     "xingguang-genre-pack.json": {
-      "sha256": "266729c27296c1c47e0df2bb090c0c987365ac16bf5da41b8ef7648474b79ae0",
+      "sha256": "d020b087cb3b0244c38a494343a80b259d42943f6d7ed523eaa173319f3b62b2",
       "previous_hashes": [
-        "f3fa96bc92e28faad588cd398b69b0e83b6ec4dc68632bf24e41de81ec1170ce"
+        "f3fa96bc92e28faad588cd398b69b0e83b6ec4dc68632bf24e41de81ec1170ce",
+        "266729c27296c1c47e0df2bb090c0c987365ac16bf5da41b8ef7648474b79ae0"
       ]
     },
     "xuanhuan-genre-pack.json": {
@@ -613,65 +651,78 @@
       "previous_hashes": []
     },
     "xuanhuan-naodong-genre-pack.json": {
-      "sha256": "90bf197a4bca3eb381299c08ac0324df85165f7304ebc9f424a4c8f27afe690c",
+      "sha256": "006595c7a7e035079807ac9786c62dcca339932002a305961cb3cfb5a0c974f3",
       "previous_hashes": [
-        "d55e9dc353b50d8d093fda9bfb067f027dfba07b85ee9b1985f7fa9d2ca07cd4"
+        "d55e9dc353b50d8d093fda9bfb067f027dfba07b85ee9b1985f7fa9d2ca07cd4",
+        "90bf197a4bca3eb381299c08ac0324df85165f7304ebc9f424a4c8f27afe690c"
       ]
     },
     "xuanhuan-yanqing-genre-pack.json": {
-      "sha256": "98428d661864a95927612046249d663b72d127505305b66bacaebbfc3d69458d",
+      "sha256": "c727a1ecaa35716f6d1025c24f5b434b516d1db9794064180936273b0745b4d9",
       "previous_hashes": [
-        "9edfd27671b5df87b3cc956216d32583ecd60690eda6fed8844c52fceedb7d6b"
+        "9edfd27671b5df87b3cc956216d32583ecd60690eda6fed8844c52fceedb7d6b",
+        "98428d661864a95927612046249d663b72d127505305b66bacaebbfc3d69458d"
       ]
     },
     "xuanyi-daomu-genre-pack.json": {
-      "sha256": "a53459bd607727462259b8a4d381ead2b9b3ca93fe55bcf85bb8418e8d6f4193",
+      "sha256": "83832cf88ec34f6020f0782aae701a832784cbda3f0cf02f2265d036165cf980",
       "previous_hashes": [
-        "4eb881d4344349e683cfb6f5e49c046f03077acc03eca2b93ca2c61f3e5a8023"
+        "4eb881d4344349e683cfb6f5e49c046f03077acc03eca2b93ca2c61f3e5a8023",
+        "a53459bd607727462259b8a4d381ead2b9b3ca93fe55bcf85bb8418e8d6f4193"
       ]
     },
     "xuanyi-lingyi-genre-pack.json": {
-      "sha256": "37c9c1ae744fe54a88b6d461835b76eceba68038dc03fdb01989ff230b1a3570",
-      "previous_hashes": []
+      "sha256": "558e96e612cb34c80c8e791aae6403b7c602828db7c9363c830807841efea0f2",
+      "previous_hashes": [
+        "37c9c1ae744fe54a88b6d461835b76eceba68038dc03fdb01989ff230b1a3570"
+      ]
     },
     "xuanyi-naodong-genre-pack.json": {
-      "sha256": "af8e263fca028eab2e7a2ed56eb1e74f5b4102979d61ed53e3d821f384d05d0d",
+      "sha256": "465cf4eb53402d6e8df4097fce81a90082fd786a394d14eb83bb9369c7794517",
       "previous_hashes": [
-        "2ee0df90ee0a422566714c6357f9001e65f5e33b5545b15271c98bec59556c60"
+        "2ee0df90ee0a422566714c6357f9001e65f5e33b5545b15271c98bec59556c60",
+        "af8e263fca028eab2e7a2ed56eb1e74f5b4102979d61ed53e3d821f384d05d0d"
       ]
     },
     "xuanyi-xingzhen-genre-pack.json": {
-      "sha256": "bdc855b57186626df3f2499b2ed409c0fd66370d056a900ed9274e951a120b03",
+      "sha256": "dd5500b6de948337335272acd3aed97c9c72f5b52ceb6153e8650f69d275d8e2",
       "previous_hashes": [
-        "10bd3b0912e1d5983a44c8e52db4a770416cac2cde90134924c0107f0c43f084"
+        "10bd3b0912e1d5983a44c8e52db4a770416cac2cde90134924c0107f0c43f084",
+        "bdc855b57186626df3f2499b2ed409c0fd66370d056a900ed9274e951a120b03"
       ]
     },
     "youxi-tiyu-genre-pack.json": {
-      "sha256": "2808d62c04851d3fa4279f5edea8e4a202990e134e82cd656e146a622cfc56ce",
+      "sha256": "d285def194cd433aa6461ebef4afda503241836b9c25c075370b6c90f62f4b79",
       "previous_hashes": [
-        "734bdc55e0fa3104cb7ad465b3dfcfefd188cc39a35d4884c36f5c5d168d3cdc"
+        "734bdc55e0fa3104cb7ad465b3dfcfefd188cc39a35d4884c36f5c5d168d3cdc",
+        "2808d62c04851d3fa4279f5edea8e4a202990e134e82cd656e146a622cfc56ce"
       ]
     },
     "youxi-wangyou-genre-pack.json": {
-      "sha256": "1f468c2b9d91562e4b7de80880cf32572b38c188eee2eca60876e6886f31121f",
+      "sha256": "9654a41145a193f2a33e104080bde00b533d7803c33d7a715bcfcc0e7541ae45",
       "previous_hashes": [
-        "c59a69dd970baecf6d2f6918ce4bbf78218af912dc22fd2a6487197b7241fde4"
+        "c59a69dd970baecf6d2f6918ce4bbf78218af912dc22fd2a6487197b7241fde4",
+        "1f468c2b9d91562e4b7de80880cf32572b38c188eee2eca60876e6886f31121f"
       ]
     },
     "zhanshen-zhuixu-genre-pack.json": {
-      "sha256": "33c2190a9567d42f328d6a68e37f156e02cb43bb6ecb335d7199b0698e5d835e",
-      "previous_hashes": []
+      "sha256": "2b7d1fbcf367e6418c12abc6c6b57ed043a76f07e7d38e2871c874bc0d9358cb",
+      "previous_hashes": [
+        "33c2190a9567d42f328d6a68e37f156e02cb43bb6ecb335d7199b0698e5d835e"
+      ]
     },
     "zhichang-hunlian-genre-pack.json": {
-      "sha256": "59137345d6e39e3a5285f1cdd9d5bc19bb7d84f908cf301a82258a7eda5650c3",
+      "sha256": "24b2cd805aaae778b8f3443548a8173c3188a5833f23c46fbab15271f495ead1",
       "previous_hashes": [
-        "410b9d55c7162bb5d692053b2a635d8e08fa3e896583752c1fdd444100f0c8f5"
+        "410b9d55c7162bb5d692053b2a635d8e08fa3e896583752c1fdd444100f0c8f5",
+        "59137345d6e39e3a5285f1cdd9d5bc19bb7d84f908cf301a82258a7eda5650c3"
       ]
     },
     "zhongtian-genre-pack.json": {
-      "sha256": "9a2f4d6ee61153d9cf643d8b5a40b7c0784c2c61529bcfbef9547456bf4b2c21",
+      "sha256": "6c1625d6590ab67747896422f62824c868c86f74e257081c17ab2595a8aec2f5",
       "previous_hashes": [
-        "bca7af06c8ae9334ca78aa1ee81d0803da7391b2e06c530a4938a3eb6b630c3f"
+        "bca7af06c8ae9334ca78aa1ee81d0803da7391b2e06c530a4938a3eb6b630c3f",
+        "9a2f4d6ee61153d9cf643d8b5a40b7c0784c2c61529bcfbef9547456bf4b2c21"
       ]
     },
     "暮冬念春-commercial-obs.json": {

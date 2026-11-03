@@ -1,280 +1,213 @@
 {
-  "meta": {
-    "id": "genre-kehuan-moshi",
-    "name": "科幻末世",
-    "sub_tags": [
-      "科幻末世",
-      "末世求生",
-      "避难所",
-      "丧尸晶核",
-      "囤货危机"
-    ],
-    "target_platform": "长篇通用",
-    "scope": "genre-generalized",
-    "confidence": 0.6,
-    "note": "通用题材包：科幻末世/废土生存/避难所基建",
-    "source_books": [
-      {
-        "title": "科幻末世标杆代表作一",
-        "platform": "番茄",
-        "performance": "千万级爆款",
-        "voice_card_ref": "kehuan-moshi_ref1"
-      },
-      {
-        "title": "科幻末世热门畅销作二",
-        "platform": "番茄",
-        "performance": "高追读榜首",
-        "voice_card_ref": "kehuan-moshi_ref2"
-      },
-      {
-        "title": "科幻末世经典完结作三",
-        "platform": "番茄",
-        "performance": "高评分必读",
-        "voice_card_ref": "kehuan-moshi_ref3"
-      }
-    ]
+ "meta": {
+  "id": "genre-kehuan-moshi",
+  "name": "科幻末世",
+  "sub_tags": [
+   "科幻末世",
+   "末世",
+   "灾变",
+   "废土",
+   "囤货末世"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.5,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-kehuan-moshi",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-kehuan-moshi（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-kehuan-moshi.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-kehuan-moshi.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
   },
-  "commercial": {
-    "opening_analysis": {
-      "chapter_1": {
-        "first_300_words_task": "以灾难降临前夕倒计时或极端恶劣天灾开场，300字内抛出囤货/庇护所第一重生存危机",
-        "hook_position": 450,
-        "conflict_intro_position": 800,
-        "protagonist_intro_method": "重生/先知或觉醒安全屋系统，冷酷果决，不拖泥带水",
-        "golden_finger_reveal": "安全屋/无限空间/物资倍增金手指首度亮相，展示存活第一张底牌"
-      },
-      "chapter_2_3_task": "第2章抢先截胡致命物资或加固安全屋避难所；第3章天灾/尸潮爆发，门外人间炼狱，门内主角丰衣足食，形成第一次反差爽感",
-      "common_mistakes": [
-        "圣母心泛滥救白眼狼",
-        "开篇大篇幅解释天灾科学成因",
-        "物资获取过于容易毫无危机感",
-        "缺少末日降临前的人情反差"
-      ]
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用断电、感染、物资清点、避难点冲突或异常天气立生存缺口。",
+    "中期：围绕物资消耗、队伍信任、基地规则和感染风险推进，每次收益都要消耗代价。",
+    "后期：把队伍分裂、新灾变和基地秩序合并压迫，结尾落到物资缺口或规则变化。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章至少有一个危险和一个资源选择。囤货/建设章也要有外部风险或内部信任成本。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
     },
-    "payoff_density": {
-      "per_thousand_words": 0.45,
-      "dry_spell_tolerance": 6,
-      "payoff_types": [
-        {
-          "type": "打脸",
-          "ratio": 0.35,
-          "buildup_length": 3,
-          "skeleton": "邻里/仇敌受冻挨饿苦苦哀求，主角在安全屋内烤肉品酒，彻底碾压旧日轻视"
-        },
-        {
-          "type": "收益兑现",
-          "ratio": 0.3,
-          "buildup_length": 2,
-          "skeleton": "探险或猎杀收获高阶晶核/稀缺能源/升级模块，庇护所功能跃升"
-        },
-        {
-          "type": "反杀",
-          "ratio": 0.2,
-          "buildup_length": 5,
-          "skeleton": "掠夺者武装冲击安全屋，遭遇主角重火力防线降维打击，全军覆没"
-        },
-        {
-          "type": "他人认可",
-          "ratio": 0.15,
-          "buildup_length": 7,
-          "skeleton": "建立私人基地，幸存者强者主动来投，确立末世一方霸主地位"
-        }
-      ]
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
     },
-    "paywall": {
-      "cliffhanger_technique": "特大天灾（极寒/酸雨/红月）骤然升级，或巨型变异兽潮包围避难所",
-      "pre_paywall_buildup": "避难所刚完成重要升级，防御体系面临第一场极限压力测试"
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
     },
-    "retention_risk_points": [
-      {
-        "position": "第1-3章",
-        "reason": "囤货流水账过长",
-        "mitigation": "把囤货过程写成与奸商/仇敌斗智斗勇，带爽感与紧迫感"
-      },
-      {
-        "position": "第15-30章",
-        "reason": "安全屋内剧情单调",
-        "mitigation": "外派无人机搜救/探查遗迹，引入异能进化与外部势力博弈"
-      }
-    ],
-    "update_rhythm": {
-      "chapters_per_day": 2,
-      "burst_timing": "尸潮防卫战或基地扩张时加更"
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
     }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "灾变前兆、物资短缺、避难所门口、亲友背叛、感染/怪物出现、系统预警都适合切入。",
+   "chapter_end_hook": "用新灾变、基地规则、资源暴露、队友异化、敌人盯上收尾。"
   },
-  "language_rules": {
-    "banned_phrases": [
-      "圣母",
-      "好人有好报",
-      "恐怖如斯",
-      "蝼蚁",
-      "大家都是同胞"
-    ],
-    "fatigue_words": [
-      {
-        "word": "倒吸一口凉气",
-        "max_per_chapter": 1
-      },
-      {
-        "word": "眼神冰冷",
-        "max_per_chapter": 2
-      },
-      {
-        "word": "物资堆积如山",
-        "max_per_chapter": 2
-      }
-    ],
-    "dialogue_style": {
-      "dominant_subtype": "硬派冷峻",
-      "note": "末世人命如草芥，对话务实利己，不讲虚头巴脑的大道理，主角行事杀伐果断"
-    },
-    "iron_rules": [
-      {
-        "rule": "末日法则第一条：绝对禁止圣母泛滥无底线救人。",
-        "bad_example": "看到前女友带着一家老小在门外哭求，他心软了，打开了安全屋大门。",
-        "good_example": "看着监视器里痛哭流涕的旧仇人，主角拉下百叶窗，给火锅里又添了一盘雪花肥牛。",
-        "rationale": "末世读者追求的是自保与秩序裁决，圣母放水会瞬间导致大面积弃书。"
-      }
-    ],
-    "forbidden_elements": [
-      "主角无端圣母",
-      "反派无限复活恶心主角",
-      "安全屋被无脑路人轻易攻破"
-    ],
-    "required_elements": [
-      "极限定时危机",
-      "物资与反差爽感",
-      "避难所黑科技进化",
-      "末世丛林生存法则"
-    ]
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
   },
-  "quality_thresholds": {
-    "dialogue_optimal": {
-      "min": 0.18,
-      "max": 0.35
+  "conflict_engine": "资源不足 + 信任成本 + 外部危险。爽点来自提前准备、判断正确、保护重要关系或抢到关键资源。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
     },
-    "pass": 75,
-    "warn": 60
-  },
-  "structure": {
-    "arc_rhythm": {
-      "chapters_per_arc": 35,
-      "climax_position": 0.8,
-      "arc_template": [
-        "灾变预警与极限囤货",
-        "末日降临与室内反差爽",
-        "外出探险与异能觉醒",
-        "掠夺者来犯与火力洗地",
-        "基地扩张与秩序建立"
-      ]
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
     },
-    "chapter_roles": [
-      {
-        "role": "铺垫",
-        "ratio": 0.25,
-        "typical_position": "卷首与灾变前夕",
-        "beats": [
-          "收集情报",
-          "危机征兆",
-          "储备物资"
-        ]
-      },
-      {
-        "role": "推进",
-        "ratio": 0.35,
-        "typical_position": "章中",
-        "beats": [
-          "天灾升级",
-          "防御强化",
-          "局部交锋"
-        ]
-      },
-      {
-        "role": "爆发",
-        "ratio": 0.15,
-        "typical_position": "卷末",
-        "beats": [
-          "正面火力全开",
-          "灭杀尸王/敌酋",
-          "掠夺丰厚战利品"
-        ]
-      },
-      {
-        "role": "缓冲",
-        "ratio": 0.15,
-        "typical_position": "爆点后",
-        "beats": [
-          "清点战利品",
-          "享用美食",
-          "升级安全屋"
-        ]
-      },
-      {
-        "role": "转折",
-        "ratio": 0.1,
-        "typical_position": "阶段末",
-        "beats": [
-          "更高级异变出现",
-          "国家避难所广播"
-        ]
-      }
-    ],
-    "chapter_word_range": {
-      "min": 2000,
-      "max": 3000,
-      "typical": 2400
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
     },
-    "foreshadow_pattern": {
-      "concurrent_open": 3,
-      "avg_span": 25,
-      "max_span": 70,
-      "plant_technique": [
-        "变异生物的诡异进化痕迹",
-        "收音机中断断续续的求救密码",
-        "天空中隐约出现的机械裂痕"
-      ]
-    },
-    "hook_system": {
-      "anti_repetition_rule": "连续两章不使用同一种天灾威胁；反杀掠夺者后紧接高阶变异警报。",
-      "hook_density_curve": [
-        "开篇重度危机钩子",
-        "中段物资掠夺与异能突破",
-        "卷末巨型天灾对抗"
-      ],
-      "hook_types": [
-        {
-          "type": "危机降临",
-          "strength": 0.9,
-          "frequency": 0.3,
-          "skeleton": "气温骤降四十度，或十万丧尸潮偏离航道朝避难所涌来。"
-        },
-        {
-          "type": "悬念揭示",
-          "strength": 0.85,
-          "frequency": 0.25,
-          "skeleton": "废弃军火库或前沿研究所发现未启用的战略级能量核心。"
-        },
-        {
-          "type": "对手登场",
-          "strength": 0.85,
-          "frequency": 0.25,
-          "skeleton": "昔日背叛自己的仇敌作为掠夺者先遣队队长现身门外。"
-        }
-      ]
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
     }
+   ]
   },
-  "world_conventions": {
-    "iron_laws": [
-      "末世资源守恒",
-      "人性利益匹配",
-      "实力决定规矩"
-    ],
-    "power_system_type": "安全屋科技等级 + 基因进化异能",
-    "progression_granularity": "从地下求生到移动战舰再到陆地霸主",
-    "naming_conventions": [
-      "避难所型号",
-      "异能序列代号",
-      "丧尸危险等级"
-    ]
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "释放来自提前判断正确、资源到手、队伍活下来、基地规则被利用、怪物/灾害规律被摸清。爽点要带损耗和新危险。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "灾变前兆、物资短缺、避难所门口、亲友背叛、感染/怪物出现、系统预警都适合切入。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "只贴末世设定",
+    "无代价囤货",
+    "把危机写成旅游",
+    "忘记普通人的恐慌和选择成本"
+   ]
   }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要只贴末世设定",
+    "rationale": "该题材的正确写法：用水、电、药、食物、弹药、车钥匙、避难所门禁、感染痕迹、天气预警、基地公告承载生存压力。",
+    "good_example": "用水、电、药、食物、弹药、车钥匙、避难所门禁、感染痕迹、天气预警、基地公告承载生存压力。（而不是只贴末世设定）",
+    "bad_example": "只贴末世设定；食物、弹药、车钥匙这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要无代价囤货",
+    "rationale": "该题材的正确写法：写科幻末世时，先给生存威胁、秩序崩坏或身份异化，再让系统、科技、空间、资源玩法提供破局可能。",
+    "good_example": "写科幻末世时，先给生存威胁、秩序崩坏或身份异化，再让系统、科技、空间、资源玩法提供破局可能。 每章必须有明确资源、危险和选择代价。（而不是无代价囤货）",
+    "bad_example": "无代价囤货；再让系统、科技、空间这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要把危机写成旅游",
+    "rationale": "该题材的正确写法：写科幻末世时，先给生存威胁、秩序崩坏或身份异化，再让系统、科技、空间、资源玩法提供破局可能。",
+    "good_example": "资源不足 + 信任成本 + 外部危险。 爽点来自提前准备、判断正确、保护重要关系或抢到关键资源。（而不是把危机写成旅游）",
+    "bad_example": "把危机写成旅游；点来自提前准备、判断正确、保护重要关系或这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要忘记普通人的恐慌和选择成本",
+    "rationale": "该题材的正确写法：写科幻末世时，先给生存威胁、秩序崩坏或身份异化，再让系统、科技、空间、资源玩法提供破局可能。",
+    "good_example": "生存压力优先，设定解释靠角色试错。 不要把末世写成无成本采购清单，也不要连续打怪忘了资源账。（而不是忘记普通人的恐慌和选择成本）",
+    "bad_example": "忘记普通人的恐慌和选择成本，通篇没有一个具体场面承接。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要只贴末世设定",
+   "不要无代价囤货",
+   "不要把危机写成旅游",
+   "不要忘记普通人的恐慌和选择成本"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "末世里人说话会更短、更急、更现实。信任建立靠分物资、救人、守夜和共同冒险，不靠空泛宣誓。",
+  "drift_guard": "不要只贴末世设定；不要无代价囤货；不要把危机写成旅游；不要忘记普通人的恐慌和选择成本。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "用水、电、药、食物、弹药、车钥匙、避难所门禁、感染痕迹、天气预警、基地公告承载生存压力。资源数字要能影响选择。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
 }

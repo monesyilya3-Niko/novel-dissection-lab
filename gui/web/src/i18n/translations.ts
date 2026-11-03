@@ -2802,6 +2802,15 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '全部',
     'en-US': 'All',
   },
+  // 题材包与文风卡成对存在且同名，列表里用这两个标签点明分工
+  asset_lib_pack_tag: {
+    'zh-CN': '· 规则包（注入用）',
+    'en-US': '· rule pack (injected)',
+  },
+  asset_lib_prose_tag: {
+    'zh-CN': '· 风格样本（参照用）',
+    'en-US': '· style sample (reference)',
+  },
   asset_lib_load_failed: {
     'zh-CN': '加载失败：',
     'en-US': 'Failed to load assets: ',
@@ -2875,6 +2884,52 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   asset_kind_book: {
     'zh-CN': '语料',
     'en-US': 'Corpus Book',
+  },
+
+  // 列表层的「这是什么」一句话说明（asset_lib 卡片直接用，避免点进去才知道）
+  asset_purpose_voice: {
+    'zh-CN': '记录一本书的叙述声线与语言风格：人称、句式节奏、对白特征、情绪处理与禁用词。',
+    'en-US': 'One book\'s narrative voice: POV, sentence rhythm, dialogue traits, emotional handling and banned wording.',
+  },
+  asset_purpose_structure: {
+    'zh-CN': '记录一本书的章节结构规律：钩子间隔、高潮周期、伏笔跨度。',
+    'en-US': 'One book\'s structural patterns: hook spacing, climax cycle, foreshadowing span.',
+  },
+  asset_purpose_commercial: {
+    'zh-CN': '记录一本书的商业节奏：爽点密度与类型、付费卡点、铺垫长度。',
+    'en-US': 'One book\'s commercial rhythm: payoff density and types, paywall points, buildup length.',
+  },
+  asset_purpose_craft: {
+    'zh-CN': '记录一本书的写作技法：伏笔、转场、对白、感官描写与可复用模式。',
+    'en-US': 'One book\'s craft techniques: foreshadowing, transitions, dialogue, sensory writing and reusable patterns.',
+  },
+  asset_purpose_genre_pack: {
+    'zh-CN': '题材级规则包：结构、商业、质检阈值、语言铁律与世界观约定，写作时直接注入。',
+    'en-US': 'Genre-level rule pack: structure, commercial rhythm, quality thresholds, hard language rules and world conventions; injected when writing.',
+  },
+  asset_purpose_prose_card: {
+    'zh-CN': '题材级风格样本：该题材整体的行文风格原文，供写作时参照，不直接注入。',
+    'en-US': 'Genre-level style sample: reference prose for the whole genre; read for reference, not injected.',
+  },
+  asset_purpose_distilled: {
+    'zh-CN': '多本书聚合出的共性规则：必守硬边界、高置信建议与分歧，自动拼入写作 prompt。',
+    'en-US': 'Cross-book aggregated rules: hard boundaries, high-confidence suggestions and disagreements; merged into the writing prompt.',
+  },
+  asset_purpose_prose_card_index: {
+    'zh-CN': '题材文风卡的寻址索引：题材名 → 卡片文件，系统内部使用。',
+    'en-US': 'Lookup index mapping genre name to prose card file; used internally.',
+  },
+  asset_purpose_trope: {
+    'zh-CN': '桥段模式库：跨书跨题材的通用情节骨架，构思时检索调用。',
+    'en-US': 'Trope library: reusable plot skeletons across books and genres, searched while plotting.',
+  },
+  asset_purpose_report: {
+    'zh-CN': '拆书生成的万字报告与笔法分析。',
+    'en-US': 'Ten-thousand-word dissection report and craft analysis generated from a book.',
+  },
+  asset_purpose_book: {
+    'zh-CN': '导入的语料书籍（正文原文）。',
+    'en-US': 'Imported corpus book (original text).',
   },
 
   // =========================================================================

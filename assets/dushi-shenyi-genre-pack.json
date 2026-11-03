@@ -1,251 +1,215 @@
 {
-  "meta": {
-    "id": "genre-dushi-shenyi",
-    "name": "都市神医",
-    "sub_tags": [
-      "都市神医",
-      "国医无双",
-      "隐世医圣",
-      "救治首富",
-      "扮猪吃虎"
-    ],
-    "target_platform": "长篇通用",
-    "scope": "genre-generalized",
-    "confidence": 0.6,
-    "note": "通用题材包：都市神医/九转回阳/银针渡命/权贵折服",
-    "source_books": [
-      {
-        "title": "都市神医标杆代表作一",
-        "platform": "番茄",
-        "performance": "千万级爆款",
-        "voice_card_ref": "dushi-shenyi_ref1"
-      },
-      {
-        "title": "都市神医热门畅销作二",
-        "platform": "番茄",
-        "performance": "高追读榜首",
-        "voice_card_ref": "dushi-shenyi_ref2"
-      },
-      {
-        "title": "都市神医经典完结作三",
-        "platform": "番茄",
-        "performance": "高评分必读",
-        "voice_card_ref": "dushi-shenyi_ref3"
-      }
-    ]
+ "meta": {
+  "id": "genre-dushi-shenyi",
+  "name": "都市神医",
+  "sub_tags": [
+   "都市神医",
+   "神医",
+   "中医",
+   "银针渡穴",
+   "打脸",
+   "悬壶济世",
+   "医武双绝"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.4,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-dushi-shenyi",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-dushi-shenyi（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-dushi-shenyi.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-dushi-shenyi.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
   },
-  "commercial": {
-    "opening_analysis": {
-      "chapter_1": {
-        "first_300_words_task": "开局被西医专家断定病入膏肓的顶级大人物面临死亡，主角在场被众人鄙视驱赶",
-        "hook_position": 450,
-        "conflict_intro_position": 750,
-        "protagonist_intro_method": "隐世医门唯一传人，携太乙金针入红尘，看似平平无奇实则通天彻地",
-        "golden_finger_reveal": "上古医经传承、肉白骨气血透视或生生造化真气"
-      },
-      "chapter_2_3_task": "第2章西医宣布抢救失败下达病危，主角出手行针力挽狂澜；第3章大人物起死回生当场下跪拜谢，送出顶级黑卡与豪宅，嘲讽者面如死灰",
-      "common_mistakes": [
-        "药方与中医理论胡编乱造毫无美感",
-        "治好权贵后被继续无脑羞辱没有地位提升",
-        "主角无欲无求不搞势力建设"
-      ]
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用急诊救人、医馆踢馆、退婚打脸立住“神医”人设，积累第一批权贵人脉。",
+    "中期：围绕疑难杂症、医道败类、古医方争夺推进，医术要有新绝技解锁。",
+    "后期：把医道巅峰对决、宿敌阴谋推到明面上见结果，结尾留隐世医门或更大舞台。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章解决一个病患或一场打脸，医案和恩怨交替推进。救治、打脸、收人脉不要断成互不相关的清单。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
     },
-    "payoff_density": {
-      "per_thousand_words": 0.45,
-      "dry_spell_tolerance": 6,
-      "payoff_types": [
-        {
-          "type": "打脸",
-          "ratio": 0.4,
-          "buildup_length": 2,
-          "skeleton": "全世界判了死刑的绝症，主角三根银针稳住心脉当场痊愈，神乎其技"
-        },
-        {
-          "type": "打脸",
-          "ratio": 0.35,
-          "buildup_length": 3,
-          "skeleton": "省城巨擘、战区统帅将主角奉为座上宾，赠百亿集团与贴身信物"
-        },
-        {
-          "type": "打脸",
-          "ratio": 0.25,
-          "buildup_length": 5,
-          "skeleton": "反派以权势逼迫主角，殊不知其背后的靠山竟是主角刚救下的大哥"
-        }
-      ]
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
     },
-    "paywall": {
-      "cliffhanger_technique": "国医馆老国手携传国药方登门请教，隐世古武世家老祖身中奇毒连夜登门求救",
-      "pre_paywall_buildup": "主角神医之名震动省城，引来京城顶级医疗财阀与古医门的封杀杀机"
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
     },
-    "retention_risk_points": [
-      {
-        "position": "第10-25章",
-        "reason": "看病行医公式化重复",
-        "mitigation": "由普通看病延伸至古医门派纷争、中药现代化产业争夺与古武者暗战"
-      }
-    ],
-    "update_rhythm": {
-      "chapters_per_day": 2,
-      "burst_timing": "救活国柱大人物或神医大比时加更"
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
     }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 用急诊室、义诊现场、退婚宴、拍卖会突发急症切入。\n- 先给名医束手无策的绝境，再给主角的破局一针。\n- 医道名词只给当前救治需要的部分，不要开篇背《黄帝内经》。",
+   "chapter_end_hook": "适合用病人身份揭晓更大来头、仇家派杀手伪装成病人、古医方残卷现世、医道大赛邀请收尾。"
   },
-  "language_rules": {
-    "banned_phrases": [
-      "恐怖如斯",
-      "蝼蚁",
-      "纳命来"
-    ],
-    "fatigue_words": [
-      {
-        "word": "气定神闲",
-        "max_per_chapter": 2
-      },
-      {
-        "word": "倒吸冷气",
-        "max_per_chapter": 1
-      }
-    ],
-    "dialogue_style": {
-      "dominant_subtype": "自信沉稳大医精诚",
-      "note": "诊断时字字诛心专业笃定，面对权贵不卑不亢，面对挑衅言简意赅"
-    },
-    "iron_rules": [
-      {
-        "rule": "中医手段要有古意风骨：针法、穴位、药性描写要专业典雅，绝不空泛胡诌。",
-        "bad_example": "他随便拿了个针扎了一下，病人就好了。",
-        "good_example": "左手引气，右手捻针，透天凉与烧山火双针并济，三寸银针发出轻微龙吟，逆转阴阳。",
-        "rationale": "神医文的质感来自于传统医道的神秘感与救死扶伤的庄严感。"
-      }
-    ],
-    "forbidden_elements": [
-      "主角见死不救毫无医德内核",
-      "权贵翻脸不认账而主角窝囊忍让"
-    ],
-    "required_elements": [
-      "太乙神针名场面",
-      "专家打脸反差",
-      "至尊黑卡权势回报",
-      "悬壶济世兼济天下"
-    ]
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
   },
-  "quality_thresholds": {
-    "dialogue_optimal": {
-      "min": 0.25,
-      "max": 0.42
+  "conflict_engine": "庸医/黑心同行误诊 + 权贵病危 + 纨绔刁难。旁人按资历、年龄、文凭误判主角，主角以医术、胆识和一颗不服的心打破判断。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
     },
-    "pass": 75,
-    "warn": 60
-  },
-  "structure": {
-    "arc_rhythm": {
-      "chapters_per_arc": 30,
-      "climax_position": 0.8,
-      "arc_template": [
-        "下山入世初显神威",
-        "救治首富名震一城",
-        "中医大比横扫西医",
-        "解救国柱权倾朝野",
-        "重整医门匡扶正道"
-      ]
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
     },
-    "chapter_roles": [
-      {
-        "role": "铺垫",
-        "ratio": 0.25,
-        "typical_position": "病患出场",
-        "beats": [
-          "病症凶险",
-          "名医束手",
-          "主角被斥"
-        ]
-      },
-      {
-        "role": "推进",
-        "ratio": 0.35,
-        "typical_position": "救治过程",
-        "beats": [
-          "把脉断症",
-          "银针过穴",
-          "药石化解"
-        ]
-      },
-      {
-        "role": "爆发",
-        "ratio": 0.2,
-        "typical_position": "病愈反转",
-        "beats": [
-          "病人苏醒",
-          "名医羞愧下拜",
-          "大人物送礼撑腰"
-        ]
-      },
-      {
-        "role": "缓冲",
-        "ratio": 0.1,
-        "typical_position": "善后",
-        "beats": [
-          "医馆开业",
-          "人脉织网"
-        ]
-      },
-      {
-        "role": "转折",
-        "ratio": 0.1,
-        "typical_position": "牵出大案",
-        "beats": [
-          "奇毒背后的大势力现身"
-        ]
-      }
-    ],
-    "chapter_word_range": {
-      "min": 2200,
-      "max": 3200,
-      "typical": 2600
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
     },
-    "foreshadow_pattern": {
-      "concurrent_open": 3,
-      "avg_span": 25,
-      "max_span": 60,
-      "plant_technique": [
-        "病人血液中残留的罕见古蛊毒",
-        "老家破旧医箱底层的半卷残篇"
-      ]
-    },
-    "hook_system": {
-      "anti_repetition_rule": "病症类型丰富变换（商界大佬猝死、军中战神暗伤、豪门千金怪病）。",
-      "hook_density_curve": [
-        "开局绝症翻盘",
-        "中局医武双绝立威",
-        "高潮中西医国际巅峰对决"
-      ],
-      "hook_types": [
-        {
-          "type": "悬念揭示",
-          "strength": 0.9,
-          "frequency": 0.4,
-          "skeleton": "心电图拉成一条直线，所有医生摘下口罩，主角大步跨入病房。"
-        },
-        {
-          "type": "悬念揭示",
-          "strength": 0.85,
-          "frequency": 0.35,
-          "skeleton": "狂妄院长当众撕毁主角处方，三分钟后院长突发心梗瘫倒在地。"
-        }
-      ]
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
     }
+   ]
   },
-  "world_conventions": {
-    "iron_laws": [
-      "医者仁心与雷霆手段并存",
-      "人脉即护道者原则"
-    ],
-    "power_system_type": "九针医道境界 + 真气修为何厚度",
-    "progression_granularity": "从街头走方郎中到一省座上宾再到天下国士无双",
-    "naming_conventions": [
-      "针法名（太乙神针、回阳九针）",
-      "古方药名",
-      "权贵豪门世家名"
-    ]
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "救治要有见证者：名医低头、家属跪谢、权贵圈口碑发酵。打脸要当场兑现：赌约、退婚、医馆踢馆，赢了就收产业、收人心、收美人芳心。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 用急诊室、义诊现场、退婚宴、拍卖会突发急症切入。\n- 先给名医束手无策的绝境，再给主角的破局一针。\n- 医道名词只给当前救治需要的部分，不要开篇背《黄帝内经》。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "把每次治病写成流水线开药方，救治过程要有悬念、代价和反转",
+    "让医术万能到失去边界，绝症重症必须有真实难度和代价",
+    "只写打脸不写医，医术本身的神秘感和专业感是立身之本",
+    "让配角医生永远降智，偶尔让同行先给出正确思路，主角再超越"
+   ]
   }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要把每次治病写成流水线开药方，救治过程要有悬念、代价和反转",
+    "rationale": "该题材的正确写法：写都市神医，医术是立身之本，打脸是情绪出口。",
+    "good_example": "写都市神医，医术是立身之本，打脸是情绪出口。 每次出诊都要回答一个问题：为什么非他不可。（而不是把每次治病写成流水线开药方，救治过程要有悬念、代价和反转）",
+    "bad_example": "把每次治病写成流水线开药方，救治过程要有悬念、代价和反转，通篇没有一个具体场面承接。"
+   },
+   {
+    "rule": "不要让医术万能到失去边界，绝症重症必须有真实难度和代价",
+    "rationale": "该题材的正确写法：写都市神医，医术是立身之本，打脸是情绪出口。",
+    "good_example": "把“望闻问切”写出悬念感，把银针写出仪式感，病人的身份越尊贵、病情越棘手，反差越强。（而不是让医术万能到失去边界，绝症重症必须有真实难度和代价）",
+    "bad_example": "让医术万能到失去边界，绝症重症必须有真实难度和代价，通篇没有一个具体场面承接。"
+   },
+   {
+    "rule": "不要只写打脸不写医，医术本身的神秘感和专业感是立身之本",
+    "rationale": "该题材的正确写法：写都市神医，医术是立身之本，打脸是情绪出口。",
+    "good_example": "庸医/黑心同行误诊 + 权贵病危 + 纨绔刁难。 旁人按资历、年龄、文凭误判主角，主角以医术、胆识和一颗不服的心打破判断。（而不是只写打脸不写医，医术本身的神秘感和专业感是立身之本）",
+    "bad_example": "只写打脸不写医，医术本身的神秘感和专业感是立身之本；旁人按资历、年龄、文凭误判主角这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要让配角医生永远降智，偶尔让同行先给出正确思路，主角再超越",
+    "rationale": "该题材的正确写法：写都市神医，医术是立身之本，打脸是情绪出口。",
+    "good_example": "医术跟着病人走，打脸跟着恩怨走。 专业感不能丢，爽感不能等。（而不是让配角医生永远降智，偶尔让同行先给出正确思路，主角再超越）",
+    "bad_example": "让配角医生永远降智，偶尔让同行先给出正确思路，主角再超越，通篇没有一个具体场面承接。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要把每次治病写成流水线开药方，救治过程要有悬念、代价和反转",
+   "不要让医术万能到失去边界，绝症重症必须有真实难度和代价",
+   "不要只写打脸不写医，医术本身的神秘感和专业感是立身之本",
+   "不要让配角医生永远降智，偶尔让同行先给出正确思路，主角再超越"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "主角淡然自信，惜字如金，关键时刻一句话定音；纨绔反派话多浮夸，方便打脸；病人家属情绪化，台词带哭腔和哀求。别让所有人只会喊“神医救命”。",
+  "drift_guard": "不要把每次治病写成流水线开药方，救治过程要有悬念、代价和反转；不要让医术万能到失去边界，绝症重症必须有真实难度和代价；不要只写打脸不写医，医术本身的神秘感和专业感是立身之本；不要让配角医生永远降智。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "用银针包、药香、脉枕、CT片、专家会诊、ICU监护仪、百年老药铺和深夜急诊室的灯承载神医现实感。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
 }

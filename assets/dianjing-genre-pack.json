@@ -1,255 +1,215 @@
 {
-  "meta": {
-    "id": "genre-dianjing",
-    "name": "电竞竞技",
-    "sub_tags": [
-      "电竞游戏",
-      "LOL英雄联盟",
-      "S赛夺冠",
-      "重回巅峰",
-      "天眼指挥"
-    ],
-    "target_platform": "长篇通用",
-    "scope": "genre-generalized",
-    "confidence": 0.6,
-    "note": "通用题材包：电竞热血/MOBA巅峰/微操手速/黑马战队逆袭",
-    "source_books": [
-      {
-        "title": "电竞竞技标杆代表作一",
-        "platform": "番茄",
-        "performance": "千万级爆款",
-        "voice_card_ref": "dianjing_ref1"
-      },
-      {
-        "title": "电竞竞技热门畅销作二",
-        "platform": "番茄",
-        "performance": "高追读榜首",
-        "voice_card_ref": "dianjing_ref2"
-      },
-      {
-        "title": "电竞竞技经典完结作三",
-        "platform": "番茄",
-        "performance": "高评分必读",
-        "voice_card_ref": "dianjing_ref3"
-      }
-    ]
+ "meta": {
+  "id": "genre-dianjing",
+  "name": "电竞文",
+  "sub_tags": [
+   "电竞",
+   "职业联赛",
+   "战队",
+   "天赋少年",
+   "竞技",
+   "游戏",
+   "冠军"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.4,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-dianjing",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-dianjing（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-dianjing.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-dianjing.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
   },
-  "commercial": {
-    "opening_analysis": {
-      "chapter_1": {
-        "first_300_words_task": "以老将遗憾退役或被俱乐部无情解约开场，300字内重生或觉醒反应力巅峰系统",
-        "hook_position": 400,
-        "conflict_intro_position": 750,
-        "protagonist_intro_method": "意识超神手速拉满，重回十八岁黄金年龄，开局韩服第一高分路人局",
-        "golden_finger_reveal": "操作预判光环、对手微表情识破或全图视野推演系统"
-      },
-      "chapter_2_3_task": "第2章排位撞车知名职业选手并完成神级丝血单杀；第3章引发各大俱乐部转会期疯抢，加入解散边缘的草根战队开启逆袭",
-      "common_mistakes": [
-        "游戏操作描写过于晦涩非玩家看不懂",
-        "全程单排不打正规比赛没有热血团魂",
-        "现实勾心斗角挤占过多比赛高光"
-      ]
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用路人王被发掘、青训营、首登职业赛场立住“天才少年”人设，加入初始战队。",
+    "中期：围绕联赛征程、转会风波、国际大赛推进，操作和名声同步升级。",
+    "后期：把世界总决赛、宿敌对决推到明面上见结果，结尾留卫冕或退役传承。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章一场对局或一次转折，赛场线和生活线交替推进。对局、训练、转会不要断成互不相关的清单。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
     },
-    "payoff_density": {
-      "per_thousand_words": 0.5,
-      "dry_spell_tolerance": 5,
-      "payoff_types": [
-        {
-          "type": "打脸",
-          "ratio": 0.35,
-          "buildup_length": 2,
-          "skeleton": "极限走位躲三个技能丝血反杀全场起立欢呼"
-        },
-        {
-          "type": "打脸",
-          "ratio": 0.3,
-          "buildup_length": 3,
-          "skeleton": "黑粉解说此前疯狂嘲讽，赛后被精彩集锦当场打脸哑口无言"
-        },
-        {
-          "type": "打脸",
-          "ratio": 0.2,
-          "buildup_length": 6,
-          "skeleton": "绝境翻盘击败不可一世的宿敌豪门，金色的雨落满全场"
-        }
-      ]
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
     },
-    "paywall": {
-      "cliffhanger_technique": "世界赛生死局选人阶段掏出绝活冷门黑科技英雄，解说惊呼全场哗然",
-      "pre_paywall_buildup": "战队大比分落后被逼入绝境，全队信任主角做最后一搏"
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
     },
-    "retention_risk_points": [
-      {
-        "position": "常规赛阶段",
-        "reason": "比赛模式单一重复",
-        "mitigation": "每场比赛设计不同的核心战术冲突（针对性禁选、野区入侵、四包二）"
-      }
-    ],
-    "update_rhythm": {
-      "chapters_per_day": 2,
-      "burst_timing": "淘汰赛决胜局或总决赛加更"
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
     }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 用网吧、排位赛、青训营、替补席切入。\n- 先给主角的落魄或不被看好，再给一场惊艳所有人的操作。\n- 游戏版本只给当前对局需要的部分，不要开篇写版本更新日志。",
+   "chapter_end_hook": "适合用转会消息、强敌约战、版本大改、伤病/状态危机收尾。"
   },
-  "language_rules": {
-    "banned_phrases": [
-      "恐怖如斯",
-      "本尊",
-      "蝼蚁",
-      "桀桀桀"
-    ],
-    "fatigue_words": [
-      {
-        "word": "手速飙升",
-        "max_per_chapter": 2
-      },
-      {
-        "word": "不可思议",
-        "max_per_chapter": 2
-      }
-    ],
-    "dialogue_style": {
-      "dominant_subtype": "年轻热血电竞口吻",
-      "note": "充满游戏黑话（拉扯、操作、开团、点菜、金身），燃点与骚话并存"
-    },
-    "iron_rules": [
-      {
-        "rule": "团战画面感第一：操作描写要有具体技能顺序和空间博弈，禁止空洞喊口号。",
-        "bad_example": "主角凭借惊人的手速，啪啪啪把敌人全打死了。",
-        "good_example": "闪现贴脸挂虚弱，侧身扭开致命预判钩，大招水银秒解回身拉弓，暴击的红字在敌方AD头顶炸裂。",
-        "rationale": "电竞文的核心是游戏团战的竞技临场感与微操细节。"
-      }
-    ],
-    "forbidden_elements": [
-      "对手无脑送人头",
-      "队友纯摆设毫无团队互动",
-      "游戏数值版本严重错乱"
-    ],
-    "required_elements": [
-      "热血团魂",
-      "绝境反打名场面",
-      "解说观众实时反馈",
-      "冠军奖杯信仰"
-    ]
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
   },
-  "quality_thresholds": {
-    "dialogue_optimal": {
-      "min": 0.3,
-      "max": 0.5
+  "conflict_engine": "天赋与质疑 + 战队内斗/转会风波 + 巅峰对决。旁人按“网瘾少年/代练”误判主角，主角以神级操作、大心脏和对胜利的渴望打破判断。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
     },
-    "pass": 75,
-    "warn": 60
-  },
-  "structure": {
-    "arc_rhythm": {
-      "chapters_per_arc": 30,
-      "climax_position": 0.85,
-      "arc_template": [
-        "重新连接韩服登顶",
-        "组建战队征战次级",
-        "杀入顶级联赛黑马",
-        "季后赛绝境穿梭",
-        "全球总决赛封神"
-      ]
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
     },
-    "chapter_roles": [
-      {
-        "role": "铺垫",
-        "ratio": 0.25,
-        "typical_position": "赛前准备",
-        "beats": [
-          "赛前研究",
-          "垃圾话战术",
-          "BP阵容博弈"
-        ]
-      },
-      {
-        "role": "推进",
-        "ratio": 0.35,
-        "typical_position": "对局展开",
-        "beats": [
-          "对线交锋",
-          "野区摩擦",
-          "小龙争夺"
-        ]
-      },
-      {
-        "role": "爆发",
-        "ratio": 0.2,
-        "typical_position": "决胜团战",
-        "beats": [
-          "大龙团秒C位",
-          "基地一波推平",
-          "全场高呼ID"
-        ]
-      },
-      {
-        "role": "缓冲",
-        "ratio": 0.1,
-        "typical_position": "赛后采访",
-        "beats": [
-          "金句频出",
-          "商业代言",
-          "复盘分析"
-        ]
-      },
-      {
-        "role": "转折",
-        "ratio": 0.1,
-        "typical_position": "转会/版本",
-        "beats": [
-          "游戏大版本更新",
-          "战术重构"
-        ]
-      }
-    ],
-    "chapter_word_range": {
-      "min": 2000,
-      "max": 3000,
-      "typical": 2500
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
     },
-    "foreshadow_pattern": {
-      "concurrent_open": 2,
-      "avg_span": 20,
-      "max_span": 50,
-      "plant_technique": [
-        "对方教练组秘密准备的英雄底牌",
-        "主角手伤暗伤的康复进度"
-      ]
-    },
-    "hook_system": {
-      "anti_repetition_rule": "对局胜负节奏多变，翻盘、碾压、抢龙、偷家轮番呈现。",
-      "hook_density_curve": [
-        "常规赛稳步连胜",
-        "季后赛硬仗拉扯",
-        "总决赛第五局巅峰"
-      ],
-      "hook_types": [
-        {
-          "type": "悬念揭示",
-          "strength": 0.9,
-          "frequency": 0.4,
-          "skeleton": "敌方四人包夹上路，主角不退反进卡视野反打。"
-        },
-        {
-          "type": "悬念揭示",
-          "strength": 0.85,
-          "frequency": 0.3,
-          "skeleton": "赛前被全网看衰打成0-3，赛后MVP海报刷爆热搜第一。"
-        }
-      ]
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
     }
+   ]
   },
-  "world_conventions": {
-    "iron_laws": [
-      "实力说话原则：赛场上不认资历只认战绩",
-      "团队协同与英雄克制平衡"
-    ],
-    "power_system_type": "个人操作反应/意识评分 + 团队协同指挥度",
-    "progression_granularity": "从高分路人王，到联赛最佳新人，再到三冠王历史第一人",
-    "naming_conventions": [
-      "选手职业ID（TheX、Faker、Uzi风格）",
-      "英雄技能代号",
-      "赛事简称（LPL、LCK、MSI、S赛）"
-    ]
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "五杀/翻盘要有观众：解说、观众、对手。操作高光要有仪式感：慢镜头、解说嘶吼、弹幕爆炸。夺冠的那一刻，整个电竞圈都要沸腾。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 用网吧、排位赛、青训营、替补席切入。\n- 先给主角的落魄或不被看好，再给一场惊艳所有人的操作。\n- 游戏版本只给当前对局需要的部分，不要开篇写版本更新日志。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "把电竞写成玄幻，操作再强也要讲版本、讲配合、讲BP",
+    "让主角永远不败，输比赛、背锅、坐冷板凳是成长必需的代价",
+    "把队友写成挂件，每个位置都有高光，每个人都有故事",
+    "让电竞圈没有生活，训练、复盘、伤病、退役是真实的重量"
+   ]
   }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要把电竞写成玄幻，操作再强也要讲版本、讲配合、讲BP",
+    "rationale": "该题材的正确写法：写电竞文，核心是“竞技”与“兄弟”。",
+    "good_example": "写电竞文，核心是“竞技”与“兄弟”。 赛场是舞台，胜负是人生。（而不是把电竞写成玄幻，操作再强也要讲版本、讲配合、讲BP）",
+    "bad_example": "把电竞写成玄幻，操作再强也要讲版本、讲配合、讲BP，通篇没有一个具体场面承接。"
+   },
+   {
+    "rule": "不要让主角永远不败，输比赛、背锅、坐冷板凳是成长必需的代价",
+    "rationale": "该题材的正确写法：写电竞文，核心是“竞技”与“兄弟”。",
+    "good_example": "把对局写出博弈感：BP、运营、团战，每一步都是计算。 把战队写出兄弟情：一起输、一起赢、一起捧杯。（而不是让主角永远不败，输比赛、背锅、坐冷板凳是成长必需的代价）",
+    "bad_example": "让主角永远不败，输比赛、背锅、坐冷板凳是成长必需的代价，通篇没有一个具体场面承接。"
+   },
+   {
+    "rule": "不要把队友写成挂件，每个位置都有高光，每个人都有故事",
+    "rationale": "该题材的正确写法：写电竞文，核心是“竞技”与“兄弟”。",
+    "good_example": "天赋与质疑 + 战队内斗/转会风波 + 巅峰对决。 旁人按“网瘾少年/代练”误判主角，主角以神级操作、大心脏和对胜利的渴望打破判断。（而不是把队友写成挂件，每个位置都有高光，每个人都有故事）",
+    "bad_example": "把队友写成挂件，每个位置都有高光，每个人都有故事，通篇没有一个具体场面承接。"
+   },
+   {
+    "rule": "不要让电竞圈没有生活，训练、复盘、伤病、退役是真实的重量",
+    "rationale": "该题材的正确写法：写电竞文，核心是“竞技”与“兄弟”。",
+    "good_example": "操作跟着对局走，兄弟跟着战队走。 竞技感不能丢，热血感不能散。（而不是让电竞圈没有生活，训练、复盘、伤病、退役是真实的重量）",
+    "bad_example": "让电竞圈没有生活，训练、复盘、伤病、退役是真实的重量，通篇没有一个具体场面承接。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要把电竞写成玄幻，操作再强也要讲版本、讲配合、讲BP",
+   "不要让主角永远不败，输比赛、背锅、坐冷板凳是成长必需的代价",
+   "不要把队友写成挂件，每个位置都有高光，每个人都有故事",
+   "不要让电竞圈没有生活，训练、复盘、伤病、退役是真实的重量"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "主角（天才少年）平时可能内向，赛场上杀伐果断；队长沉稳，负责兜底；解说激情，团战时语速拉满。战队语音要短促有力，日常斗嘴要热血中二。别让所有人只会喊“奈斯”。",
+  "drift_guard": "不要把电竞写成玄幻，操作再强也要讲版本、讲配合、讲BP；不要让主角永远不败，输比赛背锅坐冷板凳是成长必需的代价；不要把队友写成挂件；不要让电竞圈没有生活。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "用键盘的敲击声、训练室的灯、比赛现场的欢呼、奖杯的反光、深夜复盘的白板、夺冠后的彩带承载电竞的热血与青春。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
 }

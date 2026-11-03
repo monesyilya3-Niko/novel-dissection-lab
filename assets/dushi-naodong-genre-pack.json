@@ -1,1 +1,220 @@
-{"commercial":{"opening_analysis":{"chapter_1":{"conflict_intro_position":900,"first_300_words_task":"先给一个具体现实窘境（欠钱、被嘲、求职失败），300字内让新规则第一次改变这件事","golden_finger_reveal":"系统或面板只给目标与奖励，不讲说明书；规则在使用中解释","hook_position":500,"protagonist_intro_method":"困境加手机消息切入，内心戏克制"},"chapter_2_3_task":"第2章让第一个误判者登场并公开看轻；第3章用新规则小翻盘，奖励到账必须有外部反馈","common_mistakes":["开篇先贴系统说明书","连续多章只刷面板不碰现实","主角没有主动选择","奖励到账无人见证"]},"payoff_density":{"dry_spell_tolerance":6,"payoff_types":[{"buildup_length":2,"ratio":0.4,"skeleton":"围观者按现实常识断言主角不行，主角用新规则在同一场面当场翻盘，见证者改口。","type":"打脸"},{"buildup_length":3,"ratio":0.3,"skeleton":"钱、技能、形象或关系位置实际到账，必须有外部反馈，如到账短信或他人评价。","type":"收益兑现"},{"buildup_length":8,"ratio":0.2,"skeleton":"隐藏的规则来源或真实实力分层揭开，旧误判者重新站队。","type":"身份揭露"},{"buildup_length":5,"ratio":0.1,"skeleton":"家人、同事或权威角色用具体行动承认主角价值，而非一句口头夸奖。","type":"他人认可"}],"per_thousand_words":0.5},"paywall":{"cliffhanger_technique":"宜放在第一次大翻盘前夜，或规则代价首次暴露、主角必须抉择时","position_chapter":null,"pre_paywall_buildup":"前中期用小见结果与误判积累期待；任务代价线提供信息差钩子"},"quality_thresholds":{"dialogue_optimal":{"max":0.4,"min":0.25},"pass":75,"warn":60},"retention_risk_points":[{"mitigation":"第1章500字内必须小见结果","position":"第1-3章","reason":"系统说明过长"},{"mitigation":"引入规则代价与身份风险","position":"第10-20章","reason":"重复刷奖励"},{"mitigation":"每章至少一半篇幅留在现实场面","position":"中期","reason":"现实线被系统线淹没"}],"update_rhythm":{"burst_timing":"爆点章可加更；翻盘章之间必须保留现实反馈章","chapters_per_day":2}},"language_rules":{"banned_phrases":["宿主","新手大礼包","秒天秒地秒空气","蝼蚁","本尊","无敌是多么寂寞"],"dialogue_style":{"dominant_subtype":"生活口语","note":"吐槽、急眼、装镇定、嘴硬皆可；系统提示冷，人说话热。"},"fatigue_words":[{"max_per_chapter":3,"word":"手机震动了一下"},{"max_per_chapter":1,"word":"倒吸一口凉气"},{"max_per_chapter":2,"word":"目瞪口呆"},{"max_per_chapter":2,"word":"他嘴角一勾"}],"forbidden_elements":["纯系统说明书","连续贴面板","只罗列奖励无人见证","主角全程被动","为去AI味硬删虚词导致中文别扭"],"iron_rules":[{"bad_example":"【叮！系统绑定成功……（此处省略三百字规则说明）】","good_example":"手机震了一下：目标：三天内让王经理道歉。奖励：现金十万。失败：倒扣。","rationale":"面板信息越长读者流失越快；规则必须在使用中解释，一次只给当前任务需要的那部分。","rule":"系统或面板只给目标、奖励、限制三件事，禁止连续贴面板讲说明书。"},{"bad_example":"他看着面板上的奖励数字，心里美滋滋。","good_example":"转账短信进来的时候，组长的筷子停在了半空。","rationale":"爽点等于现实收益改变加他人见证；没有见证的奖励等于没发。","rule":"每次规则见结果必须落到现实场面并有外部反馈，禁止主角看面板自嗨。"},{"bad_example":"系统发布任务，他只好照做。","good_example":"他盯着那个接受按钮看了三秒，想起房东的催租短信，点了下去。","rationale":"被动主角留不住读者；选择即人物，代价即悬念。","rule":"主角每章至少做一次主动选择，禁止全程被系统推着走。"},{"bad_example":"这个系统是三年前外星文明留下的，它的原理是……","good_example":"“又响了？”“嗯。”他把手机扣过去，“说来话长，先吃饭。”","rationale":"人说话热、系统说话冷是该题材的声线铁律；解释设定是叙述者的活，不是角色的台词。","rule":"对话带生活口吻，系统提示保持冷感，禁止角色替系统解释设定。"}],"required_elements":["具体的现实窘境开场","新规则在现实场面的小见结果","至少一个误判或见证的旁观者","奖励到账的外部反馈","章末指向下一章现实麻烦的钩子"]},"meta":{"confidence":0.55,"id":"genre-dushi-naodong","name":"都市脑洞","note":"通用题材包：由题材文风卡泛化综合，非单书蒸馏；source_books 不足 3 本属预期内。接入具体书籍蒸馏数据后应重标定数字区间。","provenance":{"copyright":"Copyright (c) 2025-2026 oh-story-claudecode","license":"MIT","note":"衍生链归因声明：写法为转述综合，非复制原文；本包为通用题材指导包，非单书蒸馏，未引用任何具体小说实测数据。","source":"novel-lab 项目内 genre-prose-card-genre-dushi-naodong.json 泛化；上游 zenstory-ai/oh-story-claudecode","verified":false},"scope":"genre-generalized","source":"genre-prose-card-genre-dushi-naodong","source_books":[{"note":"非单书蒸馏；指导内容来自题材通用规律，未引用具体书目","title":"genre-prose-card-genre-dushi-naodong（题材文风卡泛化）"}],"sub_tags":["都市脑洞","都市系统","听劝文","规则奖励","生活脑洞"],"target_platform":"长篇通用"},"quality_thresholds":{"dialogue_optimal":{"max":0.4,"min":0.25},"pass":75,"warn":60},"structure":{"arc_rhythm":{"arc_template":["现实窘境与规则绑定","小见结果与误判积累","代价升级与身份风险","公开翻盘与秩序改写","新任务与更大麻烦"],"chapters_per_arc":30,"climax_position":0.8},"chapter_roles":[{"beats":["现实窘境展示","新规则首次介入","围观者按常识误判"],"ratio":0.25,"role":"铺垫","typical_position":"卷首与日常段"},{"beats":["规则小见结果","现实收益变化","误判者登场"],"ratio":0.35,"role":"推进","typical_position":"章中至卷中"},{"beats":["当场翻盘","围观者态度反转","旧秩序被改写"],"ratio":0.15,"role":"爆发","typical_position":"卷末或关键转折"},{"beats":["奖励到账的外部反馈","关系修复","新任务铺垫"],"ratio":0.15,"role":"缓冲","typical_position":"爆点之后"},{"beats":["规则限制暴露","身份漏洞出现","更大麻烦登场"],"ratio":0.1,"role":"转折","typical_position":"规则代价暴露节点"}],"chapter_word_range":{"max":2600,"min":1800,"typical":2000},"foreshadow_pattern":{"avg_span":20,"concurrent_open":3,"max_span":60,"plant_technique":["手机消息的未读提示","账单合同上的异常数字","路人一句无心的评价","系统面板里没解释的灰色选项"]},"hook_system":{"anti_repetition_rule":"连续两章不重复同一钩子类型；系统提示音类钩子后必须接现实麻烦或人物反应。","hook_density_curve":["开篇快节奏给第一次小见结果","中段靠任务代价与误判维持","爆点章连续翻盘后回落"],"hook_types":[{"frequency":0.25,"skeleton":"章末只给新任务的目标与奖励数字，不解释规则来源；读者必须翻下一章才知道代价是什么。","strength":0.8,"type":"信息断点"},{"frequency":0.25,"skeleton":"让主角用新规则在合同、账单、直播间等现实场面当场翻盘，围观者按常识误判在先。","strength":0.85,"type":"实力展示"},{"frequency":0.15,"skeleton":"低门槛身份被新规则抬升，旧评价者在同一场面当众改口，完成地位反转。","strength":0.9,"type":"身份反转"},{"frequency":0.2,"skeleton":"规则代价或现实麻烦升级：任务失败惩罚、身份漏洞被盯上、亲友被卷入漩涡。","strength":0.85,"type":"危机降临"},{"frequency":0.15,"skeleton":"系统来源或规则边界露出一角，解释一半留一半，始终保留更大的未知。","strength":0.75,"type":"悬念揭示"}]}},"world_conventions":{"iron_laws":["规则只在现实场面上被验证：手机消息、账单合同、家庭关系、学校公司、围观评价，缺一不可。","爽点公式固定为：别人按现实常识判断错了，主角用新规则当场翻盘。","奖励到账后必须有外部反馈；无人见证的奖励不算爽点。","规则越爽，限制越要具体；每章至少出现一次代价或限制提醒。","主角必须有主动选择；系统可以给任务，不能替主角做决定。","不抢其他线的节奏：脑洞只承担新规则改写现实的主干，情感线与悬疑线另起炉灶。"],"naming_conventions":["现代都市人名","公司与职位称谓","系统提示用中性短句"],"power_system_type":"核心能力来自系统、面板、异常规则或特殊约定（如听劝返利、吹牛成真）；规则必须有明确的限制、代价与触发条件，无代价的能力不允许存在。","progression_granularity":"以任务完成度、奖励到账、现实地位变化（钱、职位、名声）衡量成长；每一次升级都必须有现实场面见证。"}}
+{
+ "meta": {
+  "id": "genre-dushi-naodong",
+  "name": "都市脑洞",
+  "sub_tags": [
+   "都市脑洞",
+   "都市系统",
+   "听劝文",
+   "规则奖励",
+   "生活脑洞"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.5,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-dushi-naodong",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-dushi-naodong（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-dushi-naodong.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-dushi-naodong.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
+  },
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用系统提示、手机消息、家庭/职场尴尬或公开评价让脑洞规则第一次改变现实收益。",
+    "中期：围绕任务代价、钱和收益、关系误会和公开反馈推进，规则越爽越要给限制。",
+    "后期：把奖励异常、热搜发酵和身份漏洞合并，结尾落到新任务或更大公开评价。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章至少有一次规则小见结果和一次外部反馈。面板信息越长，现实反应越要具体，否则会变成自嗨。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
+    },
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
+    },
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
+    },
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
+    }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 用欠钱、离婚、退队、被嘲、求职失败、亲戚压力、手机消息等低门槛困境切入。\n- 金手指不要先讲说明书，先给一次能被现实场景验证的小见结果。\n- 若有系统面板，面板只给目标、奖励、限制三件事，立刻回到角色反应。",
+   "chapter_end_hook": "适合用新任务、新奖励到账、手机热搜、陌生来电、检测结果、下一位误判者登场收尾。钩子要指向下一章的现实麻烦，而不只是“系统又响了”。"
+  },
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
+  },
+  "conflict_engine": "现实身份被看轻 + 新规则介入 + 旁人误判。冲突要围绕“谁不信、谁阻拦、谁要付账、谁会被公开打脸”推进，别让主角一个人看面板自嗨。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
+    },
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
+    },
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
+    },
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
+    }
+   ]
+  },
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "小爽点是现实收益到账，钱、形象、技能、关系位置改变；中爽点是围观者态度反转；大爽点是旧秩序被主角的新规则改写。奖励到账后必须有外部反馈。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 用欠钱、离婚、退队、被嘲、求职失败、亲戚压力、手机消息等低门槛困境切入。\n- 金手指不要先讲说明书，先给一次能被现实场景验证的小见结果。\n- 若有系统面板，面板只给目标、奖励、限制三件事，立刻回到角色反应。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "写成纯系统说明书",
+    "连续贴面板",
+    "只罗列奖励",
+    "让主角没有主动选择"
+   ]
+  }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要写成纯系统说明书",
+    "rationale": "该题材的正确写法：现实场面优先：手机通知、账单、合同、体检表、监控、门禁、直播间、公司群、亲戚饭桌。",
+    "good_example": "现实场面优先：手机通知、账单、合同、体检表、监控、门禁、直播间、公司群、亲戚饭桌。 脑洞规则必须在现实场面上被验证。（而不是写成纯系统说明书）",
+    "bad_example": "写成纯系统说明书；手机通知、账单、合同这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要连续贴面板",
+    "rationale": "该题材的正确写法：写都市脑洞时，先让读者看见一个具体的现实窘境，再让核心脑洞立刻改变这件事。",
+    "good_example": "写都市脑洞时，先让读者看见一个具体的现实窘境，再让核心脑洞立刻改变这件事。 系统、面板、听劝、绑定、吹牛成真、异常能力都不能悬空展示，必须落到手机消息、账单合同、家庭关系、学校公司、围观评价这些现实场面上。（而不是连续贴面板）",
+    "bad_example": "连续贴面板；系统、面板、听劝这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要只罗列奖励",
+    "rationale": "该题材的正确写法：写都市脑洞时，先让读者看见一个具体的现实窘境，再让核心脑洞立刻改变这件事。",
+    "good_example": "爽点优先写“别人按现实常识判断错了，主角用新规则当场翻盘”。（而不是只罗列奖励）",
+    "bad_example": "只罗列奖励；系统、面板、听劝这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要让主角没有主动选择",
+    "rationale": "该题材的正确写法：写都市脑洞时，先让读者看见一个具体的现实窘境，再让核心脑洞立刻改变这件事。",
+    "good_example": "现实身份被看轻 + 新规则介入 + 旁人误判。 冲突要围绕“谁不信、谁阻拦、谁要付账、谁会被公开打脸”推进，别让主角一个人看面板自嗨。（而不是让主角没有主动选择）",
+    "bad_example": "让主角没有主动选择；谁不信、谁阻拦、谁要付账这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要为了去AI味硬删“的、了、地、得”导致中文别扭",
+    "rationale": "该题材的正确写法：写都市脑洞时，先让读者看见一个具体的现实窘境，再让核心脑洞立刻改变这件事。",
+    "good_example": "系统信息压短，现实反馈放大；设定用到哪写到哪。 跨题材时，都市脑洞只承担“新规则改写现实”的主干，别抢走情感线或悬疑线的主节奏。（而不是为了去AI味硬删“的、了、地、得”导致中文别扭）",
+    "bad_example": "为了去AI味硬删“的、了、地、得”导致中文别扭，通篇没有一个具体场面承接。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要写成纯系统说明书",
+   "不要连续贴面板",
+   "不要只罗列奖励",
+   "不要让主角没有主动选择",
+   "不要为了去AI味硬删“的、了、地、得”导致中文别扭"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "都市脑洞的对话要带生活口吻：吐槽、急眼、装镇定、嘴硬都可以。系统提示冷一点，人说话热一点，别让角色替系统解释设定。",
+  "drift_guard": "不要写成纯系统说明书；不要连续贴面板；不要只罗列奖励；不要让主角没有主动选择；不要为了去AI味硬删“的、了、地、得”导致中文别扭。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "现实场面优先：手机通知、账单、合同、体检表、监控、门禁、直播间、公司群、亲戚饭桌。脑洞规则必须在现实场面上被验证。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
+}

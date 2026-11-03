@@ -1,254 +1,215 @@
 {
-  "meta": {
-    "id": "genre-lishi-chuanyue",
-    "name": "历史穿越",
-    "sub_tags": [
-      "历史穿越",
-      "寒门权谋",
-      "工业强国",
-      "九龙夺嫡",
-      "争霸天下"
-    ],
-    "target_platform": "长篇通用",
-    "scope": "genre-generalized",
-    "confidence": 0.6,
-    "note": "通用题材包：历史架空/科举寒门/降维打击/治国强兵",
-    "source_books": [
-      {
-        "title": "历史穿越标杆代表作一",
-        "platform": "番茄",
-        "performance": "千万级爆款",
-        "voice_card_ref": "lishi-chuanyue_ref1"
-      },
-      {
-        "title": "历史穿越热门畅销作二",
-        "platform": "番茄",
-        "performance": "高追读榜首",
-        "voice_card_ref": "lishi-chuanyue_ref2"
-      },
-      {
-        "title": "历史穿越经典完结作三",
-        "platform": "番茄",
-        "performance": "高评分必读",
-        "voice_card_ref": "lishi-chuanyue_ref3"
-      }
-    ]
+ "meta": {
+  "id": "genre-lishi-chuanyue",
+  "name": "历史穿越",
+  "sub_tags": [
+   "历史穿越",
+   "穿越",
+   "权谋",
+   "争霸",
+   "架空历史",
+   "王朝",
+   "改变历史"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.4,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-lishi-chuanyue",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-lishi-chuanyue（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-lishi-chuanyue.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-lishi-chuanyue.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
   },
-  "commercial": {
-    "opening_analysis": {
-      "chapter_1": {
-        "first_300_words_task": "穿越到古代贫寒之家或落魄宗室，300字内面临抄家、讨债、饿死或退婚的燃眉之急",
-        "hook_position": 500,
-        "conflict_intro_position": 900,
-        "protagonist_intro_method": "现代工科/经济学霸，开局冷静清算家底，寻找破局第一桶金",
-        "golden_finger_reveal": "现代工业/科学记忆或图纸库，用简易化学/物理知识当场变现"
-      },
-      "chapter_2_3_task": "第2章提炼精盐/造纸/酿高度酒赚取第一桶金；第3章惊动地方权贵或官府，通过献策或结交名士站稳脚跟",
-      "common_mistakes": [
-        "满口现代大白话跳戏",
-        "一天手搓蒸汽机无铺垫",
-        "皇帝朝廷全员降智"
-      ]
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用落地求生、初露锋芒、得遇贵人立住“穿越者”人设，积累第一桶金和第一个靠山。",
+    "中期：围绕朝堂权谋、军功封爵、变法图强推进，势力版图逐步扩大。",
+    "后期：把一统/变法/宿命对决推到明面上见结果，结尾留青史评价或新的时代。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章一场权谋或一次破局，朝堂线和战争线/经营线交替推进。权谋、战争、感情不要断成互不相关的清单。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
     },
-    "payoff_density": {
-      "per_thousand_words": 0.4,
-      "dry_spell_tolerance": 7,
-      "payoff_types": [
-        {
-          "type": "打脸",
-          "ratio": 0.35,
-          "buildup_length": 4,
-          "skeleton": "用格物之术或算筹诗词在文会朝堂惊艳四座，名儒权贵叹服"
-        },
-        {
-          "type": "收益兑现",
-          "ratio": 0.25,
-          "buildup_length": 3,
-          "skeleton": "雪盐烈酒风靡全城，日进斗金解决生存困境"
-        },
-        {
-          "type": "他人认可",
-          "ratio": 0.25,
-          "buildup_length": 6,
-          "skeleton": "洞悉朝堂夺嫡暗流，助阵营大获全胜受封要职"
-        }
-      ]
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
     },
-    "paywall": {
-      "cliffhanger_technique": "朝廷党争风暴骤起，密旨连夜传至封地，或边关告急蛮夷十万大军压境",
-      "pre_paywall_buildup": "主角在地方根基刚立，引起了京城首辅与东宫太子的忌惮与杀机"
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
     },
-    "retention_risk_points": [
-      {
-        "position": "第10-20章",
-        "reason": "沉迷赚钱剧情停滞",
-        "mitigation": "引入地方豪绅夺产危机，逼主角走科举入仕或武功夺权"
-      }
-    ],
-    "update_rhythm": {
-      "chapters_per_day": 2,
-      "burst_timing": "科举放榜或决战沙场时加更"
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
     }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 用刑场、战场、科举考场、青楼、荒村切入。\n- 先给穿越者的绝境，再给第一个利用现代知识破局的机会。\n- 朝代背景只给当前场景需要的部分，不要开篇写史纲。",
+   "chapter_end_hook": "适合用圣旨突至、敌国密使、历史事件提前/延后、身份被怀疑收尾。"
   },
-  "language_rules": {
-    "banned_phrases": [
-      "给力",
-      "卧槽",
-      "懵逼",
-      "扎心了"
-    ],
-    "fatigue_words": [
-      {
-        "word": "微微一笑",
-        "max_per_chapter": 2
-      },
-      {
-        "word": "倒吸一口凉气",
-        "max_per_chapter": 1
-      }
-    ],
-    "dialogue_style": {
-      "dominant_subtype": "古风雅致结合市井烟火",
-      "note": "朝堂机锋，市井生动，主角言谈张弛有度"
-    },
-    "iron_rules": [
-      {
-        "rule": "古代社会阶级森严：商人地位低下，有钱必须尽快寻求权力庇护或自身入仕。",
-        "bad_example": "主角成了首富后在王爷面前吆五喝六，王爷不仅不生气还认主角当大哥。",
-        "good_example": "日进万贯的第一天，主角便将三成利契送入知府衙门，求得官商护身符。",
-        "rationale": "脱离皇权专制逻辑的商业爽文会极大降低历史文读者的认同感。"
-      }
-    ],
-    "forbidden_elements": [
-      "现代词汇泛滥跳戏",
-      "反派官僚全员降智",
-      "科技跨度无视古代冶金基础"
-    ],
-    "required_elements": [
-      "时代考据感",
-      "利益纠葛与阶级权谋",
-      "现代科技降维打击"
-    ]
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
   },
-  "quality_thresholds": {
-    "dialogue_optimal": {
-      "min": 0.25,
-      "max": 0.42
+  "conflict_engine": "现代知识 vs 古代秩序 + 皇权猜忌 + 列国/诸侯倾轧。旁人按“出身/门第”误判主角，主角以超越时代的眼光、知识和手腕打破判断。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
     },
-    "pass": 75,
-    "warn": 60
-  },
-  "structure": {
-    "arc_rhythm": {
-      "chapters_per_arc": 40,
-      "climax_position": 0.8,
-      "arc_template": [
-        "寒门自救第一桶金",
-        "考取功名初入官场",
-        "地方主政治理一方",
-        "朝堂博弈九龙夺嫡",
-        "平定边患鼎革天下"
-      ]
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
     },
-    "chapter_roles": [
-      {
-        "role": "铺垫",
-        "ratio": 0.25,
-        "typical_position": "卷初",
-        "beats": [
-          "清点家底",
-          "背景切入",
-          "矛盾初显"
-        ]
-      },
-      {
-        "role": "推进",
-        "ratio": 0.35,
-        "typical_position": "卷中",
-        "beats": [
-          "研发新技术",
-          "结交朋党",
-          "反击阴谋"
-        ]
-      },
-      {
-        "role": "爆发",
-        "ratio": 0.15,
-        "typical_position": "卷末",
-        "beats": [
-          "廷争胜利",
-          "击溃外敌",
-          "加官进爵"
-        ]
-      },
-      {
-        "role": "缓冲",
-        "ratio": 0.15,
-        "typical_position": "爆发后",
-        "beats": [
-          "论功行赏",
-          "发展封地",
-          "百姓爱戴"
-        ]
-      },
-      {
-        "role": "转折",
-        "ratio": 0.1,
-        "typical_position": "过渡段",
-        "beats": [
-          "先帝崩逝朝局更迭"
-        ]
-      }
-    ],
-    "chapter_word_range": {
-      "min": 2400,
-      "max": 3400,
-      "typical": 2800
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
     },
-    "foreshadow_pattern": {
-      "concurrent_open": 3,
-      "avg_span": 30,
-      "max_span": 80,
-      "plant_technique": [
-        "边关军报的粮草数字差",
-        "皇子暗中购置的大量马蹄铁"
-      ]
-    },
-    "hook_system": {
-      "anti_repetition_rule": "商业赚钱爽与朝堂权谋爽交替推进。",
-      "hook_density_curve": [
-        "开局贫寒破产危机",
-        "中局生死党争死局",
-        "高潮决战国运一役"
-      ],
-      "hook_types": [
-        {
-          "type": "危机降临",
-          "strength": 0.9,
-          "frequency": 0.35,
-          "skeleton": "政敌买通大理寺，弹劾奏章已递送御前，抄家校尉正在策马途中。"
-        },
-        {
-          "type": "实力展示",
-          "strength": 0.85,
-          "frequency": 0.35,
-          "skeleton": "百炼钢成、新式火炮试射，巨响震碎了朝廷工部官员的认知。"
-        }
-      ]
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
     }
+   ]
   },
-  "world_conventions": {
-    "iron_laws": [
-      "枪杆子与钱袋子并存",
-      "民心所向即天命",
-      "科技演进合乎逻辑"
-    ],
-    "power_system_type": "官僚品秩/爵位 + 现代科技工业体系",
-    "progression_granularity": "从寒门秀才到七品县令再到内阁首辅与开国元勋",
-    "naming_conventions": [
-      "古代官职名",
-      "爵位称谓",
-      "古代年号与地名"
-    ]
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "权谋胜利要有观众：朝堂、后宫、天下。赢要赢得漂亮：借刀杀人、釜底抽薪、以退为进。改变历史的瞬间要有仪式感：那一刻，要让历史拐弯的感觉扑面而来。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 用刑场、战场、科举考场、青楼、荒村切入。\n- 先给穿越者的绝境，再给第一个利用现代知识破局的机会。\n- 朝代背景只给当前场景需要的部分，不要开篇写史纲。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "把古人写成现代人，语言、礼制、思维方式要有时代感",
+    "用现代科技粗暴碾压，火器、工业需要合理的落地过程",
+    "让历史人物沦为工具人，名人要有名人的气度与局限",
+    "胡乱改写重大历史事件而不给代价，蝴蝶效应要有回响"
+   ]
   }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要把古人写成现代人，语言、礼制、思维方式要有时代感",
+    "rationale": "该题材的正确写法：写历史穿越，核心是“降维”与“融入”的张力。",
+    "good_example": "写历史穿越，核心是“降维”与“融入”的张力。 现代知识是利器，但人性、权力、时代局限是真正的对手。（而不是把古人写成现代人，语言、礼制、思维方式要有时代感）",
+    "bad_example": "把古人写成现代人，语言、礼制、思维方式要有时代感；但人性、权力、时代局限是真正这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要用现代科技粗暴碾压，火器、工业需要合理的落地过程",
+    "rationale": "该题材的正确写法：写历史穿越，核心是“降维”与“融入”的张力。",
+    "good_example": "把权谋写出层次：阳谋、阴谋、心术。 把历史写出重量：每个决定都有代价。（而不是用现代科技粗暴碾压，火器、工业需要合理的落地过程）",
+    "bad_example": "用现代科技粗暴碾压，火器、工业需要合理的落地过程；但人性、权力、时代局限是真正这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要让历史人物沦为工具人，名人要有名人的气度与局限",
+    "rationale": "该题材的正确写法：写历史穿越，核心是“降维”与“融入”的张力。",
+    "good_example": "现代知识 vs 古代秩序 + 皇权猜忌 + 列国/诸侯倾轧。 旁人按“出身/门第”误判主角，主角以超越时代的眼光、知识和手腕打破判断。（而不是让历史人物沦为工具人，名人要有名人的气度与局限）",
+    "bad_example": "让历史人物沦为工具人，名人要有名人的气度与局限，通篇没有一个具体场面承接。"
+   },
+   {
+    "rule": "不要胡乱改写重大历史事件而不给代价，蝴蝶效应要有回响",
+    "rationale": "该题材的正确写法：写历史穿越，核心是“降维”与“融入”的张力。",
+    "good_example": "知识跟着困境走，权谋跟着人心走。 时代感不能丢，爽感不能等。（而不是胡乱改写重大历史事件而不给代价，蝴蝶效应要有回响）",
+    "bad_example": "胡乱改写重大历史事件而不给代价，蝴蝶效应要有回响，通篇没有一个具体场面承接。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要把古人写成现代人，语言、礼制、思维方式要有时代感",
+   "不要用现代科技粗暴碾压，火器、工业需要合理的落地过程",
+   "不要让历史人物沦为工具人，名人要有名人的气度与局限",
+   "不要胡乱改写重大历史事件而不给代价，蝴蝶效应要有回响"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "主角初到时语言带现代痕迹，逐渐被时代同化；谋士说话绵里藏针；武将直率；皇帝威严但不脸谱。奏对、圣旨、檄文要有文言韵味但保证可读。别让古人满口现代网络词。",
+  "drift_guard": "不要把古人写成现代人，语言、礼制、思维方式要有时代感；不要用现代科技粗暴碾压，火器、工业需要合理的落地过程；不要让历史人物沦为工具人；不要胡乱改写重大历史事件而不给代价。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "用宫墙的影子、朝笏、战马的嘶鸣、粮仓的算筹、边关的风沙、深夜的灯下密诏承载历史的厚重感。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
 }

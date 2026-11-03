@@ -248,7 +248,33 @@ export default function AssetLibrary() {
                     >
                       <ListItemText
                         primary={it.name}
-                        secondary={`${getKindLabel(it.kind, t)} · ${(it.size / 1024).toFixed(1)} KB`}
+                        // 2026-11-03：列表里 51 个题材包与 48 个文风卡并排，
+                        // 同题材两份还同名（都是「传统玄幻」），只靠 kind 标签分不清。
+                        // 第二位改用后端给的 purpose 一句话说明，点进去之前就知道是什么。
+                        secondary={
+                          <>
+                            <Box component="span" sx={{ display: 'block' }}>
+                              {getKindLabel(it.kind, t)} · {(it.size / 1024).toFixed(1)} KB
+                              {/* 同题材的题材包 / 文风卡成对存在且同名，这里点明区别 */}
+                              {it.kind === 'genre_pack' || it.kind === 'prose_card' ? (
+                                <Box component="span" sx={{ ml: 0.5, opacity: 0.7 }}>
+                                  {it.kind === 'genre_pack'
+                                    ? t('asset_lib_pack_tag', '· 规则包（注入用）')
+                                    : t('asset_lib_prose_tag', '· 风格样本（参照用）')}
+                                </Box>
+                              ) : null}
+                            </Box>
+                            {it.purpose ? (
+                              <Box
+                                component="span"
+                                sx={{ display: 'block', fontSize: 12, lineHeight: 1.5, opacity: 0.75 }}
+                              >
+                                {/* 优先用本地词典（双语），后端 purpose 只作中文兜底 */}
+                                {t(`asset_purpose_${it.kind}`, it.purpose)}
+                              </Box>
+                            ) : null}
+                          </>
+                        }
                         primaryTypographyProps={{ fontSize: 14 }}
                       />
                     </ListItemButton>

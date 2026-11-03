@@ -807,15 +807,21 @@ class AssetIndex:
                 size, mtime = st.st_size, st.st_mtime
             except OSError:
                 pass
+        kind = row.get("kind")
         return {
-            "kind": row.get("kind"),
-            "id": f"{row.get('kind')}:{stem}",
+            "kind": kind,
+            "id": f"{kind}:{stem}",
             "name": name,
             "path": path,
             "size": size,
             "mtime": mtime,
             "book_id": row.get("book_id"),
             "genre": row.get("genre"),
+            # 列表层用途说明（2026-11-03）：此前只有点进详情才有 describe_asset
+            # 的长文，列表里 51 个题材包与 48 个文风卡并排时用户完全看不出区别
+            # （同题材两份同名，只有 kind 标签不同）。这里给一句人话，前端直接显示。
+            "purpose": _KIND_PURPOSE.get(kind or "", ""),
+            "usage": _KIND_USAGE.get(kind or "", ""),
         }
 
     @staticmethod

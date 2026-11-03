@@ -106,6 +106,12 @@ export interface AssetItem {
   size: number
   mtime: number
   bookId?: string
+  /** 该题材 slug（题材包 / 文风卡的题材标识），用于判断两份是否同题材 */
+  genre?: string
+  /** 一句话说明「这是什么」，列表层直接显示，免得用户点进去才知道 */
+  purpose?: string
+  /** 一句话说明「用在哪」，与 purpose 配套 */
+  usage?: string
 }
 
 export interface Overview {

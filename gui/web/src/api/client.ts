@@ -396,6 +396,11 @@ function assetItemFromSnake(a: Record<string, unknown>): AssetItem {
     size: a.size as number,
     mtime: a.mtime as number,
     bookId: (a.bookId ?? undefined) as string | undefined,
+    // 2026-11-03：列表层用途说明。此前白名单漏掉这两个字段，
+    // 后端加了也没传到界面，同题材的题材包与文风卡仍分不清。
+    genre: (a.genre ?? undefined) as string | undefined,
+    purpose: (a.purpose ?? undefined) as string | undefined,
+    usage: (a.usage ?? undefined) as string | undefined,
   }
 }
 

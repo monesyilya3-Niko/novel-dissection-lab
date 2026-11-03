@@ -1,252 +1,213 @@
 {
-  "meta": {
-    "id": "genre-xuanhuan-naodong",
-    "name": "玄幻脑洞",
-    "sub_tags": [
-      "玄幻脑洞",
-      "运朝争霸",
-      "天道盘点",
-      "诸天垂钓",
-      "气运词条"
-    ],
-    "target_platform": "长篇通用",
-    "scope": "genre-generalized",
-    "confidence": 0.6,
-    "note": "通用题材包：玄幻脑洞/诸天万界/气运词条/天道盘点/运朝帝王",
-    "source_books": [
-      {
-        "title": "玄幻脑洞标杆代表作一",
-        "platform": "番茄",
-        "performance": "千万级爆款",
-        "voice_card_ref": "xuanhuan-naodong_ref1"
-      },
-      {
-        "title": "玄幻脑洞热门畅销作二",
-        "platform": "番茄",
-        "performance": "高追读榜首",
-        "voice_card_ref": "xuanhuan-naodong_ref2"
-      },
-      {
-        "title": "玄幻脑洞经典完结作三",
-        "platform": "番茄",
-        "performance": "高评分必读",
-        "voice_card_ref": "xuanhuan-naodong_ref3"
-      }
-    ]
+ "meta": {
+  "id": "genre-xuanhuan-naodong",
+  "name": "玄幻脑洞",
+  "sub_tags": [
+   "玄幻脑洞",
+   "玄幻系统",
+   "反套路玄幻",
+   "多子多福",
+   "词条玄幻"
+  ],
+  "target_platform": "长篇通用",
+  "confidence": 0.5,
+  "scope": "genre-generalized",
+  "source": "genre-prose-card-genre-xuanhuan-naodong",
+  "source_books": [
+   {
+    "title": "genre-prose-card-genre-xuanhuan-naodong（题材文风卡泛化）",
+    "note": "非单书蒸馏；结构字段搬运自文风卡原文，数值字段为通用默认值"
+   }
+  ],
+  "note": "由 genre-prose-card-genre-xuanhuan-naodong.json 派生（2026-11-02）。structure / language_rules / world_conventions 的文本搬运自文风卡原文；commercial / quality_thresholds / chapter_word_range 的**数值未经该题材实测标定**，为通用默认值，接入具体书籍蒸馏数据后应重新标定。",
+  "provenance": {
+   "source": "novel-lab 项目内 genre-prose-card-genre-xuanhuan-naodong.json 泛化",
+   "license": "MIT",
+   "copyright": "Copyright (c) 2026 novel-lab",
+   "verified": false,
+   "note": "衍生链归因声明：写法为转述综合，非复制原文；未引用任何具体小说实测数据。"
   },
-  "commercial": {
-    "opening_analysis": {
-      "chapter_1": {
-        "first_300_words_task": "开局觉醒推演诸天或修改气运词条金手指，300字内打破传统玄幻慢热瓶颈，直接查看天骄气运并截胡首桩逆天机缘",
-        "hook_position": 450,
-        "conflict_intro_position": 800,
-        "protagonist_intro_method": "冷静理智高维视角，将万界生灵视作棋盘，开局掠夺金色传说词条",
-        "golden_finger_reveal": "气运词条面板（可升级可掠夺）、诸天投影光幕或垂钓诸天至宝"
-      },
-      "chapter_2_3_task": "第2章原气运之子寻找机缘扑空，机缘已入主角腹中；第3章主角炼化机缘战力暴涨，当众反杀打脸前来退婚或夺骨的天之骄子，震撼整座圣地",
-      "common_mistakes": [
-        "写成老套退婚废柴流慢热拖沓",
-        "金手指设定繁琐讲解两千字说明书",
-        "词条升级没有明确战斗力反馈"
-      ]
+  "derived_sections": [
+   "开场抓手",
+   "章尾钩子",
+   "前中后期打法",
+   "节奏密度",
+   "冲突发动机",
+   "爽点与情绪释放",
+   "对话与声线",
+   "场景颗粒",
+   "禁止漂移",
+   "证据摘要"
+  ]
+ },
+ "structure": {
+  "chapter_word_range": {
+   "min": 2000,
+   "max": 3200,
+   "typical": 2500
+  },
+  "arc_rhythm": {
+   "arc_template": [
+    "前期：用废柴测试、宗门危机、血脉检测或系统觉醒让反常规规则第一次落地。",
+    "中期：围绕旧修炼秩序、宗门资格、资源分配和公开误判反复升级，脑洞必须带来收益或代价。",
+    "后期：把词条、榜单、强敌和规则限制推到公开清算，结尾留奖励异常或更高层发现偏差。"
+   ],
+   "chapters_per_arc": 40,
+   "climax_position": 0.8,
+   "rhythm_notes": "每章按四步推进：旧玄幻压力，脑洞规则介入，公开误判，收益/代价落地。设定越怪，越要快见结果一次小结果。"
+  },
+  "hook_system": {
+   "hook_types": [
+    {
+     "type": "悬念揭示",
+     "strength": 0.7,
+     "frequency": 0.3,
+     "skeleton": "在场景收束处抛出一个未解释的细节，不立即给答案。"
     },
-    "payoff_density": {
-      "per_thousand_words": 0.5,
-      "dry_spell_tolerance": 5,
-      "payoff_types": [
-        {
-          "type": "升级",
-          "ratio": 0.4,
-          "buildup_length": 2,
-          "skeleton": "掠夺白绿词条合成为金色神级【重瞳至尊】【万劫不灭】，战力质变横推同辈"
-        },
-        {
-          "type": "收益兑现",
-          "ratio": 0.35,
-          "buildup_length": 3,
-          "skeleton": "抢先气运之子一步挖走九天神金与帝经残卷，让天命之子怀疑人生"
-        },
-        {
-          "type": "他人认可",
-          "ratio": 0.25,
-          "buildup_length": 5,
-          "skeleton": "诸天投影光幕盘点万界十大战神，主角真身位列榜首引爆万族惊悚"
-        }
-      ]
+    {
+     "type": "情感冲击",
+     "strength": 0.75,
+     "frequency": 0.3,
+     "skeleton": "长期压制的关系被一个具体事件触动，角色反应先于台词。"
     },
-    "paywall": {
-      "cliffhanger_technique": "上界不朽道统降下法旨强收主角宗门为奴，主角激活了金色词条【弑天帝命】，抬手一枪刺破苍穹",
-      "pre_paywall_buildup": "主角建立了无上运朝，引来上界禁区古老巨头的联手围剿"
+    {
+     "type": "危机降临",
+     "strength": 0.85,
+     "frequency": 0.2,
+     "skeleton": "威胁在读者已知、角色未知的位置出现，收在动作将发未发处。"
     },
-    "retention_risk_points": [
-      {
-        "position": "跨界换地图",
-        "reason": "战力膨胀后老战力崩坏",
-        "mitigation": "词条系统遵循概念级因果律，无论到哪个位面皆降维打击"
-      }
-    ],
-    "update_rhythm": {
-      "chapters_per_day": 2,
-      "burst_timing": "金色词条觉醒或踏碎不朽圣地加更"
+    {
+     "type": "信息断点",
+     "strength": 0.65,
+     "frequency": 0.2,
+     "skeleton": "关键信息说到一半被打断，或只给结论不给原因。"
     }
+   ],
+   "anti_repetition_rule": "连续两章不重复同一钩子类型。",
+   "hook_density_curve": [
+    "开篇用强钩子立住压力",
+    "中段交替使用信息类与情感类",
+    "爆点前后各留一个缓冲章"
+   ],
+   "chapter_opening": "- 用废柴身份、宗门危机、退婚羞辱、敌人上门、血脉检测、系统规则觉醒切入。\n- 核心规则一句话能讲明白，第二个节拍就要见结果。\n- 规则越离谱，限制越要清楚。",
+   "chapter_end_hook": "适合用规则新限制、强敌登门、宗门任务、榜单排名、隐藏血脉/词条刷新、系统奖励异常收尾。"
   },
-  "language_rules": {
-    "banned_phrases": [
-      "桀桀桀",
-      "蝼蚁",
-      "本座",
-      "纳命来"
-    ],
-    "fatigue_words": [
-      {
-        "word": "金色光芒大放",
-        "max_per_chapter": 2
-      },
-      {
-        "word": "倒吸冷气",
-        "max_per_chapter": 2
-      }
-    ],
-    "dialogue_style": {
-      "dominant_subtype": "霸气超然降维俯瞰",
-      "note": "对所谓天命之子嗤之以鼻，话语从容威严，格局宏大"
-    },
-    "iron_rules": [
-      {
-        "rule": "脑洞必须颠覆传统玄幻死板套路：以新规则（词条、运朝、投影）重塑升级体验。",
-        "bad_example": "主角每天在瀑布下打拳练剑练了一百年，终于突破到了炼气期第三层。",
-        "good_example": "主角看了一眼气运之子头顶的金色光环，伸手一点：【至尊骨】词条已提取，下一秒体内龙吟震天，修为连破三大重天。",
-        "rationale": "玄幻脑洞的核心是新颖金手指对陈旧修炼体系的降维替代与高效爽感。"
-      }
-    ],
-    "forbidden_elements": [
-      "回归老式吐血苦修",
-      "金手指送给别人",
-      "气运之子无限原地复活恶心人"
-    ],
-    "required_elements": [
-      "彩色气运词条分级",
-      "截胡天命机缘爽感",
-      "概念级神通异象",
-      "运朝神国宏伟气象"
-    ]
+  "chapter_roles": [],
+  "foreshadow_pattern": {
+   "avg_span_chapters": 5,
+   "max_concurrent_open": 3
   },
-  "quality_thresholds": {
-    "dialogue_optimal": {
-      "min": 0.2,
-      "max": 0.38
+  "conflict_engine": "旧修炼秩序 + 反常规规则 + 公开见证。别人按境界、血脉、宗门地位判断，主角用新规则改写结果。"
+ },
+ "commercial": {
+  "payoff_density": {
+   "per_thousand_words": 0.8,
+   "dry_spell_tolerance": 3,
+   "payoff_types": [
+    {
+     "type": "收益兑现",
+     "ratio": 0.35,
+     "buildup_length": 6,
+     "skeleton": "铺垫代价与阻力在前，兑现时给出具体可见的回报。"
     },
-    "pass": 75,
-    "warn": 60
-  },
-  "structure": {
-    "arc_rhythm": {
-      "chapters_per_arc": 30,
-      "climax_position": 0.85,
-      "arc_template": [
-        "气运觉醒掠夺机缘",
-        "截胡天命称霸圣地",
-        "立国运朝天道封神",
-        "横推禁区诸天投影",
-        "独断万古万界天帝"
-      ]
+    {
+     "type": "身份揭露",
+     "ratio": 0.3,
+     "buildup_length": 8,
+     "skeleton": "让旁观者先误判主角位置，再以事实推翻其判断。"
     },
-    "chapter_roles": [
-      {
-        "role": "铺垫",
-        "ratio": 0.2,
-        "typical_position": "发现目标",
-        "beats": [
-          "洞察天骄词条",
-          "锁定逆天机缘"
-        ]
-      },
-      {
-        "role": "推进",
-        "ratio": 0.4,
-        "typical_position": "截胡融合",
-        "beats": [
-          "提前布局夺宝",
-          "词条熔炼升级",
-          "境界暴涨"
-        ]
-      },
-      {
-        "role": "爆发",
-        "ratio": 0.25,
-        "typical_position": "同阶横推",
-        "beats": [
-          "无敌异象降临",
-          "一掌镇压圣子",
-          "全族老祖惊骇膜拜"
-        ]
-      },
-      {
-        "role": "缓冲",
-        "ratio": 0.05,
-        "typical_position": "清点收获",
-        "beats": [
-          "万道神音绕梁"
-        ]
-      },
-      {
-        "role": "转折",
-        "ratio": 0.1,
-        "typical_position": "上界法旨",
-        "beats": [
-          "引动域外诸天异动"
-        ]
-      }
-    ],
-    "chapter_word_range": {
-      "min": 2200,
-      "max": 3200,
-      "typical": 2600
+    {
+     "type": "情感回应",
+     "ratio": 0.2,
+     "buildup_length": 5,
+     "skeleton": "长期压制的关系在具体事件后得到回应。"
     },
-    "foreshadow_pattern": {
-      "concurrent_open": 3,
-      "avg_span": 30,
-      "max_span": 70,
-      "plant_technique": [
-        "某位落魄乞丐头顶隐藏的七彩混沌词条",
-        "九天之上沉睡的帝尊残魂"
-      ]
-    },
-    "hook_system": {
-      "anti_repetition_rule": "词条种类百花齐放（战斗、悟性、气运、寿命、因果、创造）。",
-      "hook_density_curve": [
-        "开局极速截胡破局",
-        "中局运朝气运鼎盛",
-        "高潮独断诸天神话"
-      ],
-      "hook_types": [
-        {
-          "type": "悬念揭示",
-          "strength": 0.9,
-          "frequency": 0.45,
-          "skeleton": "九道纯阳词条合一，金色退去，化作前所未有的【鸿蒙创世】神级词条。"
-        },
-        {
-          "type": "实力展示",
-          "strength": 0.9,
-          "frequency": 0.4,
-          "skeleton": "上界真仙降临企图灭宗，主角身后浮现亿万里人道运朝金龙，一指点落真仙陨落。"
-        }
-      ]
+    {
+     "type": "反杀",
+     "ratio": 0.15,
+     "buildup_length": 10,
+     "skeleton": "受压迫方在被逼到绝境时翻盘，代价先付、翻盘在后。"
     }
+   ]
   },
-  "world_conventions": {
-    "iron_laws": [
-      "气运所钟万法辟易",
-      "运朝位格定天命",
-      "词条概念级绝对生效"
-    ],
-    "power_system_type": "词条品阶（白/绿/蓝/紫/金/红/彩） + 运朝果位 + 仙道玄幻境界",
-    "progression_granularity": "从宗门边缘弟子到一品气运王侯再到诸天唯一无上帝尊",
-    "naming_conventions": [
-      "词条专属名称（【天生重瞳】【荒古圣体】【天道垂青】）",
-      "运朝尊号",
-      "诸天位面名"
-    ]
+  "update_rhythm": {
+   "chapters_per_day": 2,
+   "burst_timing": "爆点章可加更；连续平和章之间必须保留一条局势推进线。"
+  },
+  "paywall": {
+   "cliffhanger_technique": "卡在关系刚升温未确立、或谜面刚抛出未解答处。"
+  },
+  "retention_risk_points": [],
+  "payoff_notes": "小爽是规则第一次生效，中爽是境界/资源到账，大爽是长老、敌人、宗门公开改口。升级、收获、装逼要分层，不要一章全倒完。",
+  "opening_analysis": {
+   "chapter_1": {
+    "protagonist_intro_method": "- 用废柴身份、宗门危机、退婚羞辱、敌人上门、血脉检测、系统规则觉醒切入。\n- 核心规则一句话能讲明白，第二个节拍就要见结果。\n- 规则越离谱，限制越要清楚。",
+    "first_300_words_task": "开场 300 字内让读者知道：主角是谁、卡在什么处境、代价是什么。",
+    "conflict_intro_position": 600,
+    "hook_position": 400,
+    "golden_finger_reveal": "若有金手指/核心优势，只展示结果与代价，不解释原理。"
+   },
+   "chapter_2_3_task": "第 2 章把压力具体化（一个对手、一个期限、一个缺口）；第 3 章给第一次实质推进。",
+   "common_mistakes": [
+    "把脑洞写成万能没限制",
+    "系统刷屏",
+    "只有设定新奇没有敌人、目标和收益",
+    "把传统玄幻资源链写丢"
+   ]
   }
+ },
+ "language_rules": {
+  "iron_rules": [
+   {
+    "rule": "不要把脑洞写成万能没限制",
+    "rationale": "该题材的正确写法：写玄幻脑洞时，先立一个反常规核心规则，再让它立刻改变修炼、宗门、身份、血脉或生死压力。",
+    "good_example": "写玄幻脑洞时，先立一个反常规核心规则，再让它立刻改变修炼、宗门、身份、血脉或生死压力。 读者期待的是玄幻规则被脑洞重写：系统、词条、召唤、多子多福、读书变强都要服务升级、资源和公开震惊。（而不是把脑洞写成万能没限制）",
+    "bad_example": "把脑洞写成万能没限制；它立刻改变修炼、宗门、身份这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要系统刷屏",
+    "rationale": "该题材的正确写法：写玄幻脑洞时，先立一个反常规核心规则，再让它立刻改变修炼、宗门、身份、血脉或生死压力。",
+    "good_example": "旧修炼秩序 + 反常规规则 + 公开见证。 别人按境界、血脉、宗门地位判断，主角用新规则改写结果。（而不是系统刷屏）",
+    "bad_example": "系统刷屏；别人按境界、血脉、宗门地位判断这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要只有设定新奇没有敌人、目标和收益",
+    "rationale": "该题材的正确写法：脑洞规则要落到灵根、词条、系统面板、召唤物、族谱、宗门榜、丹药、擂台、秘境入口。",
+    "good_example": "脑洞规则要落到灵根、词条、系统面板、召唤物、族谱、宗门榜、丹药、擂台、秘境入口。 反常规必须有旁人能看见的结果。（而不是只有设定新奇没有敌人、目标和收益）",
+    "bad_example": "只有设定新奇没有敌人、目标和收益；规则要落到灵根、词条、系统面板这类具体场面一个都没有，读者只见概念。"
+   },
+   {
+    "rule": "不要把传统玄幻资源链写丢",
+    "rationale": "该题材的正确写法：写玄幻脑洞时，先立一个反常规核心规则，再让它立刻改变修炼、宗门、身份、血脉或生死压力。",
+    "good_example": "设定短说明，马上给小试或代价。 每章必须有规则见结果，不只铺设定。（而不是把传统玄幻资源链写丢）",
+    "bad_example": "把传统玄幻资源链写丢，通篇没有一个具体场面承接。"
+   }
+  ],
+  "forbidden_elements": [
+   "不要把脑洞写成万能没限制",
+   "不要系统刷屏",
+   "不要只有设定新奇没有敌人、目标和收益",
+   "不要把传统玄幻资源链写丢"
+  ],
+  "banned_phrases": [],
+  "required_elements": [],
+  "fatigue_words": [],
+  "dialogue_style": "玄幻角色可以更有仪式感，但台词仍要围绕利益、身份和危险。系统提示要短，宗门人物别全员喊震惊。",
+  "drift_guard": "不要把脑洞写成万能没限制；不要系统刷屏；不要只有设定新奇没有敌人、目标和收益；不要把传统玄幻资源链写丢。"
+ },
+ "world_conventions": {
+  "iron_laws": [],
+  "naming_conventions": "",
+  "power_system_type": "",
+  "progression_granularity": "",
+  "scene_granularity": "脑洞规则要落到灵根、词条、系统面板、召唤物、族谱、宗门榜、丹药、擂台、秘境入口。反常规必须有旁人能看见的结果。"
+ },
+ "quality_thresholds": {
+  "pass": 75,
+  "warn": 60,
+  "dialogue_optimal": {
+   "min": 0.15,
+   "max": 0.35
+  }
+ }
 }
