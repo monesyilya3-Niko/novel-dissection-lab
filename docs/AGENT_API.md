@@ -308,7 +308,9 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 
 ---
 
-## 5. 全量 REST API 端点清单（97 端点速查）
+## 5. 全量 REST API 端点清单（132 端点速查）
+
+> 端点总数以 `len(gui.router.ROUTES)` 实测为准，`tests/test_doc_metrics.py` 守着本行数字。
 
 | 分类 | 方法 | 路径 | 描述 |
 |---|---|---|---|
@@ -360,8 +362,12 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 | | `PUT` | `/api/writing/notes/{nid}` | 更新便签 |
 | | `DELETE` | `/api/writing/notes/{nid}` | 删除便签 |
 | | `GET` | `/api/writing/stats` | 码字统计与创作大盘指标 |
+| | `POST` | `/api/writing/count-words` | 单次字数统计（不落库） |
 | | `GET` | `/api/writing/export` | **全格式导出 (DOCX / MD / TXT)** |
 | | `POST` | `/api/writing/deslop` | **去 AI 味全维度诊断与润色评估** |
+| | `POST` | `/api/writing/tension-analysis` | 章节情绪张力起伏波形（可选神作标杆比对） |
+| | `POST` | `/api/writing/golden-three-tension` | **黄金三章张力曲线重叠比对与多维诊断** |
+| | `POST` | `/api/writing/reader-retention` | **商业网文读者留存流失预测与跳出诊断** |
 | **质检引擎** | `POST` | `/api/quality/check` | 单章质量快速检查 |
 | | `POST` | `/api/quality/book` | 全书目录质检 |
 | | `POST` | `/api/quality/qc` | 四层十二维 QC 综合长任务 |
@@ -382,6 +388,9 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 | | `POST` | `/api/platform/check` | 单章投前合规检查 |
 | | `POST` | `/api/platform/format` | 平台规范格式化排版 |
 | | `POST` | `/api/platform/export` | 投前整书合规检查与打包导出 |
+| | `POST` | `/api/platform/diagnose` | **签约过稿深度诊断评级与致命劝退排查** |
+| | `POST` | `/api/platform/litrpg/stat-box` | LitRPG 属性面板解析与格式化 |
+| | `POST` | `/api/platform/royalroad/format` | Royal Road BBCode 折叠排版 |
 | **模型与系统** | `GET` | `/api/system/status` | 系统健康、版本与存储统计 |
 | | `POST` | `/api/system/compliance` | 运行合规性审计检查 |
 | | `GET` | `/api/system/models` | 系统模型概况 |
@@ -410,6 +419,33 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 | | `POST` | `/api/admin/change-password` | **修改密码（吊销旧会话）** |
 | | `GET` | `/api/admin/sessions` | 查看活跃管理会话 |
 | | `DELETE`| `/api/admin/sessions/{sid}` | 强踢指定管理会话 |
+| **离线工具库** | `GET` | `/api/stats` | 全局统计汇总 |
+| | `GET` | `/api/tools/names` | 智能起名工坊（`kind`/`style`/`gender`/`count`） |
+| | `POST` | `/api/tools/poison-check` | 十大核心毒点避雷扫描 |
+| | `GET` | `/api/tools/goldfingers` | 金手指机制库 |
+| | `GET` | `/api/tools/hooks` | 开篇钩子库 |
+| | `GET` | `/api/tools/taboos` | 题材禁忌库 |
+| | `GET` | `/api/tools/shuangdians` | 爽点打脸逆袭模型 |
+| | `GET` | `/api/tools/worlds` | 世界观与力量体系 |
+| | `GET` | `/api/tools/dialogues` | 名场面台词库 |
+| | `GET` | `/api/tools/characters` | 爆款人设反差矩阵 |
+| | `GET` | `/api/tools/emotions` | 情绪高潮五感演出库 |
+| **精华库** | `GET` | `/api/essence/stats` | 精华库宏观聚合指标 |
+| | `GET` | `/api/essence/books` | 已精读著作列表（`genre`/`platform` 过滤） |
+| | `GET` | `/api/essence/books/{book_id}` | 单部精华书详情 |
+| | `DELETE` | `/api/essence/books/{book_id}` | 移除精华书 |
+| | `POST` | `/api/essence/analyze` | 离线深度精读解构长任务 |
+| | `GET` | `/api/essence/assets` | 五维精华资产列表 |
+| | `POST` | `/api/essence/assets` | 新增精华资产 |
+| | `DELETE` | `/api/essence/assets/{asset_id}` | 删除精华资产 |
+| | `POST` | `/api/essence/adopt` | 单条精华资产采纳到项目 |
+| | `GET` | `/api/essence/chains` | 伏笔暗线图谱 |
+| | `POST` | `/api/essence/chains` | 新增伏笔链 |
+| | `DELETE` | `/api/essence/chains/{chain_id}` | 删除伏笔链 |
+| | `GET` | `/api/essence/books/{book_id}/export-outline` | 导出全书大纲 |
+| | `GET` | `/api/essence/books/{book_id}/export-beats` | 导出轻提纲节拍 |
+| | `POST` | `/api/essence/books/{book_id}/adopt-all` | 整书五维资产批量采纳 |
+| | `POST` | `/api/essence/constitution/check` | 小说宪法正典审查（角色声线/世界观违宪） |
 
 ---
 
