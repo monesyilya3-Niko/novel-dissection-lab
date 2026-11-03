@@ -104,6 +104,27 @@ export interface WritingWorkbenchProps {
   initialPipelineTab?: number
 }
 
+/**
+ * 下拉项的两行展示：名称 + 一行小字说明。
+ *
+ * 2026-11-03：写作页的题材包与文风卡同名（都是「传统玄幻」），只显示 name 时
+ * 选错了才知道。这里补一个 tag（规则包 / 风格样本）和题材标签，选中前就能分清。
+ * 说明只在有值时才渲染，不占额外高度。
+ */
+function AssetMenuLabel({ asset, tag }: { asset: { name: string; genre?: string }; tag?: string }) {
+  return (
+    <Box component="span" sx={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+      <Box component="span">
+        {asset.name}
+        {tag ? <Box component="span" sx={{ ml: 0.5, fontSize: 12, opacity: 0.6 }}>{tag}</Box> : null}
+      </Box>
+      {asset.genre ? (
+        <Box component="span" sx={{ fontSize: 11, opacity: 0.55 }}>{asset.genre}</Box>
+      ) : null}
+    </Box>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // WS-A6：Pipeline 9 tab 的三组心智模型（顺序即索引，索引兼容旧 localStorage）
 // ---------------------------------------------------------------------------
@@ -336,10 +357,7 @@ function InjectPanel({ sel }: { sel: WritingAssetSelection }) {
           <MenuItem value="">{t('gen_none_option', '无')}</MenuItem>
           {sortedGenrePacks.map((a) => (
             <MenuItem key={a.id} value={a.id}>
-              {a.name}
-              {sel.voiceGenre && a.genre === sel.voiceGenre
-                ? t('gen_same_genre_tag', '（同题材）')
-                : ''}
+              <AssetMenuLabel asset={a} tag={t('asset_lib_pack_tag', '· 规则包（注入用）')} />
             </MenuItem>
           ))}
         </TextField>
@@ -353,7 +371,11 @@ function InjectPanel({ sel }: { sel: WritingAssetSelection }) {
         </TextField>
         <TextField select label={t('gen_prose_card_label', '文风参照卡（可选）')} value={proseCard} onChange={(e) => setProseCard(e.target.value)} sx={{ minWidth: 220 }} size="small">
           <MenuItem value="">{t('gen_none_option', '无')}</MenuItem>
-          {byKind('prose_card').map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
+          {byKind('prose_card').map((a) => (
+            <MenuItem key={a.id} value={a.id}>
+              <AssetMenuLabel asset={a} tag={t('asset_lib_prose_tag', '· 风格样本（参照用）')} />
+            </MenuItem>
+          ))}
         </TextField>
         <Button variant="contained" onClick={doInject} disabled={!voice || loading}>
           {loading ? <CircularProgress size={20} /> : t('gen_generate_prompt', '生成 Prompt')}

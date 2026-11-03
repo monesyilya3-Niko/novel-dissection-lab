@@ -14,6 +14,8 @@ export interface AssetOption {
   kind: string
   /** 题材标识（后端 _make_item / _asset_row_to_item 提供；未知为 undefined） */
   genre?: string
+  /** 一句话用途（后端列表接口的 purpose 字段），下拉里作为辅助说明显示 */
+  purpose?: string
 }
 
 export interface GenreMismatch {
