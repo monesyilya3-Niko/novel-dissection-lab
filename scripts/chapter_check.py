@@ -588,15 +588,39 @@ def check_emotion_tags(text: str) -> tuple:
     return score, f"旁白情绪标签 {tag_count} 处（AI味重灾区）"
 
 
+def _thresholds_block(genre_pack):
+    """取题材包的 quality_thresholds 块，兼容两种落盘位置。
+
+    2026-11-03 修复：此前只读 ``commercial.quality_thresholds``，而 48 个
+    题材包把阈值放在**顶层** ``quality_thresholds``（派生脚本与手写包都如此），
+    结果 resolve_thresholds 永远拿不到值、静默回退 75/60——用户在题材包里
+    改阈值毫无效果。现在两处都认，顶层优先（更靠近数据根，也便于手改）。
+    """
+    if not isinstance(genre_pack, dict):
+        return None
+    top = genre_pack.get("quality_thresholds")
+    if isinstance(top, dict):
+        return top
+    commercial = genre_pack.get("commercial")
+    if isinstance(commercial, dict):
+        nested = commercial.get("quality_thresholds")
+        if isinstance(nested, dict):
+            return nested
+    return None
+
+
 def resolve_thresholds(genre_pack):
     """解析评分阈值，返回 (pass, warn) 二元组。
 
-    单一事实来源：题材包 commercial.quality_thresholds 可覆盖默认 75/60。
+    取值顺序：题材包顶层 ``quality_thresholds`` → ``commercial.quality_thresholds``
+    → 默认 75/60。**逐字段解析**：只配了 pass 或只配了 warn 时，另一个字段
+    各自回退默认值，而不是整块作废（题材包里常见「只调 dialogue_optimal」
+    这类部分配置）。
+
     回退规则（全部静默回退，不抛异常）：
-      - genre_pack 为 None                 → (75, 60)
-      - 无 quality_thresholds 键            → (75, 60)
-      - pass / warn 非 int 或越界(0-100)   → (75, 60)
-      - warn > pass                        → (75, 60)
+      - genre_pack 为 None / 无阈值块        → (75, 60)
+      - 单个字段非 int 或越界(0-100)         → 该字段用默认值
+      - 合并后 warn > pass                   → (75, 60)（整块不可信，退默认）
     允许 pass == warn（此时无 WARN 档，>=pass 即 PASS，否则 FAIL）。
 
     Args:
@@ -607,19 +631,18 @@ def resolve_thresholds(genre_pack):
     """
     if genre_pack is None:
         return DEFAULT_PASS, DEFAULT_WARN
-    thresholds = genre_pack.get("commercial", {}).get("quality_thresholds") \
-        if isinstance(genre_pack, dict) else None
+    thresholds = _thresholds_block(genre_pack)
     if not isinstance(thresholds, dict):
         return DEFAULT_PASS, DEFAULT_WARN
-
-    pass_line = thresholds.get("pass")
-    warn_line = thresholds.get("warn")
 
     def _valid(v):
         return isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 100
 
-    if not (_valid(pass_line) and _valid(warn_line)):
-        return DEFAULT_PASS, DEFAULT_WARN
+    raw_pass = thresholds.get("pass")
+    raw_warn = thresholds.get("warn")
+    pass_line = raw_pass if _valid(raw_pass) else DEFAULT_PASS
+    warn_line = raw_warn if _valid(raw_warn) else DEFAULT_WARN
+
     if warn_line > pass_line:
         return DEFAULT_PASS, DEFAULT_WARN
     return pass_line, warn_line

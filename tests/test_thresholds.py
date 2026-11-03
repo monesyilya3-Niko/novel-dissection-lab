@@ -84,10 +84,13 @@ class TestResolveThresholds(unittest.TestCase):
             CHAPTER_CHECK.resolve_thresholds(_pack(50, 80)), (75, 60))
 
     def test_non_int_string_falls_back(self):
+        # 2026-11-03 行为变更：改为**逐字段**回退。只写错一个字段时，
+        # 另一个字段的正确值不该被一起丢弃（否则用户改 pass 时，
+        # 他配好的 warn 会莫名回到 60）。
         self.assertEqual(
             CHAPTER_CHECK.resolve_thresholds(_pack("75", 60)), (75, 60))
         self.assertEqual(
-            CHAPTER_CHECK.resolve_thresholds(_pack(80, "60")), (75, 60))
+            CHAPTER_CHECK.resolve_thresholds(_pack(80, "60")), (80, 60))
 
     def test_float_falls_back(self):
         self.assertEqual(
@@ -97,16 +100,39 @@ class TestResolveThresholds(unittest.TestCase):
         self.assertEqual(
             CHAPTER_CHECK.resolve_thresholds(_pack(101, 60)), (75, 60))
         self.assertEqual(
-            CHAPTER_CHECK.resolve_thresholds(_pack(80, -1)), (75, 60))
+            CHAPTER_CHECK.resolve_thresholds(_pack(80, -1)), (80, 60))
         self.assertEqual(
-            CHAPTER_CHECK.resolve_thresholds(_pack(80, 101)), (75, 60))
+            CHAPTER_CHECK.resolve_thresholds(_pack(80, 101)), (80, 60))
 
     def test_bool_is_invalid_falls_back(self):
         # bool 是 int 的子类，但必须视为非法（True == 1 在 0-100 内，需显式排除）
         self.assertEqual(
             CHAPTER_CHECK.resolve_thresholds(_pack(True, 60)), (75, 60))
         self.assertEqual(
-            CHAPTER_CHECK.resolve_thresholds(_pack(80, False)), (75, 60))
+            CHAPTER_CHECK.resolve_thresholds(_pack(80, False)), (80, 60))
+
+    def test_top_level_thresholds_are_honoured(self):
+        """2026-11-03 修复：48 个题材包把阈值放在**顶层** quality_thresholds，
+        而旧实现只读 commercial.quality_thresholds，导致配置被静默忽略。
+        用户在用题材包里改阈值毫无效果，正是本测试要锁住的行为。"""
+        self.assertEqual(
+            CHAPTER_CHECK.resolve_thresholds(
+                {"quality_thresholds": {"pass": 82, "warn": 68}}), (82, 68))
+        # 顶层优先于嵌套（顶层更靠近数据根，也便于手改）
+        self.assertEqual(
+            CHAPTER_CHECK.resolve_thresholds({
+                "quality_thresholds": {"pass": 90, "warn": 70},
+                "commercial": {"quality_thresholds": {"pass": 50, "warn": 40}},
+            }), (90, 70))
+
+    def test_partial_config_keeps_the_other_field(self):
+        """只配 dialogue_optimal（xuanhuan 等包的真实形态）时，
+        pass/warn 各自回退默认，而不是因为缺字段整块作废。"""
+        gp = {"quality_thresholds": {"dialogue_optimal": {"min": 0.12, "max": 0.4}}}
+        self.assertEqual(CHAPTER_CHECK.resolve_thresholds(gp), (75, 60))
+        self.assertEqual(
+            CHAPTER_CHECK.resolve_thresholds({"quality_thresholds": {"pass": 88}}),
+            (88, 60))
 
     def test_boundary_values_are_valid(self):
         # 0 与 100 是合法边界（不应回退）
