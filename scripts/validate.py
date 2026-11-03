@@ -345,7 +345,26 @@ def validate_genre_pack(d):
         check_probability(meta.get("confidence"), "meta.confidence")
         sb = meta.get("source_books")
         if check_list(sb, "meta.source_books"):
-            if len(sb) < 3:
+            # 派生包豁免（2026-11-03）：铁律一要求题材包由 ≥3 本书聚合，但
+            # scripts/derive_genre_packs.py 会从「题材文风卡」泛化出包——这类包的
+            # source_books 只有一条（指向那张 prose 卡），provenance.source 明确写着
+            # 「genre-prose-card-genre-xxx.json 泛化」。它们是**有意为之的官方派生**，
+            # 不是聚合不足，报 WARN 只会让 39 个包常年挂警告、淹没真问题。
+            # 判据看 provenance 是否指向 prose 卡，而不是看 source_books 的条数。
+            prov = meta.get("provenance") or {}
+            prov_text = json.dumps(prov, ensure_ascii=False) if isinstance(prov, dict) else str(prov)
+            # source_books 的元素既可能是对象（真实聚合产物），也可能只是书名
+            # 字符串（历史资产 / 测试夹具）。两种都要能取到标题。
+            derived_from_prose_card = (
+                "genre-prose-card" in prov_text
+                or any(
+                    "genre-prose-card" in (
+                        str(b.get("title", "")) if isinstance(b, dict) else str(b)
+                    )
+                    for b in sb
+                )
+            )
+            if len(sb) < 3 and not derived_from_prose_card:
                 warn(f"题材包应由 ≥3 本聚合，当前 {len(sb)} 本", "meta.source_books")
 
     # --- structure 校验（遗留优化：接入 HOOK_ENUM / CHAPTER_ROLE_ENUM）---

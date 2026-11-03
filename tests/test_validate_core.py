@@ -311,6 +311,48 @@ class TestValidateGenrePackAndTrope(unittest.TestCase):
         self.assertTrue(any("缺少 'rule'" in e for e in validate.ERRORS))
         self.assertTrue(any("题材包应由 ≥3 本聚合" in w for w in validate.WARNS))
 
+    def test_derived_genre_pack_exempt_from_three_book_warning(self):
+        """从题材文风卡派生的包不该报「<3 本聚合」（2026-11-03）。
+
+        背景：``scripts/derive_genre_packs.py`` 会把 ``genre-prose-card-genre-*.json``
+        泛化成题材包，这类包的 ``source_books`` 只有一条（指向那张 prose 卡）。
+        铁律一的「≥3 本聚合」针对的是跨书聚合，派生包是有意为之的官方产物，
+        此前全部报 WARN——39 个包常年挂警告，真问题被淹没。
+        判据看 provenance / 书名里是否指向 prose 卡，而不是条数。
+        """
+        # 形态 A：provenance 指向 prose 卡（现实资产用的字段）
+        gp = copy.deepcopy(self.valid_genre_pack)
+        gp["meta"]["source_books"] = [
+            {"title": "genre-prose-card-genre-xuanhuan（题材文风卡泛化）"}
+        ]
+        gp["meta"]["provenance"] = {
+            "source": "novel-lab 项目内 genre-prose-card-genre-xuanhuan.json 泛化",
+            "license": "MIT",
+            "copyright": "novel-lab",
+        }
+        validate.validate_genre_pack(gp)
+        self.assertEqual(
+            [w for w in validate.WARNS if "题材包应由 ≥3 本聚合" in w], [],
+            "派生包不应再报 ≥3 本聚合警告",
+        )
+
+        # 形态 B：source_books 是字符串列表，但书名指向 prose 卡
+        gp2 = copy.deepcopy(self.valid_genre_pack)
+        gp2["meta"]["source_books"] = ["genre-prose-card-genre-xuanhuan"]
+        validate.validate_genre_pack(gp2)
+        self.assertEqual(
+            [w for w in validate.WARNS if "题材包应由 ≥3 本聚合" in w], [],
+        )
+
+        # 形态 C：真·单书来源（真实书名）仍必须告警——豁免不能变成一律不报
+        gp3 = copy.deepcopy(self.valid_genre_pack)
+        gp3["meta"]["source_books"] = [{"title": "暮冬念春"}]
+        validate.validate_genre_pack(gp3)
+        self.assertTrue(
+            any("题材包应由 ≥3 本聚合" in w for w in validate.WARNS),
+            "真实单书来源仍应告警",
+        )
+
     def test_trope_library_verbal_and_verbatim_rejection(self):
         # 1. 正常通过
         validate.validate_trope_library(self.valid_trope_library)
