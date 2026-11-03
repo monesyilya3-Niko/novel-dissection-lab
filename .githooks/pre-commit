@@ -54,10 +54,21 @@ resolve_python() {
     done
 
     # 3) 回退到 PATH（带警告，不静默）
+    #    ⚠️ 必须跳过 Microsoft Store 的 python3 别名：它的可执行位为真、但运行时
+    #    只会弹应用商店（2026-11-03 实测：钩子跑完 exit 49，测试一行没跑，
+    #    报"测试未通过"——比找不到解释器更难诊断）。main.js 里有同样的坑记录。
+    #    WindowsApps 下的 AppInstallerPythonRedirector.exe 就是那个别名。
     for name in python3 python; do
-        if command -v "$name" >/dev/null 2>&1; then
+        cmd=$(command -v "$name" 2>/dev/null) || continue
+        case "$cmd" in
+            *WindowsApps*|*windowsapps*)
+                echo "[pre-commit] 跳过 Microsoft Store 别名：$cmd" >&2
+                continue
+                ;;
+        esac
+        if [ -x "$cmd" ]; then
             echo "[pre-commit] 警告：未找到项目约定解释器，回退到 PATH 的 $name。" >&2
-            command -v "$name"
+            printf '%s\n' "$cmd"
             return 0
         fi
     done
