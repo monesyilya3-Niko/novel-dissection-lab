@@ -42,6 +42,18 @@ CHAPTER_RE = re.compile(
     rf'|(?:{SPECIAL_TITLES})(?:[一二三四五六七八九十0-9]+)?'
     r')(?=$|\s|[:：、.．]|(?<=[一-鿿])[^一-鿿])'
 )
+# 2026-11-03 补：标题后**直接接正文**的中文写法（``第1章开端``）。
+# 之前靠上面的 CHAPTER_RE 匹配不到（它要求标题后必须跟分隔符），
+# 实测这类稿件会被切成「（无标题开头）」，第一章标题丢失。
+#
+# 单独一条更严格的规则，避免与上面的宽松规则合并后误切正文：
+#   - 必须从行首开始，``第+数字+章/回/节``，后面紧跟汉字
+#   - 整行长度 ≤ 40（章节标题不会太长；正文句子会）
+#   - 行内不能再出现句末标点（。！？），否则那是叙述句
+#   - 章号后不能是「节/章」等重复量词
+_NO_SPACE_TITLE_RE = re.compile(
+    r'^\s*第[一二三四五六七八九十百千零0-9]+[章回节](?=[^\s:：、.．\n])'
+)
 VOLUME_RE = re.compile(r'第[一二三四五六七八九十百千零0-9]+卷')
 # 仅用中文引号对，避免 ASCII 直引号在正文里误匹配/贪婪跨越
 QUOTE_PAIRS = [('「', '」'), ('『', '』'), ('“', '”'), ('‘', '’')]
@@ -49,12 +61,27 @@ QUOTE_PAIRS = [('「', '」'), ('『', '』'), ('“', '”'), ('‘', '’')]
 SENT_RE = re.compile(r'[。！？!?…;；\n]')
 
 
+def _is_no_space_title(line: str) -> bool:
+    """判定「第N章标题」这种标题与正文之间没有空格的写法。
+
+    只在**看起来确实是标题**时才认（见 _NO_SPACE_TITLE_RE 的约束），
+    宁可漏认也不要误把正文叙述句切成章节。
+    """
+    s = line.strip()
+    if not s or len(s) > 40:
+        return False
+    if not _NO_SPACE_TITLE_RE.match(s):
+        return False
+    # 标题不含句末标点；含句号/问号/感叹号的是叙述句
+    return not any(ch in s for ch in "。！？；…")
+
+
 def split_chapters(text):
     """把整本文本切成 (标题, 正文) 列表，过滤空章。"""
     chapters = []
     cur_title, cur_body = "（无标题开头）", []
     for ln in text.splitlines():
-        if CHAPTER_RE.match(ln):
+        if CHAPTER_RE.match(ln) or _is_no_space_title(ln):
             if cur_body or cur_title != "（无标题开头）":
                 chapters.append((cur_title.strip(), "\n".join(cur_body).strip()))
             cur_title, cur_body = ln.strip(), []

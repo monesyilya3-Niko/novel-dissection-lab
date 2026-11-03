@@ -216,5 +216,39 @@ class TestChapterFilenameCompat(unittest.TestCase):
         nos = [no for no, _ in writing_extra._iter_chapter_files(proj)]
         self.assertEqual(nos, [1, 2, 10], "章节未按数字序排列")
 
+
+class TestChapterTitleSplitting(unittest.TestCase):
+    """导入时的章节切分兼容（2026-11-03 补「第1章开端」无空格写法）。
+
+    实测这类稿子此前整本被切成「（无标题开头）」，第一章标题丢失。
+    """
+
+    def _split(self, text: str):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import sampler
+        return sampler.split_chapters(text)
+
+    def test_no_space_title_recognised(self):
+        chs = self._split("第1章开端\n\n正文一。\n\n第2章转折\n\n正文二。")
+        self.assertEqual([t for t, _ in chs], ["第1章开端", "第2章转折"])
+
+    def test_spaced_title_still_works(self):
+        chs = self._split("第1章 开端\n\n正文\n\n第2章 转折\n\n正文")
+        self.assertEqual(len(chs), 2)
+
+    def test_narrative_mentioning_chapter_not_split(self):
+        """正文里提到「第3章」不能被当成标题。"""
+        chs = self._split("第1章 开端\n\n他翻开第3章的内容，继续读下去。\n\n第2章 转折\n\n正文")
+        self.assertEqual([t for t, _ in chs], ["第1章 开端", "第2章 转折"])
+
+    def test_long_paragraph_not_split(self):
+        chs = self._split("第1章 开端\n\n" + "这是一段很长的正文内容" * 12 + "。")
+        self.assertEqual(len(chs), 1)
+
+    def test_sentence_with_period_not_split(self):
+        """标题行含句末标点时视为叙述，不切章。"""
+        chs = self._split("第1章 开端\n\n第2章开始了。主角走进门。\n\n正文")
+        self.assertEqual(len(chs), 1)
+
 if __name__ == "__main__":
     unittest.main()
