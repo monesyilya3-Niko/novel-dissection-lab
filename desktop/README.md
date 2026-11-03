@@ -7,6 +7,10 @@ Windows 桌面应用：Electron 原生窗口 + 内嵌 Python 后端（Windows em
 
 - `main.js` — 主进程：启动后端 → 解析服务 URL → 打开窗口 → 退出时回收后端
 - `package.json` — electron + electron-builder 依赖
+  - **electron ≥ 40、electron-builder ≥ 26**（`tests/test_desktop_packaging.py` 守主版本下限）。
+    2026-11-03 从 `electron 34`（2025-01 发布、已 EOL）升到 **45.2.1**，builder 25→26。
+    主进程只用到 app / BrowserWindow / dialog / ipcMain / shell / contextBridge 这些长期稳定
+    API，跨版本无改动即可运行（升级后窗口、后端拉起、打包安装均实测通过）。
 - `electron-builder.yml` — 打包配置（win NSIS 安装器；须在 Windows 上构建，见下）
 - `build/` — 图标（icon.ico/png）、Python embeddable 原始包
 - `backend/` — 打包用的后端资源：`gui/`（含 web/dist）、`scripts/`、`python-win/`

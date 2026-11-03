@@ -17,6 +17,7 @@ sync_backend.py 复制 python-win（缺失则报错退出），package.json 加 
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 import unittest
@@ -346,3 +347,53 @@ class TestDesktopIconConfig(unittest.TestCase):
                     "win.signAndEditExecutable: false 会跳过写图标，"
                     "导致 exe 回退到 Electron 默认图标（见本类 docstring 背景4）",
                 )
+
+
+class TestElectronVersionSupported(unittest.TestCase):
+    """守卫：Electron 与 electron-builder 不得停留在停止支持的版本（2026-11-03）。
+
+    背景：桌面版自 2026-09-28 建仓起一直锁在 ``electron ^34.0.0``——那是
+    2025-01 发布的版本，2025-06 之后不再有安全补丁；发现时最新已是 45。
+    Electron 只维护最近几个大版本，EOL 版本等于底层 Chromium 的已知漏洞
+    永远不修。本应用只加载本机 127.0.0.1 内容，暴露面有限，但没有理由长期
+    停更——升级到 45.2.1 后实测：窗口、后端拉起、打包安装全部正常。
+
+    这里只用「主版本号下限」做粗糙守卫（不联网、不锁死小版本）：真正的
+    版本由 package-lock.json 决定，本测试只防「退回 EOL 大版本」这类回退。
+    """
+
+    MIN_ELECTRON_MAJOR = 40
+    MIN_BUILDER_MAJOR = 26
+
+    def _dep(self, name: str) -> str:
+        pkg = json.loads((ROOT / "desktop" / "package.json").read_text(encoding="utf-8"))
+        spec = pkg.get("devDependencies", {}).get(name)
+        self.assertIsNotNone(spec, f"desktop/package.json 缺少 {name}")
+        return spec
+
+    @staticmethod
+    def _major(spec: str) -> int:
+        m = re.search(r"(\d+)", spec)
+        if not m:
+            raise AssertionError(f"无法从版本区间解析主版本号: {spec}")
+        return int(m.group(1))
+
+    def test_electron_not_eol(self):
+        spec = self._dep("electron")
+        major = self._major(spec)
+        self.assertGreaterEqual(
+            major, self.MIN_ELECTRON_MAJOR,
+            f"desktop/package.json 的 electron 停在 {spec}（主版本 {major}）。"
+            f"Electron 只维护最近几个大版本，{major} 早已停止安全更新。"
+            "升级前先确认 main.js/preload.js 用的 API 仍存在（本项目只用 "
+            "app/BrowserWindow/dialog/ipcMain/shell/contextBridge，均长期稳定）。",
+        )
+
+    def test_electron_builder_not_ancient(self):
+        spec = self._dep("electron-builder")
+        major = self._major(spec)
+        self.assertGreaterEqual(
+            major, self.MIN_BUILDER_MAJOR,
+            f"desktop/package.json 的 electron-builder 停在 {spec}（主版本 {major}）。"
+            f"26 起下载器改为 @electron/get，{major} 之前的版本在本机反复下载失败。",
+        )
