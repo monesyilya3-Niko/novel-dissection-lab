@@ -129,11 +129,23 @@ def write_manifest() -> dict[str, Any]:
 
 
 def _sha256(fp: Path) -> str:
-    h = hashlib.sha256()
-    with fp.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(65536), b""):
-            h.update(chunk)
-    return h.hexdigest()
+    """文件内容哈希，**换行符归一化**后计算。
+
+    2026-11-03 修复：此前直接对原始字节求哈希。本机 ``core.autocrlf=true``
+    让工作树是 CRLF、仓库内是 LF，于是同一个资产生成的 manifest 在 Windows
+    上记 CRLF 的哈希、在 Linux/CI 上是 LF 的哈希，两边永远对不上——
+    实测 CI 三条腿同时红，108 个资产被判定 hash 不匹配。
+
+    更严重的是这会影响运行时：``diff()`` 在 Linux 上会把每一个内置资产都
+    当成「用户改过」，从而永不覆盖升级。
+
+    统一按 LF 计算（JSON 资产不依赖 CRLF 语义，归一化不会改变解析结果）。
+
+    注意：必须整块读再归一化——按 64KB 分块时 ``\r\n`` 可能被切在两块之间，
+    ``replace`` 会漏掉那一个。资产文件都很小（最大 410KB），整读无压力。
+    """
+    data = fp.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def _shipped_files(src: Path) -> dict[str, Path]:

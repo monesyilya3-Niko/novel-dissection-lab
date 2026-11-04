@@ -9,9 +9,9 @@ manifest 是发布物升级判定的唯一依据，必须与磁盘逐字节一�
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -40,13 +40,15 @@ class TestManifestFreshness(unittest.TestCase):
 
     def test_hashes_match_disk(self):
         data = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        # 直接复用被测实现，避免测试里再写一份换行归一化逻辑
+        # （Windows 工作树是 CRLF、仓库/CI 是 LF，两份实现容易漂移）
+        from gui import builtin_sync
         stale = []
         for name, entry in (data.get("files") or {}).items():
             fp = self.assets / name
             if not fp.is_file():
                 continue
-            actual = hashlib.sha256(fp.read_bytes()).hexdigest()
-            if actual != entry.get("sha256"):
+            if builtin_sync._sha256(fp) != entry.get("sha256"):
                 stale.append(name)
         self.assertEqual(
             stale, [],
@@ -54,6 +56,21 @@ class TestManifestFreshness(unittest.TestCase):
             "`python -m gui.builtin_sync --write-manifest` 后重新提交：\n  "
             + "\n  ".join(stale),
         )
+
+    def test_hash_is_line_ending_agnostic(self):
+        """同一份 JSON 用 CRLF 与 LF 落盘，哈希必须相同。
+
+        这是跨平台正确性的核心：manifest 在 Windows 生成、在 Linux CI
+        校验，若哈希随换行符变化，两边永远对不上（实测 CI 三条腿全红）。
+        """
+        from gui import builtin_sync
+        body = '{\n  "a": 1\n}\n'
+        with tempfile.TemporaryDirectory() as td:
+            lf = Path(td) / "lf.json"
+            crlf = Path(td) / "crlf.json"
+            lf.write_bytes(body.encode("utf-8"))
+            crlf.write_bytes(body.replace("\n", "\r\n").encode("utf-8"))
+            self.assertEqual(builtin_sync._sha256(lf), builtin_sync._sha256(crlf))
 
 
 if __name__ == "__main__":
