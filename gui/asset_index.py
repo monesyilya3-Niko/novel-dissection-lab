@@ -639,8 +639,11 @@ class AssetIndex:
         root = config.CORPUS_DIR
         if not root.is_dir():
             return out
-        for fp in sorted(root.glob("*.txt")):
-            if fp.is_file():
+        # 2026-11-04：与 text_access.TEXT_SUFFIXES 对齐（.txt + .md）。
+        # 只扫 *.txt 会让上传的 .md 书稿在资产库里"消失"。
+        from gui import text_access as _ta
+        for fp in sorted(root.iterdir()):
+            if fp.is_file() and fp.suffix.lower() in _ta.TEXT_SUFFIXES:
                 out.append(self._make_item("book", fp, root))
         return out
 

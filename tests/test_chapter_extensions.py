@@ -86,5 +86,48 @@ class TestChapterExtensions(unittest.TestCase):
         self.assertIn("第2章.txt", names)
 
 
+class TestExtensionSingleSource(unittest.TestCase):
+    """正文扩展名的判断必须只有一处定义（text_access.TEXT_SUFFIXES）。
+
+    2026-11-04 实测到的分歧：上传端点硬编码 .txt（.md 被拒，但路径导入能过）、
+    corpus 扫描只扫 *.txt（上传的 .md 在资产库里消失）。两处都已改为复用同一定义。
+    """
+
+    def test_upload_accepts_md(self):
+        from gui.server import _safe_upload_filename
+        self.assertEqual(_safe_upload_filename("第1章.md"), "第1章.md")
+        self.assertEqual(_safe_upload_filename("书稿.TXT"), "书稿.TXT")
+
+    def test_upload_rejects_other_extensions(self):
+        from gui.server import _safe_upload_filename
+        from gui.services import ServiceError
+        for name in ("a.pdf", "a.docx", "a.epub", "a"):
+            with self.subTest(name=name):
+                with self.assertRaises(ServiceError):
+                    _safe_upload_filename(name)
+
+    def test_corpus_scan_includes_md(self):
+        from gui import config
+        d = Path(self._tmp_path()) / "corpus扫描"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "书稿.txt").write_text("正文", encoding="utf-8")
+        (d / "书稿2.md").write_text("正文", encoding="utf-8")
+        (d / "笔记.pdf").write_text("x", encoding="utf-8")
+        from gui import migrate
+        orig = config.CORPUS_DIR
+        config.CORPUS_DIR = d
+        try:
+            found = {p.name for p in migrate.scan_corpus()}
+        finally:
+            config.CORPUS_DIR = orig
+        self.assertIn("书稿.txt", found)
+        self.assertIn("书稿2.md", found)
+        self.assertNotIn("笔记.pdf", found)
+
+    @staticmethod
+    def _tmp_path() -> str:
+        return tempfile.mkdtemp()
+
+
 if __name__ == "__main__":
     unittest.main()

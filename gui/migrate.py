@@ -183,11 +183,17 @@ def scan_reports() -> list[Path]:
 
 
 def scan_corpus() -> list[Path]:
-    """扫描 corpus/*.txt（排除 raw/sampled/metrics/fanqie 子目录）。"""
+    """扫描 corpus/ 根目录下的正文文件（排除 raw/sampled/metrics/fanqie 子目录）。
+
+    2026-11-04：扩展名口径与 ``text_access.TEXT_SUFFIXES`` 对齐（.txt + .md），
+    否则上传的 .md 书稿不会进库。
+    """
+    from gui import text_access as _ta
     root = config.CORPUS_DIR
     if not root.is_dir():
         return []
-    return sorted(p for p in root.glob("*.txt") if p.is_file())
+    return sorted(p for p in root.iterdir()
+                  if p.is_file() and p.suffix.lower() in _ta.TEXT_SUFFIXES)
 
 
 # ---------------------------------------------------------------------------

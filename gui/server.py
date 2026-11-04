@@ -25,7 +25,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from gui import admin, auto_backup, config, db, router, services
+from gui import admin, auto_backup, config, db, router, services, text_access
 from gui.logging_setup import get_logger, setup_logging
 from gui.services import ServiceError
 from gui.services import unique_corpus_path as _unique_corpus_path
@@ -86,13 +86,19 @@ def announce_initial_password(initial_pw: str) -> Path | None:
 
 
 def _safe_upload_filename(name: str) -> str:
-    """上传文件名安全检查：去目录、去控制字符、仅允许 .txt。"""
+    """上传文件名安全检查：去目录、去控制字符、仅允许正文扩展名。
+
+    2026-11-04：此前硬编码只收 ``.txt``，而导入侧（``text_access.TEXT_SUFFIXES``）
+    接受 ``.md``——用户把一个 .md 稿子拖进上传区会被这里拦掉，走「路径导入」却能过，
+    同一个文件两种结果。改为复用同一定义，避免第三处口径。
+    """
     base = Path(name).name.strip()
     base = re.sub(r'[\x00-\x1f\x7f/\\]', "_", base)
     if not base or base in (".", ".."):
         raise ServiceError("文件名非法", 400)
-    if not base.lower().endswith(".txt"):
-        raise ServiceError("首版仅支持 .txt 导入", 400)
+    if Path(base).suffix.lower() not in text_access.TEXT_SUFFIXES:
+        raise ServiceError(
+            f"仅支持 {' / '.join(sorted(text_access.TEXT_SUFFIXES))} 导入", 400)
     # B8：限制文件名长度（200 字符），超长时 400 拒绝，避免 book_id 过长
     # 导致 gui_state 文件名超限（ext4 255 字节 / Windows MAX_PATH）。
     if len(base) > 200:
