@@ -179,11 +179,10 @@ def _copy_external_chapter_dir(root: Path, scratch_dir: Path) -> Path:
     信任边界没有扩大：旧实现早已允许任意本机绝对路径的单文件进质检，这里只是把
     同一能力对齐到"整本书在一个目录里、且不在 novel/corpus 下"的真实场景。
     """
-    import fnmatch
     import os
     import shutil
 
-    pattern, excluded = engine_adapter.chapter_scan_rules()
+    is_chapter, excluded = engine_adapter.chapter_scan_rules()
     dest_root = scratch_dir / root.name
     copied = 0
     total_bytes = 0
@@ -209,7 +208,9 @@ def _copy_external_chapter_dir(root: Path, scratch_dir: Path) -> Path:
         # 不进入符号链接目录（followlinks=False 已保证），顺手剪掉，避免绕出 root。
         dirnames[:] = [d for d in dirnames if not (Path(dirpath) / d).is_symlink()]
         for name in sorted(filenames):
-            if not fnmatch.fnmatch(name, pattern):
+            # 2026-11-04：与加载器同一判定（扩展名 + 能解析出章号），
+            # 避免把 设定.md / readme.md 这类笔记也复制进副本
+            if not is_chapter(name):
                 continue
             src = Path(dirpath) / name
             if src.is_symlink():
@@ -239,8 +240,9 @@ def _copy_external_chapter_dir(root: Path, scratch_dir: Path) -> Path:
 
     if copied == 0:
         raise ServiceError(
-            f"目录里没有可质检的章节文件（{pattern}）：{root}；"
-            "确认章节是 .txt，且不在备份/build 这类被排除的子目录里", 400)
+            f"目录里没有可质检的章节文件：{root}；"
+            "确认章节是 .txt 或 .md 且文件名带章节序号，"
+            "并且不在备份/build 这类被排除的子目录里", 400)
     _log.info(f"外部目录已隔离复制 {root} → {dest_root}（{copied} 章，{total_bytes} 字节）")
     return dest_root
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -647,15 +648,19 @@ def resolve_thresholds(genre_pack: dict | None = None) -> tuple[int, int]:
 
 # --- 章节扫描口径（单一来源：scripts/chapter_loader）---
 
-def chapter_scan_rules() -> tuple[str, frozenset[str]]:
-    """返回 (章节文件通配符, 排除目录名集合)。
+def chapter_scan_rules() -> tuple[Callable[[str], bool], frozenset[str]]:
+    """返回 (章节文件判定函数, 排除目录名集合)。
 
-    给需要"按章节加载器的规则挑文件"的调用方用（目前是质检的外部目录隔离复制），
-    避免在 gui 层复制一份 ``*.txt`` 与排除名单造成口径漂移——铁律要求 scripts/
+    2026-11-04：由「一个通配符」改为「判定函数」。仅按扩展名筛会把
+    ``设定.md`` / ``readme.md`` 这类无章号的笔记一起复制进质检隔离副本，
+    而加载器根本不会读它们——复制了也是垃圾，还会误导用户以为它们参与了质检。
+
+    判定规则的单一口径在 ``scripts.chapter_loader.is_chapter_filename``
+    （正文扩展名 + 能解析出章号），这里只做出口转发——铁律要求 scripts/
     只能经本模块触碰，所以规则也从这里出口。
     """
-    from scripts.chapter_loader import EXCLUDED_DIR_NAMES
-    return "*.txt", frozenset(EXCLUDED_DIR_NAMES)
+    from scripts.chapter_loader import EXCLUDED_DIR_NAMES, is_chapter_filename
+    return is_chapter_filename, frozenset(EXCLUDED_DIR_NAMES)
 
 
 def read_chapter_text(path: str | Path) -> str:

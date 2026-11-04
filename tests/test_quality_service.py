@@ -131,8 +131,9 @@ class TestExternalDirectory(unittest.TestCase):
         sub = base / "卷一"
         sub.mkdir()
         (sub / "第002章.txt").write_text("第二章正文。" * 40, encoding="utf-8")
-        # 加载器不认的三类：非 .txt、被排除的备份目录、符号链接文件
-        (base / "设定.md").write_text("不该被复制", encoding="utf-8")
+        # 加载器不认的三类：无章号的文件、被排除的备份目录、符号链接文件
+        # （2026-11-04：.md 现在也算正文，所以这里用「没有章号的笔记」作为反例）
+        (base / "设定笔记.md").write_text("不该被复制", encoding="utf-8")
         bak = base / "备份"
         bak.mkdir()
         (bak / "第001章.txt").write_text("备份副本，不该被复制", encoding="utf-8")
@@ -151,9 +152,11 @@ class TestExternalDirectory(unittest.TestCase):
     def test_external_dir_copied_with_loader_rules(self):
         fp = quality_service.resolve_chapter_target(str(self.ext / "我的书"))
         self.assertTrue(fp.is_dir())
-        names = sorted(p.name for p in fp.rglob("*.txt"))
+        names = sorted(p.name for p in fp.rglob("*") if p.is_file())
+        # .txt 与 .md 都算正文（与 text_access.TEXT_SUFFIXES 对齐），
+        # 但无章号的笔记不被复制
         self.assertEqual(names, ["第001章.txt", "第002章.txt"])
-        self.assertEqual(list(fp.rglob("*.md")), [])
+        self.assertNotIn("设定笔记.md", names)
         self.assertIn(fp.parent.name, {p.name for p in (config.STATE_ROOT / "scratch").iterdir()})
 
     def test_gbk_and_utf8_same_file_score_identically(self):
@@ -196,7 +199,8 @@ class TestExternalDirectory(unittest.TestCase):
     def test_dir_without_chapters_rejected_with_actionable_message(self):
         empty = self.ext / "空目录"
         empty.mkdir()
-        (empty / "readme.md").write_text("没有 txt", encoding="utf-8")
+        # 2026-11-04：.md 也算正文，用「没有章号的 md」构造空目录
+        (empty / "readme.md").write_text("没有章节号", encoding="utf-8")
         with self.assertRaises(ServiceError) as cm:
             quality_service.resolve_chapter_target(str(empty))
         self.assertEqual(cm.exception.code, 400)

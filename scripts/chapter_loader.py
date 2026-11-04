@@ -17,7 +17,7 @@
 规则（确定性）：
     - 单文件：直接读取；文件名取不到数字时按第 1 章兼容（沿用既有行为），
       取到 0（如 ``chapter-0.txt``）时**保留 0**，不伪装成第 1 章。
-    - 目录：``Path.rglob("*.txt")``；相对路径中任一 **父目录** 名 casefold 后命中
+    - 目录：``*.txt`` 与 ``*.md`` 都算正文（与 gui/text_access.TEXT_SUFFIXES 对齐）；相对路径中任一 **父目录** 名 casefold 后命中
       ``EXCLUDED_DIR_NAMES`` 即跳过；文件名取不到数字则记入 ``ignored``。
     - 双根语义（保留旧 ``logic_check`` 的 ``[source, source/"chapters"]``）：
       常规嵌套 ``source/chapters/`` 已被 ``source`` 的递归扫描覆盖，只加载一次；
@@ -148,6 +148,19 @@ def _chapter_number(path: Path):
     return int(m.group(1)) if m else None
 
 
+def is_chapter_filename(name: str) -> bool:
+    """文件名是否像「章节文件」：正文扩展名 + 能解析出章号。
+
+    2026-11-04：给 gui 层的工具（质检外部目录隔离复制）复用同一个判断，
+    避免它在 gui 里另写一套扩展名/章号规则。只按扩展名筛会把 ``设定.md``
+    ``readme.md`` 这类笔记一起复制进去——它们没有章号，加载器根本不读。
+    """
+    path = Path(name)
+    if path.suffix.lower() not in {".txt", ".md"}:
+        return False
+    return _chapter_number(path) is not None
+
+
 def _is_excluded(relative_parts) -> bool:
     """相对路径的父目录部分是否命中排除集合（大小写不敏感）。"""
     return any(part.casefold() in EXCLUDED_DIR_NAMES for part in relative_parts)
@@ -213,7 +226,12 @@ def discover_chapter_files(source) -> dict:
     ignored_seen = set()
     accepted = {}         # 物理路径 → (已接受章号, 候选路径)
     for root in _scan_roots(source):
-        for path in sorted(root.rglob("*.txt")):
+        # 2026-11-04：与 gui/text_access.TEXT_SUFFIXES 对齐，.md 也算正文。
+        # 此前只扫 *.txt，导入侧却接受 .md——.md 稿子能导入、能打分，
+        # 一旦进质检就**整本静默消失**（不是报错，是根本没有章节）。
+        for path in sorted(root.rglob("*")):
+            if path.suffix.lower() not in {".txt", ".md"} or not path.is_file():
+                continue
             relative = path.relative_to(root)
             number = None if _is_excluded(relative.parts[:-1]) else _chapter_number(path)
             resolved = _resolve_physical(path)
