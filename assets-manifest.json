@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generated_at": "2026-11-03T05:41:54.800306-08:00",
+  "generated_at": "2026-11-03T20:30:34.513454-08:00",
   "files": {
     "campus-redemption-commercial-obs-distilled.json": {
       "sha256": "9e15efac128e669657d025928dcdd6fa9ffaac5b989ef39ea151f01edfff584a",
@@ -548,9 +548,10 @@
       ]
     },
     "realistic-romance-genre-pack.json": {
-      "sha256": "d67ee5776fbc3dede4ab48796a54a537b4a3f0938616ee1feadc83710c4004a9",
+      "sha256": "434c308e2c9a5476d35b8030a18c757a9f494268f2950891b7d2b7ad54b923fa",
       "previous_hashes": [
-        "d7b3ef1fa52e3654d3c68ee00f0525b7a8b61e54b586a079a596815fdd94e0ca"
+        "d7b3ef1fa52e3654d3c68ee00f0525b7a8b61e54b586a079a596815fdd94e0ca",
+        "d67ee5776fbc3dede4ab48796a54a537b4a3f0938616ee1feadc83710c4004a9"
       ]
     },
     "sangshi_chosen-commercial-obs.json": {
