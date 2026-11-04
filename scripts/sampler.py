@@ -159,7 +159,14 @@ def _sentence_at(body, boundaries, k):
 def extract_dialogue(chapters, indices):
     """抽取选中章里的对话行 + 前后各一句（数据量降到约 20%）。
 
-    先按引号对定位对话片段，再反查其所在句子（避免句内句号把引号劈成两半）。
+    2026-11-04 修复：``line`` 此前用「包含引号起点的那一句」，而句子边界
+    ``SENT_RE`` 把 ``。`` 也算边界——引号对内部的句号会把对话劈成两半，
+    实测 ``「你来了。」她说`` 抽出来是 ``对话: 「你来了`` / ``后: 」她说``，
+    碎片既不是完整对话也不像上下文。pass2 拿这种输入自然认不出角色
+    （实测 GUI 下 pass2 连续三次返回「仅提取到 0 个角色」）。
+
+    现在 ``line`` 直接取**引号对本身**（完整对话），``before`` / ``after``
+    取引号之外相邻的两句。
     """
     out = []
     for i in indices:
@@ -167,21 +174,42 @@ def extract_dialogue(chapters, indices):
         # 句子边界（带字符偏移），用于定位上下文
         boundaries = [m.start() for m in SENT_RE.finditer(body)] + [len(body)]
 
+        def _context_before(text: str, pos: int) -> str:
+            """引号之前、把引号内容当成整体后的最后一句。
+
+            直接把 pos 之前的内容按句边界切，取最后一段；若这段只剩引号碎片
+            （例如 ``。「``）就再往前取一段。
+
+            text 显式传参而不是捕获外层 ``body``——闭包按引用延迟绑定循环变量，
+            一旦延后调用就会静默拿到下一章的数据（ruff B023 也会拦）。
+            """
+            seg = text[:pos]
+            parts = [p for p in re.split(SENT_RE, seg) if p.strip()]
+            for cand in reversed(parts):
+                # 只含标点/引号符号的碎片不算有效上下文
+                if re.search(r"[^\s。！？!?…;；\n「」『』“”‘’\"']", cand):
+                    return cand.strip()
+            return ""
+
+        def _context_after(text: str, pos: int) -> str:
+            """引号之后的第一句（把引号内容当成整体）。"""
+            seg = text[pos:]
+            parts = [p for p in re.split(SENT_RE, seg) if p.strip()]
+            for cand in parts:
+                if re.search(r"[^\s。！？!?…;；\n「」『』“”‘’\"']", cand):
+                    return cand.strip()
+            return ""
+
         for op, cl in QUOTE_PAIRS:
             pat = re.escape(op) + r'(?:[^' + re.escape(cl) + r']*)' + re.escape(cl)
             for m in re.finditer(pat, body):
-                start = m.start()
-                si = 0
-                for k in range(len(boundaries) - 1):
-                    if boundaries[k] <= start < boundaries[k + 1]:
-                        si = k
-                        break
+                quote = m.group(0).strip()
                 out.append({
                     "chapter": i + 1,
                     "title": title,
-                    "before": _sentence_at(body, boundaries, si - 1),
-                    "line": _sentence_at(body, boundaries, si),
-                    "after": _sentence_at(body, boundaries, si + 1),
+                    "before": _context_before(body, m.start()),
+                    "line": quote,
+                    "after": _context_after(body, m.end()),
                 })
     return out
 

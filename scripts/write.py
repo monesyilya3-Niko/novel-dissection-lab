@@ -166,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--genre-pack", help="题材包路径（用于附加质量检查，可选）")
     ap.add_argument("--target-score", type=int, default=90, help="一致性目标分（默认 90，未达标自动改写）")
     ap.add_argument("--max-attempts", type=int, default=3,
-                    help="最多生成轮数（1 初稿 + N-1 改写，默认 3；GUI 侧取设置页 writing.max_attempts）")
+                    help="最多生成轮数（1 初稿 + N-1 改写，默认 3，范围 1-10；GUI 侧取设置页 writing.max_attempts）")
     ap.add_argument("--quality-target", type=int, default=None, help="章节质量目标分（可选；缺省时按题材包 quality_thresholds 回退，再回退 75）")
     ap.add_argument("--dry-run", action="store_true", help="只打印将调用的内容，不调 LLM")
     args = ap.parse_args(argv)
@@ -277,7 +277,14 @@ def main(argv: list[str] | None = None) -> int:
 
     # ---- 生成 + 自检 + 改写循环（目标 ≥ target_score）----
     target_score = getattr(args, "target_score", 90)
-    max_attempts = getattr(args, "max_attempts", 3) or 3
+    # 2026-11-04 修复（P0 数据丢失）：此前只有 `or 3`，它兜得住 0 却兜不住负数。
+    # `--max-attempts -5` 会让 range(1, -4) 为空 → 一次 LLM 都不调 → content 保持 ""
+    # → 下面 save_chapter 用空串覆盖已有章节，且打印「[3/4] 已入库」看不出异常。
+    max_attempts = getattr(args, "max_attempts", 3)
+    if not isinstance(max_attempts, int) or isinstance(max_attempts, bool):
+        raise SystemExit("[X] --max-attempts 必须为整数")
+    if not (1 <= max_attempts <= 10):
+        raise SystemExit(f"[X] --max-attempts 必须在 1-10 之间（实际 {max_attempts}）")
     content = ""
     for attempt in range(1, max_attempts + 1):  # 1 初稿 + (N-1) 改写
         print(f"[2/4] 生成 (第{attempt}稿): task='{args.task[:40]}...'")
@@ -378,6 +385,12 @@ def main(argv: list[str] | None = None) -> int:
 直接输出修正后的完整正文。"""
             print(f"      ⚠ 未达标，携带扣分明细改写（第{attempt+1}轮）...")
 
+    # 2026-11-04（P0）：空正文绝不落盘。模型拒答/被过滤/所有尝试都失败时
+    # content 可能仍是空串，此前的行为是用空文件覆盖已有章节（实测 7500 字节变 0）。
+    if not content or not content.strip():
+        print("[X] 未能生成任何正文（模型可能拒答或返回空内容）；"
+              "已保留原章节文件，未做任何覆盖。", file=sys.stderr)
+        return 1
     ch_file = save_chapter(novel_dir, args.chapter, content)
     print(f"[3/4] 已入库: {ch_file}")
 

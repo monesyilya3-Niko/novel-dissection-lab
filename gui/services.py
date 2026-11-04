@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import time
 from collections import OrderedDict
@@ -598,6 +599,14 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
         state = state_store.load_state(book_id)
         state["status"] = "done"
         state_store.save_state(state)
+        # 2026-11-04：分析结束后组装整书资产卡。
+        # 此前只落了批级 pass 文件就置 done，而 get_book_results /
+        # _generate_reports_inner 读的是 {book_id}-voice-card.json 这类整书卡——
+        # 没有任何代码生成它们，于是结果页资产全空、报告 0 字、铁律二必然判失败。
+        try:
+            _assemble_after_analysis(book_id, genre, chapters, state)
+        except Exception as exc:  # noqa: BLE001 - 组装失败不改变"分析已完成"的事实
+            _log.warning("分析后组装资产失败（批级产物仍完整）: %s", exc)
         _publish(book_id, 0, 0, "done", done, total_batches, ctx)
     except Exception as exc:  # noqa: BLE001
         state = state_store.load_state(book_id)
@@ -1079,6 +1088,116 @@ def _generate_reports(book_id: str, book: dict[str, Any]) -> None:
     """
     with _report_gen_lock:
         _generate_reports_inner(book_id, book)
+
+
+def _assemble_after_analysis(book_id: str, genre: str,
+                             chapters: list, state: dict[str, Any]) -> list[str]:
+    """分析完成后把批级 pass 文件组装成整书资产卡（2026-11-04 新增）。
+
+    背景：GUI 分析只落批级 ``assets/{book_id}/cN-bM-passK.json``，
+    而 ``get_book_results`` / ``_generate_reports_inner`` 读的是整书卡
+    ``assets/{book_id}-voice-card.json`` 这类——此前**没有任何代码生成它们**，
+    于是结果页资产全空、报告 0 字、铁律二必然判失败，且用户只看到「分析完成」。
+
+    做法：按章节/批次顺序把批级 pass 结果合并成一份"整书 pass"，再走与 CLI
+    相同的 normalize + assemble 路径，落盘并立即重索引。
+
+    GUI 只跑 4 个 pass（PASS_ORDER 不含 pass5），所以 craft-card 无法生成——
+    这是 GUI 与 CLI 的能力差异，不是本次遗漏；笔法报告在缺卡时留空提示。
+    """
+    import json as _json
+
+    def _merge(pass_name: str) -> dict[str, Any]:
+        """按 cN-bM 顺序把同 pass 的批级结果合并成一份整书 pass 输出。"""
+        base = config.ASSETS_ROOT / book_id
+        if not base.is_dir():
+            return {}
+        merged: dict[str, Any] = {}
+        lists: dict[str, list] = {}
+        for fp in sorted(base.glob(f"c*-b*-{pass_name}.json"),
+                         key=lambda p: _batch_sort_key(p.name)):
+            try:
+                part = _json.loads(fp.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if not isinstance(part, dict):
+                continue
+            for k, v in part.items():
+                if k in ("_meta", "model", "tokens"):
+                    continue
+                if isinstance(v, list):
+                    lists.setdefault(k, []).extend(v)
+                elif isinstance(v, dict):
+                    merged.setdefault(k, {}).update(v)
+                else:
+                    merged.setdefault(k, v)
+        merged.update(lists)
+        return merged
+
+    written: list[str] = []
+    title = state.get("title") or book_id
+    manifest = {"title": title}
+    metrics = {}
+    book = _books_get(book_id)
+    if book and isinstance(book.get("metrics"), dict):
+        metrics = book["metrics"]
+
+    from gui import migrate as _migrate
+
+    def _write(name: str, card: dict[str, Any]) -> None:
+        fp = config.ASSETS_ROOT / f"{book_id}-{name}.json"
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        # 先校验再落盘（与 assemble.py 2026-09-21 的口径一致）：
+        # 校验失败时不覆盖旧卡，避免次品污染。
+        errs, _warns = engine_adapter.validate_asset_card(card, fp.name)
+        if errs:
+            _log.warning("组装卡未通过校验，跳过落盘 %s: %s", fp.name, errs[:3])
+            return
+        tmp = fp.with_name(fp.name + ".tmp")
+        tmp.write_text(_json.dumps(card, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp, fp)
+        try:
+            _migrate.sync_asset(fp)
+        except Exception as exc:  # noqa: BLE001 - 索引失败不影响文件本身
+            _log.warning("组装卡重索引失败 %s: %s", fp.name, exc)
+        written.append(fp.name)
+
+    # voice-card：pass2(角色) + pass3(叙述/对白/情绪/意象/禁用词)
+    try:
+        pass2 = _merge("pass2_character")
+        pass3 = _merge("pass3_style")
+        if pass2 or pass3:
+            voices = engine_adapter.normalize_pass2(pass2)
+            narration, dialogue, emotion, imagery, banned = engine_adapter.normalize_pass3(pass3)
+            card = engine_adapter.assemble_asset_voice_card(
+                title, genre, manifest, metrics, voices,
+                narration, dialogue, emotion, imagery, banned)
+            _write("voice-card", card)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("组装 voice-card 失败: %s", exc)
+
+    # structure-obs / commercial-obs：各自由单 pass 组装
+    for pass_name, kind, name in (("pass1_structure", "structure", "structure-obs"),
+                                  ("pass4_commercial", "commercial", "commercial-obs")):
+        try:
+            out = _merge(pass_name)
+            if out:
+                card = engine_adapter.assemble_asset_obs(kind, title, genre, out)
+                _write(name, card)
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("组装 %s 失败: %s", name, exc)
+
+    if written:
+        _log.info("分析后已组装 %d 张整书资产卡: %s", len(written), written)
+    return written
+
+
+def _batch_sort_key(filename: str) -> tuple[int, int, str]:
+    """``c3-b2-pass1_structure.json`` → (3, 2, ...)，用于按章批顺序合并。"""
+    m = re.match(r"c(\d+)-b(\d+)-(.+)\.json$", filename)
+    if not m:
+        return (10**9, 10**9, filename)
+    return (int(m.group(1)), int(m.group(2)), m.group(3))
 
 
 def _generate_reports_inner(book_id: str, book: dict[str, Any]) -> None:

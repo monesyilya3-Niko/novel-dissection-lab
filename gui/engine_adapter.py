@@ -260,8 +260,13 @@ def build_single_batch_slices(
     这是 GUI 单章单批粒度与 pipeline 整书粒度的衔接点：
     - pass1_structure / pass3_style / pass4_commercial 都吃 ``chapters`` 列表，
       这里只放一个「章」条目，text 为该批文本，tail500 取批末 500 字。
-    - pass2_character 吃 ``dialogues`` 列表，这里无法对单批可靠抽取对话（
-      对话抽取依赖跨批上下文），故返回空 dialogues，实际分析以结构层为主。
+    - pass2_character 吃 ``dialogues`` 列表。
+
+    2026-11-04 修复：pass2 此前**硬编码返回空 dialogues**，注释理由是
+    「对话抽取依赖跨批上下文」。实测不成立——``sampler.extract_dialogue``
+    接受任意 ``(title, body)`` 列表，单批照样能抽出对话。空 dialogues 的后果是
+    GUI 下 pass2 每一批都拿不到输入，模型回「请把小说文本发给我」，
+    该 pass 必然失败（而失败还被记成 success，见 pipeline._has_payload）。
     """
     reason = f"批次切片（第{chapter_index}章第{_batch_reason(batch_text)}）"
     chapter_entry = {
@@ -272,7 +277,10 @@ def build_single_batch_slices(
         "reason": reason,
     }
     if kind == "pass2_character":
-        return {"pass2_character": {"dialogues": []}}
+        # 单批也能抽对话：把本批当一个"章"传进去，索引 0
+        dialogues = _get_sampler().extract_dialogue(
+            [(chapter_title, batch_text)], [0])
+        return {"pass2_character": {"dialogues": dialogues}}
     if kind == "pass1_structure":
         return {"pass1_structure": {"chapters": [chapter_entry]}}
     if kind == "pass3_style":
@@ -474,6 +482,16 @@ def _get_assemble():
     if _assemble is None:
         import assemble as _assemble  # type: ignore
     return _assemble
+
+
+_validate = None
+
+
+def _get_validate():
+    global _validate
+    if _validate is None:
+        import validate as _validate  # type: ignore
+    return _validate
 
 
 _inject = None
@@ -744,6 +762,17 @@ def assemble_asset_craft_card(name: str, genre: str, manifest: dict, metrics: di
                               pass5: dict) -> dict[str, Any]:
     """组装 craft-card（assemble.assemble_craft_card）。"""
     return _get_assemble().assemble_craft_card(name, genre, manifest, metrics, pass5)
+
+
+def validate_asset_card(card: dict[str, Any], filename: str | None = None) -> tuple[list[str], list[str]]:
+    """校验资产卡，返回 (硬错误, 警告)（validate.validate_asset_data）。
+
+    kind 由内容/文件名自动推断（validate.auto_kind），调用方不必自己判断。
+    2026-11-04：给「分析后组装」用——先校验再落盘，校验不过就不覆盖旧卡。
+    """
+    v = _get_validate()
+    kind = v.auto_kind(card, filename)
+    return v.validate_asset_data(kind, card)
 
 
 def clean_verbatim(asset: dict[str, Any], book_text: str) -> tuple[dict, int]:

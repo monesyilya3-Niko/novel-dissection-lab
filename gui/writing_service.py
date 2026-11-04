@@ -869,6 +869,22 @@ def _run_generate(task_id: str, voice_data: dict, system: str, req: dict) -> Non
                                        cons.get("details", []), qc.get("issues", []),
                                        voice_data, content)
 
+        # 2026-11-04（P0 数据丢失）：空正文绝不落盘。
+        # llm_chat 把 `content: null` 归一成 ""（模型拒答/内容过滤/空 choices 都走这里），
+        # 此前空稿仍会被当作「最佳稿」落盘——实测把 3600 字节的已有章节覆盖成 0 字节，
+        # 任务状态还是 done、message 写着「完成：一致性 23.0/100，质量 24.0/100」。
+        if not (best_content or "").strip():
+            with _WRITING_LOCK:
+                _WRITING_TASKS[task_id]["status"] = "error"
+                _WRITING_TASKS[task_id]["error"] = (
+                    "模型未返回任何正文（可能拒答或被内容过滤）。已保留原章节文件，"
+                    "未做任何覆盖；请检查模型配置或稍后重试。")
+            sse.broker.publish({
+                "task_type": "writing", "task_id": task_id, "phase": "error",
+                "error": "模型未返回任何正文",
+            })
+            return
+
         # 落盘最佳稿：快照→落盘→记账三步原子化（_CHAPTER_WRITE_LOCK），防并发竞态
         from gui import writing_extra
         with _CHAPTER_WRITE_LOCK:
