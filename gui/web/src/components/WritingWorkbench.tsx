@@ -600,7 +600,14 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
             {taskState.attempt ? ` | 第${taskState.attempt}稿` : ''}
           </Typography>
           {taskState.status === 'running' || taskState.status === 'rewriting' || taskState.status === 'scoring' ? (
-            <LinearProgress sx={{ mt: 1 }} />
+            <>
+              <LinearProgress sx={{ mt: 1 }} />
+              {/* 2026-11-03：此前任务一旦开跑就只能干等（最多 N 轮 × LLM 超时） */}
+              <Button size="small" color="error" variant="outlined" sx={{ mt: 1 }}
+                onClick={() => { void writingApi.cancelTask(taskState.taskId).catch(() => {}) }}>
+                取消任务
+              </Button>
+            </>
           ) : null}
           {taskState.score != null && (
             <Typography variant="body2" sx={{ mt: 1 }}>

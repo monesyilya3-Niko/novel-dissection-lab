@@ -543,6 +543,9 @@ export const writingApi = {
   inject: (body: Record<string, unknown>) => post<import('../types').InjectResult>('/writing/inject', body),
   generate: (body: Record<string, unknown>) => post<import('../types').WritingTaskState>('/writing/generate', body),
   taskState: (taskId: string) => get<import('../types').WritingTaskState>(`/writing/tasks/${taskId}`),
+  /** 取消写作任务（2026-11-03）：在当前轮 LLM 调用结束后停止，不落盘。 */
+  cancelTask: (taskId: string) =>
+    post<{ taskId: string; status: string; cancelled: boolean }>(`/writing/tasks/${encodeURIComponent(taskId)}/cancel`, {}),
   importChapter: (body: Record<string, unknown>) => post<import('../types').ImportChapterResult>('/writing/chapters', body),
   score: (body: Record<string, unknown>) => post<import('../types').ScoreResult>('/writing/score', body),
   assemble: (body: Record<string, unknown>) => post<Record<string, unknown>>('/writing/assemble', body),

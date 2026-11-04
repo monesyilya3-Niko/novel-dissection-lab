@@ -308,7 +308,7 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 
 ---
 
-## 5. 全量 REST API 端点清单（133 端点速查）
+## 5. 全量 REST API 端点清单（134 端点速查）
 
 > 端点总数以 `len(gui.router.ROUTES)` 实测为准，`tests/test_doc_metrics.py` 守着本行数字。
 
@@ -345,6 +345,7 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 | | `POST` | `/api/writing/inject` | 资产注入生成 System Prompt |
 | | `POST` | `/api/writing/generate` | 章节智能起草（支持无模型降级） |
 | | `GET` | `/api/writing/tasks/{task_id}` | 查询写作生成任务状态 |
+| | `POST` | `/api/writing/tasks/{task_id}/cancel` | 取消写作任务（当前轮结束后停止） |
 | | `POST` | `/api/writing/chapters` | 章节正文入库（原子落盘与记账） |
 | | `POST` | `/api/writing/score` | 章节双维度打分（一致性+质量） |
 | | `POST` | `/api/writing/assemble` | 题材资产聚合装配 |

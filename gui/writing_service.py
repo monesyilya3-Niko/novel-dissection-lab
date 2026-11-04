@@ -622,6 +622,9 @@ def generate(voice: str, project: str, chapter_no: int, task: str,
             "quality_score": None, "target_score": target_score,
             "pass_line": pass_line, "chapter_path": None,
             "message": "开始生成初稿", "attempts": [], "error": None,
+            # 2026-11-03：可取消标记。一次生成最多 N 轮 × LLM 超时（180s），
+            # 合计可达数分钟且此前无从中断——用户只能干等。
+            "cancelled": False,
         }
 
     thread = threading.Thread(
@@ -650,6 +653,25 @@ def task_state(task_id: str) -> dict[str, Any]:
 
 
 _MAX_CHAPTER_NO = 100_000
+
+
+def cancel(task_id: str) -> dict[str, Any]:
+    """取消写作任务（2026-11-03）。
+
+    置 cancelled 标记；后台线程在**下一轮开始前**看到标记就退出并置
+    status="cancelled"。正在进行的单次 LLM 调用不会被强行中断（响应体
+    读一半丢掉没有意义，也会浪费已花的 token），但结果不会被采用、不会落盘。
+    已经结束的任务调用本接口返回其当前状态，不报错（幂等）。
+    """
+    with _WRITING_LOCK:
+        t = _WRITING_TASKS.get(task_id)
+        if not t:
+            raise ServiceError(f"任务不存在: {task_id}", 404)
+        if t.get("status") in _ACTIVE_STATUSES:
+            t["cancelled"] = True
+            t["message"] = "正在取消（当前轮结束后停止）"
+        return {"task_id": task_id, "status": t.get("status"),
+                "cancelled": bool(t.get("cancelled"))}
 
 
 def import_chapter(project: str, chapter_no: int, content: str,
@@ -725,6 +747,15 @@ def _run_generate(task_id: str, voice_data: dict, system: str, req: dict) -> Non
         best_qc = 0
 
         for attempt in range(1, max_attempts + 1):
+            # 2026-11-03：每轮开始前检查取消（LLM 调用本身仍在跑完当前轮，
+            # 但不会再进入下一轮，也不会落盘）。
+            with _WRITING_LOCK:
+                if _WRITING_TASKS.get(task_id, {}).get("cancelled"):
+                    _WRITING_TASKS[task_id]["status"] = "cancelled"
+                    _WRITING_TASKS[task_id]["message"] = "已取消"
+                    sse.broker.publish({"task_type": "writing", "task_id": task_id,
+                                        "phase": "cancelled"})
+                    return
             with _WRITING_LOCK:
                 _WRITING_TASKS[task_id]["status"] = "running" if attempt == 1 else "rewriting"
                 _WRITING_TASKS[task_id]["attempt"] = attempt

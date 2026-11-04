@@ -439,6 +439,15 @@ def _h_writing_task(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, 
     return ok(writing_service.task_state(params["task_id"]))
 
 
+def _h_writing_task_cancel(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    """取消写作任务（2026-11-03）。"""
+    from gui import writing_service
+    task_id = params.get("task_id")
+    if not isinstance(task_id, str) or not task_id:
+        raise ServiceError("task_id 必须为非空字符串", 400)
+    return ok(writing_service.cancel(task_id))
+
+
 def _h_writing_import_chapter(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_service
     b = body or {}
@@ -1503,6 +1512,7 @@ ROUTES: list[tuple[str, re.Pattern, Callable[[dict, dict], dict]]] = [
     ("POST", re.compile(r"^/api/writing/inject$"), _h_writing_inject),
     ("POST", re.compile(r"^/api/writing/generate$"), _h_writing_generate),
     ("GET", re.compile(r"^/api/writing/tasks/(?P<task_id>[^/]+)$"), _h_writing_task),
+    ("POST", re.compile(r"^/api/writing/tasks/(?P<task_id>[^/]+)/cancel$"), _h_writing_task_cancel),
     ("POST", re.compile(r"^/api/writing/chapters$"), _h_writing_import_chapter),
     ("POST", re.compile(r"^/api/writing/score$"), _h_writing_score),
     ("POST", re.compile(r"^/api/writing/assemble$"), _h_writing_assemble),
