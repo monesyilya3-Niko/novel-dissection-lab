@@ -94,7 +94,7 @@ function ReportSection({ reportId }: { reportId: string }) {
         if (alive) setReport(r)
       })
       .catch((e) => {
-        if (alive) setError((e as Error).message)
+        if (alive) setError(friendlyError(e))
       })
     return () => {
       alive = false

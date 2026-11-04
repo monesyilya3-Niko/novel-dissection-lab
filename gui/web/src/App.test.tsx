@@ -41,7 +41,8 @@ vi.mock('./api/client', () => ({
   getBookResults: vi.fn().mockResolvedValue(null),
   subscribeEvents: vi.fn().mockReturnValue(() => {}),
   systemApi: { settings: vi.fn().mockResolvedValue({}) },
-  friendlyError: (e: unknown) => String(e),
+  // 2026-11-03：AppContext 初始化错误改走 friendlyError
+  friendlyError: (e: unknown) => (e instanceof Error && e.message ? e.message : String(e)),
 }))
 
 describe('App 顶层应用框架与导航集成测试', () => {

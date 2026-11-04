@@ -11,7 +11,7 @@ import React, {
 import type { Book, BookResults, Chapter, Overview, ProgressEvent, StatusInfo } from '../types'
 import type { WorkbenchKey } from '../layout/WorkbenchNav'
 import * as api from '../api/client'
-import { systemApi, adminApi } from '../api/client'
+import { systemApi, adminApi, friendlyError } from '../api/client'
 
 interface AppState {
   // 当前导入的书
@@ -251,7 +251,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false
     const fail = (e: unknown) => {
-      if (!cancelled) setInitError(e instanceof Error ? e.message : String(e))
+      // 2026-11-03：走 friendlyError，与其它工作台同口径（令牌/体积/端口等
+      // 可操作提示不能被裸 e.message 吞掉）
+      if (!cancelled) setInitError(friendlyError(e))
     }
     refreshStatus()
       .then(() => {

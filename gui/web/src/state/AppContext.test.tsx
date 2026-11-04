@@ -6,6 +6,9 @@ import * as api from '../api/client'
 import type { Book, Chapter, Overview, StatusInfo } from '../types'
 
 vi.mock('../api/client', () => ({
+  // 2026-11-03：AppContext 的初始化错误改走 friendlyError，mock 需提供
+  // 与真实实现一致：普通 Error 取 message，其余 String()
+  friendlyError: (e: unknown) => (e instanceof Error && e.message ? e.message : String(e)),
   getStatus: vi.fn(),
   getBook: vi.fn(),
   getOverview: vi.fn(),
@@ -23,7 +26,6 @@ vi.mock('../api/client', () => ({
   systemApi: {
     settings: vi.fn(),
   },
-  friendlyError: (e: unknown) => String(e),
 }))
 
 const sampleBook: Book = {

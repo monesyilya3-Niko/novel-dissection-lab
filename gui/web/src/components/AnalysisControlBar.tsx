@@ -14,6 +14,7 @@ import { getGenres } from '../api/client'
 import { useI18n } from '../state/I18nContext'
 import { inferGenreFromFilename } from '../utils/inferGenre'
 import type { TaskStatus } from '../types'
+import { friendlyError } from '../api/client'
 import DisabledTooltipButton from './common/DisabledTooltipButton'
 
 const STATUS_KEYS: Record<TaskStatus, string> = {
@@ -113,7 +114,9 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
       await runFullAnalysis(genre)
       onGoResult()
     } catch (e) {
-      setRawError((e as Error).message)
+      // 2026-11-03：此前直接用 e.message，绕过了 friendlyError 的
+      // 令牌/体积/符号链接等可操作提示，英文界面下也只会看到后端中文原文。
+      setRawError(friendlyError(e))
     } finally {
       setBusy(false)
     }
