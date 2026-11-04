@@ -290,6 +290,9 @@ def import_book(path: str, batch_size: int | None = None) -> dict[str, Any]:
     chapters_raw = engine_adapter.split_chapters(text)
     if not chapters_raw:
         raise ServiceError("未解析到任何章节（请确认文件为章节体 txt）", 400)
+    # 空章会被 split_chapters 过滤（拆书无从分析空正文），但用户需要知道
+    # 少了哪几章，否则「导入 50 章只见 48 章」看起来像丢内容。
+    skipped_empty = engine_adapter.count_skipped_empty_chapters(text)
 
     _require_positive_batch_size(batch_size)
     bs = batch_size or config.batch_size_from_env()
@@ -361,6 +364,7 @@ def import_book(path: str, batch_size: int | None = None) -> dict[str, Any]:
         "title": title,
         "source_path": str(src),
         "total_chapters": len(chapters_raw),
+        "skipped_empty_chapters": skipped_empty,
         "chapters": chapters_meta,
     }
 

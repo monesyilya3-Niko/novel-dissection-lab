@@ -128,6 +128,18 @@ def split_chapters(text: str) -> list[tuple[str, str]]:
     return _get_sampler().split_chapters(text)
 
 
+def count_skipped_empty_chapters(text: str) -> int:
+    """统计切章时因正文为空而被跳过的章数（2026-11-04）。
+
+    导入报告用：用户「导入了 50 章却只看到 48 章」时，需要一句解释，
+    否则会以为丢内容了。空章过滤本身是正确的——拆书无从分析空正文。
+    """
+    sampler = _get_sampler()
+    total = len(sampler.split_chapters_all(text))
+    kept = len(sampler.split_chapters(text))
+    return max(0, total - kept)
+
+
 def detect_volumes(chapters: list[tuple[str, str]]) -> list[tuple[int, int]]:
     """按『第X卷』切分卷边界，返回 [(start, end), ...] 索引对（0 起）。"""
     return _get_sampler().detect_volumes(chapters)

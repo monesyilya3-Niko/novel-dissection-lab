@@ -137,6 +137,15 @@ export default function ImportPanel({ compact }: Props) {
       {book && (
         <Alert severity="success" sx={{ mt: 1.5 }}>
           {t('analysis_import_success_prefix')}{book.title}{t('analysis_import_success_middle')}{book.totalChapters}{t('analysis_import_success_suffix')}
+          {/* 2026-11-04：空章被过滤（拆书无从分析空正文），但要让用户知道
+              少了哪几章，否则「导入 50 章只见 48 章」看起来像丢内容 */}
+          {book.skippedEmptyChapters ? (
+            <Box component="span" sx={{ display: 'block', mt: 0.5, fontSize: 12, opacity: 0.8 }}>
+              {t('analysis_import_skipped_empty',
+                  '另有 {n} 个正文为空的章节未导入（空章无法拆书分析）',
+                  { n: String(book.skippedEmptyChapters) })}
+            </Box>
+          ) : null}
         </Alert>
       )}
       {/* 已导入书目（2026-11-03 补）：此前导入后刷新页面就找不回自己的书 */}

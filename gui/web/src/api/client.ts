@@ -131,6 +131,7 @@ function bookFromSnake(b: Record<string, unknown>): Book {
     title: b.title as string,
     sourcePath: b.sourcePath as string,
     totalChapters: b.totalChapters as number,
+    skippedEmptyChapters: (b.skippedEmptyChapters ?? undefined) as number | undefined,
     chapters: ((b.chapters ?? []) as Record<string, unknown>[]).map(chapterFromSnake),
   }
 }

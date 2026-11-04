@@ -3361,6 +3361,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '》 · ',
     'en-US': '" · ',
   },
+  analysis_import_skipped_empty: {
+    'zh-CN': '另有 {n} 个正文为空的章节未导入（空章无法拆书分析）',
+    'en-US': '{n} chapter(s) with empty body were skipped — there is nothing to analyse',
+  },
   analysis_import_success_suffix: {
     'zh-CN': ' 章',
     'en-US': ' chapters',

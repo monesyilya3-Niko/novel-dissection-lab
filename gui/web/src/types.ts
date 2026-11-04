@@ -25,6 +25,8 @@ export interface Book {
   title: string
   sourcePath: string
   totalChapters: number
+  /** 切章时因正文为空被跳过的章数（导入报告用，2026-11-04） */
+  skippedEmptyChapters?: number
   chapters: Chapter[]
 }
 

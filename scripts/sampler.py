@@ -76,8 +76,13 @@ def _is_no_space_title(line: str) -> bool:
     return not any(ch in s for ch in "。！？；…")
 
 
-def split_chapters(text):
-    """把整本文本切成 (标题, 正文) 列表，过滤空章。"""
+def split_chapters_all(text):
+    """切章但**保留空章**（正文为空也返回），返回全部 (标题, 正文)。
+
+    2026-11-04 新增。``split_chapters`` 会过滤正文为空的章——这对拆书分析
+    是正确的（空章无从分析），但用户「导入了 50 章却只看到 48 章」时
+    没有任何解释。导入报告用本函数统计被跳过了几章。
+    """
     chapters = []
     cur_title, cur_body = "（无标题开头）", []
     for ln in text.splitlines():
@@ -89,7 +94,12 @@ def split_chapters(text):
             cur_body.append(ln)
     if cur_body:
         chapters.append((cur_title.strip(), "\n".join(cur_body).strip()))
-    return [(t, b) for t, b in chapters if b.strip()]
+    return chapters
+
+
+def split_chapters(text):
+    """把整本文本切成 (标题, 正文) 列表，过滤空章。"""
+    return [(t, b) for t, b in split_chapters_all(text) if b.strip()]
 
 
 def detect_volumes(chapters):
