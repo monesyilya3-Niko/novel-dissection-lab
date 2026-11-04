@@ -531,6 +531,11 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
                 if ctx["stop_flag"].is_set():
                     _publish(book_id, ci, bi, "paused", done, total_batches, ctx)
                     return
+                # 2026-11-03：从暂停恢复后要把 state.status 改回 running。
+                # 此前 pause 会把状态写成 "paused"，resume 只 clear 了内存里的
+                # Event，主循环这里没回写状态——于是分析已经继续跑批，
+                # /api/status 却永远显示 paused，前端也就不再刷新进度。
+                _resume_status_if_paused(book_id)
 
                 _publish(book_id, ci, bi, "running", done, total_batches, ctx)
                 # 标记 running 落盘
@@ -596,6 +601,20 @@ def _wait_if_paused(ctx: dict[str, Any]) -> None:
         time.sleep(0.2)
 
 
+def _resume_status_if_paused(book_id: str) -> None:
+    """暂停恢复后把落盘状态改回 running（幂等，非 paused 时不动）。
+
+    只在确实处于 paused 时写盘，避免每个批都多一次 state 读写。
+    """
+    try:
+        state = state_store.load_state(book_id)
+        if state.get("status") == "paused":
+            state["status"] = "running"
+            state_store.save_state(state)
+    except Exception as exc:  # noqa: BLE001 - 状态回写失败不阻断分析
+        _log.warning("恢复 paused→running 失败（不影响分析继续）: %s", exc)
+
+
 def _publish(book_id: str, ci: int, bi: int, status: str, done: int, total: int, ctx: dict[str, Any]) -> None:
     broker.publish({
         "book_id": book_id,
@@ -643,6 +662,9 @@ def resume(book_id: str, genre: str | None = None, model_id: str | None = None) 
         # 若处于 paused，则解除暂停继续。
         if ctx["paused"].is_set():
             ctx["paused"].clear()
+            # 2026-11-03：立即回写 running，不要等下一批才开始——否则用户点了
+            # 「继续」，接口返回 200，但 /api/status 仍是 paused，看上去没反应。
+            _resume_status_if_paused(book_id)
             return {"cursor": state_store.load_state(book_id).get("cursor", "")}
         raise ServiceError("分析已在运行中", 409)
 
