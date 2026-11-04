@@ -57,8 +57,34 @@ def _active_writing_count() -> int:
         return sum(1 for t in _WRITING_TASKS.values() if t.get("status") in _ACTIVE_STATUSES)
 
 
+#: Windows 不能用作文件名/目录名的保留名（大小写不敏感，含扩展名形式也在内）
+_WIN_RESERVED_NAMES = frozenset({
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+})  # fmt: skip
+
+#: Windows 文件名非法字符（不含已被单独拦截的 / 与 \）
+_WIN_ILLEGAL_CHARS = frozenset('<>:"|?*')
+
+#: 单段路径名上限。Windows 常见限制 255 字符，但项目名还要拼进
+#: ``novel/<项目>/chapters/arc-1/chapter-001.txt``，留足余量取 64。
+_MAX_PROJECT_NAME_LEN = 64
+
+
 def _sanitize_project(project: str) -> str:
-    """校验项目名：必须是字符串、非空、无 / \\ .. 与控制字符；非法 → ServiceError(400)。"""
+    """校验项目名：必须是字符串、非空、可作为 Windows 目录名。
+
+    2026-11-04 加固。此前只拦 ``/ \\ .. 控制字符`` 与 ``default``，实测这些
+    名字**能通过校验但建目录必失败**，用户拿到一个 500 而不是可读的 400：
+
+        CON / PRN / AUX / NUL / COM1…（Windows 保留设备名）
+        ``项目:测试``（冒号）      → WinError 267 目录名称无效
+        ``项目*名``（星号）        → WinError 123 语法不正确
+        300 字符的长名             → WinError 3 路径找不到
+
+    补齐三类校验：保留名、``<>:"|?*`` 非法字符、长度上限。
+    """
     if not isinstance(project, str):
         # /api/writing/* 的 project 来自请求体；传数字时下面 .strip() 会抛
         # AttributeError，用户端只收到一句"内部错误"，看不出是哪个参数错了。
@@ -68,6 +94,21 @@ def _sanitize_project(project: str) -> str:
     p = project.strip()
     if any(ch in p for ch in ("/", "\\", "..", "\x00", "\n", "\r")):
         raise ServiceError(f"非法项目名: {project!r}", 400)
+    bad = sorted(set(p) & _WIN_ILLEGAL_CHARS)
+    if bad:
+        raise ServiceError(
+            f"项目名不能包含 {' '.join(bad)}（Windows 文件名非法字符）", 400)
+    # 保留名判定用「主名」：CON.txt / CON.tar.gz 在 Windows 上同样非法
+    stem = p.split(".")[0].upper()
+    if stem in _WIN_RESERVED_NAMES:
+        raise ServiceError(
+            f"项目名不能使用 Windows 保留名 {p!r}（如 CON / PRN / NUL / COM1）", 400)
+    if len(p) > _MAX_PROJECT_NAME_LEN:
+        raise ServiceError(
+            f"项目名过长（{len(p)} 字符，上限 {_MAX_PROJECT_NAME_LEN}）", 400)
+    if p.endswith("."):
+        # Windows 会静默吃掉结尾的点，导致目录名与记录名不一致
+        raise ServiceError("项目名不能以句点结尾", 400)
     if p == "default":
         raise ServiceError("default 为 CLI 只读项目，请在 GUI 新建项目", 400)
     return p
