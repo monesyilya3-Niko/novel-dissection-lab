@@ -71,6 +71,16 @@ _WIN_ILLEGAL_CHARS = frozenset('<>:"|?*')
 #: ``novel/<项目>/chapters/arc-1/chapter-001.txt``，留足余量取 64。
 _MAX_PROJECT_NAME_LEN = 64
 
+#: 每卷章数。与 ``scripts/write.py`` 的 ``arc = (chapter_no - 1) // 30 + 1``
+#: 必须一致——否则 GUI 与 CLI 会把同一章写到不同目录。
+CHAPTERS_PER_ARC = 30
+
+
+def _arc_for_chapter(chapter_no: int) -> int:
+    """章号 → 卷号（1 起）。与 CLI ``scripts/write.py`` 同口径。"""
+    return (chapter_no - 1) // CHAPTERS_PER_ARC + 1
+
+
 
 def _sanitize_project(project: str) -> str:
     """校验项目名：必须是字符串、非空、可作为 Windows 目录名。
@@ -619,7 +629,8 @@ def generate(voice: str, project: str, chapter_no: int, task: str,
 
     # 无模型降级（同步返回，不占并发额度）
     if not engine_adapter.any_model_configured():
-        chapter_path = novel_dir / "chapters" / "arc-1" / f"chapter-{chapter_no:03d}.txt"
+        chapter_path = (novel_dir / "chapters" / f"arc-{_arc_for_chapter(chapter_no)}"
+                        / f"chapter-{chapter_no:03d}.txt")
         guide = _build_degrade_guide(
             {"project": project, "chapter_no": chapter_no, "task": task,
              "target_score": target_score, "pass_line": pass_line},

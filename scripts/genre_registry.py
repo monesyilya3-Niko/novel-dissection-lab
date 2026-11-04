@@ -66,6 +66,8 @@ _CHAIN_KINDS = ("craft-card", "voice-card", "structure-obs", "commercial-obs", "
 # ---------------------------------------------------------------------------
 _META_CACHE: dict[tuple, list[tuple[str, dict]]] = {}
 _META_CACHE_TS: float = 0.0
+#: 最近一次实际计算所用的指纹。快路径只认它，避免多指纹时返回错条目。
+_META_CACHE_LAST_FP: tuple | None = None
 
 
 def _cache_ttl() -> float:
@@ -117,12 +119,21 @@ def _iter_asset_meta() -> list[tuple[str, dict]]:
     TTL 过期后重算指纹，指纹没变则续期，变了则重扫。见 _META_CACHE 注释。
     """
     import time
-    global _META_CACHE_TS
+    global _META_CACHE_TS, _META_CACHE_LAST_FP
     now = time.monotonic()
 
-    # 快路径：TTL 内直接命中，连 stat 都省掉
-    if _META_CACHE and (now - _META_CACHE_TS) < _cache_ttl():
-        for cached in _META_CACHE.values():
+    # 快路径：TTL 内直接命中，连 stat 都省掉。
+    #
+    # 2026-11-04 修复：此前写的是 ``for cached in _META_CACHE.values(): return cached``，
+    # 缓存里有**多个指纹**时会返回任意一个——而下面「只保留当前指纹的条目」的注释
+    # 说明作者知道会累积。实测：两个指纹并存时，读到的可能是另一个目录的结果。
+    # 这与「磁盘是唯一真相源」的红线直接冲突（读到的不是当前 assets/ 的内容）。
+    #
+    # 现在只认**最近一次计算出的那个指纹**（_META_CACHE_LAST_FP）。
+    if (_META_CACHE and _META_CACHE_LAST_FP is not None
+            and (now - _META_CACHE_TS) < _cache_ttl()):
+        cached = _META_CACHE.get(_META_CACHE_LAST_FP)
+        if cached is not None:
             return cached
 
     fp = _assets_fingerprint()
@@ -131,6 +142,7 @@ def _iter_asset_meta() -> list[tuple[str, dict]]:
         if cached is not None:
             # 指纹未变：续期，继续用旧结果（避免重扫）
             _META_CACHE_TS = now
+            _META_CACHE_LAST_FP = fp
             return cached
 
     out: list[tuple[str, dict]] = []
@@ -151,6 +163,7 @@ def _iter_asset_meta() -> list[tuple[str, dict]]:
         _META_CACHE.clear()
         _META_CACHE[fp] = out
         _META_CACHE_TS = now
+        _META_CACHE_LAST_FP = fp
     return out
 
 

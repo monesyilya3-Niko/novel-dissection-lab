@@ -248,12 +248,18 @@ class TestMetaCacheInvalidation(unittest.TestCase):
             json.dumps({"meta": {"kind": "genre-prose-card", "id": genre_id or slug}}),
             encoding="utf-8",
         )
-        # 确定性 mtime 推进：用序列号 bump mtime_ns，避免依赖 wall-clock
-        # 与文件系统时间戳分辨率（高负载/Defender/粗粒度 FS 下会合并导致 flake）。
-        self._mtime_seq = getattr(self, "_mtime_seq", 0) + 1
+        # 确定性 mtime 推进：用**类级**单调序列 bump mtime_ns。
+        #
+        # 2026-11-04 修复：此前用 ``self._mtime_seq = getattr(self, ...) + 1``，
+        # 每次调用都从 1 开始；而 ``os.utime`` 写入的 +1 纳秒会被文件系统精度
+        # （NTFS 约 100ns）吃掉，两次紧邻的写入拿到**同一个** mtime，
+        # 指纹不变 → 缓存判定"未修改"，``test_modified_content_invalidates``
+        # 因此稳定失败（实测干净 HEAD 上连跑三次必红）。
+        # 改为类级计数并大步长（1ms），保证每次写入都产生不同的 mtime_ns。
+        type(self)._mtime_seq = getattr(type(self), "_mtime_seq", 0) + 1
         try:
             st = p.stat()
-            ns = st.st_mtime_ns + self._mtime_seq
+            ns = st.st_mtime_ns + type(self)._mtime_seq * 1_000_000
             os.utime(p, ns=(ns, ns))
         except OSError:
             pass
