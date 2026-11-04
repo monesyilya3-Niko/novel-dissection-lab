@@ -294,7 +294,18 @@ def import_book(path: str, batch_size: int | None = None) -> dict[str, Any]:
     _require_positive_batch_size(batch_size)
     bs = batch_size or config.batch_size_from_env()
     title = src.stem
-    book_id = state_store.book_id_from_title(title, str(src))
+    # 2026-11-04：book_id 生成规则已从「原始路径 md5」改为「规范化路径 md5」
+    # （修正同一文件换写法就变成新书的问题）。为了让**规则变更前已导入**的书
+    # 仍能被找回，这里做一次兼容：新 id 没有状态文件、但旧规则 id 有时，沿用旧 id。
+    # 只在旧 id 确实存在时回退，新导入的书一律走新规则，不会长期依赖。
+    new_id = state_store.book_id_from_title(title, str(src))
+    legacy_id = state_store.legacy_book_id_from_title(title, str(src))
+    if (new_id != legacy_id
+            and state_store.resolve_state_path(new_id) is None
+            and state_store.resolve_state_path(legacy_id) is not None):
+        book_id = legacy_id
+    else:
+        book_id = new_id
 
     # 计算每章批次（只存元信息；正文不入响应，按需由 chapter 接口返回）。
     chapters_meta: list[dict[str, Any]] = []

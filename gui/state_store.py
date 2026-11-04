@@ -68,16 +68,62 @@ def resolve_state_path(book_id: str) -> Path | None:
     return None
 
 
-def book_id_from_title(title: str, source_path: str) -> str:
-    """由书名 + 源路径 hash 生成稳定的 book_id（A7 决策）。
+def _normalize_source_path(source_path: str) -> str:
+    """把源路径规范化成哈希用的稳定形式。
 
-    用书名 sanitize 后拼接路径的短 hash，保证同一文件重复导入得到同一 id。
+    2026-11-04 修复：此前直接 ``md5(source_path)``，于是同一个文件换个写法
+    就是一本"新书"。实测同一个 a.txt 的五种写法得到五个不同 book_id：
+
+        C:\\books\\a.txt      → 我的书-86a699a1
+        C:/books/a.txt        → 我的书-c566f783   （正斜杠）
+        C:\\books\\.\\a.txt   → 我的书-dbc7b3a2   （冗余 .）
+        C:\\books\\A.TXT      → 我的书-f85314b7   （文件名大小写）
+        C:\\BOOKS\\a.txt      → 我的书-7d362819   （目录大小写）
+
+    后果：用户第二次用另一种写法导入同一本书，得到全新的 book_id，
+    之前跑完的分析结果、已生成的资产、报告全部对不上，界面上看是"书丢了"。
+
+    规范化做三件事：反斜杠转正斜杠、折叠冗余分隔符与 ``.`` 段、casefold。
+    **不**做路径解析（``resolve()`` 会跟随符号链接并依赖文件是否存在，
+    导入后再移动源文件会让 id 漂移，比不解析更糟）。
+    Windows 路径大小写不敏感，故统一 casefold；POSIX 下这会牺牲
+    ``a.txt`` / ``A.txt`` 的区分度，但同一目录里两者同时存在的场景极罕见，
+    而"换个写法书就没了"是必现问题。
+    """
+    s = str(source_path or "").strip().replace("\\", "/")
+    parts = [p for p in s.split("/") if p not in ("", ".")]
+    return "/".join(parts).casefold()
+
+
+def legacy_book_id_from_title(title: str, source_path: str) -> str:
+    """旧规则（原始路径 md5）生成的 book_id，仅用于兼容历史数据。
+
+    2026-11-04 之前 ``book_id_from_title`` 直接 md5 原字符串。规则改成规范化
+    路径后，用旧规则导入过的书会算出一个新 id、找不到自己的状态文件。
+    ``import_book`` 用它做一次回退：新 id 无状态文件而旧 id 有时沿用旧 id。
+
+    永远不会用于新书——只作为「找得到就接着用」的查找键。
     """
     import hashlib
 
     sanitized = "".join(c if (c.isalnum() or c in "-_") else "-" for c in title)
     sanitized = sanitized.strip("-") or "book"
-    digest = hashlib.md5(source_path.encode("utf-8")).hexdigest()[:8]
+    digest = hashlib.md5(str(source_path or "").encode("utf-8")).hexdigest()[:8]
+    return f"{sanitized}-{digest}"
+
+
+def book_id_from_title(title: str, source_path: str) -> str:
+    """由书名 + 源路径 hash 生成稳定的 book_id（A7 决策）。
+
+    用书名 sanitize 后拼接路径的短 hash，保证同一文件重复导入得到同一 id。
+    路径先经 :func:`_normalize_source_path` 规范化，换写法不换 id。
+    """
+    import hashlib
+
+    sanitized = "".join(c if (c.isalnum() or c in "-_") else "-" for c in title)
+    sanitized = sanitized.strip("-") or "book"
+    digest = hashlib.md5(
+        _normalize_source_path(source_path).encode("utf-8")).hexdigest()[:8]
     return f"{sanitized}-{digest}"
 
 
