@@ -9,6 +9,8 @@ const mockListSamples = vi.fn()
 vi.mock('../api/client', () => ({
   getGenres: (...args: unknown[]) => mockGetGenres(...args),
   listSamples: (...args: unknown[]) => mockListSamples(...args),
+  // 2026-11-03：ImportPanel 内的 LibraryList 会调用 listBooks
+  listBooks: () => Promise.resolve([]),
   getReport: vi.fn().mockResolvedValue({ id: 'r1', name: '总报告', markdown: '# 报告' }),
   friendlyError: (e: unknown) => String(e),
 }))

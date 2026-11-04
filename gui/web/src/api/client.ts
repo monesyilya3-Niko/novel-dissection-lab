@@ -284,6 +284,25 @@ export async function listSamples(): Promise<SampleInfo[]> {
   return data.samples
 }
 
+/** 已导入书目（2026-11-03 新增端点）。
+ *
+ * 此前普通工作台没有书列表，用户导入一本书后刷新页面就找不回来。
+ */
+export interface LibraryBook {
+  bookId: string
+  title: string
+  genre: string | null
+  status: 'idle' | 'done' | 'ready' | string
+  sourcePath: string | null
+  importedAt: string | null
+  updatedAt: string | null
+}
+
+export async function listBooks(): Promise<LibraryBook[]> {
+  const data = await request<{ total: number; books: LibraryBook[] }>('GET', '/books')
+  return data.books ?? []
+}
+
 /** 一键导入内置示例语料。 */
 export async function importSample(name: string): Promise<Book> {
   const data = await request<Record<string, unknown>>('POST', '/samples/import', { name })

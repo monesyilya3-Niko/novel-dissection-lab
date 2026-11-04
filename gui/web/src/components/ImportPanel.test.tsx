@@ -20,6 +20,8 @@ vi.mock('../state/AppContext', () => ({
 
 vi.mock('../api/client', () => ({
   listSamples: () => mockListSamples(),
+  // 2026-11-03：LibraryList 新增的数据源，缺 mock 会让组件抛错
+  listBooks: () => Promise.resolve([]),
   // 保留真实 friendlyError 的行为契约：错误一律归一成可读文案。
   // 2026-11-02：此项此前缺失，导致组件里直接显示 (e as Error).message
   // 也没人发现——这正是本测试要守的回归点。

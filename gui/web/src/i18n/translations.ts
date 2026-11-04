@@ -3180,16 +3180,21 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'en-US': 'No model configured. Please set up a model in Settings first',
   },
   analysis_import_pdf_hint: {
-    'zh-CN': '暂不支持 PDF 导入，请先用 Word/记事本另存为 .txt (UTF-8 编码)',
-    'en-US': 'PDF import is not supported. Please save as .txt (UTF-8) via Word or Notepad first',
+    'zh-CN': '暂不支持 PDF 导入，请先用 Word/记事本另存为 .txt 或 .md（编码保持默认即可，GBK 也支持）',
+    'en-US': 'PDF import is not supported. Save as .txt or .md via Word or Notepad first (GBK is fine too)',
+  },
+  analysis_import_epub_hint: {
+    'zh-CN': '暂不支持 EPUB 导入，请先用阅读器或转换工具导出为 .txt / .md',
+    'en-US': 'EPUB import is not supported. Export it to .txt / .md with a reader or converter first',
   },
   analysis_import_doc_hint: {
-    'zh-CN': '暂不支持 Word 文档导入，请先另存为 .txt (UTF-8 编码)',
-    'en-US': 'Word document import is not supported. Please save as .txt (UTF-8) first',
+    'zh-CN': '暂不支持 Word 文档导入，请先另存为 .txt 或 .md（编码保持默认即可，GBK 也支持）',
+    'en-US': 'Word document import is not supported. Save as .txt or .md first (GBK is fine too)',
   },
+  // 2026-11-03：.md 后端一直支持，前端此前误拦。词条保留但改为说明支持。
   analysis_import_md_hint: {
-    'zh-CN': '暂不支持 Markdown 导入，请先另存为 .txt (UTF-8 编码)',
-    'en-US': 'Markdown import is not supported. Please save as .txt (UTF-8) first',
+    'zh-CN': '.md 文件可直接导入',
+    'en-US': '.md files can be imported directly',
   },
   error_action_file_too_large: {
     'zh-CN': '文件过大(100MB上限)，请拆分后重试',
@@ -3320,9 +3325,21 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '报告',
     'en-US': 'Report',
   },
+  analysis_library_title: {
+    'zh-CN': '已导入书目',
+    'en-US': 'Imported books',
+  },
+  analysis_library_status_done: {
+    'zh-CN': '已拆',
+    'en-US': 'Analyzed',
+  },
+  analysis_library_status_idle: {
+    'zh-CN': '待拆',
+    'en-US': 'Not analyzed',
+  },
   analysis_import_only_txt: {
-    'zh-CN': '仅支持 .txt 文件导入',
-    'en-US': 'Only .txt files are supported',
+    'zh-CN': '仅支持 .txt / .md 文件导入（UTF-8、GBK、GB18030、UTF-16 编码均可）',
+    'en-US': 'Only .txt / .md files are supported (UTF-8, GBK, GB18030 and UTF-16 encodings all work)',
   },
   analysis_import_title: {
     'zh-CN': '导入 .txt 书籍',

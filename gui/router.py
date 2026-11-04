@@ -64,6 +64,30 @@ def _samples_dir() -> Path:
     return d
 
 
+def _h_list_books(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    """列出已导入的书（2026-11-03 补）。
+
+    此前没有任何「我的书」端点——用户导入一本书后只能操作刚导入的那本，
+    刷新页面就再也找不回来（正文在内存 LRU 里，状态在 state 文件里，
+    但前端不知道 book_id）。管理员后台有 /api/admin/books，普通工作台没有。
+    """
+    from gui import db as _db
+    status = params.get("status")
+    if status is not None and not isinstance(status, str):
+        raise ServiceError("status 必须为字符串", 400)
+    rows = _db.get_books(status=status or None)
+    items = [{
+        "book_id": r.get("book_id"),
+        "title": r.get("title") or r.get("book_id"),
+        "genre": r.get("genre"),
+        "status": r.get("status"),
+        "source_path": r.get("source_path"),
+        "imported_at": r.get("imported_at"),
+        "updated_at": r.get("updated_at"),
+    } for r in rows]
+    return ok({"total": len(items), "books": items})
+
+
 def _h_list_samples(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     """GET /api/samples：列出内置示例语料（供新手一键导入试手）。"""
     d = _samples_dir()
@@ -1447,6 +1471,8 @@ def _h_essence_constitution_check(_params: dict[str, Any], body: dict[str, Any])
 # (method, 正则, handler)。命名捕获组通过正则分组名传入 params。
 ROUTES: list[tuple[str, re.Pattern, Callable[[dict, dict], dict]]] = [
     ("POST", re.compile(r"^/api/import$"), _h_import),
+    # 已导入书清单（2026-11-03）：此前只有管理员后台能看书列表
+    ("GET", re.compile(r"^/api/books$"), _h_list_books),
     ("GET", re.compile(r"^/api/samples$"), _h_list_samples),
     ("POST", re.compile(r"^/api/samples/import$"), _h_import_sample),
     ("GET", re.compile(r"^/api/book/(?P<book_id>[^/]+)$"), _h_get_book),

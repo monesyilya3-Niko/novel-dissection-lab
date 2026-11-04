@@ -9,7 +9,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Chip from '@mui/material/Chip'
 import Divider from '@mui/material/Divider'
 import { useApp } from '../state/AppContext'
-import { friendlyError, listSamples, type SampleInfo } from '../api/client'
+import { friendlyError, listSamples, listBooks, type SampleInfo, type LibraryBook } from '../api/client'
 import { useI18n } from '../state/I18nContext'
 
 interface Props {
@@ -27,13 +27,15 @@ export default function ImportPanel({ compact }: Props) {
   const doUpload = useCallback(
     async (file: File) => {
       const lower = file.name.toLowerCase()
-      if (!lower.endsWith('.txt')) {
+      // 2026-11-03：后端 text_access.TEXT_SUFFIXES 一直支持 .txt 与 .md，
+      // 前端却把 .md 当成不支持拦掉，并给用户「请另存为 .txt」的错误指引。
+      if (!lower.endsWith('.txt') && !lower.endsWith('.md')) {
         const ext = lower.includes('.') ? lower.slice(lower.lastIndexOf('.')) : ''
         const knownHints: Record<string, string> = {
           '.pdf': 'analysis_import_pdf_hint',
           '.doc': 'analysis_import_doc_hint',
           '.docx': 'analysis_import_doc_hint',
-          '.md': 'analysis_import_md_hint',
+          '.epub': 'analysis_import_epub_hint',
         }
         const hintKey = ext ? knownHints[ext] : undefined
         if (hintKey) {
@@ -85,7 +87,7 @@ export default function ImportPanel({ compact }: Props) {
       <input
         ref={fileInput}
         type="file"
-        accept=".txt"
+        accept=".txt,.md"
         style={{ display: 'none' }}
         onChange={onFileChosen}
       />
@@ -137,6 +139,8 @@ export default function ImportPanel({ compact }: Props) {
           {t('analysis_import_success_prefix')}{book.title}{t('analysis_import_success_middle')}{book.totalChapters}{t('analysis_import_success_suffix')}
         </Alert>
       )}
+      {/* 已导入书目（2026-11-03 补）：此前导入后刷新页面就找不回自己的书 */}
+      <LibraryList />
       {/* 内置示例语料：一键导入试手 */}
       <SampleList onImported={() => setError(null)} />
     </Box>
@@ -203,6 +207,70 @@ function SampleList({ onImported }: { onImported: () => void }) {
           {error}
         </Alert>
       )}
+    </Box>
+  )
+}
+
+/** 已导入书目列表（2026-11-03）。
+
+ * 背景：普通工作台此前没有任何「我的书」入口——导入后只能操作刚导入的那本，
+ * 刷新页面 book_id 就丢了（正文在服务端内存/状态文件里，前端不知道是哪个）。
+ * 后端 /api/book/{id} 本来就能按 id 重载，缺的只是列表。
+ */
+function LibraryList() {
+  const { t } = useI18n()
+  const { book } = useApp()
+  const [items, setItems] = useState<LibraryBook[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    listBooks()
+      .then((bs) => setItems(bs))
+      .catch((e) => setError(friendlyError(e)))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load, book?.bookId])
+
+  if (loading && items.length === 0) return null
+  if (error) return null
+  if (items.length === 0) return null
+
+  return (
+    <Box sx={{ mt: 2 }}>
+      <Divider sx={{ mb: 1 }} />
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+        {t('analysis_library_title', '已导入书目')}（{items.length}）
+      </Typography>
+      <Box sx={{ maxHeight: 180, overflow: 'auto' }}>
+        {items.map((b) => (
+          <Box
+            key={b.bookId}
+            sx={{
+              display: 'flex', alignItems: 'center', gap: 1, py: 0.4,
+              px: 0.5, borderRadius: 1,
+              bgcolor: book?.bookId === b.bookId ? 'action.selected' : 'transparent',
+            }}
+          >
+            <Typography variant="body2" sx={{ flex: 1, fontSize: 13 }} noWrap>
+              {b.title}
+            </Typography>
+            <Chip
+              size="small"
+              label={b.status === 'done'
+                ? t('analysis_library_status_done', '已拆')
+                : t('analysis_library_status_idle', '待拆')}
+              color={b.status === 'done' ? 'success' : 'default'}
+              variant="outlined"
+              sx={{ height: 18, fontSize: 11 }}
+            />
+          </Box>
+        ))}
+      </Box>
     </Box>
   )
 }

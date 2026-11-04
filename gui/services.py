@@ -327,6 +327,19 @@ def import_book(path: str, batch_size: int | None = None) -> dict[str, Any]:
             "metrics": metrics,
         })
 
+    # 2026-11-03：导入后立即登记到 books 表。
+    # 此前 import_book 只写内存 LRU 与状态文件，books 表要等下一次
+    # ``migrate`` 全量扫描才会出现这本书——用户刚导入完，首页「已拆书」
+    # 与 /api/overview.total_books 都不变，看上去像导入没成功。
+    # 失败只记日志：登记不上不该让导入本身失败（正文已在内存与状态文件里）。
+    try:
+        from gui import migrate as _migrate
+        with db.tx() as conn:
+            _migrate._upsert_book(
+                conn, book_id, title, str(src), None, "idle")
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("导入后登记 books 表失败（不影响本次导入）: %s", exc)
+
     # 建/复用状态文件。
     state = state_store.load_state(book_id)
     state["title"] = title

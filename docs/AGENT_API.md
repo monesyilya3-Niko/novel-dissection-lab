@@ -308,13 +308,14 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 
 ---
 
-## 5. 全量 REST API 端点清单（132 端点速查）
+## 5. 全量 REST API 端点清单（133 端点速查）
 
 > 端点总数以 `len(gui.router.ROUTES)` 实测为准，`tests/test_doc_metrics.py` 守着本行数字。
 
 | 分类 | 方法 | 路径 | 描述 |
 |---|---|---|---|
 | **语料与导入** | `POST` | `/api/import` | 本地路径式分章分批导入 |
+| | `GET` | `/api/books` | 已导入书目清单（`status` 可筛选 idle/done/ready） |
 | | `GET` | `/api/samples` | 获取系统内置示例语料列表 |
 | | `POST` | `/api/samples/import` | 一键导入内置样例语料 |
 | | `GET` | `/api/book/{book_id}` | 获取书籍元数据与批次摘要 |
