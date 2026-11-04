@@ -246,10 +246,18 @@ def _copy_external_chapter_dir(root: Path, scratch_dir: Path) -> Path:
 
 
 def _materialize_text(text: str, task_id: str) -> Path:
-    """把粘贴文本落到 scratch/<task_id>/ 子目录，避免跨任务污染。"""
+    """把粘贴文本落到 scratch/<task_id>/ 子目录，避免跨任务污染。
+
+    2026-11-04 修复：文件名此前是 ``input.txt``，而 chapter_loader 的
+    章号解析只认 ``chapter-N`` / ``第N章`` / 纯数字等形式——``input`` 取不到
+    章号就被归入 ignored，目录里等于没有章节，质检直接报
+    「未找到章节文件」。粘贴文本走质检这条路径因此**整体不可用**。
+
+    改名为 ``chapter-001.txt``（章号确定，与落盘约定一致）。
+    """
     scratch_dir = config.STATE_ROOT / "scratch" / task_id
     scratch_dir.mkdir(parents=True, exist_ok=True)
-    fp = scratch_dir / "input.txt"
+    fp = scratch_dir / "chapter-001.txt"
     fp.write_text(text, encoding="utf-8")
     return fp
 
