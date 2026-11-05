@@ -181,6 +181,23 @@ class TestEssenceService(unittest.TestCase):
         self.assertGreater(macro["dialogue_ratio"], 0)
         self.assertIn("top_characters", macro)
 
+        # 占比单位统一为小数（2026-11-05）。
+        # 此前同一返回体里 snake_case 是百分数（*100）、camelCase 是小数，
+        # 而 scripts/metrics.py 的同名字段也是小数——谁读错谁差 100 倍。
+        # 断言两个字段严格相等且落在 (0, 1]，把口径钉死。
+        self.assertEqual(
+            macro["dialogue_ratio"], macro["dialogueRatio"],
+            "dialogue_ratio 与 dialogueRatio 必须是同一单位（小数）")
+        self.assertGreater(macro["dialogue_ratio"], 0)
+        self.assertLessEqual(
+            macro["dialogue_ratio"], 1.0,
+            f"占比必须是 0–1 的小数，实际 {macro['dialogue_ratio']}（像是百分数）")
+        # 文案里仍然是给人看的百分数（summary/content 在 suggestedAssets 里）
+        text_blob = "".join(
+            str(a.get("summary", "")) + str(a.get("content", ""))
+            for a in macro["suggestedAssets"])
+        self.assertIn("%", text_blob)
+
         # 开篇切片解构
         chapters = essence_service.split_chapters_simple(sample_novel)
         opening_slice = essence_service.extract_opening_slice(chapters)

@@ -488,7 +488,13 @@ def extract_macro_essence(
     # 1. 对话占比与平均句长
     quote_matches = re.findall(r'[“"「]([^”"」]+)[”"」]', text)
     dialogue_chars = sum(len(q) for q in quote_matches)
-    dialogue_ratio = round((dialogue_chars / total_chars) * 100, 1) if total_chars > 0 else 0
+    # ⚠️ 内部一律用**小数**（0.0–1.0）表示占比（2026-11-05 统一）：
+    #
+    # 原实现在这里算成百分数（`* 100`，如 32.4），而同一个返回体里的
+    # camelCase 字段 `dialogueRatio` 又是小数（0.324），且 scripts/metrics.py
+    # 的 `dialogue_ratio` 也是小数。三个同名字段两种单位，谁读错谁差 100 倍。
+    # 现在只在**渲染文案**处乘 100，数据字段统一小数。
+    dialogue_ratio = round(dialogue_chars / total_chars, 4) if total_chars > 0 else 0.0
 
     sentences = [s.strip() for s in re.split(r'[。！？!?\n]+', text) if len(s.strip()) > 1]
     avg_sentence_len = round(sum(len(s) for s in sentences) / len(sentences), 1) if sentences else 0
@@ -589,8 +595,8 @@ def extract_macro_essence(
         {
             "category": "style",
             "title": f"《{title}》行文文风与对白节奏卡",
-            "summary": f"全书对话占比 {dialogue_ratio}%，平均句长 {avg_sentence_len} 字，行文节奏评估为「{'高频紧凑型' if avg_sentence_len < 16 else '舒缓沉浸型'}」。",
-            "content": f"【题材】：{genre} · 平台：{platform}\n【节奏评估】：{'高频紧凑型' if avg_sentence_len < 16 else '舒缓沉浸型'}\n【对白占比】：{dialogue_ratio}%\n【平均句长】：{avg_sentence_len}字/句\n【高潮周期】：约每 {climax_interval} 章形成一次字数与情绪波峰爆发。",
+            "summary": f"全书对话占比 {dialogue_ratio * 100:.1f}%，平均句长 {avg_sentence_len} 字，行文节奏评估为「{'高频紧凑型' if avg_sentence_len < 16 else '舒缓沉浸型'}」。",
+            "content": f"【题材】：{genre} · 平台：{platform}\n【节奏评估】：{'高频紧凑型' if avg_sentence_len < 16 else '舒缓沉浸型'}\n【对白占比】：{dialogue_ratio * 100:.1f}%\n【平均句长】：{avg_sentence_len}字/句\n【高潮周期】：约每 {climax_interval} 章形成一次字数与情绪波峰爆发。",
         },
         {
             "category": "persona",
@@ -628,7 +634,9 @@ def extract_macro_essence(
         "totalChapters": total_chapters,
         "totalChars": total_chars,
         "avgChapterLen": avg_chapter_len,
-        "dialogueRatio": round(dialogue_chars / total_chars, 4) if total_chars > 0 else 0.0,
+        # 与上面的 snake_case 同源同单位（小数），别再各算一遍——
+        # 分开算正是历史上两种单位并存的根源。
+        "dialogueRatio": dialogue_ratio,
         "rhythmClimaxInterval": climax_interval,
         "aiSlopScore": ai_slop_score,
         "openingThreeChapters": opening_three,
