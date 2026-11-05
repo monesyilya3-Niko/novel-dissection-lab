@@ -146,21 +146,28 @@ def read_text(
     # （两处必须同口径，否则同一个稿子在导入与质检里表现不同）。
     # UTF-16 只认带 BOM 的：无 BOM 的 UTF-16 无法可靠区分，误判会把正常
     # GBK 文件解成乱码。GB18030 是 GBK 超集，先试它再退 GBK。
+    # 统一换行（2026-11-05）：Windows 稿子是 CRLF。原样返回会让导出的投稿稿
+    # 每行末尾留着 \r——浏览器与多数编辑器看不出来，但任何按行处理的下游
+    # （平台投稿、Git diff、脚本）都会踩到。writing_extra._read_chapter 早已
+    # 这么做，这里补齐，让两个读入口径一致。
+    def _norm(t: str) -> str:
+        return t.replace("\r\n", "\n").replace("\r", "\n")
+
     if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
         try:
-            return data.decode("utf-16")
+            return _norm(data.decode("utf-16"))
         except UnicodeDecodeError:
             pass
     try:
         # utf-8-sig：剥离 Windows 记事本「另存为 UTF-8」写入的 BOM（EF BB BF）。
         # BOM 留在正文首字符会让首章标题匹配失败（实测被切章器识别为
         # 「（无标题开头）」）。utf-8-sig 解普通 UTF-8 同样正确，仅额外剥 BOM。
-        return data.decode("utf-8-sig")
+        return _norm(data.decode("utf-8-sig"))
     except UnicodeDecodeError:
         pass
     for enc in ("gb18030", "gbk"):
         try:
-            return data.decode(enc)
+            return _norm(data.decode(enc))
         except UnicodeDecodeError:
             continue
     raise _fmt(msgs, "decode", field=field)

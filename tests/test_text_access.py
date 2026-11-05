@@ -266,5 +266,35 @@ class TestCallersRouteThroughGuard(_TmpCase):
         self.assertIn("chapter_path", cm.exception.message)
 
 
+class TestLineEndingNormalization(unittest.TestCase):
+    """读正文必须统一换行（2026-11-05）。
+
+    Windows 稿子是 CRLF。原样返回会让导出的投稿稿每行末尾留着 \r——
+    浏览器与多数编辑器看不出来，但平台投稿、Git diff、脚本都会踩到。
+    writing_extra._read_chapter 早已归一化，text_access 没有，两个读入口径不一致。
+    """
+
+    def test_crlf_is_normalized(self):
+        import tempfile
+        from pathlib import Path as _P
+        from gui import text_access
+        with tempfile.TemporaryDirectory() as td:
+            f = _P(td) / "crlf.txt"
+            f.write_bytes("第1章 开端\r\n正文一。\r\n下一段。\r\n".encode("utf-8"))
+            out = text_access.read_text(f, field="t")
+            self.assertNotIn("\r", out)
+            self.assertEqual(out, "第1章 开端\n正文一。\n下一段。\n")
+
+    def test_lone_cr_is_normalized(self):
+        import tempfile
+        from pathlib import Path as _P
+        from gui import text_access
+        with tempfile.TemporaryDirectory() as td:
+            f = _P(td) / "cr.txt"
+            f.write_bytes(b"\xe7\xac\xac1\xe7\xab\xa0\r\xe6\xad\xa3\xe6\x96\x87")
+            out = text_access.read_text(f, field="t")
+            self.assertNotIn("\r", out)
+
+
 if __name__ == "__main__":
     unittest.main()
