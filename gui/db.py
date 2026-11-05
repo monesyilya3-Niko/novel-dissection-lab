@@ -49,6 +49,9 @@ RowLike = sqlite3.Row | dict[str, Any]
 # 解决不了「共享连接的事务语义」问题。
 # ---------------------------------------------------------------------------
 _conns: dict[int, sqlite3.Connection] = {}   # threading.get_ident() -> Connection
+#: 连接的创建线程（2026-11-05）：ident 会被复用，单靠 ident 无法判断"这条连接还
+#: 属于当前这个线程吗"。取用时校验的是 Thread 对象的同一性。与 _conns 同生命周期。
+_conn_owner: dict[int, threading.Thread] = {}
 _conns_lock = threading.Lock()
 _conn_path: Path | None = None             # 当前所有连接绑定的库路径
 _get_conn_calls: list[int] = [0]            # B3：死线程清理节流计数器
@@ -89,6 +92,7 @@ def _close_all_locked() -> None:
         except sqlite3.Error:
             pass
     _conns.clear()
+    _conn_owner.clear()
     _conn_path = None
 
 
@@ -104,10 +108,20 @@ def get_conn() -> sqlite3.Connection:
     （B3：否则跨线程关闭抛 ProgrammingError 被吞掉，FD 泄漏）。
 
     库路径变化时（测试 monkeypatch ``config.STATE_ROOT``）自动关闭旧连接重建。
+
+    ⚠️ 线程 ident 会被复用（2026-11-05 修）：CPython 的 ``Thread.ident`` 在线程
+    退出后可被新线程继承。原实现只按 ident 查表，于是**新线程会拿到旧线程留下的
+    连接**——而那条连接的数据库文件可能已被删除/替换（测试隔离目录整棵回收后
+    正是如此）。在 SQLite C 库里对已消失的文件继续执行语句是未定义行为，实测
+    在 Ubuntu + Python 3.13 上稳定 Segfault（exit 139）。
+
+    现在把连接与创建它的 ``Thread`` 对象一起登记，取用时校验对象同一性：
+    ident 相同但 Thread 不是同一个 → 视为残留，关掉重建。
     """
     global _conn_path
     path = db_path()
     tid = threading.get_ident()
+    me = threading.current_thread()
     with _conns_lock:
         if _conn_path is not None and _conn_path != path:
             # STATE_ROOT 被切换（测试隔离场景）→ 丢弃全部旧连接
@@ -117,28 +131,53 @@ def get_conn() -> sqlite3.Connection:
         if _get_conn_calls[0] % 50 == 0:
             _prune_dead_threads_locked()
         conn = _conns.get(tid)
+        if conn is not None and _conn_owner.get(tid) is not me:
+            # ident 被复用：这条连接属于某个已退出的线程，不能拿来用。
+            try:
+                conn.close()
+            except sqlite3.Error:
+                pass
+            conn = None
         if conn is None:
+            _close_stale_for_tid(tid)
             conn = _new_conn(path)
             _conns[tid] = conn
+            _conn_owner[tid] = me
             if _conn_path is None:
                 _conn_path = path
     return conn
 
 
-def _prune_dead_threads_locked() -> None:
-    """关闭已死亡线程的残留连接（B3：防止 fd/内存单调泄漏）。
-
-    调用方必须持有 _conns_lock。
-    """
-    live_idents = {t.ident for t in threading.enumerate() if t.ident is not None}
-    # 主线程的 ident 恒为 alive；当前线程也在 enumerate 内。
-    dead = [tid for tid in _conns if tid not in live_idents]
-    for tid in dead:
+def _close_stale_for_tid(tid: int) -> None:
+    """关掉该 ident 上残留的旧连接（若存在）。调用方持有 _conns_lock。"""
+    old = _conns.pop(tid, None)
+    _conn_owner.pop(tid, None)
+    if old is not None:
         try:
-            _conns[tid].close()
+            old.close()
         except sqlite3.Error:
             pass
-        del _conns[tid]
+
+
+def _prune_dead_threads_locked() -> None:
+    """关闭已退出线程的残留连接（B3：防止 fd/内存单调泄漏）。
+
+    调用方必须持有 _conns_lock。
+
+    ⚠️ 判据是 **Thread 对象是否还活着**，不是 ident 是否存在于 enumerate()：
+    ident 会被复用，按 ident 判断会把"已死线程的旧连接"误判为活着的，
+    而它指向的数据库文件可能已不存在。
+    """
+    for tid, conn in list(_conns.items()):
+        owner = _conn_owner.get(tid)
+        if owner is not None and owner.is_alive():
+            continue
+        try:
+            conn.close()
+        except sqlite3.Error:
+            pass
+        _conns.pop(tid, None)
+        _conn_owner.pop(tid, None)
 
 
 def _reset_conn() -> None:

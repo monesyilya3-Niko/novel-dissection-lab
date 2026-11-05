@@ -260,6 +260,94 @@ class TestDb(unittest.TestCase):
             conn.close()
 
 
+class TestThreadIdentReuse(unittest.TestCase):
+    """线程 ident 复用不得让新线程拿到旧线程的连接（2026-11-05）。
+
+    背景：``get_conn()`` 按 ``threading.get_ident()`` 分池。CPython 的 ident 在
+    线程退出后**可被新线程继承**——原实现只按 ident 查表，于是新线程会拿到旧
+    线程留下的连接，而那条连接绑定的数据库文件可能已被删除/替换（测试隔离目录
+    整棵回收后正是如此）。在 SQLite C 库里对已消失的文件继续执行语句是未定义
+    行为，实测 Ubuntu + Python 3.13 上稳定 Segfault（exit 139）。
+
+    修法：连接与创建它的 Thread 对象一起登记，取用时校验对象同一性。
+    """
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="db_ident_"))
+        self._ctx = _isolation.isolate_paths(self._tmp)
+        self._ctx.__enter__()
+        db.init_schema()
+
+    def tearDown(self):
+        try:
+            self._ctx.__exit__(None, None, None)
+        finally:
+            _isolation.remove_tree(self._tmp)
+
+    def test_connection_is_registered_with_its_owner_thread(self):
+        """连接必须与创建它的 Thread 一起登记（ident 单独不足以判定归属）。"""
+        import threading
+
+        held = {}
+
+        def worker() -> None:
+            db.get_conn()
+            held["tid"] = threading.get_ident()
+
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join(10)
+        self.assertFalse(t.is_alive())
+
+        tid = held["tid"]
+        self.assertIn(tid, db._conn_owner, "连接必须登记 owner Thread")
+        self.assertIs(db._conn_owner[tid], t)
+
+    def test_prune_closes_connections_of_exited_threads(self):
+        """修剪的是「owner 线程已退出」的连接，不是「ident 不在 enumerate」。"""
+        import threading
+
+        held = {}
+
+        def worker() -> None:
+            db.get_conn()
+            held["tid"] = threading.get_ident()
+
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join(10)
+        tid = held["tid"]
+
+        with db._conns_lock:
+            self.assertIn(tid, db._conns, "前置条件：该线程应已登记连接")
+            before = len(db._conns)
+            db._prune_dead_threads_locked()
+            self.assertNotIn(tid, db._conns, "已退出线程的连接必须被修剪")
+            self.assertNotIn(tid, db._conn_owner)
+            self.assertLess(len(db._conns), before)
+
+    def test_foreign_owner_connection_is_not_handed_out(self):
+        """owner 不是当前线程时，get_conn 必须关掉重建而不是直接返回。"""
+        import threading
+
+        # 先让主线程建一条正常连接
+        primary = db.get_conn()
+        main_tid = threading.get_ident()
+
+        # 把主线程这条连接伪装成"某个已退出的线程的"
+        with db._conns_lock:
+            class _Dead:
+                def is_alive(self) -> bool:
+                    return False
+
+            db._conn_owner[main_tid] = _Dead()  # type: ignore[assignment]
+
+        fresh = db.get_conn()          # 不得返回 primary
+        self.assertIsNot(fresh, primary,
+                         "owner 不同时必须重建连接，不能复用旧句柄")
+        fresh.execute("SELECT 1")      # 新连接必须可用
+
+
 class TestSchemaInitTransactionSafety(unittest.TestCase):
     """init_schema 不得吞掉调用方事务（2026-10-13 审计修复 D13）。
 
