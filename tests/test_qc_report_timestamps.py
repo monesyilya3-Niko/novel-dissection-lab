@@ -127,7 +127,7 @@ class TestQcMarkdownCoverage(unittest.TestCase):
 
 
 class TestReportFilenameReadable(unittest.TestCase):
-    """质检报告文件名必须人类可读（2026-11-03）。
+    r"""质检报告文件名必须人类可读（2026-11-03）。
 
     背景：落盘名此前是 display_target 把 / 和 \ 换成下划线，
     外部路径会变成 ``_Users_monesy_AppData_Local_Temp_mudong_qc_txt-q-31f0ed77``。

@@ -1092,14 +1092,14 @@ class TestPruneBackupsNeverWipesAll(unittest.TestCase):
 
 
 class TestRollbackPicksTimestampedBackup(unittest.TestCase):
-    """rollback 必须按时间戳选备份，不受非本函数产物干扰（D21 第 2 点）。
+    r"""rollback 必须按时间戳选备份，不受非本函数产物干扰（D21 第 2 点）。
 
     缺陷背景：原实现 sorted(glob("index.db.bak-*"))[-1] 取"最新"。
     glob 会一并匹配非本函数产物（如手工放的 index.db.bak-manual），
     而 'm' > '2' 使其在字符串序中排到最后 → rollback 会去恢复那个手工文件
     而非真正最新的备份。实测：存在 index.db.bak-manual 时 latest 指向它。
 
-    修法：正则白名单（^index\.db\.bak-\d{8}-\d{6}$）+ 按内嵌时间戳排序。
+    修法：正则白名单（`^index\.db\.bak-\d{8}-\d{6}$`）+ 按内嵌时间戳排序。
     """
 
     def setUp(self):

@@ -1,4 +1,4 @@
-"""项目名必须能真正建出目录（2026-11-04）。
+r"""项目名必须能真正建出目录（2026-11-04）。
 
 背景：``_sanitize_project`` 此前只拦 ``/ \ .. 控制字符`` 与 ``default``。
 实测这些名字**通过校验但建目录必失败**，用户拿到 500 而不是可读的 400：
@@ -66,12 +66,32 @@ class TestProjectNameValidation(unittest.TestCase):
                     (Path(td) / _sanitize_project(name)).mkdir()
 
     def test_rejected_names_would_have_failed_on_disk(self):
-        """反向确认：被拒的名字确实建不出目录（防止校验变成纯粹的形式主义）。"""
-        with tempfile.TemporaryDirectory() as td:
-            for name in ("CON", "项目:测试", "项目*名"):
-                with self.subTest(name=name):
-                    with self.assertRaises(OSError):
-                        (Path(td) / name).mkdir()
+        """反向确认：被拒的名字确实建不出目录（防止校验变成纯粹的形式主义）。
+
+        ⚠️ 这条**只在 Windows 上有意义**（2026-11-05 修）：
+        ``CON`` 是 Windows 保留设备名（WinError 267），``:`` 与 ``*`` 是
+        Windows 非法字符（WinError 123/267）。而在 POSIX 上这三个都是**合法
+        文件名**，``mkdir`` 必然成功——原断言 ``assertRaises(OSError)`` 在 CI 的
+        Ubuntu 三条腿上稳定失败（实测 3 failures × 2 个 Python 版本）。
+
+        校验逻辑本身跨平台一致（按 Windows 规则拒绝），这是有意的：
+        同一份项目名在 Windows 上落盘失败，就不该让它在别的平台悄悄成功。
+        因此这里改为"仅在 Windows 上做磁盘反向验证"，POSIX 上验证
+        "同样的名字确实被校验器拒绝"（这才是真正的不变式）。
+        """
+        names = ("CON", "项目:测试", "项目*名")
+        if sys.platform == "win32":
+            with tempfile.TemporaryDirectory() as td:
+                for name in names:
+                    with self.subTest(name=name):
+                        with self.assertRaises(OSError):
+                            (Path(td) / name).mkdir()
+            return
+        # POSIX：磁盘允许这些名字，但校验器仍必须拒绝它们（跨平台一致的口径）。
+        for name in names:
+            with self.subTest(name=name):
+                with self.assertRaises(ServiceError):
+                    _sanitize_project(name)
 
 
 if __name__ == "__main__":
