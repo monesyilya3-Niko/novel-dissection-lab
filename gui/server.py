@@ -948,6 +948,20 @@ class GuiServer:
         except Exception as exc:  # noqa: BLE001
             _log.warning("启动清理 scratch 失败（不影响服务启动）: %s", exc)
 
+        # 2026-11-05：回收上次进程遗留的 running/paused 状态。
+        # 批次状态只在当前进程的主循环里被推进，进程被杀/崩溃后落盘的 running
+        # 没有任何代码会再改它——前端把该批画成「运行中」直到永远，
+        # retry_failed 只收 failed，也重试不到它。实测生产库已有 1 条 running、
+        # 1 条 paused 卡在那里。
+        # 处理：把 running 批退回 pending（可重跑），任务状态退回 idle。
+        try:
+            from gui import services as _svc
+            n = _svc.recover_stale_tasks()
+            if n:
+                _log.info("启动回收上次遗留的进行中任务 %d 个", n)
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("启动回收遗留任务失败（不影响服务启动）: %s", exc)
+
         host, port = self._bind_port()
         self._httpd = ThreadingHTTPServer((host, port), _Handler)
         self._httpd.daemon_threads = True

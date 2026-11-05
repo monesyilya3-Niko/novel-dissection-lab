@@ -656,6 +656,63 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
             _runtime.pop(book_id, None)
 
 
+def recover_stale_tasks() -> int:
+    """启动时回收上次进程遗留的进行中状态（2026-11-05）。
+
+    批次状态 ``running`` 只在当前进程的主循环里被推进成 success/failed。
+    进程被杀或崩溃后，落盘的 ``running`` 没有任何代码会再改它：
+    前端把该批画成「运行中」直到永远；``retry_failed`` 只收 ``failed``，
+    也重试不到它。任务级 ``status=running/paused`` 同理——``resume`` 在内存
+    ``_runtime`` 为空时会走 start_analysis，但状态里的 paused 会让前端看起来
+    还在暂停中。
+
+    处理：把 ``running`` 批退回 ``pending``（可重跑、断点续传会正常跳过已
+    success 的批），任务状态退回 ``idle``。返回修动的任务数。
+
+    只动 running/paused，绝不动 success/failed——failed 留给用户显式重试。
+    """
+    fixed = 0
+    for fp in state_store._iter_state_files():
+        # book_id 从文件名推（gui_state_<book_id>.json）——文件内容里的
+        # book_id 字段历史数据可能缺失，文件名则一定是对的。
+        book_id = _book_id_from_state_file(fp)
+        if not book_id:
+            continue
+        try:
+            state = state_store.load_state(book_id)
+        except Exception:  # noqa: BLE001
+            continue
+        if not state:
+            continue
+        changed = False
+        for rec in (state.get("chapter_states") or {}).values():
+            if isinstance(rec, dict) and rec.get("status") == "running":
+                rec["status"] = "pending"
+                changed = True
+        if state.get("status") in ("running", "paused"):
+            state["status"] = "idle"
+            changed = True
+        if not changed:
+            continue
+        try:
+            state["book_id"] = book_id
+            state_store.save_state(state)
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("回收任务状态失败 %s: %s", book_id, exc)
+            continue
+        fixed += 1
+    return fixed
+
+
+def _book_id_from_state_file(fp) -> str:
+    """``gui_state_<book_id>.json`` → book_id；不匹配返回空串。"""
+    name = fp.name
+    prefix, suffix = "gui_state_", ".json"
+    if name.startswith(prefix) and name.endswith(suffix):
+        return name[len(prefix):-len(suffix)]
+    return ""
+
+
 def _wait_if_paused(ctx: dict[str, Any]) -> None:
     """暂停时阻塞，直到 resume 或 stop。"""
     while ctx["paused"].is_set() and not ctx["stop_flag"].is_set():
