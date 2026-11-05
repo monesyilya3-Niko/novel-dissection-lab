@@ -27,10 +27,16 @@ class TestAssembleAfterAnalysis(unittest.TestCase):
         self._tmp = tempfile.mkdtemp(prefix="nl-assemble-")
         self._ctx = _isolation.isolate_paths(Path(self._tmp))
         self._ctx.__enter__()
-        from gui import config, services, state_store
+        from gui import config, db, services, state_store
         self.config = config
         self.services = services
         self.state_store = state_store
+        # 按生产口径建表：服务器启动时正是 init_schema() + apply_migrations()。
+        # 不建表的话 sync_asset 会抛 "no such table: assets"——那是夹具缺步骤，
+        # 不是被测代码的缺陷（曾试图让 sync_asset 自愈，结果在隔离目录回收后
+        # 触发 db 连接池重建，造成解释器段错误，已回退）。
+        db.init_schema()
+        db.apply_migrations()
         self.book_id = "assemble-book"
         self.batch_dir = config.ASSETS_ROOT / self.book_id
         self.batch_dir.mkdir(parents=True, exist_ok=True)

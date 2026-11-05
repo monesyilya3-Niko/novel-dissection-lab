@@ -933,28 +933,10 @@ def sync_asset(fp: Path) -> bool:
     except OSError:
         size, mtime = None, None
 
-    def _upsert() -> None:
-        with _db.tx() as conn:
-            _upsert_asset(
-                conn, asset_key=f"{kind}:{stem}", kind=kind, name=name, path=_rel_path(fp),
-                book_id=book_id, genre=genre, size=size, mtime=mtime, meta_json=meta_json)
-
-    try:
-        _upsert()
-    except Exception as exc:  # noqa: BLE001
-        # 表缺失时自愈一次（2026-11-05）：分析结束后的组装会立即调用本函数，
-        # 若此时库还没建表（首次运行/库被删/迁移未执行），原先异常一路上抛到
-        # _assemble_after_analysis 的 try 里被吞成一行 warning——资产文件在磁盘上
-        # 但索引里没有它，资产库与搜索结果全部看不到这张卡。
-        # 这里先补建 schema 再重试一次；仍失败则如实抛给调用方。
-        if "no such table" not in str(exc).lower():
-            raise
-        try:
-            _db.init_schema()
-            _db.apply_migrations()
-            _upsert()
-        except Exception:
-            raise exc from None
+    with _db.tx() as conn:
+        _upsert_asset(
+            conn, asset_key=f"{kind}:{stem}", kind=kind, name=name, path=_rel_path(fp),
+            book_id=book_id, genre=genre, size=size, mtime=mtime, meta_json=meta_json)
     return True
 
 
