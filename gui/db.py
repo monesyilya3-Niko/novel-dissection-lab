@@ -181,9 +181,35 @@ def _prune_dead_threads_locked() -> None:
 
 
 def _reset_conn() -> None:
-    """关闭并清空全部连接（供测试隔离：切换 STATE_ROOT 后重建连接）。"""
+    """关闭并清空全部连接（供测试隔离：切换 STATE_ROOT 后重建连接）。
+
+    ⚠️ 会跨线程 close——若别的线程正持有连接执行语句，那是未定义行为
+    （SQLite C 库可能直接段错误）。测试隔离请优先用 ``_drop_current_thread_conn``。
+    """
     with _conns_lock:
         _close_all_locked()
+
+
+def _drop_current_thread_conn() -> None:
+    """只丢弃**当前线程**自己登记的连接（2026-11-05）。
+
+    测试隔离的正确姿势：一个线程只该管自己那条连接。跨线程 close 会命中
+    守护线程正在使用的句柄（例如 services._schedule_report_generation 起的
+    _watch 会走 db.tx()），在 SQLite C 库里是未定义行为——实测在 GitHub
+    Actions 的 Ubuntu 上导致 Py3.11/3.12/3.13 交替 Segfault（exit 139）。
+
+    别的线程的残留由 ``get_conn()`` 自己处理：它发现库路径变化时会重建，
+    而 owner Thread 已退出的连接会被 ``_prune_dead_threads_locked`` 清理。
+    """
+    tid = threading.get_ident()
+    with _conns_lock:
+        conn = _conns.pop(tid, None)
+        _conn_owner.pop(tid, None)
+    if conn is not None:
+        try:
+            conn.close()
+        except sqlite3.Error:
+            pass
 
 
 @contextmanager

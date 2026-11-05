@@ -113,22 +113,26 @@ def isolate_paths(tmp_root: Path) -> Iterator[dict[str, Path]]:
     finally:
         for name, value in saved.items():
             setattr(config, name, value)
-        # 只关闭**数据库文件落在本临时目录内**的连接（2026-11-05 第二次修正）。
+        # ⚠️ 只在**当前线程**释放自己登记的连接，绝不跨线程 close（2026-11-05 第三次修正）。
         #
-        # 历史：
-        #   原实现无条件 db._reset_conn()——关闭全部线程的连接，包括别的用例/
-        #   守护线程正在使用的。实测在 Ubuntu + Python 3.11/3.12 上触发
-        #   Segfault（exit 139）。
-        #   一度改为完全不做，结果 3.13 也崩了 —— 说明"把本目录的旧连接留着"
-        #   本身就是崩溃源：临时目录已被回收，连接仍指向其中已删除的 index.db，
-        #   后续 get_conn() 换路径重建时与这些悬空句柄相撞。
+        # 历史（三次试错，记录以免再绕）：
+        #   v1 `db._reset_conn()`：关全部线程的连接 → Ubuntu 3.11/3.12 Segfault
+        #   v2 完全不关            ：本目录连接悬空指向已删库 → 3.13 Segfault
+        #   v3 `_close_conns_under`：仍会跨线程 close → Ubuntu 3.12/3.13 Segfault
         #
-        # 正确姿态是中间路线：本目录的连接必须关（否则悬空），别的目录的
-        # 连接一律不碰（否则跨线程误伤）。_close_conns_under 正是按
-        # PRAGMA database_list 逐个判定归属，且它在下一行的 remove_tree 里
-        # 也会被调用——这里显式提前调一次，是因为**必须在还原 config 之后、
-        # 删目录之前**释放句柄。
-        _close_conns_under(tmp_root)
+        # 共同点：任何**跨线程** close 都可能命中某条正被使用的连接（守护线程
+        # _watch 会走 db.tx()），在 SQLite C 库里是未定义行为。Python 版本差异
+        # 只决定它崩不崩、什么时候崩。
+        #
+        # 现在的做法是彻底不做跨线程动作：只摘掉当前线程自己的那条。
+        # 残留连接留给 gui.db 自己在下次 get_conn() 时处理——它已经会按路径变化
+        # 重建（这是生产路径，比测试里的强行清理可靠）。目录回收由 remove_tree
+        # 尽力而为；Windows 上删不掉的残留目录由 _isolation 的清理守卫覆盖。
+        try:
+            from gui import db as _db
+            _db._drop_current_thread_conn()
+        except Exception:  # noqa: BLE001 - 精简环境/属性缺失时保持原行为
+            pass
         remove_tree(tmp_root)
 
 
