@@ -145,10 +145,35 @@ def load_state(book_id: str) -> dict[str, Any]:
 
     读取顺序（L2 兼容）：新目录 ``STATE_JSON_DIR`` 优先，缺失时回退旧位置
     ``STATE_ROOT``（兼容 L2 修复前落在 ``gui_state/`` 的历史 JSON）。
+
+    ⚠️ 读也必须持按路径锁（2026-11-05 修）：
+
+    写者用「写唯一 tmp + ``os.replace``」落盘。Windows 上 ``os.replace`` 与
+    另一线程正打开的句柄互斥——读线程恰好在替换瞬间 ``open()`` 会拿到
+    ``Permission denied``（WinError 5）；那本是一次无害的瞬时冲突，但
+    ``load_state`` 会把它当成「文件损坏」，**返回一份空白状态**。
+
+    实测（1 写者循环 200 次 + 1 读者持续读，本机 Windows）::
+
+        写 200 次后 n=130                          ← 丢了 70 次写入
+        日志里 7 次 "状态文件损坏，按空白状态重建"
+
+    更糟的是：``update_state`` 内部先 ``load_state`` 再写回——若这次读拿到
+    空白状态，整份进度会被空状态覆盖，比"少一次写"严重得多（压测里
+    200 批最终只剩 136 条）。
+
+    与写者共用同一把 ``_path_lock``，读写互斥；锁区间只覆盖 open+read，
+    不会和写者的锁区间嵌套（``update_state`` 内部用的是无锁版本见下）。
     """
     path = resolve_state_path(book_id)
     if path is None:
         return new_state(book_id, "")
+    with _path_lock(path):
+        return _load_state_unlocked(book_id, path)
+
+
+def _load_state_unlocked(book_id: str, path: Path) -> dict[str, Any]:
+    """``load_state`` 的无锁版本（调用方已持有 ``path`` 的按路径锁）。"""
     try:
         with path.open("r", encoding="utf-8") as fh:
             return json.load(fh)
@@ -266,7 +291,8 @@ def update_state(book_id: str) -> Iterator[dict[str, Any]]:
     """
     path = state_path_for(book_id)
     with _path_lock(path):
-        state = load_state(book_id)
+        # 走无锁版本：外层已持有 path 的锁，再调 load_state 会自死锁。
+        state = _load_state_unlocked(book_id, path)
         yield state
         state["book_id"] = book_id
         try:

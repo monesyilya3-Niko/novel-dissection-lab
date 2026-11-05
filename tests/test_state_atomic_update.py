@@ -152,6 +152,68 @@ class TestUpdateStateAtomicity(unittest.TestCase):
             state.pop("book_id", None)
         self.assertEqual(st.load_state(self.book_id).get("book_id"), self.book_id)
 
+    def test_concurrent_reader_does_not_lose_writes(self):
+        """读者与写者并发时不得丢写（2026-11-05 修 load_state 无锁读）。
+
+        Windows 上写者用「写唯一 tmp + os.replace」落盘，与另一线程正打开的
+        句柄互斥。读线程恰好在替换瞬间 open() 会拿到 Permission denied，
+        而 ``load_state`` 把它当成「文件损坏」，返回一份**空白状态**——
+        随后 ``update_state`` 用这份空白状态整份写回，进度全丢。
+
+        实测（本机 Windows，1 写者 200 次 + 1 读者持续读）：
+            修前 n=130（丢 70 次写入），日志 7 次「状态文件损坏，按空白状态重建」
+            修后 n=200，零告警
+
+        注意：这条在 Linux 上通常也不失败（POSIX 允许替换时保持旧 inode），
+        所以它主要防 Windows 回归；别因为 CI 绿就以为可以拿掉。
+        """
+        st = self.state_store
+        stop = threading.Event()
+        reader_errors: list[str] = []
+
+        def writer() -> None:
+            for _ in range(100):
+                with st.update_state(self.book_id) as state:
+                    state["n"] = state.get("n", 0) + 1
+
+        def reader() -> None:
+            while not stop.is_set():
+                try:
+                    st.load_state(self.book_id)
+                except Exception as exc:  # noqa: BLE001
+                    reader_errors.append(f"{type(exc).__name__}: {exc}")
+
+        rt = threading.Thread(target=reader, daemon=True)
+        wt = threading.Thread(target=writer)
+        rt.start()
+        wt.start()
+        wt.join(timeout=120)
+        stop.set()
+        rt.join(timeout=30)
+
+        self.assertFalse(wt.is_alive(), "写者未在超时内完成（可能自死锁）")
+        self.assertEqual(reader_errors, [])
+        self.assertEqual(st.load_state(self.book_id).get("n"), 100,
+                         "并发读导致写入被覆盖（load_state 又变成无锁读了？）")
+
+    def test_load_state_does_not_self_deadlock_with_update_state(self):
+        """``update_state`` 内部读必须走无锁版本，否则同锁重入会挂死。"""
+        st = self.state_store
+        done: list[str] = []
+
+        def run() -> None:
+            with st.update_state(self.book_id) as state:
+                state["x"] = 1
+            loaded = st.load_state(self.book_id)   # 锁必须已释放
+            assert loaded.get("x") == 1
+            done.append("ok")
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+        t.join(timeout=10)
+        self.assertFalse(t.is_alive(), "update_state / load_state 组合挂死")
+        self.assertEqual(done, ["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()
