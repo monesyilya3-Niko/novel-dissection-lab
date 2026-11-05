@@ -14,6 +14,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 _TESTS_DIR = Path(__file__).resolve().parent
 _ROOT = _TESTS_DIR.parent
@@ -23,6 +24,7 @@ sys.path.insert(0, str(_TESTS_DIR))
 import _isolation  # noqa: E402
 
 from gui import config, db, deslop_service, router, writing_extra  # noqa: E402
+from gui.services import ServiceError  # noqa: E402
 
 
 class TestDeslopService(unittest.TestCase):
@@ -404,6 +406,62 @@ class TestWritingExportAndReorder(unittest.TestCase):
         self.assertEqual(res["format"], "txt")
         self.assertEqual(res["chapters"], 2)
         self.assertIn("第一章 问剑雪山", res["content"])
+        self.assertEqual(res["skipped"], [], "正常情况下不该有被跳过的章节")
+
+    def test_export_does_not_silently_drop_unreadable_chapter(self):
+        """读不出来的章节必须如实上报，不能既丢章又报满数（2026-11-05）。
+
+        原实现五个导出格式都写着 ``except OSError: continue``，而返回体的
+        ``chapters`` 是 ``len(files)``（文件总数）。实测（文件被 Word/网盘占用）::
+
+            声明 chapters=3 → 实际内容只有 2 章
+
+        用户看到「已导出 3 章」，拿到的稿子少一章，且没有任何提示。
+        """
+        pdir = config.NOVEL_DIR / self.project / "chapters" / "arc-1"
+        (pdir / "chapter-003.txt").write_text("第三章 夜雨\n\n雨打芭蕉。", encoding="utf-8")
+
+        real = writing_extra._read_chapter
+
+        def flaky(fp):
+            if "003" in str(fp):
+                raise OSError(13, "Permission denied", str(fp))
+            return real(fp)
+
+        with mock.patch.object(writing_extra, "_read_chapter", flaky):
+            for fmt in ("txt", "md", "docx", "epub", "shunn"):
+                with self.subTest(fmt=fmt):
+                    res = writing_extra.export_project(self.project, fmt=fmt)
+                    self.assertEqual(res["chapters"], 2,
+                                     f"{fmt}: chapters 必须报实际导出数，不是文件总数")
+                    self.assertEqual(len(res["skipped"]), 1, f"{fmt}: 必须上报被跳过的章节")
+                    self.assertEqual(res["skipped"][0]["chapter"], "3")
+                    self.assertIn("chapter-003", res["skipped"][0]["file"])
+                    self.assertIn("Permission denied", res["skipped"][0]["reason"])
+
+    def test_export_all_chapters_unreadable_is_400_not_empty_output(self):
+        """全部读不出来时应报错，而不是导出一份空稿。"""
+        real = writing_extra._read_chapter
+
+        def always_fail(fp):
+            raise OSError(13, "Permission denied", str(fp))
+
+        with mock.patch.object(writing_extra, "_read_chapter", always_fail):
+            with self.assertRaises(ServiceError) as ctx:
+                writing_extra.export_project(self.project, fmt="txt")
+            self.assertEqual(ctx.exception.code, 400)
+        self.assertIsNotNone(real)  # 保留引用，避免被 lint 判未使用
+
+    def test_export_undecodable_chapter_reported_not_500(self):
+        """编码无法识别的章节与"文件被占用"必须同口径：跳过并上报，不是整次 500。"""
+        pdir = config.NOVEL_DIR / self.project / "chapters" / "arc-1"
+        bad = pdir / "chapter-003.txt"
+        bad.write_bytes(b"\xff\xfe\x00\x00 not-decodable \x81\x82")
+
+        res = writing_extra.export_project(self.project, fmt="txt")
+        self.assertEqual(res["chapters"], 2)
+        self.assertEqual(len(res["skipped"]), 1)
+        self.assertIn("编码无法识别", res["skipped"][0]["reason"])
 
     def test_export_md(self):
         res = writing_extra.export_project(self.project, fmt="md")

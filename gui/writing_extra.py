@@ -1329,6 +1329,50 @@ def _iter_chapter_files(project: str) -> list[tuple[int, Path]]:
     return sorted(found.items())
 
 
+def _read_chapters_for_export(files: list[tuple[int, Path]]) -> tuple[list[tuple[int, str]], list[dict[str, str]]]:
+    """按章节号读取全部章节，返回 ``(可导出的章节, 被跳过的章节)``（2026-11-05）。
+
+    ⚠️ 为什么要有这个函数：五个导出格式各自写了::
+
+        try:
+            content = _read_chapter(fp).strip()
+        except OSError:
+            continue
+
+    读不出来的章节被**静默丢弃**，而返回体里的 ``"chapters": len(files)`` 报的是
+    **文件总数**。实测（文件被占用时）::
+
+        声明 chapters=3 → 实际内容只有 2 章
+
+    用户看到「已导出 3 章」，拿到的稿子少一章，且没有任何提示。
+
+    更矛盾的是：同一类"这一章读不了"，编码问题走 ``ServiceError``（整个导出
+    400/500），文件占用走 ``OSError``（静默跳过）。现在两条都收敛到这里，
+    统一「跳过 + 如实报告」。
+
+    跳过信息以 ``{"chapter": N, "file": 名, "reason": 说明}`` 形式返回，
+    由各导出函数放进响应体的 ``skipped`` 字段。
+    """
+    kept: list[tuple[int, str]] = []
+    skipped: list[dict[str, str]] = []
+    for no, fp in files:
+        try:
+            content = _read_chapter(fp).strip()
+        except ServiceError as exc:
+            # 编码无法识别：以前是整次导出直接 500，现在与 OSError 同口径
+            skipped.append({"chapter": str(no), "file": fp.name, "reason": str(exc)})
+            continue
+        except OSError as exc:
+            skipped.append({"chapter": str(no), "file": fp.name,
+                            "reason": f"读取失败：{exc.strerror or exc}"})
+            continue
+        if not content:
+            skipped.append({"chapter": str(no), "file": fp.name, "reason": "章节内容为空"})
+            continue
+        kept.append((no, content))
+    return kept, skipped
+
+
 def get_chapter_words(project: str, chapter_no: int) -> int | None:
     """返回已落盘章节的字数（count_words 口径）；章节不存在返回 None。
 
@@ -1414,13 +1458,10 @@ def export_project_txt(project: str) -> dict[str, Any]:
     if not files:
         raise ServiceError(f"项目尚无章节可导出: {project}", 404)
     parts: list[str] = []
-    for no, fp in files:
-        try:
-            content = _read_chapter(fp).strip()
-        except OSError:
-            continue
-        if not content:
-            continue
+    kept, skipped = _read_chapters_for_export(files)
+    if not kept:
+        raise ServiceError(f"项目章节全部读取失败，无可导出内容: {project}", 400)
+    for no, content in kept:
         # 首行若像标题则直接沿用正文（避免标题重复输出），否则补一个默认标题
         first_line = content.split("\n", 1)[0].strip()
         looks_like_title = bool(first_line) and len(first_line) <= 60 and "。" not in first_line and "，" not in first_line
@@ -1431,7 +1472,8 @@ def export_project_txt(project: str) -> dict[str, Any]:
     body = "\n\n".join(parts)
     filename = f"{project}-全书导出-{date.today().isoformat()}.txt"
     return {"filename": filename, "content": body, "format": "txt",
-            "chapters": len(files), "words": count_words(body)}
+            "chapters": len(kept), "words": count_words(body),
+            "skipped": skipped}
 
 
 def export_project_md(project: str) -> dict[str, Any]:
@@ -1442,27 +1484,27 @@ def export_project_md(project: str) -> dict[str, Any]:
         raise ServiceError(f"项目尚无章节可导出: {project}", 404)
     
     today_str = date.today().isoformat()
+    kept, skipped = _read_chapters_for_export(files)
+    if not kept:
+        raise ServiceError(f"项目章节全部读取失败，无可导出内容: {project}", 400)
     lines: list[str] = [
         f"# {project}",
         "",
-        f"> 导出日期：{today_str} ｜ 章节总数：{len(files)}",
+        f"> 导出日期：{today_str} ｜ 章节总数：{len(kept)}",
         "",
         "---",
         "",
     ]
     total_words = 0
-    for no, fp in files:
-        try:
-            content = _read_chapter(fp).strip()
-        except OSError:
-            continue
-        if not content:
-            continue
+    for no, content in kept:
         total_words += count_words(content)
         first_line = content.split("\n", 1)[0].strip()
+        # 章节文件若本身是 Markdown（`# 第1章`），首行要剥掉已有的 # 前缀，
+        # 否则会输出 `## # 第1章`（2026-11-05）。
+        first_line = re.sub(r"^#{1,6}\s*", "", first_line).strip()
         looks_like_title = bool(first_line) and len(first_line) <= 60 and "。" not in first_line and "，" not in first_line
         if looks_like_title:
-            body = content[len(first_line):].strip()
+            body = content.split("\n", 1)[1].strip() if "\n" in content else ""
             lines.append(f"## {first_line}")
             lines.append("")
             lines.append(body)
@@ -1480,8 +1522,9 @@ def export_project_md(project: str) -> dict[str, Any]:
         "filename": filename,
         "content": full_md,
         "format": "md",
-        "chapters": len(files),
+        "chapters": len(kept),
         "words": total_words,
+        "skipped": skipped,
     }
 
 
@@ -1516,19 +1559,14 @@ def export_project_docx(project: str) -> dict[str, Any]:
         ]
 
         total_words = 0
-        for no, fp in files:
-            try:
-                content = _read_chapter(fp).strip()
-            except OSError:
-                continue
-            if not content:
-                continue
+        _kept, _skipped = _read_chapters_for_export(files)
+        for no, content in _kept:
             total_words += count_words(content)
             first_line = content.split("\n", 1)[0].strip()
             looks_like_title = bool(first_line) and len(first_line) <= 60 and "。" not in first_line and "，" not in first_line
             if looks_like_title:
                 ch_title = first_line
-                ch_body = content[len(first_line):].strip()
+                ch_body = content.split("\n", 1)[1].strip() if "\n" in content else ""
             else:
                 ch_title = f"第{no}章"
                 ch_body = content
@@ -1561,8 +1599,9 @@ def export_project_docx(project: str) -> dict[str, Any]:
         "filename": filename,
         "content_base64": b64_content,
         "format": "docx",
-        "chapters": len(files),
+        "chapters": len(_kept),
         "words": total_words,
+        "skipped": _skipped,
     }
 
 
@@ -1629,20 +1668,15 @@ def export_project_epub(project: str) -> dict[str, Any]:
         spine_items = []
         toc_items = []
         total_words = 0
+        _kept, _skipped = _read_chapters_for_export(files)
 
-        for no, fp in files:
-            try:
-                content = _read_chapter(fp).strip()
-            except OSError:
-                continue
-            if not content:
-                continue
+        for no, content in _kept:
             total_words += count_words(content)
             first_line = content.split("\n", 1)[0].strip()
             looks_like_title = bool(first_line) and len(first_line) <= 60 and "。" not in first_line and "，" not in first_line
             if looks_like_title:
                 ch_title = first_line
-                ch_body = content[len(first_line):].strip()
+                ch_body = content.split("\n", 1)[1].strip() if "\n" in content else ""
             else:
                 ch_title = f"第{no}章"
                 ch_body = content
@@ -1732,8 +1766,9 @@ def export_project_epub(project: str) -> dict[str, Any]:
         "filename": filename,
         "content_base64": b64_content,
         "format": "epub",
-        "chapters": len(files),
+        "chapters": len(_kept),
         "words": total_words,
+        "skipped": _skipped,
     }
 
 
@@ -1771,20 +1806,15 @@ def export_project_shunn(
     lines: list[str] = []
     total_words = 0
     chapter_contents: list[tuple[str, str]] = []
+    _kept, _skipped = _read_chapters_for_export(files)
 
-    for no, fp in files:
-        try:
-            content = _read_chapter(fp).strip()
-        except OSError:
-            continue
-        if not content:
-            continue
+    for no, content in _kept:
         total_words += count_words(content)
         first_line = content.split("\n", 1)[0].strip()
         looks_like_title = bool(first_line) and len(first_line) <= 60 and "。" not in first_line and "，" not in first_line
         if looks_like_title:
             ch_title = first_line
-            ch_body = content[len(first_line):].strip()
+            ch_body = content.split("\n", 1)[1].strip() if "\n" in content else ""
         else:
             ch_title = f"CHAPTER {no}"
             ch_body = content
@@ -1819,8 +1849,9 @@ def export_project_shunn(
         "filename": filename,
         "content": full_text,
         "format": "shunn",
-        "chapters": len(files),
+        "chapters": len(_kept),
         "words": total_words,
+        "skipped": _skipped,
         # UI 据此提示「作者信息未填，稿件仍含占位符」
         "author_missing": author_missing,
     }
