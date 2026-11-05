@@ -234,15 +234,16 @@ export interface ScoreResult {
   passLine: number
 }
 
+// 这些是**运行时**键名（deepToCamel 之后），不是后端源码里的 snake_case。
 export interface ImportChapterResult {
-  chapter_path: string
-  chapter_no: number
-  char_count: number
+  chapterPath: string
+  chapterNo: number
+  charCount: number
   overwrote: boolean
-  consistency_score?: number
-  quality_score?: number
-  quality_verdict?: string
-  pass_line?: number
+  consistencyScore?: number
+  qualityScore?: number
+  qualityVerdict?: string
+  passLine?: number
 }
 
 export interface QcIssue {
@@ -324,8 +325,8 @@ export interface Trope {
 }
 
 export interface TropeListResult {
-  /** 后端字段名是 total_count（snake_case，见 gui/services.py::list_tropes），
+  /** 运行时键名是 totalCount（后端源码写 total_count，client.ts 已转 camelCase）。
    *  2026-09-30 修过前端误读 totalCount 导致数量徽标恒为 0 的 bug。 */
-  total_count: number
+  totalCount: number
   tropes: Trope[]
 }

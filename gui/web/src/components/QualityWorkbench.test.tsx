@@ -1,11 +1,11 @@
 // 全书质检截断提示回归（终审 M-5 的 GUI 侧补漏 + fix round 1/2）：
 // 「列表被砍短」有两种来源，面板都必须说明，且文案里的条数要与屏幕实际渲染行数一致：
-//   1) 响应体被截断：book_quality_check 的 issues 最多 issues_limit 条（50），
-//      total_issues 是真实总数；
+//   1) 响应体被截断：book_quality_check 的 issues 最多 issuesLimit 条（50），
+//      totalIssues 是真实总数；
 //   2) 仅前端渲染受限：响应没截断，但 issues.length 超过面板行数上限 ISSUE_ROWS（20）。
 // 未超行数且未截断时必须保持静默；不得出现「仅显示前 20 条」而屏幕不足 20 行。
 // fix round 3：表头「共 N 个问题」与提示行「共 N 条」必须是同一个 N（真实总数），
-// 且缺 issues_limit 时不得渲染「响应上限 undefined 条」。
+// 且缺 issuesLimit 时不得渲染「响应上限 undefined 条」。
 // 展开入口：issues.length > 20 时列表下方出现「展开全部 / 收起」，切换为纯本地 UI 状态
 // （不重新请求后端）。展开后必须渲染响应体内的全部条目，且提示行不得再说「仅显示前」；
 // 响应体本身被截断时，展开后仍要保留「响应上限 M 条」的指引。
@@ -66,13 +66,13 @@ describe('BookQualityPanel 截断提示', () => {
   it('响应被截断（61 条 / 上限 50）时，提示同时给出可见条数与响应上限', async () => {
     bookMock.mockResolvedValue({
       total_chapters: 60,
-      total_issues: 61,
+      totalIssues: 61,
       severity: { critical: 0, high: 3, medium: 58 },
       types: {},
       verdict: 'WARN',
       issues: makeIssues(50),
-      issues_truncated: true,
-      issues_limit: 50,
+      issuesTruncated: true,
+      issuesLimit: 50,
     })
     await runBookQuality('共 61 个问题')
 
@@ -88,16 +88,16 @@ describe('BookQualityPanel 截断提示', () => {
     expect(screen.getAllByText(ISSUE_ROW)).toHaveLength(VISIBLE_ROWS)
   })
 
-  it('截断但缺 issues_limit 时，响应上限兜底为实收条数而非 undefined', async () => {
+  it('截断但缺 issuesLimit 时，响应上限兜底为实收条数而非 undefined', async () => {
     bookMock.mockResolvedValue({
       total_chapters: 60,
-      total_issues: 61,
+      totalIssues: 61,
       severity: { critical: 0, high: 3, medium: 58 },
       types: {},
       verdict: 'WARN',
       issues: makeIssues(50),
-      issues_truncated: true,
-      // 故意不返回 issues_limit（M-5：此处曾渲染「响应上限 undefined 条」）
+      issuesTruncated: true,
+      // 故意不返回 issuesLimit（M-5：此处曾渲染「响应上限 undefined 条」）
     })
     await runBookQuality('共 61 个问题')
 
@@ -109,13 +109,13 @@ describe('BookQualityPanel 截断提示', () => {
   it('响应未截断但超过面板行数（30 条）时，仍提示仅显示前 20 条', async () => {
     bookMock.mockResolvedValue({
       total_chapters: 30,
-      total_issues: 30,
+      totalIssues: 30,
       severity: { critical: 0, high: 2, medium: 28 },
       types: {},
       verdict: 'WARN',
       issues: makeIssues(30),
-      issues_truncated: false,
-      issues_limit: 50,
+      issuesTruncated: false,
+      issuesLimit: 50,
     })
     await runBookQuality('共 30 个问题')
 
@@ -129,13 +129,13 @@ describe('BookQualityPanel 截断提示', () => {
   it('30 条时提供「展开全部」入口，展开后渲染全部 30 行且提示不再说「仅显示前」', async () => {
     bookMock.mockResolvedValue({
       total_chapters: 30,
-      total_issues: 30,
+      totalIssues: 30,
       severity: { critical: 0, high: 2, medium: 28 },
       types: {},
       verdict: 'WARN',
       issues: makeIssues(30),
-      issues_truncated: false,
-      issues_limit: 50,
+      issuesTruncated: false,
+      issuesLimit: 50,
     })
     await runBookQuality('共 30 个问题')
 
@@ -165,13 +165,13 @@ describe('BookQualityPanel 截断提示', () => {
   it('50 条且响应被截断时，展开渲染 50 行，提示仍保留响应上限指引', async () => {
     bookMock.mockResolvedValue({
       total_chapters: 60,
-      total_issues: 61,
+      totalIssues: 61,
       severity: { critical: 0, high: 3, medium: 58 },
       types: {},
       verdict: 'WARN',
       issues: makeIssues(50),
-      issues_truncated: true,
-      issues_limit: 50,
+      issuesTruncated: true,
+      issuesLimit: 50,
     })
     await runBookQuality('共 61 个问题')
 
@@ -189,13 +189,13 @@ describe('BookQualityPanel 截断提示', () => {
   it('未截断且不超过面板行数（12 条）时，不显示任何提示且 12 行全渲染', async () => {
     bookMock.mockResolvedValue({
       total_chapters: 12,
-      total_issues: 12,
+      totalIssues: 12,
       severity: { critical: 0, high: 1, medium: 11 },
       types: {},
       verdict: 'WARN',
       issues: makeIssues(12),
-      issues_truncated: false,
-      issues_limit: 50,
+      issuesTruncated: false,
+      issuesLimit: 50,
     })
     await runBookQuality('共 12 个问题')
 
@@ -208,7 +208,7 @@ describe('BookQualityPanel 截断提示', () => {
   it('旧后端未返回截断字段且条数未超行数时，同样不显示提示', async () => {
     bookMock.mockResolvedValue({
       total_chapters: 2,
-      total_issues: 2,
+      totalIssues: 2,
       severity: { critical: 0, high: 1, medium: 1 },
       types: {},
       verdict: 'WARN',
@@ -223,13 +223,13 @@ describe('BookQualityPanel 截断提示', () => {
   it('实收条数不足面板行数时，提示按实际渲染条数给出而非写死 20', async () => {
     bookMock.mockResolvedValue({
       total_chapters: 60,
-      total_issues: 61,
+      totalIssues: 61,
       severity: { critical: 0, high: 3, medium: 58 },
       types: {},
       verdict: 'WARN',
       issues: makeIssues(5),
-      issues_truncated: true,
-      issues_limit: 50,
+      issuesTruncated: true,
+      issuesLimit: 50,
     })
     await runBookQuality('共 61 个问题')
 
@@ -248,7 +248,7 @@ describe('BookQualityPanel 截断提示', () => {
     })
     await runBookQuality('共 30 个问题')
 
-    // 缺 total_issues 时必须退回 issues.length，不能渲染成「共 undefined 条」。
+    // 缺 totalIssues 时必须退回 issues.length，不能渲染成「共 undefined 条」。
     const hint = screen.getByText('共 30 条，仅显示前 20 条')
     expect(hint).toBeInTheDocument()
     expect(screen.getAllByText(ISSUE_ROW)).toHaveLength(VISIBLE_ROWS)
@@ -265,13 +265,13 @@ describe('QualityWorkbench i18n 双语支持', () => {
     try {
       bookMock.mockResolvedValue({
         total_chapters: 60,
-        total_issues: 61,
+        totalIssues: 61,
         severity: { critical: 0, high: 3, medium: 58 },
         types: {},
         verdict: 'WARN',
         issues: makeIssues(50),
-        issues_truncated: true,
-        issues_limit: 50,
+        issuesTruncated: true,
+        issuesLimit: 50,
       })
 
       render(

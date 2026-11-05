@@ -183,6 +183,7 @@ async function typedRequest<T>(
   body?: unknown,
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
   retryCount: number = 0,
+  skipCamel: boolean = false,
 ): Promise<T> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
@@ -209,11 +210,19 @@ async function typedRequest<T>(
     clearTimeout(timer)
   }
 
-  return parseApiResponse<T>(res, path)
+  return parseApiResponse<T>(res, path, skipCamel)
 }
 
-/** 解析统一响应体：非 JSON / 业务 code 非零都抛 ApiError。 */
-async function parseApiResponse<T>(res: Response, path: string): Promise<T> {
+/**
+ * 解析统一响应体：非 JSON / 业务 code 非零都抛 ApiError。
+ *
+ * ``skipCamel`` 用于**会被原样写回后端**的响应（目前只有资产详情）。这类载荷
+ * 的键名是数据本身（资产 JSON 的 schema），不是 API 字段名；转成 camelCase 后
+ * 前端原样提交回去，落盘的就是 camelCase，`scripts/validate.py` 直接判 9 个
+ * 硬错（缺 emotion_handling / meta.source_title 等）——实测 0 错资产改一次就废。
+ */
+async function parseApiResponse<T>(res: Response, path: string,
+                                   skipCamel: boolean = false): Promise<T> {
   let json: ApiResponse<unknown>
   try {
     json = (await res.json()) as ApiResponse<unknown>
@@ -228,7 +237,7 @@ async function parseApiResponse<T>(res: Response, path: string): Promise<T> {
     }
     throw new ApiError(json.message || `请求失败 (code=${json.code})`, json.code)
   }
-  return deepToCamel<T>(json.data)
+  return skipCamel ? (json.data as T) : deepToCamel<T>(json.data)
 }
 
 const UPLOAD_TIMEOUT_MS = 120_000
@@ -536,6 +545,17 @@ const put = <T>(path: string, body?: unknown) => typedRequest<T>('PUT', path, bo
 const del = <T>(path: string) => typedRequest<T>('DELETE', path)
 const get = <T>(path: string) => typedRequest<T>('GET', path)
 
+/**
+ * 不做 camelCase 转换的 GET（只给"原样写回后端"的载荷用）。
+ *
+ * 资产详情是资产 JSON 本体：键名就是 schema（``emotion_handling`` /
+ * ``meta.source_title``）。转成 camelCase 后前端原样提交回保存接口，
+ * 落盘即成为不合规 schema —— 实测 0 错误资产经一次「详情→保存」后
+ * 产生 9 个硬错误，而界面仍提示「保存成功」。
+ */
+const getRaw = <T>(path: string) =>
+  typedRequest<T>('GET', path, undefined, DEFAULT_TIMEOUT_MS, 0, true)
+
 // 写作
 export const writingApi = {
   projects: () => get<import('../types').WritingProject[]>('/writing/projects'),
@@ -840,7 +860,9 @@ export const assetApi = {
     const qs = q.toString()
     return get<Record<string, unknown>>(`/assets${qs ? `?${qs}` : ''}`)
   },
-  detail: (kind: string, id: string) => get<Record<string, unknown>>(`/assets/${kind}/${encodeURIComponent(id)}`),
+  // 必须走 getRaw：content 是资产 JSON 本体，会被编辑器原样写回后端。
+  detail: (kind: string, id: string) =>
+    getRaw<Record<string, unknown>>(`/assets/${kind}/${encodeURIComponent(id)}`),
   update: (kind: string, id: string, content: Record<string, unknown>) =>
     put<Record<string, unknown>>(`/assets/${kind}/${encodeURIComponent(id)}`, { content }),
   delete: (kind: string, id: string) =>
@@ -909,7 +931,7 @@ export const platformApi = {
   export: (body: { platform_id: string; book_dir: string }) =>
     post<Record<string, unknown>>('/platform/export', body),
   parseStatBox: (text: string) =>
-    post<{ stat_boxes: Array<Record<string, unknown>>; count: number }>('/platform/litrpg/stat-box', { text }),
+    post<{ statBoxes: Array<Record<string, unknown>>; count: number }>('/platform/litrpg/stat-box', { text }),
   formatRoyalRoad: (body: {
     title: string
     text: string
@@ -1292,27 +1314,30 @@ export const essenceApi = {
   }) => post<ConstitutionCheckResult>('/essence/constitution/check', body),
 }
 
+// 注意：这些类型声明的是**运行时**键名，即 deepToCamel 转换后的 camelCase。
+// 后端源码里写的是 snake_case，但 client.ts 统一转换过——按 snake 声明会让
+// TS 与实际数据相反，掩盖「读到 undefined」类缺陷（2026-11-05 修）。
 export interface ConstitutionViolation {
-  rule_id: string
-  rule_name: string
-  matched_term: string
-  line_no: number
+  ruleId: string
+  ruleName: string
+  matchedTerm: string
+  lineNo: number
   snippet: string
   severity: string
 }
 
 export interface CharacterVoiceAlert {
   character: string
-  forbidden_phrase: string
-  line_no: number
+  forbiddenPhrase: string
+  lineNo: number
   snippet: string
 }
 
 export interface ConstitutionCheckResult {
-  compliance_score: number
-  is_compliant: boolean
+  complianceScore: number
+  isCompliant: boolean
   violations: ConstitutionViolation[]
-  character_voice_alerts: CharacterVoiceAlert[]
+  characterVoiceAlerts: CharacterVoiceAlert[]
   summary: string
 }
 

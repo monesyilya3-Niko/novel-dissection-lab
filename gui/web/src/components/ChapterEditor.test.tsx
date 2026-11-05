@@ -36,10 +36,10 @@ vi.mock('../api/client', () => ({
   },
   essenceApi: {
     checkConstitution: vi.fn().mockResolvedValue({
-      compliance_score: 100,
-      is_compliant: true,
+      complianceScore: 100,
+      isCompliant: true,
       violations: [],
-      character_voice_alerts: [],
+      characterVoiceAlerts: [],
       summary: '全章设定完美合规',
     }),
   },

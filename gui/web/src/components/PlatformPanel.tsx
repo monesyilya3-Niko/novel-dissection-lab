@@ -43,10 +43,10 @@ interface ParsedStatBox {
   type: string
   title: string
   fields: Record<string, string>
-  raw_text: string
+  rawText: string
   start: number
   end: number
-  char_count?: number
+  charCount?: number
 }
 
 const SAMPLE_LITRPG_TEXT = `Chapter 1: The Descent into the Red Dungeon
@@ -173,7 +173,7 @@ export default function PlatformPanel() {
     setLitrpgError('')
     try {
       const res = await platformApi.parseStatBox(litrpgText)
-      setParsedBoxes((res.stat_boxes ?? []) as unknown as ParsedStatBox[])
+      setParsedBoxes((res.statBoxes ?? []) as unknown as ParsedStatBox[])
     } catch (e) {
       setLitrpgError(friendlyError(e))
     } finally {
@@ -549,10 +549,10 @@ export default function PlatformPanel() {
                         <Chip label={box.title || 'Status Window'} color="primary" size="small" />
                         <Chip label={t('platform_statbox_type_label', `类型: ${box.type}`, { type: box.type })} variant="outlined" size="small" />
                         <Typography variant="caption" color="text.secondary">
-                          {t('platform_statbox_pos_label', `位置: 第 ${box.start} - ${box.end} 字符 (${box.char_count || box.raw_text?.length} 字)`, {
+                          {t('platform_statbox_pos_label', `位置: 第 ${box.start} - ${box.end} 字符 (${box.charCount || box.rawText?.length} 字)`, {
                             start: box.start,
                             end: box.end,
-                            count: box.char_count || box.raw_text?.length || 0,
+                            count: box.charCount || box.rawText?.length || 0,
                           })}
                         </Typography>
                       </Box>
@@ -575,7 +575,7 @@ export default function PlatformPanel() {
                           whiteSpace: 'pre-wrap',
                         }}
                       >
-                        {box.raw_text}
+                        {box.rawText}
                       </Typography>
                     </Paper>
                   ))}

@@ -500,12 +500,12 @@ export default function ChapterEditor({
             <Chip
               size="small"
               label={t('editor_const_score_chip', '合规得分: {score} ({status})', {
-                score: constitutionResult.compliance_score,
-                status: constitutionResult.is_compliant
+                score: constitutionResult.complianceScore,
+                status: constitutionResult.isCompliant
                   ? t('editor_const_compliant', '正典合规')
                   : t('editor_const_risk', '存在违宪风险'),
               })}
-              color={constitutionResult.is_compliant ? 'success' : constitutionResult.compliance_score >= 60 ? 'warning' : 'error'}
+              color={constitutionResult.isCompliant ? 'success' : constitutionResult.complianceScore >= 60 ? 'warning' : 'error'}
             />
           )}
         </DialogTitle>
@@ -520,7 +520,7 @@ export default function ChapterEditor({
 
           {constitutionResult && !constitutionLoading && (
             <>
-              {constitutionResult.violations.length === 0 && constitutionResult.character_voice_alerts.length === 0 ? (
+              {constitutionResult.violations.length === 0 && constitutionResult.characterVoiceAlerts.length === 0 ? (
                 <Alert severity="success">
                   {constitutionResult.summary || t('editor_const_safe_alert', '全章设定完美合规，未触碰世界观红线，角色声线与行为严丝合缝！')}
                 </Alert>
@@ -542,13 +542,13 @@ export default function ChapterEditor({
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                               <Chip
                                 size="small"
-                                label={v.rule_name}
+                                label={v.ruleName}
                                 color={v.severity === 'high' ? 'error' : 'warning'}
                               />
                               <Typography variant="caption" sx={{ fontWeight: 600 }}>
                                 {t('editor_const_term_matched', '命中禁用词：【{term}】（第 {line} 行）', {
-                                  term: v.matched_term,
-                                  line: v.line_no,
+                                  term: v.matchedTerm,
+                                  line: v.lineNo,
                                 })}
                               </Typography>
                             </Box>
@@ -562,20 +562,20 @@ export default function ChapterEditor({
                   )}
 
                   {/* 角色声线脱缰警告 */}
-                  {constitutionResult.character_voice_alerts.length > 0 && (
+                  {constitutionResult.characterVoiceAlerts.length > 0 && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'warning.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        {t('editor_const_voice_title', '🎭 角色声线脱缰警报 ({count})', { count: constitutionResult.character_voice_alerts.length })}
+                        {t('editor_const_voice_title', '🎭 角色声线脱缰警报 ({count})', { count: constitutionResult.characterVoiceAlerts.length })}
                       </Typography>
-                      {constitutionResult.character_voice_alerts.map((ca, i) => (
+                      {constitutionResult.characterVoiceAlerts.map((ca, i) => (
                         <Card key={i} variant="outlined" sx={{ bgcolor: 'action.hover' }}>
                           <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                               <Chip size="small" label={t('editor_const_voice_char', '角色: {character}', { character: ca.character })} color="info" />
                               <Typography variant="caption" color="error" sx={{ fontWeight: 600 }}>
                                 {t('editor_const_voice_forbidden', '说了禁说台词：【{phrase}】（第 {line} 行）', {
-                                  phrase: ca.forbidden_phrase,
-                                  line: ca.line_no,
+                                  phrase: ca.forbiddenPhrase,
+                                  line: ca.lineNo,
                                 })}
                               </Typography>
                             </Box>

@@ -236,14 +236,14 @@ function BookQualityPanel() {
   // 2026-09-17（终审 M-5）：book_quality_check 的 issues 最多 issues_limit 条，而
   // total_issues 是真实总数。截断时若不说明，界面会像「共 61 个问题」却只列出 50 条。
   // fix round 2：面板自己还有 ISSUE_ROWS 行上限，「响应未截断但超过行上限」同样要说明。
-  const issuesTruncated = result?.issues_truncated === true
+  const issuesTruncated = result?.issuesTruncated === true
   // total_issues 缺失时（旧后端）退回响应实收条数，避免渲染出「共 undefined 条」。
   // fix round 3（M-1）：表头也用它，屏幕上「共 N 个问题」与「共 N 条」统一为真实总数口径，
   // 不再并列出现「共 50 个问题」（响应实收数）与「共 61 条」（真实总数）两个 N。
-  const totalIssues = (result?.total_issues as number | undefined) ?? issues.length
+  const totalIssues = (result?.totalIssues as number | undefined) ?? issues.length
   // fix round 3（M-5）：截断为真但 issues_limit 缺失时，用响应实收条数兜底——截断响应里
   // issues.length 恰好等于上限，不会渲染出「响应上限 undefined 条」。
-  const issuesLimit = (result?.issues_limit as number | undefined) ?? issues.length
+  const issuesLimit = (result?.issuesLimit as number | undefined) ?? issues.length
   // 屏幕实际渲染条数：收起时取面板上限与响应实收条数的较小者，展开时取响应实收条数。
   const canExpand = issues.length > ISSUE_ROWS
   const isExpanded = canExpand && expanded

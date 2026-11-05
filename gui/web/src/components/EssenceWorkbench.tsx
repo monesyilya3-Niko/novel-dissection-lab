@@ -1378,20 +1378,20 @@ function ConstitutionCheckSection() {
   const [error, setError] = useState('')
   const [charVoiceInput, setCharVoiceInput] = useState('')
   const [result, setResult] = useState<{
-    compliance_score: number
-    is_compliant: boolean
+    complianceScore: number
+    isCompliant: boolean
     violations: {
-      rule_id: string
-      rule_name: string
-      matched_term: string
-      line_no: number
+      ruleId: string
+      ruleName: string
+      matchedTerm: string
+      lineNo: number
       snippet: string
       severity: string
     }[]
-    character_voice_alerts: {
+    characterVoiceAlerts: {
       character: string
-      forbidden_phrase: string
-      line_no: number
+      forbiddenPhrase: string
+      lineNo: number
       snippet: string
     }[]
     summary: string
@@ -1484,12 +1484,12 @@ function ConstitutionCheckSection() {
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Chip
-                label={result.is_compliant ? t('essence_const_chip_compliant') : t('essence_const_chip_violation')}
-                color={result.is_compliant ? 'success' : 'error'}
+                label={result.isCompliant ? t('essence_const_chip_compliant') : t('essence_const_chip_violation')}
+                color={result.isCompliant ? 'success' : 'error'}
                 sx={{ fontWeight: 'bold' }}
               />
               <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                {t('essence_const_score_label')}{result.compliance_score} / 100
+                {t('essence_const_score_label')}{result.complianceScore} / 100
               </Typography>
             </Box>
             <Typography variant="body2" color="text.secondary">
@@ -1520,11 +1520,11 @@ function ConstitutionCheckSection() {
                           color={v.severity === 'high' ? 'error' : 'warning'}
                         />
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {v.rule_name}
+                          {v.ruleName}
                         </Typography>
                       </Box>
                       <Typography variant="caption" color="text.secondary">
-                        第 {v.line_no} 行命中: 「{v.matched_term}」
+                        第 {v.lineNo} 行命中: 「{v.matchedTerm}」
                       </Typography>
                     </Box>
                     <Typography variant="body2" sx={{ mt: 1, fontFamily: 'monospace', bgcolor: 'action.hover', p: 0.5, borderRadius: 1 }}>
@@ -1539,25 +1539,25 @@ function ConstitutionCheckSection() {
           {/* 角色声线冲突列表 */}
           <Box sx={{ mt: 1 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
-              {t('essence_const_voice_h')} ({result.character_voice_alerts.length} 项)
+              {t('essence_const_voice_h')} ({result.characterVoiceAlerts.length} 项)
             </Typography>
-            {result.character_voice_alerts.length === 0 ? (
+            {result.characterVoiceAlerts.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 {t('essence_const_no_voice_alerts')}
               </Typography>
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {result.character_voice_alerts.map((a, idx) => (
+                {result.characterVoiceAlerts.map((a, idx) => (
                   <Card key={idx} variant="outlined" sx={{ p: 1.5, borderColor: 'secondary.main' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                         <Chip size="small" label={`角色: ${a.character}`} color="secondary" />
                         <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                          禁说词汇: 「{a.forbidden_phrase}」
+                          禁说词汇: 「{a.forbiddenPhrase}」
                         </Typography>
                       </Box>
                       <Typography variant="caption" color="text.secondary">
-                        第 {a.line_no} 行
+                        第 {a.lineNo} 行
                       </Typography>
                     </Box>
                     <Typography variant="body2" sx={{ mt: 1, fontFamily: 'monospace', bgcolor: 'action.hover', p: 0.5, borderRadius: 1 }}>

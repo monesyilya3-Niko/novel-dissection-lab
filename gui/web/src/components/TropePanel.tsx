@@ -79,7 +79,7 @@ export default function TropePanel({ onInsert, currentGenre, taskText }: TropePa
       .list()
       .then((r) => {
         setTropes(r.tropes ?? [])
-        setTotalCount(r.total_count ?? 0)
+        setTotalCount(r.totalCount ?? 0)
         setLoading(false)
       })
       .catch((e) => {

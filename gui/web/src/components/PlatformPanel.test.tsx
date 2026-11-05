@@ -48,22 +48,22 @@ vi.mock('../api/client', () => ({
       actionableFixes: ['黄金三章节奏建议：在第二章进一步抛出悬念'],
     }),
     parseStatBox: vi.fn().mockResolvedValue({
-      stat_boxes: [
+      statBoxes: [
         {
           type: 'bracket_window',
           title: 'Status Window',
           fields: { Name: 'Carl', Level: '1', Strength: '14' },
-          raw_text: '[Status Window]\nName: Carl\nLevel: 1\nStrength: 14',
+          rawText: '[Status Window]\nName: Carl\nLevel: 1\nStrength: 14',
           start: 0,
           end: 50,
-          char_count: 50,
+          charCount: 50,
         },
       ],
       count: 1,
     }),
     formatRoyalRoad: vi.fn().mockResolvedValue({
       formatted: "[b]Author's Note:[/b]\nThanks for reading!\n\n---\n[spoiler=\"Status Window\"]\n[Status Window]\nName: Carl\n[/spoiler]",
-      stat_boxes_found: 1,
+      statBoxes_found: 1,
     }),
   },
   friendlyError: (e: unknown) => String(e),

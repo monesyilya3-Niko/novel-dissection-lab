@@ -498,8 +498,8 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
         genre_pack: genrePack || undefined,
       })
       const summary = r.overwrote
-        ? `第 ${r.chapter_no} 章已覆盖（本次 ${r.char_count} 字；字数统计只记增量）`
-        : `第 ${r.chapter_no} 章入库成功（${r.char_count} 字）`
+        ? `第 ${r.chapterNo} 章已覆盖（本次 ${r.charCount} 字；字数统计只记增量）`
+        : `第 ${r.chapterNo} 章入库成功（${r.charCount} 字）`
       setImportResult(`${summary}\n${JSON.stringify(r, null, 2)}`)
     } catch (e) {
       setImportResult(friendlyError(e))
@@ -924,6 +924,12 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   const [newNoteContent, setNewNoteContent] = useState('')
 
   const [openNewChain, setOpenNewChain] = useState(false)
+  // 伏笔暗线挂在**精华库**的书籍下，而不是写作项目下（2026-11-05 修）。
+  // 原先直接把 currentProject 当 book_id 发出去，而后端 create_chain 会在
+  // essence_books 里查父行，查不到即 404——实测「我的写作项目」这类名字必然
+  // 报「未找到小说精华档案」，功能 100% 不可用。
+  const [chainBookId, setChainBookId] = useState('')
+  const [essenceBookOptions, setEssenceBookOptions] = useState<Array<{ bookId: string; title: string }>>([])
   const [newChainTitle, setNewChainTitle] = useState('')
   const [newChainCategory, setNewChainCategory] = useState('identity')
   const [newChainPlant, setNewChainPlant] = useState(1)
@@ -995,13 +1001,11 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       setCharacters(charRes || [])
       setNotes(noteRes || [])
       setStats(statsRes)
+      // 只展示当前项目关联书籍的暗线（2026-11-05 修）。
+      // 原来查不到就回退到「全库暗线」，于是 A 项目的「草蛇灰线」里会冒出
+      // B 书的伏笔，按章号高亮时还会误命中，数据看起来像串了。
       const loadedChains = (chainRes as { chains?: EssenceChain[] })?.chains || []
-      if (loadedChains.length > 0) {
-        setChains(loadedChains)
-      } else if (essenceApi?.listChains) {
-        const fallback = await essenceApi.listChains().catch(() => ({ chains: [] }))
-        setChains(fallback.chains || [])
-      }
+      setChains(loadedChains)
     } catch (e) {
       console.warn('加载项目详情失败', e)
     }
@@ -1189,11 +1193,29 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   }
 
   // 快捷创建伏笔暗线
+  const openNewChainDialog = useCallback(async () => {
+    setOpenNewChain(true)
+    try {
+      const res = await essenceApi.listBooks()
+      const books = ((res as { books?: Array<{ bookId: string; title: string }> })?.books) || []
+      setEssenceBookOptions(books)
+      // 只有一本书时自动选中，省一次点击
+      if (books.length === 1) setChainBookId(books[0].bookId)
+    } catch {
+      setEssenceBookOptions([])
+    }
+  }, [])
+
   const handleCreateChain = async () => {
     if (!newChainTitle.trim()) return
+    if (!chainBookId) {
+      setError(t('studio_chain_need_book',
+        '请先选择这条伏笔所属的精华库书籍（伏笔档案按书归档，不挂在写作项目下）'))
+      return
+    }
     try {
       await essenceApi.createChain({
-        book_id: currentProject,
+        book_id: chainBookId,
         title: newChainTitle.trim(),
         category: newChainCategory,
         plant_chapter: newChainPlant,
@@ -1226,7 +1248,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
         title: chapterTitle.trim() || `第${chapterNo}章`,
         content: content,
       })
-      setToast(`第 ${chapterNo} 章已入库！共 ${r.char_count} 字（${r.overwrote ? '覆盖旧章' : '新增章节'}）`)
+      setToast(`第 ${chapterNo} 章已入库！共 ${r.charCount} 字（${r.overwrote ? '覆盖旧章' : '新增章节'}）`)
       try {
         localStorage.removeItem(getDraftKey(currentProject, chapterNo))
       } catch (_e) {
@@ -2011,7 +2033,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
                             setNewChainPlant(chapterNo)
                             setNewChainReveal(Math.max(chapterNo + 3, 5))
                             setNewChainClimax(Math.max(chapterNo + 8, 10))
-                            setOpenNewChain(true)
+                            openNewChainDialog()
                           }}
                           sx={{ fontSize: 11, py: 0.2 }}
                         >
@@ -2423,6 +2445,23 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       <Dialog open={openNewChain} onClose={() => setOpenNewChain(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{t('studio_new_chain_title', '记录全书草蛇灰线（伏笔暗线）')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            required
+            label={t('studio_chain_book_label', '所属书籍（精华库）')}
+            value={chainBookId}
+            onChange={(e) => setChainBookId(e.target.value)}
+            helperText={essenceBookOptions.length === 0
+              ? t('studio_chain_book_empty',
+                  '精华库还没有书籍档案，请先在「精华工坊」为已拆解的书建立档案')
+              : t('studio_chain_book_hint', '伏笔暗线按书归档，用于与已拆解作品对照')}
+          >
+            {essenceBookOptions.map((b) => (
+              <MenuItem key={b.bookId} value={b.bookId}>{b.title || b.bookId}</MenuItem>
+            ))}
+          </TextField>
           <TextField
             autoFocus
             fullWidth

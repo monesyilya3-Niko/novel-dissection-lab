@@ -262,23 +262,23 @@ describe('EssenceWorkbench', () => {
 
   it('切换到宪法正典审查并执行合规检测', async () => {
     mockCheckConstitution.mockResolvedValue({
-      compliance_score: 90,
-      is_compliant: true,
+      complianceScore: 90,
+      isCompliant: true,
       violations: [
         {
-          rule_id: 'no_anachronism',
-          rule_name: '严禁时代脱节或现代高科技穿越',
-          matched_term: '智能手机',
-          line_no: 1,
+          ruleId: 'no_anachronism',
+          ruleName: '严禁时代脱节或现代高科技穿越',
+          matchedTerm: '智能手机',
+          lineNo: 1,
           snippet: '...他拿起智能手机...',
           severity: 'medium',
         },
       ],
-      character_voice_alerts: [
+      characterVoiceAlerts: [
         {
           character: '苏念',
           forbidden_phrase: '绝望',
-          line_no: 2,
+          lineNo: 2,
           snippet: '苏念眼中满是绝望。',
         },
       ],

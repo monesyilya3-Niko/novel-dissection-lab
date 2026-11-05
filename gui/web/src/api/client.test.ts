@@ -220,3 +220,58 @@ describe('访问令牌 X-Auth-Token（服务端部署模式）', () => {
       .toContain('?auth=')
   })
 })
+
+describe('资产详情必须跳过 camelCase 转换（2026-11-05）', () => {
+  /**
+   * content 是资产 JSON 本体，键名就是 schema（emotion_handling /
+   * meta.source_title）。编辑器会把它原样 stringify 回文本框、再原样提交给
+   * 保存接口。一旦被转成 camelCase 落盘，scripts/validate.py 直接判硬错。
+   *
+   * 实测：一张 0 错误的 voice-card，走一遍「详情 → 保存」后产生 9 个硬错误，
+   * 而界面仍提示「保存成功」。
+   */
+  it('assetApi.detail 返回的 content 保持 snake_case', async () => {
+    mockFetchOnce({
+      code: 0,
+      message: '',
+      data: {
+        kind: 'voice-card',
+        id: 'x',
+        content: {
+          meta: { source_title: '测试书', sample_chapters: [1, 2, 3] },
+          emotion_handling: { body_reaction_vocabulary: ['手指捏白'] },
+        },
+      },
+    } as never)
+    vi.mocked(fetch).mockImplementationOnce(mockFetchOnce({
+      code: 0,
+      message: '',
+      data: {
+        kind: 'voice-card',
+        id: 'x',
+        content: {
+          meta: { source_title: '测试书', sample_chapters: [1, 2, 3] },
+          emotion_handling: { body_reaction_vocabulary: ['手指捏白'] },
+        },
+      },
+    }) as never)
+    vi.resetModules()
+    const mod = await import('./client')
+    const res = await mod.assetApi.detail('voice-card', 'x')
+    const content = res.content as Record<string, Record<string, unknown>>
+    expect(content.emotion_handling).toBeDefined()
+    expect(content.emotionHandling).toBeUndefined()
+    expect(content.meta.source_title).toBe('测试书')
+    expect(content.meta.sourceTitle).toBeUndefined()
+  })
+
+  it('普通接口仍然转 camelCase（对照组）', async () => {
+    vi.mocked(fetch).mockImplementationOnce(
+      mockFetchOnce({ code: 0, message: '', data: { total_books: 3 } }) as never,
+    )
+    vi.resetModules()
+    const mod = await import('./client')
+    const res = await mod.getOverview()
+    expect((res as unknown as Record<string, unknown>).totalBooks).toBe(3)
+  })
+})
