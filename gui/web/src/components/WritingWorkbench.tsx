@@ -1832,7 +1832,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
                         <Chip size="small" label={`签约概率: ${diagResult.signingProb}`} color="info" />
                       </Box>
                       <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                        对白占比: {(diagResult.dialogueRatio * 100).toFixed(1)}% | 综合评分: {diagResult.score}分
+                        对白占比: {Number(diagResult.dialogueRatio).toFixed(1)}% | 综合评分: {diagResult.score}分
                       </Typography>
                       {diagResult.vetoRisks.length > 0 && (
                         <Box sx={{ mt: 1 }}>

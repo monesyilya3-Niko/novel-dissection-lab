@@ -360,7 +360,7 @@ export default function PlatformPanel() {
                   />
                 </Box>
                 <Typography variant="caption" color="text.secondary">
-                  {t('platform_diag_stats_summary', `字数: ${diagnosis.charCount} | 对话占比: ${(diagnosis.dialogueRatio * 100).toFixed(1)}%`, { count: diagnosis.charCount, ratio: (diagnosis.dialogueRatio * 100).toFixed(1) })}
+                  {t('platform_diag_stats_summary', `字数: ${diagnosis.charCount} | 对话占比: ${Number(diagnosis.dialogueRatio).toFixed(1)}%`, { count: diagnosis.charCount, ratio: Number(diagnosis.dialogueRatio).toFixed(1) })}
                 </Typography>
               </Box>
 

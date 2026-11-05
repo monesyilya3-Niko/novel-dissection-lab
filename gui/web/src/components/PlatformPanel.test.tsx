@@ -40,7 +40,10 @@ vi.mock('../api/client', () => ({
       score: 92,
       grade: 'A',
       signingProb: '极高',
-      dialogueRatio: 0.28,
+      // 2026-11-05：platform_service.diagnose_chapter 返回的是**百分数**
+      // （``round(ratio * 100, 1)``），不是 0-1 比例。此前 mock 写 0.28
+      // 把错误约定固化了，掩盖了前端多乘 100 的缺陷。
+      dialogueRatio: 28.0,
       vetoRisks: [],
       actionableFixes: ['黄金三章节奏建议：在第二章进一步抛出悬念'],
     }),
@@ -105,6 +108,10 @@ describe('PlatformPanel', () => {
       expect(screen.getByText(/评级 A/)).toBeDefined()
       expect(screen.getByText(/签约潜力分: 92/)).toBeDefined()
       expect(screen.getByText('黄金三章节奏建议：在第二章进一步抛出悬念')).toBeDefined()
+      // 2026-11-05：后端返回的是百分数（28.0），前端不得再乘 100。
+      // 此前显示 2800.0%，因为 mock 用 0.28 把错误约定固化了。
+      expect(screen.getByText(/对话占比: 28\.0%/)).toBeDefined()
+      expect(screen.queryByText(/2800/)).toBeNull()
     })
   })
 
