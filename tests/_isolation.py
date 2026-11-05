@@ -113,23 +113,22 @@ def isolate_paths(tmp_root: Path) -> Iterator[dict[str, Path]]:
     finally:
         for name, value in saved.items():
             setattr(config, name, value)
-        # ⚠️ 不能无条件 db._reset_conn()（2026-11-05 修）：
+        # 只关闭**数据库文件落在本临时目录内**的连接（2026-11-05 第二次修正）。
         #
-        # 它关闭**全部线程**的 SQLite 连接。而本进程里可能有守护线程正持着
-        # 连接执行语句——例如 services._schedule_report_generation 起的
-        # _watch 线程，done 后会走 _generate_reports → migrate.sync_asset →
-        # db.tx() → get_conn()，连接登记在那个线程名下。
+        # 历史：
+        #   原实现无条件 db._reset_conn()——关闭全部线程的连接，包括别的用例/
+        #   守护线程正在使用的。实测在 Ubuntu + Python 3.11/3.12 上触发
+        #   Segfault（exit 139）。
+        #   一度改为完全不做，结果 3.13 也崩了 —— 说明"把本目录的旧连接留着"
+        #   本身就是崩溃源：临时目录已被回收，连接仍指向其中已删除的 index.db，
+        #   后续 get_conn() 换路径重建时与这些悬空句柄相撞。
         #
-        # 从另一个线程 close() 一条正在使用中的连接，在 SQLite C 库里是未定义
-        # 行为。实测：GitHub Actions 的 Ubuntu + Python 3.11/3.12 上稳定触发
-        # `Segmentation fault (core dumped)`（exit 139），崩在后续的
-        # test_gui_backend.test_full_local_chain；同一提交在 3.13 与 Windows 上
-        # 全绿。
-        #
-        # 正确的做法是"只关数据库文件确实落在本临时目录内的连接"——
-        # remove_tree 内部的 _close_conns_under() 正是这么做的（用
-        # PRAGMA database_list 逐个判定），而且它就在下一行被调用。
-        # 因此这里什么都不用额外做。
+        # 正确姿态是中间路线：本目录的连接必须关（否则悬空），别的目录的
+        # 连接一律不碰（否则跨线程误伤）。_close_conns_under 正是按
+        # PRAGMA database_list 逐个判定归属，且它在下一行的 remove_tree 里
+        # 也会被调用——这里显式提前调一次，是因为**必须在还原 config 之后、
+        # 删目录之前**释放句柄。
+        _close_conns_under(tmp_root)
         remove_tree(tmp_root)
 
 
