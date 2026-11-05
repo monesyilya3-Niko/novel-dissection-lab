@@ -113,13 +113,23 @@ def isolate_paths(tmp_root: Path) -> Iterator[dict[str, Path]]:
     finally:
         for name, value in saved.items():
             setattr(config, name, value)
-        # Windows 上为了防止 cleanup() 时 SQLite 连接未释放导致 WinError 32，
-        # 在隔离结束时自动清空所有连接。
-        from gui import db
-        db._reset_conn()
-        # 连接释放之后才能删：以前 isolate_paths 从不回收它接管的 tmp_root，
-        # 每跑一轮就留一撮 wxextra_/b3_/concw_/lru_ 目录（2026-10-08 实测 %TEMP%
-        # 里光本项目测试残留就有 3000+ 个）。
+        # ⚠️ 不能无条件 db._reset_conn()（2026-11-05 修）：
+        #
+        # 它关闭**全部线程**的 SQLite 连接。而本进程里可能有守护线程正持着
+        # 连接执行语句——例如 services._schedule_report_generation 起的
+        # _watch 线程，done 后会走 _generate_reports → migrate.sync_asset →
+        # db.tx() → get_conn()，连接登记在那个线程名下。
+        #
+        # 从另一个线程 close() 一条正在使用中的连接，在 SQLite C 库里是未定义
+        # 行为。实测：GitHub Actions 的 Ubuntu + Python 3.11/3.12 上稳定触发
+        # `Segmentation fault (core dumped)`（exit 139），崩在后续的
+        # test_gui_backend.test_full_local_chain；同一提交在 3.13 与 Windows 上
+        # 全绿。
+        #
+        # 正确的做法是"只关数据库文件确实落在本临时目录内的连接"——
+        # remove_tree 内部的 _close_conns_under() 正是这么做的（用
+        # PRAGMA database_list 逐个判定），而且它就在下一行被调用。
+        # 因此这里什么都不用额外做。
         remove_tree(tmp_root)
 
 
