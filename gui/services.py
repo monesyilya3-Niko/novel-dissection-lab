@@ -659,6 +659,13 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
         with state_store.update_state(book_id) as state:
             state["status"] = "done"
             state.pop("last_error", None)
+        # 同步 books 表状态（2026-11-05 修）。
+        #
+        # /api/books 的 status 取自 SQLite books.status，而分析完成原先只改
+        # 状态文件——全库没有任何代码把 books.status 推进到 done（唯一写入点
+        # 是导入时的 "idle"）。实测：db.get_books(status='done') 恒为 0 条，
+        # 而状态文件里有 7 本 done。用户看到拆完的书仍标「待拆」。
+        _sync_book_status(book_id, "done")
         # 2026-11-04：分析结束后组装整书资产卡。
         # 此前只落了批级 pass 文件就置 done，而 get_book_results /
         # _generate_reports_inner 读的是 {book_id}-voice-card.json 这类整书卡——
@@ -669,13 +676,52 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
             _log.warning("分析后组装资产失败（批级产物仍完整）: %s", exc)
         _publish(book_id, 0, 0, "done", done, total_batches, ctx)
     except Exception as exc:  # noqa: BLE001
+        err_msg = str(exc)[:500]
         with state_store.update_state(book_id) as state:
             state["status"] = "error"
-            state["last_error"] = str(exc)[:500]
+            state["last_error"] = err_msg
+        _sync_book_status(book_id, "error")
+        # 必须广播 error 事件（2026-11-05 修）。
+        #
+        # 原实现只写状态文件、不 publish，而前端（AppContext）只在收到 done
+        # 时刷新——于是「未配置模型 / 读盘失败 / 组装异常」这类致命错误发生后，
+        # 进度条永远停在「运行中」，用户必须手动刷新页面才能看到 error，
+        # 且刷新后也看不到失败原因（/api/status 当时不回传 last_error）。
+        #
+        # 这里补发一条与 done 同形的事件，前端按既有 done 分支刷新即可收敛。
+        broker.publish({
+            "book_id": book_id,
+            "status": "error",
+            "chapter_index": 0,
+            "batch_index": 0,
+            "done": 0,
+            "total": 0,
+            "message": err_msg,
+        })
     finally:
         # B7：任务结束清理 _runtime 条目，避免内存缓慢增长。
         with _runtime_lock:
             _runtime.pop(book_id, None)
+
+
+def _sync_book_status(book_id: str, status: str) -> None:
+    """把分析任务状态同步进 SQLite ``books`` 表（2026-11-05 新增）。
+
+    ``/api/books`` 的 status 列取自 ``books.status``，而分析完成原先只改状态
+    文件——于是拆完的书在书库里永远显示「待拆」。这里在 done / error 时回写。
+
+    尽力而为：库不可用只记日志，不影响分析结果本身。
+    """
+    try:
+        from gui import migrate as _migrate
+        book = _books_get(book_id)
+        title = (book or {}).get("title") or book_id
+        src = (book or {}).get("source_path")
+        genre = (book or {}).get("genre")
+        with db.tx() as conn:
+            _migrate._upsert_book(conn, book_id, title, src, genre, status)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("回写 books.status=%s 失败（不影响分析）: %s", status, exc)
 
 
 def recover_stale_tasks() -> int:
@@ -893,6 +939,9 @@ def get_status(book_id: str | None = None) -> dict[str, Any]:
         "total": total,
         "chapter_states": state.get("chapter_states", {}),
         "asset_index": state.get("asset_index", {}),
+        # 失败原因（2026-11-05）：load_task 早就带了 last_error，但这里从没往外传，
+        # 于是用户只能看到 status="error"，不知道错在哪。
+        "last_error": state.get("last_error") or "",
     }
 
 

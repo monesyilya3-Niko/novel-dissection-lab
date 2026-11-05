@@ -48,8 +48,39 @@ class TestBooksEndpoint(unittest.TestCase):
         self.assertEqual(len(rows), 1, "导入后 books 表没有这本书")
         self.assertEqual(rows[0]["status"], "idle")
 
+    def test_analysis_done_syncs_books_status(self):
+        """分析完成后 books.status 必须推进到 done（2026-11-05 修）。
+
+        /api/books 的 status 取自 SQLite，而分析完成原先只改状态文件——
+        全库没有任何代码把 books.status 从导入时的 "idle" 推进到 "done"。
+        实测 db.get_books(status='done') 恒为 0 条，用户看到拆完的书仍标「待拆」。
+        """
+        from gui import db, services
+        src = Path(self._tmp.name) / "状态同步.txt"
+        src.write_text("第1章 开端\n\n" + "正文内容。" * 200, encoding="utf-8")
+        bid = services.import_book(str(src))["book_id"]
+        self.assertEqual(db.get_books(book_id=bid)[0]["status"], "idle")
+
+        services._sync_book_status(bid, "done")
+        self.assertEqual(db.get_books(book_id=bid)[0]["status"], "done",
+                         "分析完成后 books.status 必须变成 done")
+
+    def test_status_endpoint_exposes_last_error(self):
+        """get_status 必须回传 last_error（2026-11-05）。
+
+        否则用户只看到 status="error"，不知道错在哪。
+        """
+        from gui import services, state_store
+        bid = "err-book"
+        state_store.save_state(state_store.new_state(bid, "错误书"))
+        with state_store.update_state(bid) as st:
+            st["status"] = "error"
+            st["last_error"] = "未配置外部模型"
+        out = services.get_status(bid)
+        self.assertEqual(out["status"], "error")
+        self.assertEqual(out["last_error"], "未配置外部模型")
+
     def test_books_route_listed(self):
-        """路由表必须包含 GET /api/books。"""
         from gui import router
         paths = [p.pattern for m, p, _f in router.ROUTES if m == "GET"]
         self.assertTrue(any("api/books" in p for p in paths),
