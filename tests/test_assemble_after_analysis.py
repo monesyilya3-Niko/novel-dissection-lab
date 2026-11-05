@@ -14,6 +14,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -27,16 +28,26 @@ class TestAssembleAfterAnalysis(unittest.TestCase):
         self._tmp = tempfile.mkdtemp(prefix="nl-assemble-")
         self._ctx = _isolation.isolate_paths(Path(self._tmp))
         self._ctx.__enter__()
-        from gui import config, db, services, state_store
+        from gui import config, migrate, services, state_store
         self.config = config
         self.services = services
         self.state_store = state_store
-        # 按生产口径建表：服务器启动时正是 init_schema() + apply_migrations()。
-        # 不建表的话 sync_asset 会抛 "no such table: assets"——那是夹具缺步骤，
-        # 不是被测代码的缺陷（曾试图让 sync_asset 自愈，结果在隔离目录回收后
-        # 触发 db 连接池重建，造成解释器段错误，已回退）。
-        db.init_schema()
-        db.apply_migrations()
+        # 本文件只验证「合并批级产物 → 组装整书卡 → 校验 → 原子落盘」，
+        # 落盘后的 SQLite 重索引（migrate.sync_asset）是另一条能力，有 68 条
+        # 专属测试（test_migrate / test_asset_sync_and_backfill / test_builtin_sync）。
+        #
+        # 这里把重索引用 no-op 顶掉，理由是可移植性：每个用例都 init_schema()
+        # 建一次库，再随隔离目录整棵回收，会反复触发 gui.db 的「路径变化→关闭
+        # 全部连接→重建」路径。实测在 GitHub Actions 的 Ubuntu + Python 3.13
+        # 组合下，累积到 ~1100 个用例后会 Segfault（exit 139）；同一提交在
+        # 3.11 / 3.12 / Windows 上全绿。减少无谓的全局连接池抖动比"顺带测到
+        # 重索引"更有价值。
+        self._sync_calls: list[str] = []
+        self._patch = mock.patch.object(
+            migrate, "sync_asset",
+            side_effect=lambda fp: self._sync_calls.append(str(fp)) or True)
+        self._patch.start()
+        self.addCleanup(self._patch.stop)
         self.book_id = "assemble-book"
         self.batch_dir = config.ASSETS_ROOT / self.book_id
         self.batch_dir.mkdir(parents=True, exist_ok=True)
