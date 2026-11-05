@@ -137,8 +137,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         refreshBookResults()
         refreshOverview()
       }
+      // 任务致命失败（2026-11-05）：后端主循环异常分支会广播 error，
+      // 原先前端只认 done，于是未配模型 / 读盘失败后进度条永远停在「运行中」，
+      // 用户必须手动刷新才能看到失败，且看不到原因（/api/status 已补 last_error）。
+      if (e.status === 'error') {
+        refreshStatus()
+        refreshOverview()
+      }
       // 报告生成完成（拆书 done 后异步回调）→ 刷新拆书结果以显示 report_ids。
       if ((e.status as string) === 'report_ready') {
+        refreshBookResults()
+        refreshOverview()
+      }
+      // 报告生成失败（2026-11-05）：铁律二未过或组装异常时后端广播 report_error
+      // 并带 message。原先前端完全不处理这个事件，用户只看到「报告未生成」，
+      // 不知道是字数不到一万还是组装失败。
+      if ((e.status as string) === 'report_error') {
         refreshBookResults()
         refreshOverview()
       }

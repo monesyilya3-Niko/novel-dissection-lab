@@ -942,6 +942,9 @@ def get_status(book_id: str | None = None) -> dict[str, Any]:
         # 失败原因（2026-11-05）：load_task 早就带了 last_error，但这里从没往外传，
         # 于是用户只能看到 status="error"，不知道错在哪。
         "last_error": state.get("last_error") or "",
+        # 报告生成失败原因（2026-11-05）：铁律二未过 / 组装异常时写进状态文件的
+        # report_error 从没有 API 出口——前端即使想显示也拿不到。
+        "report_error": state.get("report_error") or "",
     }
 
 

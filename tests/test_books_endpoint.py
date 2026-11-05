@@ -108,5 +108,45 @@ class TestBooksEndpoint(unittest.TestCase):
             handler({"status": 123}, {})
 
 
+class TestReportErrorSurface(unittest.TestCase):
+    """报告生成失败的原因必须能通过 API 拿到（2026-11-05）。
+
+    铁律二未过 / 组装异常时后端会写 state["report_error"] 并广播
+    status="report_error"，但：
+    - 前端完全不处理 report_error 事件
+    - /api/status 也从不返回该字段
+    于是用户只看到「报告未生成」，不知道是字数不到一万还是组装失败。
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._iso = _isolation.isolate_paths(Path(self._tmp.name))
+        self._iso.__enter__()
+        from gui import db
+        db.init_schema()
+
+    def tearDown(self):
+        self._iso.__exit__(None, None, None)
+        self._tmp.cleanup()
+
+    def test_status_exposes_report_error(self):
+        from gui import services, state_store
+        bid = "rpt-err-book"
+        state_store.save_state(state_store.new_state(bid, "报告失败"))
+        with state_store.update_state(bid) as st:
+            st["status"] = "done"
+            st["report_error"] = "铁律二未通过：合计 8000 字 < 10000"
+        out = services.get_status(bid)
+        self.assertEqual(out.get("report_error"),
+                         "铁律二未通过：合计 8000 字 < 10000")
+
+    def test_report_error_empty_when_absent(self):
+        from gui import services, state_store
+        bid = "rpt-ok-book"
+        state_store.save_state(state_store.new_state(bid, "正常"))
+        out = services.get_status(bid)
+        self.assertEqual(out.get("report_error"), "")
+
+
 if __name__ == "__main__":
     unittest.main()

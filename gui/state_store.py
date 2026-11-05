@@ -517,6 +517,9 @@ def load_task(book_id: str) -> dict[str, Any]:
             "state_revision": int(row.get("state_revision", 0)),
             "last_error": row.get("last_error"),
             "asset_index": {},  # L1：SQLite 路径无此列，显式返回空 dict 保持字段存在
+            # report_error 只存在于 JSON 副本（SQLite 无此列）。不补的话
+            # /api/status 在权威路径下永远拿不到报告失败原因（2026-11-05）。
+            "report_error": (load_state(book_id).get("report_error") or ""),
         }
     # 回退 JSON。
     return load_state(book_id)
