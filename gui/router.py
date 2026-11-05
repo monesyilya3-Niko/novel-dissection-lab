@@ -1068,7 +1068,7 @@ def _h_admin_books(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, 
         book_id = b.get("book_id", "")
         try:
             detail = services.get_book(book_id)
-            total = detail.get("totalChapters", 0)
+            total = detail.get("total_chapters", 0)
         except Exception:  # noqa: BLE001
             total = 0
         out.append({

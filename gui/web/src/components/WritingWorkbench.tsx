@@ -81,6 +81,10 @@ const WRITING_STATUS_LABELS: Record<string, string> = {
   scoring: '打分中',
   done: '已完成',
   error: '失败',
+  // 后端 cancel() 会置 status="cancelled" 并广播 phase="cancelled"。
+  // 原先这里没有这条、终态判定也没包含它，于是点了「取消任务」后
+  // 进度条与按钮一直转圈，任务其实已经停了（2026-11-05 修）。
+  cancelled: '已取消',
 }
 const writingStatusLabel = (s: string | null | undefined) => (s ? WRITING_STATUS_LABELS[s] ?? s : s)
 
@@ -472,7 +476,8 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
           try {
             const s = await writingApi.taskState(r.taskId)
             setTaskState(s)
-            if (s.status === 'done' || s.status === 'error' || s.status === 'degraded') {
+            if (s.status === 'done' || s.status === 'error' || s.status === 'degraded'
+                || s.status === 'cancelled') {
               setRunning(false)
               unsub()
               sseUnsubRef.current = null

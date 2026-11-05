@@ -607,7 +607,7 @@ def get_dashboard() -> dict[str, Any]:
     items = []
     for b in books[:10]:
         try:
-            total = services.get_book(b.get("book_id", "")).get("totalChapters", 0)
+            total = services.get_book(b.get("book_id", "")).get("total_chapters", 0)
         except Exception:  # noqa: BLE001
             total = 0
         items.append({"bookId": b.get("book_id"), "title": b.get("title"),

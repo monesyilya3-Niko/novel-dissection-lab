@@ -190,7 +190,9 @@ export interface WritingAttempt {
 
 export interface WritingTaskState {
   taskId: string
-  status: 'pending' | 'running' | 'scoring' | 'rewriting' | 'done' | 'degraded' | 'error'
+  // cancelled：后端 cancel() 会置这个状态（writing_service 主循环里检查）。
+  // 原先类型定义漏了它，前端终态判定也随之漏掉，于是取消后一直转圈。
+  status: 'pending' | 'running' | 'scoring' | 'rewriting' | 'done' | 'degraded' | 'error' | 'cancelled'
   mode: 'llm' | 'no_model'
   chapterNo: number
   attempt?: number
