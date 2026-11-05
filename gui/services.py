@@ -133,6 +133,12 @@ def _books_get(book_id: str) -> dict[str, Any] | None:
     """LRU 获取：命中时移到末尾（标记最近使用）；未命中时尝试从源文件重载。
 
     B9：淘汰后透明重载，保证用户无感。
+
+    2026-11-04：内存与 _BOOK_INDEX 都未命中时，回退查 SQLite ``books`` 表。
+    此前只有 `_BOOK_INDEX` 一个来源，而它是纯进程内字典——重启后为空，
+    于是所有已导入的书一律 404「未导入（请先 import）」，断点续传彻底失效
+    （实测：导入 → 清内存 → get_book 直接 404）。books 表里一直有正确的
+    ``source_path``（``import_book`` 会 upsert 进去），只是从来没人读它。
     """
     with _books_lock:
         book = _BOOKS.get(book_id)
@@ -141,6 +147,14 @@ def _books_get(book_id: str) -> dict[str, Any] | None:
             return book
         # 未命中：尝试从索引重载
         src_path = _BOOK_INDEX.get(book_id)
+    if src_path is None:
+        # 回退：从持久化的 books 表取源路径（重启后与 LRU 淘汰后的兜底）
+        try:
+            rows = db.get_books(book_id=book_id)
+            if rows:
+                src_path = rows[0].get("source_path") or None
+        except Exception as exc:  # noqa: BLE001 - 库不可用时保持原行为
+            _log.warning("从 books 表回退取 source_path 失败: %s", exc)
     if src_path is None:
         return None
     # 在锁外重载（IO 耗时），重载后重新加锁插入
