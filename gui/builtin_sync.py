@@ -66,7 +66,7 @@ def load_manifest() -> dict[str, Any] | None:
     """读取并校验随包 manifest；缺失或结构非法返回 None（降级为旧行为）。"""
     fp = manifest_path()
     try:
-        data = json.loads(fp.read_text(encoding="utf-8"))
+        data = json.loads(fp.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError):
         return None
     if not isinstance(data, dict):

@@ -318,7 +318,7 @@ def _checked_asset_path(ref: str, expected: str) -> Path | None:
     if fp is None:
         return None
     try:
-        data = json.loads(fp.read_text(encoding="utf-8"))
+        data = json.loads(fp.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, OSError) as exc:
         _log.warning(f"资产加载失败，跳过该资产 {fp.name}: {exc}")
         return None
@@ -359,7 +359,7 @@ def check(target: str | None = None, text: str | None = None,
         gp_fp = _safe_asset_path(genre_pack)
         if gp_fp:
             try:
-                gp_data = json.loads(gp_fp.read_text(encoding="utf-8"))
+                gp_data = json.loads(gp_fp.read_text(encoding="utf-8-sig"))
             except (json.JSONDecodeError, OSError) as exc:
                 _log.warning(f"题材包加载失败，本次检查不带题材约束 {gp_fp.name}: {exc}")
 
@@ -370,7 +370,7 @@ def check(target: str | None = None, text: str | None = None,
         voice_fp = _safe_asset_path(voice)
         if voice_fp:
             try:
-                voice_data = json.loads(voice_fp.read_text(encoding="utf-8"))
+                voice_data = json.loads(voice_fp.read_text(encoding="utf-8-sig"))
                 # 内容契约：voice 参数只接受 voice 卡（distilled/index 在此同步 400）。
                 assert_asset_kind(voice_data, "voice", voice)
                 cons = engine_adapter.score_text(voice_data, text, label=target or "粘贴文本")
@@ -477,7 +477,7 @@ def list_qc_reports() -> list[dict[str, Any]]:
     if qc_dir.is_dir():
         for fp in qc_dir.glob("*.json"):
             try:
-                data = json.loads(fp.read_text(encoding="utf-8"))
+                data = json.loads(fp.read_text(encoding="utf-8-sig"))
                 created = (data.get("meta") or {}).get("created_at")
                 if not created:
                     created = datetime.fromtimestamp(fp.stat().st_mtime).isoformat(timespec="seconds")

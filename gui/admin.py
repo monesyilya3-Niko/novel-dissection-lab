@@ -152,7 +152,7 @@ def _load_admin() -> dict[str, Any] | None:
     last_err: OSError | None = None
     for _ in range(3):
         try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
+            data = json.loads(fp.read_text(encoding="utf-8-sig"))
             break
         except json.JSONDecodeError as exc:
             raise AdminCorruptError(f"{fp} JSON 解析失败: {exc}") from exc
@@ -736,7 +736,7 @@ def _delete_book_locked(book_id: str, username: str, ip: str) -> dict[str, Any]:
             state_files.append(fp)
             if state is None:
                 try:
-                    state = json.loads(fp.read_text(encoding="utf-8"))
+                    state = json.loads(fp.read_text(encoding="utf-8-sig"))
                 except (json.JSONDecodeError, OSError):
                     state = {}
     if state is None:

@@ -277,10 +277,11 @@ class TestLineEndingNormalization(unittest.TestCase):
     def test_crlf_is_normalized(self):
         import tempfile
         from pathlib import Path as _P
+
         from gui import text_access
         with tempfile.TemporaryDirectory() as td:
             f = _P(td) / "crlf.txt"
-            f.write_bytes("第1章 开端\r\n正文一。\r\n下一段。\r\n".encode("utf-8"))
+            f.write_bytes("第1章 开端\r\n正文一。\r\n下一段。\r\n".encode())
             out = text_access.read_text(f, field="t")
             self.assertNotIn("\r", out)
             self.assertEqual(out, "第1章 开端\n正文一。\n下一段。\n")
@@ -288,12 +289,58 @@ class TestLineEndingNormalization(unittest.TestCase):
     def test_lone_cr_is_normalized(self):
         import tempfile
         from pathlib import Path as _P
+
         from gui import text_access
         with tempfile.TemporaryDirectory() as td:
             f = _P(td) / "cr.txt"
             f.write_bytes(b"\xe7\xac\xac1\xe7\xab\xa0\r\xe6\xad\xa3\xe6\x96\x87")
             out = text_access.read_text(f, field="t")
             self.assertNotIn("\r", out)
+
+
+class TestJsonFileBomCompat(unittest.TestCase):
+    """JSON 读取必须兼容 BOM（2026-11-05）。
+
+    用户用记事本编辑资产卡后「另存为 UTF-8」会写入 BOM（EF BB BF）。严格
+    UTF-8 解码得到 \ufeff{...}，json 直接抛 Unexpected UTF-8 BOM——界面上
+    就是"资产损坏"。而 CLI 侧 scripts/assemble.load_json 早就有 utf-8-sig
+    回退，同一份资产 CLI 能用、GUI 报损坏。
+
+    修法：GUI 里 31 处 json.loads(x.read_text("utf-8")) 统一改用
+    read_text(encoding="utf-8-sig")。
+    """
+
+    def test_bom_json_is_readable(self):
+        import tempfile
+        from pathlib import Path as _P
+
+        from gui import text_access
+        with tempfile.TemporaryDirectory() as td:
+            f = _P(td) / "bom.json"
+            f.write_bytes("﻿{\"a\": 1}".encode())
+            self.assertEqual(text_access.read_json_file(f), {"a": 1})
+
+    def test_plain_json_still_readable(self):
+        import tempfile
+        from pathlib import Path as _P
+
+        from gui import text_access
+        with tempfile.TemporaryDirectory() as td:
+            f = _P(td) / "plain.json"
+            f.write_text('{"a": 2}', encoding="utf-8")
+            self.assertEqual(text_access.read_json_file(f), {"a": 2})
+
+    def test_invalid_json_raises(self):
+        import json as _json
+        import tempfile
+        from pathlib import Path as _P
+
+        from gui import text_access
+        with tempfile.TemporaryDirectory() as td:
+            f = _P(td) / "bad.json"
+            f.write_text("{ not json", encoding="utf-8")
+            with self.assertRaises(_json.JSONDecodeError):
+                text_access.read_json_file(f)
 
 
 if __name__ == "__main__":

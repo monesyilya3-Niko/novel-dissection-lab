@@ -144,7 +144,7 @@ def _load_asset_json(ref: str) -> dict[str, Any]:
     if not fp.is_file():
         raise ServiceError(f"资产不存在: {ref}", 404)
     try:
-        return json.loads(fp.read_text(encoding="utf-8"))
+        return json.loads(fp.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, OSError) as exc:
         raise ServiceError(f"资产文件损坏: {exc}", 500) from exc
 
@@ -237,7 +237,7 @@ def list_projects() -> list[dict[str, Any]]:
                 name = child.name
                 if state_file.is_file():
                     try:
-                        name = json.loads(state_file.read_text(encoding="utf-8")).get("name", child.name)
+                        name = json.loads(state_file.read_text(encoding="utf-8-sig")).get("name", child.name)
                     except (json.JSONDecodeError, OSError):
                         pass
                 projects.append({"id": child.name, "name": name, "read_only": False})
@@ -477,7 +477,7 @@ def assemble(name: str, genre: str, skip_craft: bool = False) -> dict[str, Any]:
         if not fp.is_file():
             return None
         try:
-            return json.loads(fp.read_text(encoding="utf-8"))
+            return json.loads(fp.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, OSError):
             return None
 
@@ -494,7 +494,7 @@ def assemble(name: str, genre: str, skip_craft: bool = False) -> dict[str, Any]:
     metrics = {}
     if metrics_fp.is_file():
         try:
-            metrics = json.loads(metrics_fp.read_text(encoding="utf-8"))
+            metrics = json.loads(metrics_fp.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, OSError) as exc:
             _log.warning(f"量化指标加载失败，注入提示将不含统计画像 {metrics_fp.name}: {exc}")
 

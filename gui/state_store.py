@@ -417,7 +417,7 @@ def list_books_summary() -> list[dict[str, Any]]:
     summaries: list[dict[str, Any]] = []
     for fp in _iter_state_files():
         try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
+            data = json.loads(fp.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, OSError) as exc:
             _log.warning(f"跳过无法解析的状态文件 {fp.name}: {exc}")
             continue

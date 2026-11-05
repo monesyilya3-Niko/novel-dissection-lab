@@ -652,7 +652,7 @@ class AssetIndex:
         if not fp.is_file():
             return False
         try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
+            data = json.loads(fp.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, OSError):
             return False
         models = data.get("models", {})
@@ -694,7 +694,7 @@ class AssetIndex:
         反向 import 会形成循环。
         """
         try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
+            data = json.loads(fp.read_text(encoding="utf-8-sig"))
         except (OSError, ValueError):
             return None
         if not isinstance(data, dict):
@@ -914,7 +914,7 @@ class AssetIndex:
         if not fp.is_file():
             return None
         try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
+            data = json.loads(fp.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, OSError) as exc:
             _log.warning(f"资产详情加载失败，content 置空 {fp.name}: {exc}")
             data = {}
@@ -946,7 +946,7 @@ class AssetIndex:
         if not fp.is_file():
             raise KeyError(f"资产不存在: {name}")
         try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
+            data = json.loads(fp.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, OSError) as exc:
             _log.warning(f"资产详情加载失败，content 置空 {fp.name}: {exc}")
             data = {}

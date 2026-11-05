@@ -646,7 +646,7 @@ def _report_char_count(fp: Path) -> int:
 def _load_json(fp: Path) -> dict[str, Any]:
     """读 JSON，失败返回空 dict（不阻断迁移，宁多勿丢靠兜底 kind）。"""
     try:
-        data = json.loads(fp.read_text(encoding="utf-8"))
+        data = json.loads(fp.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, OSError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -909,7 +909,7 @@ def sync_asset(fp: Path) -> bool:
     if not fp.is_file():
         return False
     try:
-        content = json.loads(fp.read_text(encoding="utf-8"))
+        content = json.loads(fp.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, OSError):
         return False
     if not isinstance(content, dict):

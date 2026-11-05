@@ -31,6 +31,7 @@
 from __future__ import annotations
 
 import errno
+import json
 import os
 import stat
 from pathlib import Path
@@ -40,6 +41,15 @@ from gui.services import ServiceError
 #: 允许读取的正文扩展名（小写）。
 TEXT_SUFFIXES: frozenset[str] = frozenset({".txt", ".md"})
 
+#: 单文件读取上限：**单章**的合理上限（打分 / 合规 / 投稿导出走这个）。
+#:
+#: ⚠️ 不要和另外两个上限"对齐"，它们是不同用途的有意分层：
+#:   - 这里 8MB  — 单章。一章 8MB 已远超任何真实网文章节（通常 2-5KB）。
+#:   - quality_service._EXTERNAL_MAX_FILE_BYTES 50MB — 质检单章，放宽是因为
+#:     外部稿子常常一章含多个小节、图片占位等冗余内容。
+#:   - services._IMPORT_MAX_BYTES 100MB — **整本**导入，不是单章。
+#: 统一成一个数字会让某个入口变得不合理（把整本导入压到 8MB，或让单章
+#: 校验放行 100MB 的垃圾文件）。
 MAX_FILE_BYTES = 8 * 1024 * 1024
 MAX_FILES = 2000
 MAX_TOTAL_BYTES = 64 * 1024 * 1024
@@ -171,6 +181,25 @@ def read_text(
         except UnicodeDecodeError:
             continue
     raise _fmt(msgs, "decode", field=field)
+
+
+def read_json_file(path: str | Path) -> object:
+    """读 JSON 文件，兼容 BOM（2026-11-05 新增，**内部数据文件专用**）。
+
+    为什么需要：GUI 里有 30+ 处 ``json.loads(fp.read_text(encoding="utf-8"))``。
+    用户用记事本编辑资产卡后「另存为 UTF-8」会写入 BOM（EF BB BF），
+    严格 UTF-8 解码得到的是 ``\\ufeff{...}``，json 直接抛
+    ``Unexpected UTF-8 BOM (decode using utf-8-sig)``——界面上就是"资产损坏"。
+    而 CLI 侧 ``scripts/assemble.load_json`` 早就有 utf-8-sig 回退，
+    同一份资产 CLI 能用、GUI 报损坏。
+
+    ⚠️ 只给**内部数据文件**（资产卡、状态、配置）用，不要用它读用户正文：
+    正文必须走 ``read_text``（它还有符号链接 / 体积 / 编码链等防线）。
+
+    异常照常抛出（JsonDecodeError / OSError），由调用方决定怎么处理——
+    这里只负责编码层，不吞错误。
+    """
+    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 
 
 def text_files_in(raw_dir: str | Path, *, field: str) -> list[Path]:

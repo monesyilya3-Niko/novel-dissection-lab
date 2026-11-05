@@ -154,7 +154,7 @@ def compliance_scan(voice: str | None = None,
         if not fp.is_file():
             raise ServiceError(f"资产不存在: {voice}", 404)
         try:
-            asset = json.loads(fp.read_text(encoding="utf-8"))
+            asset = json.loads(fp.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, OSError) as exc:
             raise ServiceError(f"资产文件损坏: {exc}", 500) from exc
 
@@ -184,7 +184,7 @@ def compliance_scan(voice: str | None = None,
         # 全量扫描（不带原文，只做字段级检查）
         for fp in sorted(config.ASSETS_ROOT.glob("*.json")):
             try:
-                asset = json.loads(fp.read_text(encoding="utf-8"))
+                asset = json.loads(fp.read_text(encoding="utf-8-sig"))
             except (json.JSONDecodeError, OSError) as exc:
                 _log.warning(f"合规扫描跳过无法解析的资产 {fp.name}: {exc}")
                 continue
@@ -258,7 +258,7 @@ def _load_settings_file() -> dict[str, Any]:
     if not path.is_file():
         return {}
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
         return data if isinstance(data, dict) else {}
     except (json.JSONDecodeError, OSError) as exc:
         _log.warning(f"settings.json 损坏，回退为空配置（阈值/写作配置将用默认值）: {exc}")

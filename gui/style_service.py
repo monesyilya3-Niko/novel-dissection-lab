@@ -198,7 +198,7 @@ def list_styles() -> list[dict[str, Any]]:
     styles = []
     for fp in sorted(_styles_dir().glob("*.json")):
         try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
+            data = json.loads(fp.read_text(encoding="utf-8-sig"))
             styles.append({
                 "name": fp.stem,
                 "created_at": data.get("created_at", ""),
@@ -217,7 +217,7 @@ def get_style(name: str) -> dict[str, Any]:
     if not fp.is_file():
         raise ServiceError(f"风格不存在: {n}", 404)
     try:
-        return json.loads(fp.read_text(encoding="utf-8"))
+        return json.loads(fp.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, OSError) as exc:
         raise ServiceError(f"风格文件损坏: {exc}", 500) from exc
 

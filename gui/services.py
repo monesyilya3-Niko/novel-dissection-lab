@@ -906,7 +906,7 @@ def get_asset(book_id: str, chapter_index: int, batch_index: int, pass_name: str
     if not ap.is_file():
         return {}
     try:
-        return json.loads(ap.read_text(encoding="utf-8"))
+        return json.loads(ap.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, OSError) as exc:
         _log.warning(f"pass 资产加载失败，按空结果返回 {ap.name}: {exc}")
         return {}
@@ -1140,7 +1140,7 @@ def _load_assembled_card(book_id: str, card_type: str) -> dict[str, Any]:
             fp = d / fname
             if fp.is_file():
                 try:
-                    return json.loads(fp.read_text(encoding="utf-8"))
+                    return json.loads(fp.read_text(encoding="utf-8-sig"))
                 except (json.JSONDecodeError, OSError) as exc:
                     _log.warning(f"资产卡加载失败 {fp.name}: {exc}")
                     continue
@@ -1202,7 +1202,7 @@ def _collect_chapter_scores(book_id: str, voice: dict[str, Any]) -> list[dict[st
         except (ValueError, IndexError):
             continue
         try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
+            data = json.loads(fp.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, OSError) as exc:
             _log.warning(f"跳过无法解析的批状态 {fp.name}: {exc}")
             continue
@@ -1307,7 +1307,7 @@ def _assemble_after_analysis(book_id: str, genre: str,
         for fp in sorted(base.glob(f"c*-b*-{pass_name}.json"),
                          key=lambda p: _batch_sort_key(p.name)):
             try:
-                part = _json.loads(fp.read_text(encoding="utf-8"))
+                part = _json.loads(fp.read_text(encoding="utf-8-sig"))
             except (OSError, ValueError):
                 continue
             if not isinstance(part, dict):
@@ -1557,7 +1557,7 @@ def _load_library(filename: str) -> Any:
             return cached[1]
 
     try:
-        data = json.loads(fp.read_text(encoding="utf-8"))
+        data = json.loads(fp.read_text(encoding="utf-8-sig"))
     except Exception as exc:  # noqa: BLE001 —— 与原各 get_* 的宽泛捕获一致
         raise ServiceError(f"{filename} 损坏: {exc}", 500) from exc
 

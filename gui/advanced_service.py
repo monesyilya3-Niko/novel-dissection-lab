@@ -35,7 +35,7 @@ def distill_genre(genre: str, book_names: list[str] | None = None) -> dict[str, 
         if "distilled" in fp.stem:
             continue
         try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
+            data = json.loads(fp.read_text(encoding="utf-8-sig"))
             if data.get("meta", {}).get("genre") == genre:
                 books.append(fp.stem.replace("-voice-card", ""))
         except (json.JSONDecodeError, OSError) as exc:
@@ -98,7 +98,7 @@ def distill_status(genre: str) -> dict[str, Any]:
         if "distilled" in fp.stem:
             continue
         try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
+            data = json.loads(fp.read_text(encoding="utf-8-sig"))
             if data.get("meta", {}).get("genre") == genre:
                 books.append(fp.stem.replace("-voice-card", ""))
         except (json.JSONDecodeError, OSError) as exc:
@@ -130,7 +130,7 @@ def aggregate_genre(genre: str) -> dict[str, Any]:
         if "distilled" in fp.stem:
             continue
         try:
-            data = json.loads(fp.read_text(encoding="utf-8"))
+            data = json.loads(fp.read_text(encoding="utf-8-sig"))
             if data.get("meta", {}).get("genre") == genre:
                 books.append(fp.stem.replace("-voice-card", ""))
         except (json.JSONDecodeError, OSError) as exc:
