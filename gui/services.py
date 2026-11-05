@@ -23,6 +23,10 @@ _log = get_logger("services")
 # 每个 pass 分析的 kind 名（串行顺序）。
 PASS_ORDER = ("pass1_structure", "pass2_character", "pass3_style", "pass4_commercial")
 
+#: 主循环最多重扫几轮。retry_failed 把失败批改回 pending 后需要再走一遍，
+#: 但有上限——否则「一直失败 → 一直 pending → 无限重扫」会把线程卡死。
+_MAX_RESCAN_ROUNDS = 3
+
 
 class ServiceError(Exception):
     """服务层业务错误，携带 HTTP 状态码。"""
@@ -545,69 +549,88 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
         total_batches = _count_total_batches(chapters, batch_size)
         done = 0
 
-        for ci, (ctitle, cbody) in enumerate(chapters, start=1):
-            batches = engine_adapter.split_batches(cbody, batch_size)
-            for b in batches:
-                bi = b["batch_index"]
-                key = state_store.batch_id(ci, bi)
+        # 2026-11-05：主循环支持**重扫**。
+        # retry_failed 在线程存活时把失败批改回 pending 并承诺「将在当前循环内重扫」，
+        # 但原来的单趟 for 循环已经走过那些位置，pending 再也不会被访问——
+        # 接口 200、提示说会重扫、该批却永远停在 pending。
+        # 现在整趟遍历结束后，只要还有 pending 批就再扫一轮（最多 MAX_RESCAN_ROUNDS 轮）。
+        _rescan_rounds = 0
+        while True:
+            for ci, (ctitle, cbody) in enumerate(chapters, start=1):
+                batches = engine_adapter.split_batches(cbody, batch_size)
+                for b in batches:
+                    bi = b["batch_index"]
+                    key = state_store.batch_id(ci, bi)
 
-                # 断点续传：已 success 的批直接跳过，不重复分析（设计 §3.3/§5）。
-                existing = state_store.load_state(book_id).get("chapter_states", {}).get(key)
-                if existing and existing.get("status") == "success":
-                    done += 1
-                    continue
+                    # 断点续传：已 success 的批直接跳过，不重复分析（设计 §3.3/§5）。
+                    existing = state_store.load_state(book_id).get("chapter_states", {}).get(key)
+                    if existing and existing.get("status") == "success":
+                        done += 1
+                        continue
 
-                _wait_if_paused(ctx)
-                if ctx["stop_flag"].is_set():
-                    _publish(book_id, ci, bi, "paused", done, total_batches, ctx)
-                    return
-                # 2026-11-03：从暂停恢复后要把 state.status 改回 running。
-                # 此前 pause 会把状态写成 "paused"，resume 只 clear 了内存里的
-                # Event，主循环这里没回写状态——于是分析已经继续跑批，
-                # /api/status 却永远显示 paused，前端也就不再刷新进度。
-                _resume_status_if_paused(book_id)
+                    _wait_if_paused(ctx)
+                    if ctx["stop_flag"].is_set():
+                        _publish(book_id, ci, bi, "paused", done, total_batches, ctx)
+                        return
+                    # 2026-11-03：从暂停恢复后要把 state.status 改回 running。
+                    # 此前 pause 会把状态写成 "paused"，resume 只 clear 了内存里的
+                    # Event，主循环这里没回写状态——于是分析已经继续跑批，
+                    # /api/status 却永远显示 paused，前端也就不再刷新进度。
+                    _resume_status_if_paused(book_id)
 
-                _publish(book_id, ci, bi, "running", done, total_batches, ctx)
-                # 标记 running 落盘
-                state = state_store.load_state(book_id)
-                state_store.set_batch_state(state, ci, bi, "running")
-                state_store.save_state(state)
-
-                # 串行跑四个 pass
-                batch_results = {}
-                last_asset = None
-                try:
-                    for pass_name in PASS_ORDER:
-                        out = engine_adapter.run_batch(
-                            pass_name, ci, ctitle, b["text"], metrics,
-                            dry_run=False, model_id=model_id,
-                        )
-                        batch_results[pass_name] = out
-                        # 每个 pass 落一个资产文件
-                        ap = state_store.asset_path(book_id, ci, bi, pass_name)
-                        ap.parent.mkdir(parents=True, exist_ok=True)
-                        ap.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
-                        # 资产相对路径以 ASSETS_ROOT 为基准（不假设 ASSETS_ROOT 在 ROOT_DIR 下，
-                        # 兼容测试/自定义目录隔离），供前端按 book_id/ch/batch/pass 定位。
-                        try:
-                            last_asset = str(ap.relative_to(config.ASSETS_ROOT))
-                        except ValueError:
-                            last_asset = str(ap)
-                except Exception as exc:  # noqa: BLE001
+                    _publish(book_id, ci, bi, "running", done, total_batches, ctx)
+                    # 标记 running 落盘
                     state = state_store.load_state(book_id)
-                    state_store.set_batch_state(state, ci, bi, "failed")
-                    state["last_error"] = str(exc)[:500]
+                    state_store.set_batch_state(state, ci, bi, "running")
+                    state_store.save_state(state)
+
+                    # 串行跑四个 pass
+                    batch_results = {}
+                    last_asset = None
+                    try:
+                        for pass_name in PASS_ORDER:
+                            out = engine_adapter.run_batch(
+                                pass_name, ci, ctitle, b["text"], metrics,
+                                dry_run=False, model_id=model_id,
+                            )
+                            batch_results[pass_name] = out
+                            # 每个 pass 落一个资产文件
+                            ap = state_store.asset_path(book_id, ci, bi, pass_name)
+                            ap.parent.mkdir(parents=True, exist_ok=True)
+                            ap.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+                            # 资产相对路径以 ASSETS_ROOT 为基准（不假设 ASSETS_ROOT 在 ROOT_DIR 下，
+                            # 兼容测试/自定义目录隔离），供前端按 book_id/ch/batch/pass 定位。
+                            try:
+                                last_asset = str(ap.relative_to(config.ASSETS_ROOT))
+                            except ValueError:
+                                last_asset = str(ap)
+                    except Exception as exc:  # noqa: BLE001
+                        state = state_store.load_state(book_id)
+                        state_store.set_batch_state(state, ci, bi, "failed")
+                        state["last_error"] = str(exc)[:500]
+                        state_store.save_state(state)
+                        done += 1
+                        _publish(book_id, ci, bi, "failed", done, total_batches, ctx)
+                        continue
+
+                    # 记录成功（资产取 pass1 作为代表，asset_index 只记批）
+                    state = state_store.load_state(book_id)
+                    state_store.set_batch_state(state, ci, bi, "success", asset=last_asset)
                     state_store.save_state(state)
                     done += 1
-                    _publish(book_id, ci, bi, "failed", done, total_batches, ctx)
-                    continue
+                    _publish(book_id, ci, bi, "success", done, total_batches, ctx)
 
-                # 记录成功（资产取 pass1 作为代表，asset_index 只记批）
-                state = state_store.load_state(book_id)
-                state_store.set_batch_state(state, ci, bi, "success", asset=last_asset)
-                state_store.save_state(state)
-                done += 1
-                _publish(book_id, ci, bi, "success", done, total_batches, ctx)
+            # 一趟遍历结束：若仍有 pending（retry_failed 改回来的），再来一轮
+            _st = state_store.load_state(book_id)
+            _has_pending = any(
+                (v or {}).get("status") == "pending"
+                for v in (_st.get("chapter_states") or {}).values())
+            if not _has_pending or ctx["stop_flag"].is_set():
+                break
+            _rescan_rounds += 1
+            if _rescan_rounds >= _MAX_RESCAN_ROUNDS:
+                _log.warning("重扫已达上限 %d 轮，仍有 pending 批，停止", _MAX_RESCAN_ROUNDS)
+                break
 
         # 全部完成
         state = state_store.load_state(book_id)
