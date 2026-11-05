@@ -811,6 +811,11 @@ def resume(book_id: str, genre: str | None = None, model_id: str | None = None) 
 
 def retry_failed(book_id: str) -> dict[str, Any]:
     """重试所有失败批（P1）。把失败批状态重置为 pending，再触发续传。"""
+    # 先无锁探一次：绝大多数情况下没有失败批，直接返回省掉一次整份状态写。
+    _probe = state_store.load_state(book_id).get("chapter_states", {})
+    if not any(isinstance(v, dict) and v.get("status") == "failed"
+               for v in _probe.values()):
+        return {"retried": 0}
     # 原子改状态：分析线程可能正在同一 book_id 上推进批次，load→save 会覆盖。
     with state_store.update_state(book_id) as state:
         failed = [k for k, v in state.get("chapter_states", {}).items()
