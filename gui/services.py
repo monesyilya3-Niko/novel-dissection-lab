@@ -505,17 +505,16 @@ def start_analysis(book_id: str, genre: str, model_id: str | None = None,
         if rt and rt.get("thread") and rt["thread"].is_alive():
             raise ServiceError("分析已在运行中", 409)
 
-        state = state_store.load_state(book_id)
-        state["genre"] = genre
-        state["model_id"] = model_id
-        state["batch_size"] = bs
         # 【修复 H3】必须把 status 重置为 running 并清掉上一次的 report_error。
         # 否则重跑一本已分析完（status="done"）的书时，报告监听线程 _watch 首次
         # 轮询就读到残留的 "done"，立刻用旧/半成品资产生成报告，并与新启动的
         # 分析线程并发读写同一批资产卡；返回体却仍声称 status:"running"。
-        state["status"] = "running"
-        state.pop("report_error", None)
-        state_store.save_state(state)
+        with state_store.update_state(book_id) as state:
+            state["genre"] = genre
+            state["model_id"] = model_id
+            state["batch_size"] = bs
+            state["status"] = "running"
+            state.pop("report_error", None)
 
         # 启动后台线程（在锁内完成登记与启动，保证并发安全）
         stop_flag = threading.Event()
@@ -579,10 +578,9 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
                     _resume_status_if_paused(book_id)
 
                     _publish(book_id, ci, bi, "running", done, total_batches, ctx)
-                    # 标记 running 落盘
-                    state = state_store.load_state(book_id)
-                    state_store.set_batch_state(state, ci, bi, "running")
-                    state_store.save_state(state)
+                    # 标记 running 落盘（原子读改写：HTTP 线程可能同时在 pause/retry）
+                    with state_store.update_state(book_id) as state:
+                        state_store.set_batch_state(state, ci, bi, "running")
 
                     # 串行跑四个 pass
                     batch_results = {}
@@ -605,18 +603,16 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
                             except ValueError:
                                 last_asset = str(ap)
                     except Exception as exc:  # noqa: BLE001
-                        state = state_store.load_state(book_id)
-                        state_store.set_batch_state(state, ci, bi, "failed")
-                        state["last_error"] = str(exc)[:500]
-                        state_store.save_state(state)
+                        with state_store.update_state(book_id) as state:
+                            state_store.set_batch_state(state, ci, bi, "failed")
+                            state["last_error"] = str(exc)[:500]
                         done += 1
                         _publish(book_id, ci, bi, "failed", done, total_batches, ctx)
                         continue
 
                     # 记录成功（资产取 pass1 作为代表，asset_index 只记批）
-                    state = state_store.load_state(book_id)
-                    state_store.set_batch_state(state, ci, bi, "success", asset=last_asset)
-                    state_store.save_state(state)
+                    with state_store.update_state(book_id) as state:
+                        state_store.set_batch_state(state, ci, bi, "success", asset=last_asset)
                     done += 1
                     _publish(book_id, ci, bi, "success", done, total_batches, ctx)
 
@@ -633,9 +629,9 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
                 break
 
         # 全部完成
-        state = state_store.load_state(book_id)
-        state["status"] = "done"
-        state_store.save_state(state)
+        with state_store.update_state(book_id) as state:
+            state["status"] = "done"
+            state.pop("last_error", None)
         # 2026-11-04：分析结束后组装整书资产卡。
         # 此前只落了批级 pass 文件就置 done，而 get_book_results /
         # _generate_reports_inner 读的是 {book_id}-voice-card.json 这类整书卡——
@@ -646,10 +642,9 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
             _log.warning("分析后组装资产失败（批级产物仍完整）: %s", exc)
         _publish(book_id, 0, 0, "done", done, total_batches, ctx)
     except Exception as exc:  # noqa: BLE001
-        state = state_store.load_state(book_id)
-        state["status"] = "error"
-        state["last_error"] = str(exc)[:500]
-        state_store.save_state(state)
+        with state_store.update_state(book_id) as state:
+            state["status"] = "error"
+            state["last_error"] = str(exc)[:500]
     finally:
         # B7：任务结束清理 _runtime 条目，避免内存缓慢增长。
         with _runtime_lock:
@@ -725,10 +720,13 @@ def _resume_status_if_paused(book_id: str) -> None:
     只在确实处于 paused 时写盘，避免每个批都多一次 state 读写。
     """
     try:
-        state = state_store.load_state(book_id)
-        if state.get("status") == "paused":
-            state["status"] = "running"
-            state_store.save_state(state)
+        # 先无锁读判一次，绝大多数批不在 paused 状态，直接返回省掉一次写。
+        if state_store.load_state(book_id).get("status") != "paused":
+            return
+        with state_store.update_state(book_id) as state:
+            # 持锁后再判一次：无锁读到 paused 与真正写之间，分析线程可能已推进状态。
+            if state.get("status") == "paused":
+                state["status"] = "running"
     except Exception as exc:  # noqa: BLE001 - 状态回写失败不阻断分析
         _log.warning("恢复 paused→running 失败（不影响分析继续）: %s", exc)
 
@@ -766,9 +764,11 @@ def pause(book_id: str) -> dict[str, Any]:
     if ctx is None:
         raise ServiceError("没有运行中的分析任务", 404)
     ctx["paused"].set()
-    state = state_store.load_state(book_id)
-    state["status"] = "paused"
-    state_store.save_state(state)
+    # ⚠️ 必须走 update_state（原子读改写）：分析线程此时可能正在同一 book_id
+    # 上把某批标 success。旧写法先 load 再 save，会用这份旧快照整份覆盖，
+    # 把已完成的批抹回初始状态（实测复现见 state_store.update_state 文档）。
+    with state_store.update_state(book_id) as state:
+        state["status"] = "paused"
     return {"cursor": state.get("cursor", "")}
 
 
@@ -795,13 +795,14 @@ def resume(book_id: str, genre: str | None = None, model_id: str | None = None) 
 
 def retry_failed(book_id: str) -> dict[str, Any]:
     """重试所有失败批（P1）。把失败批状态重置为 pending，再触发续传。"""
-    state = state_store.load_state(book_id)
-    failed = [k for k, v in state.get("chapter_states", {}).items() if v.get("status") == "failed"]
-    if not failed:
-        return {"retried": 0}
-    for key in failed:
-        state["chapter_states"][key]["status"] = "pending"
-    state_store.save_state(state)
+    # 原子改状态：分析线程可能正在同一 book_id 上推进批次，load→save 会覆盖。
+    with state_store.update_state(book_id) as state:
+        failed = [k for k, v in state.get("chapter_states", {}).items()
+                  if isinstance(v, dict) and v.get("status") == "failed"]
+        if not failed:
+            return {"retried": 0}
+        for key in failed:
+            state["chapter_states"][key]["status"] = "pending"
     # L2：线程存活时主循环会按 pending 重扫，不必（也不能）再 resume。
     rt = _runtime.get(book_id)
     if rt and rt.get("thread") and rt["thread"].is_alive():
@@ -1177,9 +1178,8 @@ def _schedule_report_generation(book_id: str, book: dict[str, Any]) -> None:
                     try:
                         _generate_reports(book_id, book)
                     except Exception as exc:  # noqa: BLE001
-                        st = state_store.load_state(book_id)
-                        st["report_error"] = str(exc)[:500]
-                        state_store.save_state(st)
+                        with state_store.update_state(book_id) as st:
+                            st["report_error"] = str(exc)[:500]
                 return
             time.sleep(1.0)
 
@@ -1339,9 +1339,8 @@ def _generate_reports_inner(book_id: str, book: dict[str, Any]) -> None:
         msg = (f"铁律二未通过：拆书报告 {chk['book_chars']} 字 + 笔法分析 "
                f"{chk['craft_chars']} 字 = 合计 {chk['total']} 字 < 硬门槛 "
                f"{chk['min_chars']} 字（已阻止写盘，未产出任何报告文件）")
-        st = state_store.load_state(book_id)
-        st["report_error"] = msg
-        state_store.save_state(st)
+        with state_store.update_state(book_id) as state:
+            state["report_error"] = msg
         broker.publish({
             "book_id": book_id,
             "status": "report_error",

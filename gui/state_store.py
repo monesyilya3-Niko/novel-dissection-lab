@@ -177,31 +177,8 @@ def _save_state_json(state: dict[str, Any]) -> None:
         raise ValueError("state 缺 book_id，无法定位状态文件")
     path = state_path_for(book_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    # 唯一临时名：pid + 线程 id + 单调计数器。
-    #
-    # 注：在**同进程内**，下面的按路径锁已足以避免冲突——本行是第二层
-    # 防御，针对锁覆盖不到的场景：跨进程写同一状态文件（如 CLI 与 GUI
-    # 同时运行）。那种场景下两个进程各自的锁互不可见，固定 tmp 名会让
-    # 它们互相窃取临时文件；唯一名让每个写者各写各的，os.replace 仍是
-    # 原子的（Windows 上跨进程同目标并发 replace 可能失败，但那是
-    # 罕见场景且失败是显式的——不会静默丢数据）。
-    with _TMP_COUNTER_LOCK:
-        _TMP_COUNTER[0] += 1
-        seq = _TMP_COUNTER[0]
-    tmp = path.with_suffix(f"{path.suffix}.{os.getpid()}.{threading.get_ident()}.{seq}.tmp")
     with _path_lock(path):
-        try:
-            with tmp.open("w", encoding="utf-8") as fh:
-                json.dump(state, fh, ensure_ascii=False, indent=2)
-                fh.write("\n")
-            os.replace(tmp, path)
-        except Exception:
-            # 失败时清掉自己的临时文件，避免残留堆积（尽力而为，不掩盖原异常）。
-            try:
-                tmp.unlink(missing_ok=True)
-            except OSError:
-                pass
-            raise
+        _save_state_json_no_lock(state, path)
 
 
 @contextmanager
@@ -260,6 +237,68 @@ def bump_revision(state: dict[str, Any]) -> dict[str, Any]:
     """单调递增 state_revision 并返回 state（原地修改）。"""
     state["state_revision"] = state.get("state_revision", 0) + 1
     return state
+
+
+@contextmanager
+def update_state(book_id: str) -> Iterator[dict[str, Any]]:
+    """原子「读 → 改 → 写」任务状态（2026-11-05 修复 lost update）。
+
+    ⚠️ 必须用它，不要写 ``load_state() → 改 → save_state()``：
+
+    原写法在并发下会**静默抹掉进度**。实测复现（2 条语句就够）::
+
+        snap = load_state(bid)            # pause() 读到的旧快照
+        worker = load_state(bid)          # 分析线程
+        set_batch_state(worker, 0, 0, "success")
+        save_state(worker)                # 进度落盘
+        snap["status"] = "paused"
+        save_state(snap)                  # ← pause 把整份旧快照覆盖回去
+        # chapter_states 从 {"c0-b0": success} 变回 {}
+
+    真实触发路径：``pause()`` / ``retry_failed()`` / ``_resume_status_if_paused()``
+    都是 HTTP 线程，而分析线程正在同一 book_id 上逐批写 success。
+    两者交错的窗口是**整份状态文件**——一旦覆盖，已完成的批会被重新分析，
+    用户看到的进度条也会往回跳。
+
+    这里的锁与 ``_save_state_json`` 用的是同一个按路径锁，所以嵌套调用
+    （``update_state`` 内再 ``save_state``）会**自死锁**——内部改用不取锁的
+    ``upsert_task_unlocked`` / ``_save_state_json_no_lock``。
+    """
+    path = state_path_for(book_id)
+    with _path_lock(path):
+        state = load_state(book_id)
+        yield state
+        state["book_id"] = book_id
+        try:
+            upsert_task_unlocked(state)
+        except Exception as exc:  # noqa: BLE001 — 库不可用时降级为纯 JSON
+            _log.warning(
+                "SQLite 权威写入失败，降级为纯 JSON 副本 book_id=%s: %s", book_id, exc)
+            try:
+                _save_state_json_no_lock(state, path)
+            except Exception as exc2:  # noqa: BLE001
+                _log.warning("JSON 降级副本写入失败（权威库可能已更新）book_id=%s: %s",
+                             book_id, exc2)
+
+
+def _save_state_json_no_lock(state: dict[str, Any], path: Path) -> None:
+    """写唯一 tmp 再原子替换，**不取路径锁**（调用方已持有）。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _TMP_COUNTER_LOCK:
+        _TMP_COUNTER[0] += 1
+        seq = _TMP_COUNTER[0]
+    tmp = path.with_suffix(f"{path.suffix}.{os.getpid()}.{threading.get_ident()}.{seq}.tmp")
+    try:
+        with tmp.open("w", encoding="utf-8") as fh:
+            json.dump(state, fh, ensure_ascii=False, indent=2)
+            fh.write("\n")
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
 
 
 def batch_id(chapter_index: int, batch_index: int) -> str:
@@ -386,6 +425,23 @@ def upsert_task(task: dict[str, Any]) -> None:
     （JSON 字符串），``cursor``/``status``/``genre``/``model_id``/``batch_size``/
     ``state_revision`` 一并落库。运行态（线程/控制标志）不落库（D3）。
     """
+    _upsert_task_core(task, _save_state_json)
+
+
+def upsert_task_unlocked(task: dict[str, Any]) -> None:
+    """``upsert_task`` 的无锁版本：调用方已持有该状态文件的路径锁。
+
+    ``update_state`` 持锁期间调用它，若再走 ``_save_state_json``（内部取同一把
+    锁）就会自死锁。这里换成不取锁的写入器。
+    """
+    _upsert_task_core(
+        task,
+        lambda st: _save_state_json_no_lock(st, state_path_for(st["book_id"])),
+    )
+
+
+def _upsert_task_core(task: dict[str, Any], json_writer) -> None:
+    """双写的公共实现；``json_writer`` 由调用方选择是否取路径锁。"""
     book_id = task.get("book_id", "")
     if not book_id:
         raise ValueError("task 缺 book_id")
@@ -407,7 +463,7 @@ def upsert_task(task: dict[str, Any]) -> None:
     db.upsert_task(db_task)
 
     # JSON 降级副本（复用原子写，避免再走 save_state 的二次 upsert 递归）。
-    _save_state_json(task)
+    json_writer(task)
 
 
 def load_task(book_id: str) -> dict[str, Any]:
