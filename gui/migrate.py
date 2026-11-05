@@ -635,9 +635,15 @@ def _upsert_genre(conn: Any, name: str, display_name: str | None, kind: str | No
 
 
 def _report_char_count(fp: Path) -> int:
-    """粗略字数：md 文本去空白后的字符数（支撑铁律二统计）。"""
+    """粗略字数：md 文本去空白后的字符数（支撑铁律二统计）。
+
+    用 utf-8-sig 而非 utf-8：报告虽由本应用生成，但用户手工编辑后
+    「另存为 UTF-8」（记事本会加 BOM）是常见操作，严格 utf-8 会抛
+    UnicodeDecodeError 被这里吞成 0 字——铁律二校验会误判报告不达标
+    （2026-11-05）。
+    """
     try:
-        text = fp.read_text(encoding="utf-8")
+        text = fp.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeDecodeError):
         return 0
     return len("".join(text.split()))
