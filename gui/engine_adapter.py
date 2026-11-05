@@ -707,6 +707,21 @@ def chapter_number_from_path(path: str | Path) -> int | None:
     return _chapter_number(Path(path))
 
 
+def discover_chapters(path: str | Path) -> dict:
+    """扫描章节目录，返回 ``{章号: Path}`` 与诊断信息（2026-11-05 新增）。
+
+    单一实现在 ``scripts.chapter_loader.discover_chapter_files``。为什么要有
+    这个出口：``writing_extra._iter_chapter_files`` 曾自己写了一套文件名匹配，
+    只认 ``^第\\d+[章回节]$``（要求「第N章」**结尾**），于是最普通的
+    ``第1章 开端.txt`` **匹配不上**——实测 5 个章节文件只识别出 1 个，
+    用户导出全书时其余章节被静默丢弃。
+
+    gui 层不得直接 import scripts/，故由本模块转发。
+    """
+    from scripts.chapter_loader import discover_chapter_files
+    return discover_chapter_files(Path(path))
+
+
 def read_chapter_text(path: str | Path) -> str:
     """读正文文件，编码按 UTF-8 → GBK 两段解（口径在 scripts/chapter_loader）。
 

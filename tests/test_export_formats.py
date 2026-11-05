@@ -210,6 +210,31 @@ class TestChapterFilenameCompat(unittest.TestCase):
         self.assertEqual(len(files), 1)
         self.assertEqual(files[0][1].name, "chapter-001.txt")
 
+    def test_common_names_are_recognized(self):
+        """导出必须认得最常见的章节命名（2026-11-05）。
+
+        writing_extra 原来自带一套正则，只认「第N章」**结尾**的形式，
+        于是 ``第1章 开端.txt`` 这类最普通的命名匹配不上。实测 5 个章节文件
+        只识别出 1 个（chapter-003.txt），其余章节在导出时被静默丢弃。
+
+        现在统一走 chapter_loader.discover_chapter_files。
+        """
+        proj = self._proj(["第1章 开端.txt", "第2章_再会.txt", "chapter-003.txt"])
+        from gui import writing_extra
+        got = [(no, fp.name) for no, fp in writing_extra._iter_chapter_files(proj)]
+        self.assertEqual(got, [(1, "第1章 开端.txt"), (2, "第2章_再会.txt"),
+                               (3, "chapter-003.txt")])
+
+    def test_backup_dir_is_excluded(self):
+        """``chapters/备份/`` 里的旧稿不得被当成正式章节导出。"""
+        proj = self._proj(["第1章.txt"])
+        from gui import config, writing_extra
+        bdir = config.NOVEL_DIR / proj / "chapters" / "备份"
+        bdir.mkdir(parents=True, exist_ok=True)
+        (bdir / "chapter-009.txt").write_text("旧稿", encoding="utf-8")
+        nos = [no for no, _ in writing_extra._iter_chapter_files(proj)]
+        self.assertEqual(nos, [1], "备份目录里的章节不该进入导出")
+
     def test_sorted_by_chapter_number(self):
         proj = self._proj(["第10章.txt", "第2章.txt", "第1章.txt"])
         from gui import writing_extra

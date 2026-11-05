@@ -1287,15 +1287,25 @@ def _iter_chapter_files(project: str) -> list[tuple[int, Path]]:
     """按章节号排序列出章节文件。
 
     同一章号出现多个文件时（如 ``001.txt`` 与 ``第1章.txt`` 并存），
-    保留文件名排序靠后的那个并告警——静默丢弃比重复更糟。
+    保留优先级更高的那个并告警——静默丢弃比重复更糟。
+
+    ⚠️ 2026-11-05：章号解析改由 ``engine_adapter.discover_chapters`` 统一出口
+    （实现在 ``scripts/chapter_loader``）。此前这里自带一套文件名正则，
+    只认「第N章」**结尾**的形式，于是最普通的 ``第1章 开端.txt`` 匹配不上——
+    实测 5 个章节文件只识别出 1 个，用户导出全书时其余章节被静默丢弃。
+    同时换成统一的扫描后，``备份/`` 等排除目录也被正确跳过（原先 rglob 会
+    把 ``chapters/备份/chapter-002.txt`` 当成正式章节导出）。
     """
     novel_dir = _novel_dir(project)
     chapters_dir = novel_dir / "chapters"
     if not chapters_dir.is_dir():
         return []
-    found: dict[int, Path] = {}
-    #: 同一章号多文件时的取舍优先级：显式带「chapter」前缀的最可信，
-    #: 其次是「第N章」，再次是纯数字（纯数字最可能是临时文件或备份）
+    diag = engine_adapter.discover_chapters(chapters_dir)
+    found: dict[int, Path] = dict(diag.get("files") or {})
+
+    # 重复章号：discover_chapter_files 会把它们从 files 里剔除（加载器宁可报错
+    # 也不静默挑一个）。导出场景不能少章，所以这里按确定性优先级补选一份：
+    # 显式 chapter 前缀 > 第N章 > 纯数字（纯数字最可能是临时文件/备份）。
     def _priority(fp: Path) -> tuple[int, int, str]:
         s = fp.stem.lower()
         if s.startswith("chapter") or s.startswith("ch"):
@@ -1304,28 +1314,15 @@ def _iter_chapter_files(project: str) -> list[tuple[int, Path]]:
             rank = 1
         else:
             rank = 2
-        # rank 越小越优先；同 rank 保留文件名较长者（通常信息更全，如 001-开端）
         return (rank, -len(fp.stem), fp.name)
 
-    duplicates: list[str] = []
-    for fp in sorted(chapters_dir.rglob("*")):
-        if not fp.is_file() or fp.suffix.lower() not in _CHAPTER_SUFFIXES:
-            continue
-        no = _chapter_no_from_name(fp.stem)
-        if no is None:
-            continue
-        prev = found.get(no)
-        if prev is not None:
-            if _priority(fp) < _priority(prev):
-                duplicates.append(f"{prev.name}（被 {fp.name} 取代）")
-                found[no] = fp
-            else:
-                duplicates.append(f"{fp.name}（保留 {prev.name}）")
-            continue
-        found[no] = fp
-    if duplicates:
-        _log.warning("项目 %s 存在重复章号文件（已保留先出现的）：%s",
-                     project, "；".join(duplicates))
+    dup_msgs: list[str] = []
+    for no, paths in (diag.get("duplicates") or {}).items():
+        best = min(paths, key=_priority)
+        found[no] = best
+        dup_msgs.append(f"章号 {no}: 保留 {best.name}（另有 {len(paths) - 1} 个同号文件）")
+    if dup_msgs:
+        _log.warning("项目 %s 存在重复章号文件：%s", project, "；".join(dup_msgs))
     return sorted(found.items())
 
 
