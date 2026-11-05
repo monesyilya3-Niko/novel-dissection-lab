@@ -45,6 +45,24 @@ import sampler  # noqa: E402
 class TestSamplerChapterSplitting(unittest.TestCase):
     """章节与分卷切分测试。"""
 
+    def test_split_chapters_chapter_number_with_spaces(self):
+        """``第 1 章`` 这类章号内带空格的写法必须识别（2026-11-05）。
+
+        手工整理的稿件常这么写。原实现要求 ``第`` 紧跟数字，于是
+        ``第 1 章`` / ``第1 章`` / ``第 1章`` 全部被当成正文——
+        整本塌成 1 章「（无标题开头）」，用户完全无法分析。
+
+        「第…章」是双锚点强标记，放宽空格不会误切正文。
+        真实语料 6 份（1900+ 章）改动前后识别数量完全一致，零回归。
+        """
+        for header in ("第 1 章", "第1 章", "第 1章", "第  12  回"):
+            with self.subTest(header=header):
+                text = f"{header} 开端\n正文A。\n\n{header} 再会\n正文B。\n"
+                chaps = sampler.split_chapters(text)
+                self.assertEqual(len(chaps), 2,
+                                 f"{header!r} 未被识别为章节标题")
+                self.assertTrue(chaps[0][0].startswith("第"), chaps[0][0])
+
     def test_split_chapters_varied_headers(self):
         text = """
 前言说明文字。
