@@ -6,11 +6,14 @@ import { I18nProvider } from '../state/I18nContext'
 const mockUploadBook = vi.fn()
 const mockImportSampleBook = vi.fn()
 const mockListSamples = vi.fn()
+const mockOpenBook = vi.fn()
+const mockListBooks = vi.fn()
 
 const mockAppState = {
   book: null as unknown,
   uploadBook: mockUploadBook,
   importSampleBook: mockImportSampleBook,
+  openBook: mockOpenBook,
 }
 
 vi.mock('../state/AppContext', () => ({
@@ -21,7 +24,7 @@ vi.mock('../state/AppContext', () => ({
 vi.mock('../api/client', () => ({
   listSamples: () => mockListSamples(),
   // 2026-11-03：LibraryList 新增的数据源，缺 mock 会让组件抛错
-  listBooks: () => Promise.resolve([]),
+  listBooks: () => mockListBooks(),
   // 保留真实 friendlyError 的行为契约：错误一律归一成可读文案。
   // 2026-11-02：此项此前缺失，导致组件里直接显示 (e as Error).message
   // 也没人发现——这正是本测试要守的回归点。
@@ -34,6 +37,7 @@ describe('ImportPanel 导入面板组件', () => {
     mockListSamples.mockResolvedValue([
       { name: 'sample_xuanhuan.txt', genre: '玄幻修真', chapters: 12 },
     ])
+    mockListBooks.mockResolvedValue([])
   })
 
   it('渲染拖拽上传区域及选择文件按钮', async () => {
@@ -149,3 +153,42 @@ describe('ImportPanel 导入面板组件', () => {
       expect(screen.getByText(/100MB/)).toBeInTheDocument()
     })
   })
+
+describe('已导入书目可点击切换（2026-11-05）', () => {
+  /**
+   * 列表项此前只有一个 Box，没有 onClick——用户看到书也切不回去，
+   * 刷新页面后 book_id 只剩在这个列表里，等于找不回自己的书。
+   */
+  it('点击书目调用 openBook', async () => {
+    mockListBooks.mockResolvedValue([
+      { bookId: 'bk-a', title: '第一本书', status: 'done' },
+      { bookId: 'bk-b', title: '第二本书', status: 'idle' },
+    ])
+    mockAppState.book = null
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <ImportPanel />
+      </I18nProvider>,
+    )
+    const item = await screen.findByText('第二本书')
+    fireEvent.click(item)
+    await waitFor(() => {
+      expect(mockOpenBook).toHaveBeenCalledWith('bk-b')
+    })
+  })
+
+  it('点击当前已选中的书不会重复切换', async () => {
+    mockListBooks.mockResolvedValue([
+      { bookId: 'bk-a', title: '当前书', status: 'done' },
+    ])
+    mockAppState.book = { bookId: 'bk-a', title: '当前书' }
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <ImportPanel />
+      </I18nProvider>,
+    )
+    const item = await screen.findByText('当前书')
+    fireEvent.click(item)
+    expect(mockOpenBook).not.toHaveBeenCalled()
+  })
+})

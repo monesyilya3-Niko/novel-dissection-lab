@@ -228,7 +228,7 @@ function SampleList({ onImported }: { onImported: () => void }) {
  */
 function LibraryList() {
   const { t } = useI18n()
-  const { book } = useApp()
+  const { book, openBook } = useApp()
   const [items, setItems] = useState<LibraryBook[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -259,9 +259,22 @@ function LibraryList() {
         {items.map((b) => (
           <Box
             key={b.bookId}
+            // 2026-11-05：列表项此前只有展示、点不动——用户看到书也切不回去，
+            // 刷新页面后 book_id 只剩在这个列表里，等于找不回自己的书。
+            onClick={() => { if (book?.bookId !== b.bookId) void openBook(b.bookId) }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                if (book?.bookId !== b.bookId) void openBook(b.bookId)
+              }
+            }}
             sx={{
               display: 'flex', alignItems: 'center', gap: 1, py: 0.4,
               px: 0.5, borderRadius: 1,
+              cursor: book?.bookId === b.bookId ? 'default' : 'pointer',
+              '&:hover': { bgcolor: 'action.hover' },
               bgcolor: book?.bookId === b.bookId ? 'action.selected' : 'transparent',
             }}
           >

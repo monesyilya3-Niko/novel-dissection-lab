@@ -56,6 +56,8 @@ interface AppState {
   importBook: (path: string) => Promise<void>
   uploadBook: (file: File) => Promise<void>
   importSampleBook: (name: string) => Promise<void>
+  /** 切换到已导入的某本书（2026-11-05）：书单列表此前只有展示，点不动 */
+  openBook: (bookId: string) => Promise<void>
   selectChapter: (idx: number) => Promise<void>
   refreshStatus: () => Promise<void>
   startAnalysis: (genre: string) => Promise<void>
@@ -193,6 +195,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await applyImportedBook(b)
   }, [applyImportedBook])
 
+  /**
+   * 切换到已导入的某本书（2026-11-05）。
+   *
+   * 「已导入书目」列表原先只有展示、点不动——用户看到书也切不回去，
+   * 刷新页面后就再也找不回（book_id 只存在于列表数据里）。
+   * 这里复用导入路径的 applyImportedBook（它会设当前书、清空章节选择、
+   * 初始化批次状态），只是书籍信息来自后端的 /api/books 列表。
+   */
+  const openBook = useCallback(async (bookId: string) => {
+    const b = await api.getBook(bookId)
+    await applyImportedBook(b)
+  }, [applyImportedBook])
+
   // 竞态守卫（与 loadBookResults 同模式）：A→B 快速切换时，A 的迟到响应
   // 不得覆盖 B。只让最后一次 selectChapter 的响应写入 currentChapter。
   const selectChapterSeq = useRef(0)
@@ -308,6 +323,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       importBook,
       uploadBook,
       importSampleBook,
+      openBook,
       selectChapter,
       refreshStatus,
       startAnalysis,
@@ -320,7 +336,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       book, selectedChapter, currentChapter, status, lastEvent, batchStates,
       initError, qualityPassLine, consistencyTarget,
       isAdmin, workbench, overview, bookResults,
-      importBook, uploadBook, importSampleBook, selectChapter, refreshStatus, startAnalysis, runFullAnalysis,
+      importBook, uploadBook, importSampleBook, openBook, selectChapter, refreshStatus, startAnalysis, runFullAnalysis,
       pauseAnalysis, resumeAnalysis, retryFailed, refreshThresholds, refreshAdmin, refreshOverview, loadBookResults, refreshBookResults,
       helpRequest, openHelp,
     ],
