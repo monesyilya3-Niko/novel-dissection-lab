@@ -277,12 +277,23 @@ def unique_corpus_path(name: str) -> Path:
 # 导入
 # ---------------------------------------------------------------------------
 
-_IMPORT_SUFFIXES = frozenset({".txt"})
+# 导入接受的正文后缀必须与其它入口一致（2026-11-05 修）。
+#
+# 原先这里是 {".txt"}，而上传入口（server._safe_upload_filename）已改用
+# text_access.TEXT_SUFFIXES（{".txt", ".md"}），章节加载器也读 .md。
+# 实测同一个 .md 稿子：上传导入成功，路径导入被拒「首版仅支持 .txt 导入」——
+# 用户会看到"拖进去能行、选路径不行"这种自相矛盾的行为。
+#
+# 延迟到使用时取（text_access 反向 import 本模块的 ServiceError，模块级 import
+# 会成环）；_import_suffixes() 是唯一入口，不要在别处再写一份后缀集合。
+def _import_suffixes() -> frozenset[str]:
+    from gui import text_access
+    return text_access.TEXT_SUFFIXES
 _IMPORT_MAX_BYTES = 100 * 1024 * 1024
 # 拆书导入的对外措辞与状态码是既有契约（tests/test_deepwater_regressions.py 认它），
 # 实现换成 text_access 后逐条显式覆盖，不让"重构"顺手改掉用户看到的错误信息。
 _IMPORT_MESSAGES = {
-    "suffix": ("首版仅支持 .txt 导入", 400),
+    "suffix": ("仅支持 .txt / .md 导入", 400),
     "symlink": ("不允许导入符号链接", 403),
     "irregular": ("只能导入常规文件", 400),
     "oversize": ("文件超过 100MB 上限", 400),
@@ -305,7 +316,7 @@ def _secure_read_text(path: str) -> str:
     return text_access.read_text(
         path,
         field="导入文件",
-        suffixes=_IMPORT_SUFFIXES,
+        suffixes=_import_suffixes(),
         max_bytes=_IMPORT_MAX_BYTES,
         messages=_IMPORT_MESSAGES,
     )

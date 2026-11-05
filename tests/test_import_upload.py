@@ -272,6 +272,22 @@ class TestImportPathEndpoint(unittest.TestCase):
         self.assertEqual(status, 400, data)
         self.assertIn(".txt", data["message"])
 
+    def test_md_file_accepted_by_path_import(self):
+        """`.md` 稿子走路径导入必须与上传入口一致（2026-11-05）。
+
+        此前 ``services._IMPORT_SUFFIXES`` 只收 ``.txt``，而上传入口用的是
+        ``text_access.TEXT_SUFFIXES``（.txt + .md）、章节加载器也读 .md。
+        实测同一个 .md 稿子：拖进上传区能过，走「路径导入」被拒——用户看到
+        "拖进去能行、选路径不行"这种自相矛盾的行为。
+        """
+        fp = self.ext_dir / "markdown稿子.md"
+        fp.write_bytes(BOOK_TXT)
+        status, data = self._post({"path": str(fp)})
+        self.assertEqual(status, 200, data)
+        self.assertEqual(data["data"]["total_chapters"], 2)
+        got = self._chapter_text(data["data"]["book_id"], 1)
+        self.assertIn("这是第一章正文内容。", got)
+
     def test_directory_refused(self):
         status, data = self._post({"path": str(self.ext_dir)})
         self.assertIn(status, (400, 404), data)

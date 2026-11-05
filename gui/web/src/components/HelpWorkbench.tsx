@@ -79,7 +79,7 @@ const GUIDES: FeatureGuide[] = [
       },
       {
         title: { 'zh-CN': '选择文件', 'en-US': 'Select File' },
-        detail: { 'zh-CN': '在文件选择器中找到你的小说 .txt 文件。要求：① .txt 格式 ② 建议 UTF-8 编码（非 UTF-8 会尝试 GBK 解码）③ 100MB 以内 ④ 章节标题含"第X章"字样（如"第001章 暮冬未尽时"）。', 'en-US': 'Choose your novel .txt file. Requirements: 1) .txt format, 2) UTF-8 encoding (GBK fallback supported), 3) Under 100MB, 4) Standard chapter title headers.' },
+        detail: { 'zh-CN': '在文件选择器中找到你的小说 .txt 文件。要求：① .txt 或 .md 格式 ② 建议 UTF-8 编码（非 UTF-8 会尝试 GBK 解码）③ 100MB 以内 ④ 章节标题含"第X章"字样（如"第001章 暮冬未尽时"）。', 'en-US': 'Choose your novel .txt file. Requirements: 1) .txt or .md format, 2) UTF-8 encoding (GBK fallback supported), 3) Under 100MB, 4) Standard chapter title headers.' },
       },
       {
         title: { 'zh-CN': '等待解析', 'en-US': 'Wait for Processing' },
@@ -101,8 +101,8 @@ const GUIDES: FeatureGuide[] = [
     ],
     faq: [
       {
-        q: { 'zh-CN': '提示"首版仅支持 .txt 导入"？', 'en-US': 'Error: "Only .txt import supported"?' },
-        a: { 'zh-CN': '文件扩展名必须是 .txt，不支持 .doc/.pdf。请先转换为纯文本。', 'en-US': 'File extension must be .txt (.doc/.pdf not supported directly). Please convert to plain text first.' },
+        q: { 'zh-CN': '提示"仅支持 .txt / .md 导入"？', 'en-US': 'Error: "Only .txt / .md import supported"?' },
+        a: { 'zh-CN': '正文只接受 .txt 与 .md 纯文本。.doc / .pdf / .docx 需先另存为纯文本。', 'en-US': 'Only .txt and .md plain text are accepted. Save .doc/.pdf/.docx as plain text first.' },
       },
       {
         q: { 'zh-CN': '提示"不允许导入符号链接"？', 'en-US': 'Error: "Symlinks not allowed"?' },
@@ -522,7 +522,7 @@ const FAQS: FaqItem[] = [
       'en-US': 'Nothing happens after selecting .txt file?',
     },
     a: {
-      'zh-CN': '检查三点：① 扩展名是否为 .txt ② 是否为 UTF-8 编码（记事本另存为时选 UTF-8；非 UTF-8 会尝试 GBK 解码）③ 文件是否超过 100MB。',
+      'zh-CN': '检查三点：① 扩展名是否为 .txt 或 .md ② 是否为 UTF-8 编码（记事本另存为时选 UTF-8；非 UTF-8 会尝试 GBK 解码）③ 文件是否超过 100MB。',
       'en-US': 'Check 3 items: 1) Extension must be .txt, 2) UTF-8 encoding (GBK fallback supported), 3) File size is within 100MB limit.',
     },
   },
