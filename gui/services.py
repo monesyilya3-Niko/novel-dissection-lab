@@ -299,7 +299,12 @@ _IMPORT_MESSAGES = {
     "oversize": ("文件超过 100MB 上限", 400),
     "missing": ("文件无法打开: {path}", 404),
     "unreadable": ("文件读取失败: {path}", 500),
-    "decode": ("文件编码无法识别（仅支持 UTF-8 / GBK）", 400),
+    # 文案必须与实际解码链一致（2026-11-05）。原写「仅支持 UTF-8 / GBK」，
+    # 而 text_access.read_text 实际依次尝试 UTF-16(BOM) / UTF-8(BOM) /
+    # GB18030 / GBK——告诉用户"不支持你的编码"会让他去徒劳地转码，
+    # 真实原因通常是文件损坏或不是文本。
+    "decode": ("文件编码无法识别（已尝试 UTF-8 / GB18030 / GBK / UTF-16；"
+               "若为其他编码请先另存为 UTF-8）", 400),
 }
 
 
