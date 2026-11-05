@@ -52,8 +52,12 @@ _conns: dict[int, sqlite3.Connection] = {}   # threading.get_ident() -> Connecti
 #: 连接的创建线程（2026-11-05）：ident 会被复用，单靠 ident 无法判断"这条连接还
 #: 属于当前这个线程吗"。取用时校验的是 Thread 对象的同一性。与 _conns 同生命周期。
 _conn_owner: dict[int, threading.Thread] = {}
+#: 每条连接绑定的库路径（2026-11-05）：路径变化时只能丢弃**属于旧路径**的连接。
+#: 原实现用单个全局 `_conn_path` 代表"所有连接绑定的路径"，一旦发现不一致就
+#: `_close_all_locked()`——那是跨线程 close，会打中别的线程正在执行的语句。
+_conn_bound_path: dict[int, Path] = {}
 _conns_lock = threading.Lock()
-_conn_path: Path | None = None             # 当前所有连接绑定的库路径
+_conn_path: Path | None = None             # 兼容保留：最近一次绑定的库路径
 _get_conn_calls: list[int] = [0]            # B3：死线程清理节流计数器
 
 
@@ -93,6 +97,7 @@ def _close_all_locked() -> None:
             pass
     _conns.clear()
     _conn_owner.clear()
+    _conn_bound_path.clear()
     _conn_path = None
 
 
@@ -107,51 +112,49 @@ def get_conn() -> sqlite3.Connection:
     但创建时设 ``check_same_thread=False`` 以允许任意线程执行 ``close()``
     （B3：否则跨线程关闭抛 ProgrammingError 被吞掉，FD 泄漏）。
 
-    库路径变化时（测试 monkeypatch ``config.STATE_ROOT``）自动关闭旧连接重建。
-
-    ⚠️ 线程 ident 会被复用（2026-11-05 修）：CPython 的 ``Thread.ident`` 在线程
-    退出后可被新线程继承。原实现只按 ident 查表，于是**新线程会拿到旧线程留下的
-    连接**——而那条连接的数据库文件可能已被删除/替换（测试隔离目录整棵回收后
-    正是如此）。在 SQLite C 库里对已消失的文件继续执行语句是未定义行为，实测
-    在 Ubuntu + Python 3.13 上稳定 Segfault（exit 139）。
-
-    现在把连接与创建它的 ``Thread`` 对象一起登记，取用时校验对象同一性：
-    ident 相同但 Thread 不是同一个 → 视为残留，关掉重建。
+    ⚠️ 两条红线（2026-11-05，都有最小复现）：
+    1. **不跨线程 close**。原实现在库路径变化时 `_close_all_locked()`，会把别的
+       线程正在执行的连接一起关掉。实测最小复现（一个线程循环 db.tx()，主线程
+       反复切换库路径）稳定 Segfault，exit 139；全量测试里表现为 Ubuntu 上
+       test_gui_backend.test_full_local_chain 前崩溃。现在路径变化只影响**本线程**
+       那条连接——别的线程下次调用时自己会发现路径不符并重建。
+    2. **ident 会被复用**。CPython 的 Thread.ident 在线程退出后可被新线程继承，
+       只按 ident 查表会让新线程拿到旧线程的、绑定已删除库文件的连接。现在按
+       Thread 对象同一性校验。
     """
     global _conn_path
     path = db_path()
     tid = threading.get_ident()
     me = threading.current_thread()
     with _conns_lock:
-        if _conn_path is not None and _conn_path != path:
-            # STATE_ROOT 被切换（测试隔离场景）→ 丢弃全部旧连接
-            _close_all_locked()
         # B3：清理死线程的残留连接（每 50 次调用检查一次，避免每次枚举开销）。
         _get_conn_calls[0] += 1
         if _get_conn_calls[0] % 50 == 0:
             _prune_dead_threads_locked()
         conn = _conns.get(tid)
-        if conn is not None and _conn_owner.get(tid) is not me:
-            # ident 被复用：这条连接属于某个已退出的线程，不能拿来用。
-            try:
-                conn.close()
-            except sqlite3.Error:
-                pass
+        # 本线程这条连接：路径不符 / owner 不是本线程 → 关掉重建（只动自己这条）。
+        if conn is not None and (
+                _conn_bound_path.get(tid) != path
+                or _conn_owner.get(tid) is not me):
+            _drop_tid_locked(tid)
             conn = None
         if conn is None:
-            _close_stale_for_tid(tid)
             conn = _new_conn(path)
             _conns[tid] = conn
             _conn_owner[tid] = me
-            if _conn_path is None:
-                _conn_path = path
+            _conn_bound_path[tid] = path
+            _conn_path = path
     return conn
 
 
-def _close_stale_for_tid(tid: int) -> None:
-    """关掉该 ident 上残留的旧连接（若存在）。调用方持有 _conns_lock。"""
+def _drop_tid_locked(tid: int) -> None:
+    """关掉某个 tid 上登记的连接。调用方持有 _conns_lock。
+
+    ⚠️ 只应在该 tid 属于**当前线程**、或 owner 线程已退出时调用。
+    """
     old = _conns.pop(tid, None)
     _conn_owner.pop(tid, None)
+    _conn_bound_path.pop(tid, None)
     if old is not None:
         try:
             old.close()
@@ -178,6 +181,7 @@ def _prune_dead_threads_locked() -> None:
             pass
         _conns.pop(tid, None)
         _conn_owner.pop(tid, None)
+        _conn_bound_path.pop(tid, None)
 
 
 def _reset_conn() -> None:
@@ -205,6 +209,7 @@ def _drop_current_thread_conn() -> None:
     with _conns_lock:
         conn = _conns.pop(tid, None)
         _conn_owner.pop(tid, None)
+        _conn_bound_path.pop(tid, None)
     if conn is not None:
         try:
             conn.close()
@@ -424,6 +429,8 @@ def close() -> None:
             except sqlite3.Error:
                 pass
         _conns.clear()
+        _conn_owner.clear()
+        _conn_bound_path.clear()
         global _conn_path
         _conn_path = None
 

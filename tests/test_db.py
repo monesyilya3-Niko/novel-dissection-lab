@@ -348,6 +348,94 @@ class TestThreadIdentReuse(unittest.TestCase):
         fresh.execute("SELECT 1")      # 新连接必须可用
 
 
+class TestNoCrossThreadClose(unittest.TestCase):
+    """库路径变化时不得关闭**别的线程**的连接（2026-11-05）。
+
+    最小复现（修复前稳定 Segfault，exit 139）::
+
+        # 一个线程循环 db.tx() 执行 SELECT 1
+        # 主线程反复切换 config.STATE_ROOT / DB_PATH 并调用 get_conn()
+        → Segmentation fault (core dumped)
+
+    根因：``get_conn()`` 发现库路径与全局 ``_conn_path`` 不一致时调
+    ``_close_all_locked()``——那是跨线程 close，会打中别的线程**正在执行**的
+    连接。在 SQLite C 库里这是未定义行为，不保证报异常，直接崩进程。
+
+    在真实测试套件里，它就是 test_gui_backend.test_full_local_chain 之前那次
+    Segfault：守护线程 _watch（services._schedule_report_generation）会走
+    db.tx()，而各测试模块不停地切换隔离路径。
+
+    修法：连接按 tid 记录自己绑定的路径（_conn_bound_path），路径变化只丢弃
+    **本线程**那条；别的线程下次调用时自己发现不符再重建。
+    """
+
+    def setUp(self):
+        self._a = Path(tempfile.mkdtemp(prefix="db_xa_"))
+        self._b = Path(tempfile.mkdtemp(prefix="db_xb_"))
+        self._orig = {n: getattr(config, n) for n in ("STATE_ROOT", "DB_PATH")}
+
+    def tearDown(self):
+        for n, v in self._orig.items():
+            setattr(config, n, v)
+        db._reset_conn()
+        for d in (self._a, self._b):
+            _isolation.remove_tree(d)
+
+    def _point_at(self, root: Path) -> None:
+        config.STATE_ROOT = root
+        config.DB_PATH = root / "index.db"
+
+    def test_path_switch_does_not_close_other_threads_connection(self):
+        """切换库路径时，别的线程的连接必须原样保留（不被 close）。"""
+        import threading
+
+        self._point_at(self._a)
+        db.init_schema()
+
+        held: dict[str, object] = {}
+        ready = threading.Event()
+        keep = threading.Event()
+
+        def worker() -> None:
+            conn = db.get_conn()
+            held["conn"] = conn
+            held["tid"] = threading.get_ident()
+            ready.set()
+            keep.wait(timeout=15)          # 持住连接，不让它退出
+            try:
+                conn.execute("SELECT 1")   # 必须仍然可用
+                held["usable"] = True
+            except Exception as exc:       # noqa: BLE001
+                held["usable"] = f"{type(exc).__name__}: {exc}"
+
+        t = threading.Thread(target=worker)
+        t.start()
+        self.assertTrue(ready.wait(timeout=10), "worker 未就绪")
+
+        # 主线程切到另一个库并取连接——不得波及 worker 那条
+        self._point_at(self._b)
+        db.init_schema()
+        db.get_conn().execute("SELECT 1")
+
+        keep.set()
+        t.join(timeout=20)
+        self.assertFalse(t.is_alive())
+
+        self.assertIs(held.get("usable"), True,
+                      "worker 的连接在别的线程切换路径后被关闭/破坏了")
+        # 且 worker 那条连接仍登记在表里（不是被 _close_all_locked 清掉）
+        self.assertIn(held["tid"], db._conns)
+
+    def test_bound_path_is_tracked_per_thread(self):
+        """每条连接都要记下自己绑定的库路径。"""
+        self._point_at(self._a)
+        db.init_schema()
+        db.get_conn()
+        tid = __import__("threading").get_ident()
+        with db._conns_lock:
+            self.assertEqual(db._conn_bound_path.get(tid), self._a / "index.db")
+
+
 class TestSchemaInitTransactionSafety(unittest.TestCase):
     """init_schema 不得吞掉调用方事务（2026-10-13 审计修复 D13）。
 
