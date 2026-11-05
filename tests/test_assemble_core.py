@@ -385,10 +385,6 @@ class TestAssembleCLIWorkflow(unittest.TestCase):
             self.assertFalse(craft_file.exists())
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestBackfillRhythm(unittest.TestCase):
     """narration 数值字段以实测指标为准（2026-10-29 数据断流修复）。
 
@@ -428,3 +424,7 @@ class TestBackfillRhythm(unittest.TestCase):
         self.assertEqual(out["sentence_rhythm"]["avg_length"], 20.0)
         # metrics 非 dict 时原样返回，不得抛异常
         self.assertEqual(assemble._backfill_rhythm({"a": 1}, "not-a-dict"), {"a": 1})
+
+
+if __name__ == "__main__":
+    unittest.main()

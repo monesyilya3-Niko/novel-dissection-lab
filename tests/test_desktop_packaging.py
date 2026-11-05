@@ -208,9 +208,6 @@ class TestDesktopPackagingManifest(unittest.TestCase):
         hits = [f for f in dist.rglob("*.js") if "novelLab" in f.read_text(encoding="utf-8")]
         self.assertTrue(hits, "dist 里没有桥引用——前端源码改了但没跑 npm run build")
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class TestNavigationGuard(unittest.TestCase):
     """桌面版导航守卫必须覆盖同源（2026-10-14 审计修复 ELE-04）。
@@ -397,3 +394,7 @@ class TestElectronVersionSupported(unittest.TestCase):
             f"desktop/package.json 的 electron-builder 停在 {spec}（主版本 {major}）。"
             f"26 起下载器改为 @electron/get，{major} 之前的版本在本机反复下载失败。",
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

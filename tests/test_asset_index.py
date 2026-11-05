@@ -265,10 +265,6 @@ class TestListBooksSummary(unittest.TestCase):
         self.assertEqual(by_id["bk2"]["done"], 0)
 
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
-
-
 class TestAssetSummary(unittest.TestCase):
     """资产可读摘要回归（2026-09-29 用户反馈"资产库有很多内容不对"）：
     详情必须带中文 summary；占位 0 与注入一致被省略；标签与 scripts 同步。
@@ -586,3 +582,7 @@ class TestLimitDefaultsAcrossLayers(unittest.TestCase):
                          "router._h_list_assets 不应再硬编码默认 50")
         self.assertIn("raw_limit", src,
                       "router 应读取原始参数并区分「未传」与「传了」")
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

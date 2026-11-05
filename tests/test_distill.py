@@ -901,10 +901,6 @@ class TestInjectRegression(unittest.TestCase):
         self.assertIn("context_intent", sig.parameters)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestRenderReadable(unittest.TestCase):
     """可读性渲染回归（2026-09-29 用户反馈"注入像乱码"）：中文标签 / 占位0过滤 /
     有效0保留 / 分歧按书分段 / 内嵌 JSON 中文键。"""
@@ -1077,3 +1073,7 @@ class TestPlaceholderZeroNotDistilled(unittest.TestCase):
             CORE._is_placeholder_zero("dialogue.dialogue_ratio", 0),
             "白名单之外的字段，0 应视为真实值",
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

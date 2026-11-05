@@ -105,10 +105,6 @@ class TestSettingsThresholdsTakeEffect(unittest.TestCase):
         self.assertEqual(engine_adapter.resolve_thresholds(None), (75, 60))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestWritingDefaultsFromSettings(unittest.TestCase):
     """设置页的写作默认值（default_words / consistency_target）必须真的被用上。
 
@@ -164,3 +160,7 @@ class TestWritingDefaultsFromSettings(unittest.TestCase):
         self.assertIsNone(router._safe_int_or_none(None, "words"))
         self.assertIsNone(router._safe_int_or_none(None, "target_score"))
         self.assertEqual(router._safe_int_or_none(3000, "words"), 3000)
+
+
+if __name__ == "__main__":
+    unittest.main()

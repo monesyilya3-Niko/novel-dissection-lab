@@ -201,15 +201,53 @@ class PassRefused(RuntimeError):
     """
 
 
-def _has_payload(out: dict) -> bool:
-    """该 pass 输出里是否含**实质内容**（而非只有 error 说明）。
+#: 模型「拒绝」时的语义标记。真实 pass 输出里从不出现这些键（生产数据
+#: 实测顶层键是 characters / chapter_analyses / imagery / banned 等具体字段）。
+_REFUSAL_MARKERS = ("error", "status")
+#: status 的值为这些才算拒绝（正常输出不会有 status，保险起见只认否定语义）
+_REFUSAL_STATUS_VALUES = frozenset({
+    "no_input", "no_data", "refused", "rejected", "error", "failed",
+    "insufficient_input", "cannot", "unable",
+})
 
-    有些模型会在同一份 JSON 里既报 error 又给出部分结果，这种不该判失败。
-    判据：除 error/detail/next_step/_meta 外，还有任何非空的顶层键。
+
+def _looks_like_refusal(out: dict) -> bool:
+    """输出是否是「模型拒绝/缺素材」的形态（2026-11-05 新增）。
+
+    实测三种拒绝形态（均来自生产数据）：
+
+        {"status": "no_input", "message": "未收到任何对话切片文本…", "characters": []}
+        {"error": "未收到任何对话切片内容…", "characters": [], "note": "…"}
+        {"status": "no_input", "message": "…", "characters": []}
+
+    ``characters: []`` 会被 ``_has_payload`` 跳过，但 ``status`` / ``message`` /
+    ``note`` 是非空字符串 → 旧判据认为「有载荷」，于是批次被标 success，
+    voice-card 的 character_voices 永远为空，全程零报错。
     """
     if not isinstance(out, dict):
         return False
-    meta = {"error", "detail", "next_step", "_meta"}
+    if out.get("error"):
+        return True
+    st = out.get("status")
+    if isinstance(st, str) and st.strip().lower() in _REFUSAL_STATUS_VALUES:
+        return True
+    return False
+
+
+def _has_payload(out: dict) -> bool:
+    """该 pass 输出里是否含**实质内容**（而非只有 error/status 说明）。
+
+    有些模型会在同一份 JSON 里既报 error 又给出部分结果，这种不该判失败。
+    判据：排除 error/status/detail/next_step/message/note/_meta 后，
+    还有任何**非空且非空容器**的顶层键。
+
+    2026-11-05：加入 status / message / note——模型的拒绝形态普遍是
+    ``{"status":"no_input","message":"…","characters":[]}``，此前 message 与
+    status 被当成"载荷"，整个拒绝被判成功（生产数据里已有 4 份）。
+    """
+    if not isinstance(out, dict):
+        return False
+    meta = {"error", "status", "detail", "next_step", "message", "note", "_meta"}
     for k, v in out.items():
         if k in meta:
             continue
@@ -250,14 +288,14 @@ def run_pass(kind: str, slices: dict, metrics: dict, dry_run: bool,
             #   - 有 characters/dialogue 等有效载荷时不算失败（部分模型会同时给）
             #   - 纯拒绝则重试（换个说法再问一次）
             #   - 重试用尽仍拒绝 → 抛错，让批次标记 failed，用户能看到原因
-            if isinstance(out, dict) and out.get("error") and not _has_payload(out):
-                refusal = str(out.get("error"))[:200]
+            if isinstance(out, dict) and _looks_like_refusal(out) and not _has_payload(out):
+                refusal = str(out.get("error") or out.get("message") or out.get("status") or "")[:200]
                 print(f"      ⚠ 模型拒绝本 pass：{refusal}")
                 if attempt < 2:
                     system = system + (
-                        "\n\n【重要】上一次你返回了 error 而不是结果。"
+                        "\n\n【重要】上一次你返回了拒绝说明而不是结果。"
                         "若输入确实缺少必要素材，请仍然输出 JSON 对象，"
-                        "并在需要素材的字段填 null，不要整体返回 error。"
+                        "并在需要素材的字段填 null，不要返回 error/status 说明。"
                     )
                     continue
                 raise PassRefused(f"{kind} 连续被模型拒绝：{refusal}")

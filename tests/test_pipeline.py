@@ -462,10 +462,6 @@ class TestPipelineMainCLI(unittest.TestCase):
             self.assertIn("外部模型调用失败", guide.read_text(encoding="utf-8"))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestRunPassModelRefusal(unittest.TestCase):
     """模型用合法 JSON 表达拒绝时不得静默当成功（2026-11-02）。
 
@@ -522,6 +518,84 @@ class TestRunPassModelRefusal(unittest.TestCase):
         self.assertTrue(pipeline_mod._has_payload({"aggregate": {"k": 1}}))
 
 
+class TestRefusalShapeDetection(unittest.TestCase):
+    """`status: no_input` 形态的拒绝同样不得静默当成功（2026-11-05）。
+
+    生产库实测 4 份 pass2 资产文件，全部被记录为 success：
+
+        c1-b0-pass2_character.json
+            {"status": "no_input", "message": "未收到任何对话切片文本…",
+             "characters": [], "_meta": {...}}
+        c2-b0-pass2_character.json
+            {"error": "未收到任何对话切片内容…", "characters": [], "note": "请提供…"}
+        c3-b0-pass2_character.json
+            {"status": "no_input", "message": "…按铁律5…不生成任何角色条目",
+             "characters": []}
+
+    旧 ``_has_payload`` 只排除 error/detail/next_step/_meta，于是 ``status`` /
+    ``message`` / ``note`` 这些非空字符串被当成"有载荷" → 批次标 success →
+    voice-card 的 ``character_voices`` 永远为空，全程零报错。
+    """
+
+    def setUp(self):
+        self.slices = {"pass2_character": {"chapters": [{"title": "第1章", "text": "…" * 50}]}}
+        self.metrics = {"total_chars": 500}
+
+    def test_looks_like_refusal_status_shape(self):
+        self.assertTrue(pipeline_mod._looks_like_refusal(
+            {"status": "no_input", "message": "未收到任何对话切片文本", "characters": []}))
+
+    def test_looks_like_refusal_error_shape(self):
+        self.assertTrue(pipeline_mod._looks_like_refusal(
+            {"error": "未收到任何对话切片内容", "characters": [], "note": "请提供"}))
+
+    def test_status_value_is_case_and_space_insensitive(self):
+        for st in ("NO_INPUT", " no_input ", "Refused", "INSUFFICIENT_INPUT"):
+            self.assertTrue(pipeline_mod._looks_like_refusal({"status": st}), st)
+
+    def test_normal_payload_is_not_refusal(self):
+        self.assertFalse(pipeline_mod._looks_like_refusal(
+            {"characters": [{"name": "A"}], "note": "样本偏少"}))
+        self.assertFalse(pipeline_mod._looks_like_refusal({"aggregate": {"k": 1}}))
+
+    def test_non_dict_is_not_refusal(self):
+        for bad in (None, [], "error", 42):
+            self.assertFalse(pipeline_mod._looks_like_refusal(bad), repr(bad))
+
+    def test_has_payload_treats_status_and_message_as_meta(self):
+        """status/message/note 是说明性字段，不算载荷。"""
+        self.assertFalse(pipeline_mod._has_payload(
+            {"status": "no_input", "message": "未收到对话切片", "characters": []}))
+        self.assertFalse(pipeline_mod._has_payload(
+            {"error": "x", "note": "y", "message": "z"}))
+        # 但只要还有真载荷，就仍算有内容（部分结果 + 报错）
+        self.assertTrue(pipeline_mod._has_payload(
+            {"status": "no_input", "characters": [{"name": "A"}]}))
+
+    def test_production_refusal_shapes_raise_after_retries(self):
+        """4 份生产拒答的真实形态，必须重试用尽后抛 PassRefused。"""
+        shapes = [
+            {"status": "no_input", "message": "未收到任何对话切片文本，无法提取声线特征",
+             "characters": [], "_meta": {"pass": "pass2_character"}},
+            {"error": "未收到任何对话切片内容，无法提取声线特征",
+             "characters": [], "note": "请提供包含角色对白的章节切片"},
+            {"status": "no_input",
+             "message": "按铁律5，无对白素材时不生成任何角色条目", "characters": []},
+            {"status": "error", "message": "素材不足", "characters": []},
+        ]
+        for payload in shapes:
+            with self.subTest(payload=payload):
+                res = {"text": json.dumps(payload, ensure_ascii=False),
+                       "model_id": "test-model", "prompt_tokens": 1,
+                       "completion_tokens": 1, "cost": 0.0, "elapsed": 0.1}
+                with mock.patch.object(pipeline_mod.llm_client, "chat", return_value=res):
+                    with self.assertRaises(pipeline_mod.PassRefused):
+                        pipeline_mod.run_pass(
+                            "pass2_character", self.slices, self.metrics,
+                            dry_run=False, model_id=None,
+                            user_override="对话切片：A：你好")
+
+
 class TestExtractJsonRobustness(unittest.TestCase):
     """JSON 提取必须容忍真实模型输出的三种形态（2026-11-02）。
 
@@ -561,3 +635,7 @@ class TestExtractJsonRobustness(unittest.TestCase):
         """顶层是数组/标量时不算合格的 pass 输出。"""
         with self.assertRaises(ValueError):
             pipeline_mod.extract_json('[1, 2, 3]')
+
+
+if __name__ == "__main__":
+    unittest.main()

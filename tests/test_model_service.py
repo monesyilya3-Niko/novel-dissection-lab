@@ -226,10 +226,6 @@ class TestModelConnectivity(unittest.TestCase):
         mp.assert_called_once_with()
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestModelIdVersionDots(unittest.TestCase):
     """模型 ID 允许版本点号（2026-11-02）。
 
@@ -253,3 +249,7 @@ class TestModelIdVersionDots(unittest.TestCase):
         for bad in ("a b", "a\tb", "a\nb", "a\x00b"):
             with self.assertRaises(ServiceError, msg=bad):
                 model_service._validate_model_id(bad)
+
+
+if __name__ == "__main__":
+    unittest.main()

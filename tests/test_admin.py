@@ -679,10 +679,6 @@ class TestAdminAuditFilter(unittest.TestCase):
             fp.unlink(missing_ok=True)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestMustChangePasswordGate(_AdminBase):
     """强制改密状态机：needs_password_change + 改密后解除。"""
 
@@ -790,3 +786,7 @@ class TestInitialPasswordHandoff(_AdminBase):
         self.assertIsNone(fp, "写失败必须返回 None")
         joined = "\n".join(captured.output)
         self.assertIn(self.PW, joined, "指引文件写不出来时，日志是唯一还能交付密码的通道")
+
+
+if __name__ == "__main__":
+    unittest.main()

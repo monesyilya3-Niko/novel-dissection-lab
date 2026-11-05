@@ -211,10 +211,6 @@ class TestTropeLibrary(unittest.TestCase):
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestApplicableGenresNormalized(unittest.TestCase):
     """桥段的 applicable_genres 必须是题材 slug 或明确的检索标签（2026-11-01）。
 
@@ -250,3 +246,7 @@ class TestApplicableGenresNormalized(unittest.TestCase):
             if len(ag) != len(set(ag)):
                 dup.append(t["id"])
         self.assertEqual(dup, [], f"归一化后仍有重复: {dup}")
+
+
+if __name__ == "__main__":
+    unittest.main()

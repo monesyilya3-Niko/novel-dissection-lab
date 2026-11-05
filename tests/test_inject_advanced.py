@@ -424,10 +424,6 @@ class TestMainCLI(unittest.TestCase):
         self.assertIn("voice-card 文件不存在", f.getvalue())
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestGenrePackDialogueStyleRendered(unittest.TestCase):
     """题材包的对话风格与漂移护栏必须进 prompt（2026-11-03 补）。
 
@@ -558,3 +554,7 @@ class TestStructureObsRendersParams(unittest.TestCase):
         from scripts import inject
         out = inject.render_structure_obs({"aggregate": {}})
         self.assertNotIn("### 结构参数", out)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -68,6 +68,62 @@ class DirectRunConventionTest(unittest.TestCase):
         )
 
 
+    def test_unittest_main_block_is_last_statement(self):
+        """`unittest.main()` 必须写在文件末尾（2026-11-05 实测 12 例）。
+
+        现象：文件先写了 ``if __name__ == "__main__": unittest.main()``，
+        后来又补了新的测试类。discovery 走 ``run_tests.py`` 不受影响，
+        但 ``python tests/test_xxx.py`` 直接运行时，main() 在补的类定义
+        **之前**就执行了 —— 那些用例永远不会被登记，直跑静默少跑。
+
+        实测差额：test_pipeline 直跑 28 / discovery 38。
+        """
+        import ast
+
+        offenders = []
+        for f in sorted(TESTS_DIR.glob("test_*.py")):
+            if f.name == Path(__file__).name:
+                continue
+            try:
+                tree = ast.parse(f.read_text(encoding="utf-8"))
+            except SyntaxError as exc:
+                offenders.append(f"{f.name}: 语法错误 {exc}")
+                continue
+            main_line = None
+            for node in tree.body:
+                if not isinstance(node, ast.If):
+                    continue
+                test = node.test
+                is_main_guard = (
+                    isinstance(test, ast.Compare)
+                    and isinstance(test.left, ast.Name)
+                    and test.left.id == "__name__"
+                )
+                if not is_main_guard or not node.body:
+                    continue
+                call = ast.unparse(node.body[0])
+                if "unittest" in call:
+                    main_line = node.lineno
+                    break
+            if main_line is None:
+                continue
+            after = [
+                n.lineno for n in tree.body
+                if isinstance(n, (ast.ClassDef, ast.FunctionDef))
+                and n.lineno > main_line
+            ]
+            if after:
+                offenders.append(
+                    f"{f.name}: unittest.main() 在第 {main_line} 行，"
+                    f"其后还有 {len(after)} 个定义（行 {after[:5]}）→ 直接运行会漏跑"
+                )
+        self.assertEqual(
+            offenders, [],
+            "以下测试文件的 unittest.main() 不在文件末尾，直接运行会静默漏跑用例。"
+            "请把 `if __name__ == \"__main__\": unittest.main()` 移到文件最后：\n"
+            + "\n".join(offenders),
+        )
+
     def test_every_script_module_imports_cleanly(self):
         scripts_dir = TESTS_DIR.parent / "scripts"
         targets = [f for f in sorted(scripts_dir.glob("*.py"))

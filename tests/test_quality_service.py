@@ -413,7 +413,6 @@ class TestConcurrencyLimit(unittest.TestCase):
             quality_service._QUALITY_TASKS.clear()
 
 
-
     def _make_chapter_dir(self, name: str):
         ch_dir = config.CORPUS_DIR / name
         ch_dir.mkdir(parents=True, exist_ok=True)
@@ -474,10 +473,6 @@ class TestListQcReports(unittest.TestCase):
         self.assertIsInstance(reports, list)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestQcSubmitNoDeadlock(unittest.TestCase):
     """回归：qc() 提交路径的并发检查在持锁状态下调用 _active_quality_count()，
     非重入 Lock 会自死锁（GUI 质检台 QC 按钮曾因此完全不可用）。
@@ -531,3 +526,7 @@ class TestIssueTruncationMetadata(unittest.TestCase):
         self.assertTrue(truncated)
         few = list(range(10))
         self.assertFalse(len(few) > cap)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -636,10 +636,6 @@ class TestValidateCLIAndDataInterface(unittest.TestCase):
         self.assertIn("结论: PASS", mock_out.getvalue())
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestVoiceCardPlaceholderZero(unittest.TestCase):
     """声线卡「量化字段全是占位 0」的校验分级（2026-10-29）。
 
@@ -700,3 +696,7 @@ class TestVoiceCardPlaceholderZero(unittest.TestCase):
         card["narration"]["sentence_rhythm"]["avg_length"] = 18.5
         validate.validate_voice_card(card)
         self.assertEqual(validate.ERRORS, [])
+
+
+if __name__ == "__main__":
+    unittest.main()
