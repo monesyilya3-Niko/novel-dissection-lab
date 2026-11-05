@@ -144,7 +144,6 @@ class TestExportFormats(unittest.TestCase):
             writing_extra.get_project_meta = orig
 
 
-
 class TestChapterFilenameCompat(unittest.TestCase):
     """章节文件命名兼容（2026-11-03）。
 
@@ -334,6 +333,33 @@ class TestLineEndingNormalisation(unittest.TestCase):
         self._write(self._lf_doc().encode("utf-8"))
         lf = writing_extra.export_project("换行测试", "txt")["content"]
         self.assertEqual(crlf, lf, "CRLF 与 LF 稿子导出结果应一致")
+
+
+class TestTxtExportStripsMarkdownPrefix(unittest.TestCase):
+    """TXT 导出必须剥掉 Markdown 标题前缀（2026-11-05）。
+
+    章节文件本身是 ``# 第1章 开端`` 时，导出的纯文本里会带着 ``#``，
+    而切章器不认 ``#``——用户把这份 TXT 重新导入时整本塌成 1 章
+    「（无标题开头）」，导出的稿子等于不能回灌。
+    """
+
+    def test_markdown_heading_stripped(self):
+        import tempfile
+
+        from gui import config, writing_extra
+        with tempfile.TemporaryDirectory() as td:
+            self._iso = None
+            proj = "md前缀"
+            cdir = config.NOVEL_DIR / proj / "chapters"
+            cdir.mkdir(parents=True, exist_ok=True)
+            (cdir / "chapter-001.md").write_text("# 第1章 开端\n正文一。",
+                                                 encoding="utf-8")
+            (cdir / "chapter-002.md").write_text("## 第2章 再会\n正文二。",
+                                                 encoding="utf-8")
+            out = writing_extra.export_project_txt(proj)["content"]
+            self.assertNotIn("#", out)
+            self.assertIn("第1章 开端", out)
+            self.assertIn("第2章 再会", out)
 
 
 if __name__ == "__main__":

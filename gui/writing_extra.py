@@ -1459,8 +1459,16 @@ def export_project_txt(project: str) -> dict[str, Any]:
     if not kept:
         raise ServiceError(f"项目章节全部读取失败，无可导出内容: {project}", 400)
     for no, content in kept:
-        # 首行若像标题则直接沿用正文（避免标题重复输出），否则补一个默认标题
+        # 章节文件本身是 Markdown（``# 第1章``）时，TXT 导出必须剥掉 # 前缀
+        # （2026-11-05）。否则导出的纯文本里带着 ``# 第1章 开端``，而切章器
+        # 不认 ``#``——用户把这份 TXT 重新导入时整本塌成 1 章「（无标题开头）」，
+        # 导出的稿子等于不能回灌。
         first_line = content.split("\n", 1)[0].strip()
+        stripped = re.sub(r"^#{1,6}\s*", "", first_line).strip()
+        if stripped != first_line:
+            content = stripped + content[len(first_line):]
+            first_line = stripped
+        # 首行若像标题则直接沿用正文（避免标题重复输出），否则补一个默认标题
         looks_like_title = bool(first_line) and len(first_line) <= 60 and "。" not in first_line and "，" not in first_line
         if looks_like_title:
             parts.append(content + "\n")
