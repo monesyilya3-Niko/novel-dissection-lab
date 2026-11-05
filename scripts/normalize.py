@@ -575,6 +575,34 @@ def extract_emotion_examples(pass3: dict, mode: str) -> list:
     return examples[:8]
 
 
+def _read_paragraph(pass3: dict) -> dict:
+    """按 prompt/schema 的精确路径读 ``narration.paragraph``（2026-11-05 新增）。
+
+    ``prompts/pass3_style.md:58`` 规定 ``paragraph: {avg_lines,
+    single_line_para_ratio, usage_of_single_line}``，而原实现把它硬编码成 ``{}``，
+    这三项永远进不了 voice-card。``assemble._backfill_rhythm`` 只能补
+    ``avg_lines`` / ``chars_per_para``（能从 metrics 算出来的那两个），
+    ``single_line_para_ratio`` 与 ``usage_of_single_line`` 无来源可补。
+
+    只保留 schema 里的三个键；数值必须是数字，其余一律丢弃（不猜、不造）。
+    """
+    node = pass3.get("narration") if isinstance(pass3.get("narration"), dict) else {}
+    para = node.get("paragraph")
+    if not isinstance(para, dict):
+        para = first(pass3, "paragraph", "段落") or {}
+    if not isinstance(para, dict):
+        return {}
+    out: dict = {}
+    for k in ("avg_lines", "single_line_para_ratio"):
+        v = para.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            out[k] = v
+    usage = as_str(para.get("usage_of_single_line") or "")
+    if usage:
+        out["usage_of_single_line"] = usage
+    return out
+
+
 def normalize_pass3(pass3: dict) -> tuple:
     pov_raw = as_str(fuzzy_find(pass3, "视角", "pov") or "")
     pov = next((v for k, v in POV_MAP.items() if k in pov_raw), "第三人称限知")
@@ -624,26 +652,47 @@ def normalize_pass3(pass3: dict) -> tuple:
             else:
                 tense_feel = "贴身跟随主角感官和思维"
 
-    # chapter_opening_patterns：从 pass3 中提取章节开头模式
+    # chapter_opening_patterns：优先按 prompt 的**精确结构**读（2026-11-05 修）。
+    #
+    # ``prompts/pass3_style.md`` 规定的是
+    # ``narration.chapter_opening_patterns: [{pattern, frequency, example_structure}]``。
+    # 原实现只用 ``fuzzy_find`` 取一个值再要求 ``isinstance(str)``——按规范输出的
+    # list 因此**必然被丢弃**，随后落进下面的"从 pov 推导默认模式"分支，凭空
+    # 产出 ``场景白描 freq=3 + 内心独白 freq=2``。实测：模型给出
+    # ``[直入对话×4, 感官痛感×2]``，落盘却是那组默认值；磁盘上 5/7 张 voice-card
+    # 的开篇模式完全相同，就是这么来的。
+    #
+    # 这属于"编造数据"，比丢字段更糟：用户会以为这就是那本书的规律。
     opening_patterns = []
-    opening_raw = fuzzy_find(pass3, "开头", "开篇", "opening", "章节起始") or ""
-    if isinstance(opening_raw, str) and len(opening_raw) > 5:
-        # 解析出模式列表
-        for pat in ["直入对话", "场景白描", "承接上章悬念", "时间跳跃", "内心独白", "旁白点题",
-                     "动作开场", "对话开场", "环境描写", "回忆切入"]:
-            if pat in opening_raw:
-                opening_patterns.append({"pattern": pat, "frequency": 1, "example_structure": ""})
+    _narr = pass3.get("narration") if isinstance(pass3.get("narration"), dict) else {}
+    _ops = _narr.get("chapter_opening_patterns")
+    if isinstance(_ops, list):
+        for item in _ops:
+            if not isinstance(item, dict):
+                continue
+            pat = as_str(item.get("pattern") or "")
+            if not pat:
+                continue
+            freq = item.get("frequency")
+            if not isinstance(freq, int) or isinstance(freq, bool) or freq < 1:
+                freq = 1
+            opening_patterns.append({
+                "pattern": pat,
+                "frequency": freq,
+                "example_structure": as_str(item.get("example_structure") or ""),
+            })
     if not opening_patterns:
-        # 从 burst_pattern 和 pov 推导默认模式
-        if "限知" in pov:
-            opening_patterns = [
-                {"pattern": "场景白描", "frequency": 3, "example_structure": "[环境状态]+[人物动作]"},
-                {"pattern": "内心独白", "frequency": 2, "example_structure": "[心理活动]+[场景引入]"},
-            ]
-        else:
-            opening_patterns = [
-                {"pattern": "承接上章悬念", "frequency": 2, "example_structure": "[上章钩子]+[新场景]"},
-            ]
+        # 兼容旧形态：模型可能把开头规律写成一段中文描述
+        opening_raw = fuzzy_find(pass3, "开头", "开篇", "opening", "章节起始") or ""
+        if isinstance(opening_raw, str) and len(opening_raw) > 5:
+            for pat in ["直入对话", "场景白描", "承接上章悬念", "时间跳跃", "内心独白", "旁白点题",
+                        "动作开场", "对话开场", "环境描写", "回忆切入"]:
+                if pat in opening_raw:
+                    opening_patterns.append(
+                        {"pattern": pat, "frequency": 1, "example_structure": ""})
+    # 兜底不再"造数据"（2026-11-05）：原实现在完全拿不到信息时会填入
+    # 场景白描×3 + 内心独白×2 这种看似具体的伪规律。空列表才是诚实的——
+    # validate 对 chapter_opening_patterns 只做长度/类型检查，不强制非空。
 
     narration = {
         "pov": pov,
@@ -655,14 +704,30 @@ def normalize_pass3(pass3: dict) -> tuple:
             "long_ratio": 0,
             "burst_pattern": as_str(burst),
         },
-        "paragraph": {},
+        # paragraph 原为硬编码 {}（2026-11-05 修）：prompt 的 schema 明确要求
+        # {avg_lines, single_line_para_ratio, usage_of_single_line}，但 normalize
+        # 从不读取，于是这三项恒为空。assemble._backfill_rhythm 只能补
+        # avg_lines / chars_per_para 这两个"能从 metrics 算出来"的，其余永远缺失。
+        "paragraph": _read_paragraph(pass3),
         "chapter_opening_patterns": opening_patterns,
     }
 
+    # subtext_level 必须从输入读（2026-11-05 修）。
+    # 原实现硬编码 "直白"，从不看模型输出，于是 schema enum
+    # （直白/偶有潜台词/大量潜台词）里的后两档永远不可能出现。
+    # prompt 之前也缺 dialogue 段，两处一起补齐（prompts/pass3_style.md）。
+    _dnode = pass3.get("dialogue") if isinstance(pass3.get("dialogue"), dict) else {}
+    _sub_raw = as_str(
+        _dnode.get("subtext_level")
+        or first(pass3, "subtext_level", "潜台词") or "")
     dialogue = {
         "dialogue_ratio": 0,  # pipeline 会用 metrics 覆盖
-        "tag_style": as_str(fuzzy_find(pass3, "对话标记", "对话标签", "对话模式", "tag_style") or ""),
-        "subtext_level": "直白",
+        "tag_style": as_str(
+            _dnode.get("tag_style")
+            or fuzzy_find(pass3, "对话标记", "对话标签", "对话模式", "tag_style") or ""),
+        "subtext_level": next(
+            (s for s in ("直白", "偶有潜台词", "大量潜台词") if s in _sub_raw),
+            "直白"),
         "character_voices": [],
     }
 
@@ -686,7 +751,20 @@ def normalize_pass3(pass3: dict) -> tuple:
     # 非体感词的干扰项（角色口头禅/对话内容，不属于身体反应词库）
     NON_BODY = ("老子", "唐小雨", "把头露出来", "我没，我没", "声若蚊鸣的", "懂？", "行不行")
     # 体感词：递归收集所有引号内短语（模型可能用嵌套结构）
-    body_vocab = as_list(first(pass3, "高频动作外化词汇", "身体反应", "body_reaction_vocabulary"))
+    # 体感词：优先按 **prompt/schema 的精确路径**取（2026-11-05 修）。
+    #
+    # ``prompts/pass3_style.md:73`` 规定的是 ``emotion_handling.body_reaction_vocabulary``，
+    # 而原实现只在**顶层**找同名键（``first(pass3, ...)`` 不递归子结构）。
+    # 实测：按 prompt 规范输出 ``{"emotion_handling": {"mode": "体感式",
+    # "body_reaction_vocabulary": ["手指捏白","心跳如鼓"]}}`` 时取到 ``[]``——
+    # 随后退化到"从引号里捞短语"，捞不到就给空表。结果 voice-card 的
+    # 惯用身体反应词永远为空。
+    #
+    # 现在的顺序：精确路径 → 旧的中文别名（顶层）→ 引号兜底。
+    body_vocab = as_list(
+        (pass3.get("emotion_handling") or {}).get("body_reaction_vocabulary")
+        if isinstance(pass3.get("emotion_handling"), dict) else None
+    ) or as_list(first(pass3, "高频动作外化词汇", "身体反应", "body_reaction_vocabulary"))
     if not body_vocab:
         def collect_quoted(node):
             out = []

@@ -151,6 +151,68 @@ class TestCleanString(unittest.TestCase):
         self.assertEqual(len(r), 2)
 
 
+class TestNormalizePass3SchemaFidelity(unittest.TestCase):
+    """normalize_pass3 必须忠实读取 prompt/schema 规定的字段（2026-11-05）。
+
+    实测缺陷：按 ``prompts/pass3_style.md`` 的规范输出，6 个字段里 4 个被丢弃，
+    而且其中一个被**编造**成固定值。磁盘上 7 张 voice-card 中有 5 张的
+    ``chapter_opening_patterns`` 完全相同（场景白描×3 + 内心独白×2），
+    就是编造的产物——用户会以为那是每本书的真实规律。
+
+    这几条把「规范输入 → 原样透传」「没有输入 → 留空而非编造」两个方向都钉死。
+    """
+
+    def test_body_reaction_vocabulary_from_schema_path(self):
+        _, _, emotion, _, _ = norm.normalize_pass3({
+            "emotion_handling": {
+                "mode": "体感式",
+                "body_reaction_vocabulary": ["手指捏白", "心跳如鼓"],
+            }
+        })
+        self.assertEqual(emotion.get("body_reaction_vocabulary"),
+                         ["手指捏白", "心跳如鼓"])
+
+    def test_subtext_level_is_read_not_hardcoded(self):
+        """原实现硬编码 "直白"，schema enum 的后两档永远不可能出现。"""
+        _, dialogue, _, _, _ = norm.normalize_pass3({
+            "dialogue": {"subtext_level": "大量潜台词", "tag_style": "靠动作代替标签"}
+        })
+        self.assertEqual(dialogue.get("subtext_level"), "大量潜台词")
+        self.assertEqual(dialogue.get("tag_style"), "靠动作代替标签")
+
+    def test_paragraph_is_read_not_empty(self):
+        """原实现硬编码 {}，三项永远进不了 voice-card。"""
+        narration, _, _, _, _ = norm.normalize_pass3({
+            "narration": {"paragraph": {
+                "avg_lines": 3,
+                "single_line_para_ratio": 0.15,
+                "usage_of_single_line": "转折前静默",
+            }}
+        })
+        self.assertEqual(narration.get("paragraph"), {
+            "avg_lines": 3,
+            "single_line_para_ratio": 0.15,
+            "usage_of_single_line": "转折前静默",
+        })
+
+    def test_opening_patterns_passed_through_verbatim(self):
+        """规范结构必须原样透传（原实现只认 str，list 被丢弃后伪造默认值）。"""
+        given = [
+            {"pattern": "直入对话", "frequency": 4, "example_structure": "[对白]+[动作]"},
+            {"pattern": "感官痛感", "frequency": 2, "example_structure": "[痛感]"},
+        ]
+        narration, _, _, _, _ = norm.normalize_pass3({
+            "narration": {"chapter_opening_patterns": given}
+        })
+        self.assertEqual(narration.get("chapter_opening_patterns"), given)
+
+    def test_opening_patterns_never_fabricated(self):
+        """拿不到信息时必须留空——编造具体数字比缺字段更有害。"""
+        narration, _, _, _, _ = norm.normalize_pass3({})
+        self.assertEqual(narration.get("chapter_opening_patterns"), [],
+                         "不得再编造「场景白描×3 + 内心独白×2」这类伪规律")
+
+
 class TestNormalizeMainCLI(unittest.TestCase):
     def test_main_cli_execution_with_explicit_argv(self):
         with tempfile.TemporaryDirectory() as td:

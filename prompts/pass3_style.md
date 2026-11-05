@@ -84,6 +84,10 @@
     "sensory_preference": {"visual": 0.4, "auditory": 0.25, "tactile": 0.2, "olfactory": 0.1, "gustatory": 0.05},
     "signature_devices": ["必须填至少1个，如：反复用短句叠加强调/用问句收尾制造悬念"]
   },
+  "dialogue": {
+    "tag_style": "对话标签习惯，如「几乎只用『道』」/「靠动作代替标签」/「大量使用『说』的替代词」",
+    "subtext_level": "直白|偶有潜台词|大量潜台词"
+  },
   "banned": {
     "never_used_words": ["全书未出现或极低频的常见词"],
     "avoided_structures": ["作者回避的句式结构"],
@@ -98,6 +102,9 @@
 - `signature_devices` 至少 1 项，**不允许为空数组**。
 - `burst_pattern` / `usage_of_single_line` 必须写「什么场景下如何」，禁止只报数字。
 - `emotion_handling.mode` 若为 `混合式`，必须在 `examples` 里说明切换规律。
+- `dialogue.subtext_level` 必填，取 `直白` / `偶有潜台词` / `大量潜台词` 之一：
+  看角色是否「说的和想的不是一回事」。`dialogue.tag_style` 观察对话标签的用法
+  （用不用「道」的替代词、是否靠动作代替标签）。
 
 ---
 
