@@ -192,8 +192,8 @@ export default function StylePanel() {
                   <Typography variant="subtitle2">{s.name}</Typography>
                   <Typography variant="caption" color="text.secondary">
                     {t('style_lib_summary', '句长 {s} 字 | 对话 {d}%', {
-                      s: String(s.metrics?.avg_sentence_length ?? '-'),
-                      d: (Number(s.metrics?.dialogue_ratio ?? 0) * 100).toFixed(0),
+                      s: String(s.metrics?.avgSentenceLength ?? s.metrics?.avg_sentence_length ?? '-'),
+                      d: (Number(s.metrics?.dialogueRatio ?? s.metrics?.dialogue_ratio ?? 0) * 100).toFixed(0),
                     })}
                   </Typography>
                 </Box>

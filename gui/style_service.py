@@ -148,6 +148,29 @@ def _rel_or_name(fp: Path) -> str:
         return f"{fp.parent.name}/{fp.name}"
 
 
+def _to_snake_keys(node):
+    """递归把 camelCase 键改回 snake_case（2026-11-05）。
+
+    前端拿到的 analyze 结果是**已转 camelCase** 的（client.ts 的 deepToCamel），
+    用户点「保存」时原样回传，后端原先也原样落盘——于是磁盘上变成
+    ``avgSentenceLength`` / ``createdAt``，而读取侧（list_styles、
+    apply_style_prompt）按 snake 读，指标全部落空：
+    「句长 - 字 | 对话 0%」，应用风格时还会给出反方向建议。
+
+    以 snake_case 为磁盘上的唯一格式：保存入口统一归一化。
+    """
+    if isinstance(node, list):
+        return [_to_snake_keys(x) for x in node]
+    if isinstance(node, dict):
+        out = {}
+        for k, v in node.items():
+            if isinstance(k, str):
+                k = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", k).lower()
+            out[k] = _to_snake_keys(v)
+        return out
+    return node
+
+
 def save_style(name: str, style_card: dict[str, Any]) -> dict[str, Any]:
     """保存风格卡到资产目录。"""
     n = _sanitize_name(name)
@@ -157,6 +180,8 @@ def save_style(name: str, style_card: dict[str, Any]) -> dict[str, Any]:
     fp = d / f"{n}.json"
     if fp.exists():
         raise ServiceError(f"风格已存在: {n}", 409)
+    # 归一化键名：前端回传的是 camelCase（见 _to_snake_keys 文档）
+    style_card = _to_snake_keys(style_card)
     style_card["name"] = n
     # 原子写（tmp + os.replace）：直接 write_text 时进程被杀会留下半份 JSON，
     # 之后 list_styles 只会 warn 并跳过它，用户看到的是"风格卡凭空消失"。

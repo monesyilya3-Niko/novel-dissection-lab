@@ -116,6 +116,33 @@ class TestStylePersistence(unittest.TestCase):
         self.assertTrue((d / "留痕测试.json").is_file())
         self.assertEqual(list(d.glob("*.tmp")), [], f"临时文件没清掉: {res}")
 
+    def test_camel_case_payload_is_normalized_to_snake(self):
+        """前端回传的 camelCase 必须归一化成 snake_case（2026-11-05）。
+
+        analyze 的结果经 client.ts 的 deepToCamel 转成 camelCase，用户点保存时
+        原样回传，后端原先也原样落盘。读取侧（list_styles / apply_style_prompt）
+        按 snake 读，于是：
+            磁盘键 avgSentenceLength → 读取侧找 avg_sentence_length → 落空
+            界面显示「句长 - 字 | 对话 0%」
+            apply_style_prompt 拿到默认值，给出反方向的写作建议
+            created_at 变成 createdAt → list_styles 显示空字符串
+        """
+        style_service.save_style("驼峰测试", {
+            "createdAt": "2026-11-05T10:00:00Z",
+            "metrics": {"avgSentenceLength": 13.7, "dialogueRatio": 0.28},
+        })
+        data = json.loads(
+            (style_service._styles_dir() / "驼峰测试.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["metrics"]["avg_sentence_length"], 13.7)
+        self.assertEqual(data["metrics"]["dialogue_ratio"], 0.28)
+        self.assertNotIn("avgSentenceLength", data["metrics"])
+        self.assertEqual(data["created_at"], "2026-11-05T10:00:00Z")
+
+        # 读取侧必须能拿到，否则界面就是「句长 - 字」
+        listed = [s for s in style_service.list_styles() if s["name"] == "驼峰测试"][0]
+        self.assertEqual(listed["created_at"], "2026-11-05T10:00:00Z")
+        self.assertEqual(listed["metrics"]["avg_sentence_length"], 13.7)
+
     def test_saved_card_is_valid_json_with_name(self):
         style_service.save_style("内容测试", {"metrics": {"avg_sentence_length": 12.0}})
         fp = style_service._styles_dir() / "内容测试.json"
