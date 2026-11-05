@@ -693,6 +693,20 @@ def chapter_scan_rules() -> tuple[Callable[[str], bool], frozenset[str]]:
     return is_chapter_filename, frozenset(EXCLUDED_DIR_NAMES)
 
 
+def chapter_number_from_path(path: str | Path) -> int | None:
+    """从文件名解析真实章号；取不到返回 None（2026-11-05 新增）。
+
+    单一口径在 ``scripts.chapter_loader``——它认 ``第N章`` / ``chapter-N`` /
+    纯数字，且**不把 ``番外1`` / ``2026-01-01`` 当成章号**。
+
+    为什么需要它：投稿导出原先用循环序号当章号，而文件按字典序排，
+    ``第10章`` 会排到 ``第1章`` 前面、被编成第 1 章——10 章以上的稿件
+    投稿后章号全错。gui 层不得直接 import scripts/，故由此出口转发。
+    """
+    from scripts.chapter_loader import _chapter_number
+    return _chapter_number(Path(path))
+
+
 def read_chapter_text(path: str | Path) -> str:
     """读正文文件，编码按 UTF-8 → GBK 两段解（口径在 scripts/chapter_loader）。
 

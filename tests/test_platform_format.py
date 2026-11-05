@@ -89,12 +89,33 @@ class TestExportChapterTitles(unittest.TestCase):
             [c["title"] for c in data["chapters"]], ["第1章 初见", "第2章 离别"])
 
     def test_export_numbers_follow_file_order(self):
-        # 文件名与首行章号不一致时以导出顺序为准，避免整本出现两个"第3章"
+        # 文件名与首行章号不一致时以**文件名解析出的章号**为准，避免整本出现两个"第3章"
         (self.tmp / "01.txt").write_text("第一章 开端\n\n正文。\n", encoding="utf-8")
         (self.tmp / "02.txt").write_text("第一章 开端\n\n正文。\n", encoding="utf-8")
         data = platform_service.export_book_for_platform("qidian", str(self.tmp))
         self.assertEqual(
             [c["title"] for c in data["chapters"]], ["第1章 开端", "第2章 开端"])
+
+    def test_export_uses_real_chapter_numbers_not_loop_index(self):
+        """10 章以上章号必须按真实值，不得被字典序 + 循环序号打乱（2026-11-05）。
+
+        原实现用 ``enumerate(chapter_files, 1)``，而文件按**文件名字典序**排——
+        ``第10章`` 排在 ``第1章`` 前面，于是「第10章」被编成第 1 章。
+        实测（第1/第2/第10/第11 章）::
+
+            修前 [(1,'第1章 标题10'), (2,'第2章 标题11'), (3,'第3章 标题1'), (4,'第4章 标题2')]
+            修后 [(1,'第1章 标题1'),  (2,'第2章 标题2'),  (10,'第10章 标题10'), (11,'第11章 标题11')]
+
+        任何按「第N章.txt」命名的 10 章以上稿件，投稿后章号全错。
+        """
+        for n in (1, 2, 10, 11):
+            (self.tmp / f"第{n}章.txt").write_text(
+                f"第{n}章 标题{n}\n\n正文{n}。\n", encoding="utf-8")
+        data = platform_service.export_book_for_platform("qidian", str(self.tmp))
+        self.assertEqual([c["num"] for c in data["chapters"]], [1, 2, 10, 11])
+        self.assertEqual([c["title"] for c in data["chapters"]],
+                         ["第1章 标题1", "第2章 标题2",
+                          "第10章 标题10", "第11章 标题11"])
 
 
 class TestDiagnoseChapter(unittest.TestCase):

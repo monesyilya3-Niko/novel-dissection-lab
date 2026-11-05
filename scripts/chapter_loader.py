@@ -55,9 +55,6 @@ __all__ = [
 # 备份/构建产物目录名（比较时 casefold）：这些目录里的 .txt 一律不参与加载
 EXCLUDED_DIR_NAMES = {"_备份", "备份", "backup", ".git", "build", "dist"}
 
-_CHAPTER_NUM_RE = re.compile(r'(\d+)')
-
-
 class ChapterLoadError(ValueError):
     """章节加载失败：同一章号命中多个未被排除的候选文件。
 
@@ -142,10 +139,49 @@ def _display_path(path: Path, source: Path) -> str:
     return str(path)
 
 
+#: 章节号解析模式（**按优先级**尝试，2026-11-05 修）。
+#:
+#: 原实现是 ``re.compile(r'(\d+)')`` + ``search()``——取文件名里**第一个数字**，
+#: 不做任何"这是不是章号"的判断。实测踩中：
+#:
+#:   2026-01-01.txt  → 章号 2026（本该是"没有章号"）
+#:   2-第10章.txt    → 章号 2（真实是第 10 章）
+#:   番外1.txt       → 章号 1（与「第1章.txt」撞号 → ChapterLoadError，整本质检失败）
+#:
+#: 网文几乎都有番外，所以第三条是"整本质检直接失败"级别的。
+#:
+#: 现在的顺序：显式章号标记 → 纯数字 → 数字+分隔符。取不到就算"没有章号"
+#: （番外/序章/设定笔记走这条），而不是硬编一个错号。
+_CHAPTER_NO_PATTERNS = (
+    re.compile(r"第\s*(\d+)\s*[章回节]"),          # 第1章 / 第 12 回
+    re.compile(r"chapter[-_ ]?(\d+)", re.I),      # chapter-001 / Chapter 1
+    re.compile(r"^ch[-_ ]?(\d+)", re.I),          # ch1 / ch-001
+    re.compile(r"^(\d+)$"),                        # 001 / 12
+    # 数字 + 分隔符：只认**不超过 4 位**的编号。日期前缀（2026-01-01）会被
+    # `^(\d+)[-_. ]` 匹配成年份 2026，所以先按"整段是不是日期"排除掉。
+    re.compile(r"^(\d{1,4})[-_. ](?!\d{1,2}[-_. ]\d{1,2})"),
+)
+
+
+
 def _chapter_number(path: Path):
-    """从文件名（不含扩展名）提取章号；取不到返回 None。"""
-    m = _CHAPTER_NUM_RE.search(path.stem)
-    return int(m.group(1)) if m else None
+    """从文件名（不含扩展名）提取章号；取不到返回 None。
+
+    按 ``_CHAPTER_NO_PATTERNS`` 的优先级逐个尝试——``第10章`` 必须解析成 10，
+    而 ``番外1`` 不该被当成第 1 章。
+    """
+    stem = path.stem
+    for pat in _CHAPTER_NO_PATTERNS:
+        m = pat.search(stem)
+        if m:
+            try:
+                return int(m.group(1))
+            except (ValueError, IndexError):
+                continue
+    # 所有模式都没命中 → 无章号（番外 / 设定笔记 / 日期前缀文件都走这里）。
+    # 不猜：硬编一个数字会和真正的第 N 章撞号（原实现让 番外1 与 第1章 冲突，
+    # 抛 ChapterLoadError 使整本质检失败）。
+    return None
 
 
 def is_chapter_filename(name: str) -> bool:

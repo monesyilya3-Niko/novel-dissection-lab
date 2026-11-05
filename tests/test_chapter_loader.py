@@ -223,6 +223,44 @@ class TestChapterLoader(unittest.TestCase):
                 (root / f"chapter-{num}.txt").write_text(num, encoding="utf-8")
             self.assertEqual(list(chapter_loader.load_chapter_texts(root)), [1, 2, 3])
 
+    def test_chapter_number_parsing_prefers_explicit_markers(self):
+        """章号解析必须认「显式章号标记」，不得取文件名里第一个数字（2026-11-05）。
+
+        原实现是 ``re.search(r'(\\d+)')``，实测：
+            2026-01-01.txt  → 2026（本该"无章号"）
+            2-第10章.txt    → 2（真实是第 10 章）
+            番外1.txt       → 1（与「第1章.txt」撞号 → ChapterLoadError，整本质检失败）
+        网文几乎都有番外，第三条是"整本质检直接失败"级别的。
+        """
+        cases = {
+            "第1章.txt": 1,
+            "第 12 回.txt": 12,
+            "chapter-007.md": 7,
+            "ch-003.txt": 3,
+            "12.txt": 12,
+            "001-开端.txt": 1,
+            "2-第10章.txt": 10,          # 显式章号优先于前导卷号
+            "2026-01-01第3章.txt": 3,    # 日期前缀 + 显式章号 → 取章号
+            "番外1.txt": None,           # 番外不参与章号编号
+            "设定笔记.txt": None,
+            "2026-01-01.txt": None,      # 日期不是章号
+        }
+        for name, expected in cases.items():
+            with self.subTest(name=name):
+                self.assertEqual(chapter_loader._chapter_number(Path(name)), expected)
+
+    def test_extras_do_not_collide_with_chapter_numbers(self):
+        """「番外1.txt」不得与「第1章.txt」撞号导致整本加载失败。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "第1章.txt").write_text("A", encoding="utf-8")
+            (root / "番外1.txt").write_text("B", encoding="utf-8")
+            diag = chapter_loader.discover_chapter_files(root)
+            self.assertEqual(list(diag["files"]), [1],
+                             "第1章应正常加载，番外不应占号")
+            self.assertEqual(list(diag["duplicates"]), [],
+                             "番外被当成第1章会导致冲突误报")
+
     def test_missing_path_returns_empty(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(chapter_loader.load_chapter_texts(Path(tmp) / "不存在"), {})

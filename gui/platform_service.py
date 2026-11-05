@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from gui import text_access
+from gui import engine_adapter, text_access
 from gui.logging_setup import get_logger
 from gui.services import ServiceError
 
@@ -543,12 +543,33 @@ def export_book_for_platform(platform_id: str, book_dir: str) -> dict[str, Any]:
     # book_dir 自 2026-10-08 起不再限制目录（用户稿子常在项目外），
     # 可读范围改由 text_access 按内容收紧：正文扩展名 + 非符号链接 + 体积上限。
     chapter_files = text_access.text_files_in(book_dir, field="book_dir")
+    # 必须按**真实章号**排序与编号（2026-11-05 修）。
+    #
+    # 原实现是 ``enumerate(chapter_files, 1)``，而 text_files_in 按**文件名字典序**
+    # 排序——于是 ``第10章`` 排在 ``第1章`` 前面，循环序号把「第10章」编成第 1 章。
+    # 实测（4 个文件 第1/第2/第10/第11 章）::
+    #
+    #   [(1,'第1章 标题10'), (2,'第2章 标题11'), (3,'第3章 标题1'), (4,'第4章 标题2')]
+    #
+    # 任何按 ``第N章`` 命名的 10 章以上稿件，投稿稿章号全错。
+    # 现在用 chapter_loader 的章号解析（它认 第N章 / chapter-N / 纯数字），
+    # 取不到章号的文件（设定笔记、番外等）排到末尾并保持文件名序。
+    numbered = []
+    unnumbered = []
+    for fp in chapter_files:
+        no = engine_adapter.chapter_number_from_path(fp)
+        (numbered if no is not None else unnumbered).append((no, fp))
+    numbered.sort(key=lambda x: x[0])
+    ordered = [fp for _no, fp in numbered] + [fp for _no, fp in unnumbered]
 
     chapters = []
     total_chars = 0
     non_compliant = 0
 
-    for i, fp in enumerate(chapter_files, 1):
+    for i, fp in enumerate(ordered, 1):
+        # 章号优先用文件名里的真实值；取不到才退回循环序号。
+        real_no = engine_adapter.chapter_number_from_path(fp)
+        num = real_no if real_no is not None else i
         try:
             # 走 text_access 而不是 Path.read_text：国内稿子大量是 GBK，
             # 只按 UTF-8 解会让整章被静默跳过，导出的书凭空少一章。
@@ -568,10 +589,10 @@ def export_book_for_platform(platform_id: str, book_dir: str) -> dict[str, Any]:
             non_compliant += 1
 
         # 格式化
-        formatted = format_chapter(platform_id, i, title, body)
+        formatted = format_chapter(platform_id, num, title, body)
 
         chapters.append({
-            "num": i,
+            "num": num,
             "title": formatted["formatted_title"],
             "char_count": formatted["content_char_count"],
             "compliant": compliance["compliant"],
