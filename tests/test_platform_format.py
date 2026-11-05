@@ -118,6 +118,39 @@ class TestExportChapterTitles(unittest.TestCase):
                           "第10章 标题10", "第11章 标题11"])
 
 
+
+class TestExportReturnsManuscript(unittest.TestCase):
+    """整书导出必须返回正文（2026-11-05）。
+
+    format_chapter 早就产出 full_chapter，但 export_book_for_platform 只挑了
+    标题/字数/合规，正文被丢弃。前端文案写着「导出合并稿」，用户实际拿不到
+    任何稿子，只看到一行统计。
+    """
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="plat_manuscript_"))
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        (self.tmp / "第1章.txt").write_text("第1章 开端\n正文一。", encoding="utf-8")
+        (self.tmp / "第2章.txt").write_text("第2章 再会\n正文二。", encoding="utf-8")
+
+    def test_chapters_carry_full_text(self):
+        data = platform_service.export_book_for_platform("qidian", str(self.tmp))
+        for ch in data["chapters"]:
+            self.assertIn("full_chapter", ch)
+            self.assertTrue(ch["full_chapter"].strip())
+
+    def test_merged_text_contains_every_chapter(self):
+        data = platform_service.export_book_for_platform("qidian", str(self.tmp))
+        merged = data["merged_text"]
+        self.assertIn("正文一", merged)
+        self.assertIn("正文二", merged)
+
+    def test_merged_text_equals_joined_chapters(self):
+        data = platform_service.export_book_for_platform("qidian", str(self.tmp))
+        expected = "\n\n".join(c["full_chapter"] for c in data["chapters"])
+        self.assertEqual(data["merged_text"], expected)
+
+
 class TestDiagnoseChapter(unittest.TestCase):
     """网文签约过稿深度诊断测试。"""
 

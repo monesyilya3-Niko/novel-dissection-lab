@@ -85,6 +85,15 @@ export default function PlatformPanel() {
   // 整书导出（2026-11-03 补，此前端点与封装都在、UI 无入口）
   const [bookDir, setBookDir] = useState('')
   const [exporting, setExporting] = useState(false)
+  const downloadTextFile = (filename: string, content: string) => {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
   const [exportResult, setExportResult] = useState<Record<string, unknown> | null>(null)
 
   // Tab 1: LitRPG 属性面板与海外排版
@@ -307,13 +316,28 @@ export default function PlatformPanel() {
               </Button>
             </Stack>
             {exportResult ? (
-              <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
-                {t('platform_export_book_done', '已导出 {n} 章 / {chars} 字，不合规 {bad} 章', {
-                  n: String(exportResult.totalChapters ?? 0),
-                  chars: String(exportResult.totalChars ?? 0),
-                  bad: String(exportResult.nonCompliantChapters ?? 0),
-                })}
-              </Typography>
+              <>
+                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+                  {t('platform_export_book_done', '已导出 {n} 章 / {chars} 字，不合规 {bad} 章', {
+                    n: String(exportResult.totalChapters ?? 0),
+                    chars: String(exportResult.totalChars ?? 0),
+                    bad: String(exportResult.nonCompliantChapters ?? 0),
+                  })}
+                </Typography>
+                {/* 2026-11-05：此前按钮文案说"导出合并稿"，但界面上只有一行统计，
+                    用户拿不到任何稿子。后端已返回 merged_text。 */}
+                {typeof exportResult.mergedText === 'string' && exportResult.mergedText
+                  ? (
+                    <Button size="small" variant="outlined" sx={{ mt: 1 }}
+                      onClick={() => downloadTextFile(
+                        `${String(exportResult.platform ?? '导出')}-合并稿.txt`,
+                        String(exportResult.mergedText),
+                      )}>
+                      {t('platform_export_download', '下载合并稿')}
+                    </Button>
+                  )
+                  : null}
+              </>
             ) : null}
           </Paper>
 

@@ -597,6 +597,12 @@ def export_book_for_platform(platform_id: str, book_dir: str) -> dict[str, Any]:
             "char_count": formatted["content_char_count"],
             "compliant": compliance["compliant"],
             "issues": compliance["issues"],
+            # 正文必须带回去（2026-11-05 修）。
+            #
+            # format_chapter 早就产出了 full_chapter，但这里只挑了标题/字数/合规，
+            # 正文被丢弃——前端文案写着「导出合并稿」，用户实际拿不到任何稿子，
+            # 只看到一行统计。
+            "full_chapter": formatted["full_chapter"],
         })
         total_chars += formatted["content_char_count"]
 
@@ -608,6 +614,8 @@ def export_book_for_platform(platform_id: str, book_dir: str) -> dict[str, Any]:
         "non_compliant_chapters": non_compliant,
         "chapters": chapters,
         "export_ready": non_compliant == 0,
+        # 合并稿：前端可直接下载/复制，不必逐章拼接（2026-11-05）
+        "merged_text": "\n\n".join(c["full_chapter"] for c in chapters),
     }
 
 
