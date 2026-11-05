@@ -116,6 +116,26 @@ class TestAssembleAfterAnalysis(unittest.TestCase):
             self.book_id, "urban", self._chapters(), self._state())
         self.assertEqual(written, [])
 
+    def test_written_cards_trigger_reindex(self):
+        """契约：每张成功落盘的卡都要触发一次 SQLite 重索引。
+
+        只写文件不重索引，资产库里搜不到这张卡——文件在磁盘上却"不存在"，
+        用户只能通过重新迁移才看得见。
+        """
+        self._write_batch(1, 0, "pass2_character", {
+            "characters": [{"name": "林昭", "role": "主角"}],
+        })
+        self._write_batch(1, 0, "pass3_style", self._rich_pass3())
+
+        written = self.services._assemble_after_analysis(
+            self.book_id, "urban", self._chapters(), self._state())
+
+        self.assertTrue(written, "前置条件：应至少产出一张卡")
+        indexed = {Path(p).name for p in self._sync_calls}
+        self.assertEqual(
+            indexed, set(written),
+            "落盘的卡与触发重索引的卡必须一一对应（写盘了却漏索引 = 资产库看不见）")
+
     def test_manifest_carries_sample_chapters(self):
         """回归：manifest 缺 selected_indices → sample_chapters=[] → 校验必失败。
 
