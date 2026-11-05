@@ -944,15 +944,27 @@ def _load_assembled_card(book_id: str, card_type: str) -> dict[str, Any]:
     suffix = mapping.get(card_type)
     if suffix is None:
         return {}
+    # 候选名：先按 GUI 的 book_id（`{书名}-{hash}`），再按 CLI 的裸书名。
+    #
+    # 2026-11-04：GUI 的 book_id 由 `book_id_from_title` 生成，形如
+    # ``我的书-4519bf2c``；而 CLI 拆书（pipeline / assemble / batch）落盘用的是
+    # 纯书名 ``我的书-voice-card.json``。两套命名空间并存，导致 GUI 导入一本
+    # CLI 已经拆完的书后，结果页资产全空——不是没拆，是名字对不上。
+    # 回退时用 book_id 去掉末尾 ``-{8位hex}`` 得到书名。
+    names = [f"{book_id}-{suffix}.json"]
+    m = re.match(r"^(?P<title>.+)-[0-9a-f]{8}$", book_id)
+    if m:
+        names.append(f"{m.group('title')}-{suffix}.json")
     # 优先 assets/{book_id}/ 子目录，其次 assets/ 根目录。
     for d in (config.ASSETS_ROOT / book_id, config.ASSETS_ROOT):
-        fp = d / f"{book_id}-{suffix}.json"
-        if fp.is_file():
-            try:
-                return json.loads(fp.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError) as exc:
-                _log.warning(f"资产卡加载失败 {fp.name}: {exc}")
-                continue
+        for fname in names:
+            fp = d / fname
+            if fp.is_file():
+                try:
+                    return json.loads(fp.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError) as exc:
+                    _log.warning(f"资产卡加载失败 {fp.name}: {exc}")
+                    continue
     return {}
 
 
