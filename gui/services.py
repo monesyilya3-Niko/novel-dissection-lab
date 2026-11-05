@@ -27,6 +27,22 @@ PASS_ORDER = ("pass1_structure", "pass2_character", "pass3_style", "pass4_commer
 #: 但有上限——否则「一直失败 → 一直 pending → 无限重扫」会把线程卡死。
 _MAX_RESCAN_ROUNDS = 3
 
+#: 合并批级 pass 文件时**不参与合并**的键（2026-11-05）。
+#:
+#: ``_meta``/``model``/``tokens`` 是元信息。``status``/``message``/``note``
+#: 是模型**拒答**的措辞（见 pipeline._looks_like_refusal）：整批拒答的文件长这样
+#:
+#:     {"status": "no_input", "message": "未收到任何对话切片文本", "characters": []}
+#:
+#: 若把它们合并进来，``if pass2 or pass3`` 会因为 ``status`` 非空而判真，
+#: 于是产出一张 ``character_voices: []`` 的空壳 voice-card——校验又恰好放行
+#: （必填字段都在，只是全空）。用户拿到一张"有卡但没内容"的资产，
+#: 比完全没有卡更难察觉。跳过这些键后，纯拒答批次合并结果为空 dict，
+#: 上层 ``if pass2 or pass3`` 自然不成立，不会生成空壳。
+_MERGE_SKIP_KEYS = frozenset({
+    "_meta", "model", "tokens", "status", "message", "note", "error", "detail",
+})
+
 
 class ServiceError(Exception):
     """服务层业务错误，携带 HTTP 状态码。"""
@@ -1229,7 +1245,7 @@ def _assemble_after_analysis(book_id: str, genre: str,
             if not isinstance(part, dict):
                 continue
             for k, v in part.items():
-                if k in ("_meta", "model", "tokens"):
+                if k in _MERGE_SKIP_KEYS:
                     continue
                 if isinstance(v, list):
                     lists.setdefault(k, []).extend(v)
@@ -1238,11 +1254,34 @@ def _assemble_after_analysis(book_id: str, genre: str,
                 else:
                     merged.setdefault(k, v)
         merged.update(lists)
-        return merged
+        # 丢掉空值：纯拒答批次合并后只剩 {"characters": []}，而这个 dict
+        # 在布尔上是 True——上层 ``if pass2 or pass3`` 仍会成立并产出空壳卡。
+        return {k: v for k, v in merged.items() if v not in (None, "", [], {})}
 
     written: list[str] = []
     title = state.get("title") or book_id
-    manifest = {"title": title}
+    # ⚠️ manifest 必须带 selected_indices / selected_count，否则
+    # assemble_voice_card 会产出一张 ``sample_chapters: []`` 的卡——
+    # validate_voice_card 对 sample_chapters 要求至少 3 项，校验必失败，
+    # _write 静默跳过落盘。结果是「组装函数写了、卡永远出不来」：
+    # 结果页资产全空、报告 0 字、铁律二必判失败，而日志只有一行 warning。
+    #
+    # GUI 分析是全章分析（不是 sampler 的抽样），故索引就是 1..N。
+    chapter_count = len(chapters) if chapters else 0
+    if not chapter_count:
+        # chapters 参数未传时用状态文件里的批记录反推章节数（cN-bM → N）。
+        idxs = set()
+        for key in (state.get("chapter_states") or {}):
+            parsed = state_store.parse_cursor(key)
+            if parsed and parsed[0]:
+                idxs.add(parsed[0])
+        chapter_count = max(idxs) if idxs else 0
+    selected_indices = list(range(1, chapter_count + 1))
+    manifest = {
+        "title": title,
+        "selected_indices": selected_indices,
+        "selected_count": len(selected_indices),
+    }
     metrics = {}
     book = _books_get(book_id)
     if book and isinstance(book.get("metrics"), dict):
