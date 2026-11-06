@@ -48,5 +48,59 @@ class TestRescanLoopExists(unittest.TestCase):
                       "重扫循环未检查 stop_flag，停止请求可能被忽略")
 
 
+class TestRetryFailedRollback(unittest.TestCase):
+    """retry_failed 在无法真正续传时不得留下卡死的 pending 批（2026-11-05）。
+
+    原实现先把 failed 改成 pending、再调 resume()。resume() 会做题材校验等，
+    一旦抛错，刚写的 pending 就永久留着：主循环不在跑、没人重扫、任务状态
+    还是 error。实测症状：批状态停在 pending，用户既看不到进度也无法推进。
+    """
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path as _P
+
+        from tests import _isolation
+        self._tmp = tempfile.mkdtemp(prefix="retry_rb_")
+        self._iso = _isolation.isolate_paths(_P(self._tmp))
+        self._iso.__enter__()
+        from gui import db
+        db.init_schema()
+        db.apply_migrations()
+
+    def tearDown(self):
+        self._iso.__exit__(None, None, None)
+
+    def _make_book(self, genre: str) -> str:
+        from pathlib import Path as _P
+
+        from gui import services, state_store
+        src = _P(self._tmp) / f"book-{genre}.txt"
+        src.write_text("\n\n".join(f"第{i}章\n" + "正文。" * 200 for i in range(1, 4)),
+                       encoding="utf-8")
+        bid = services.import_book(str(src))["book_id"]
+        with state_store.update_state(bid) as st:
+            st["genre"] = genre
+            st["status"] = "error"
+            state_store.set_batch_state(st, 1, 0, "failed")
+        services._runtime.pop(bid, None)
+        return bid
+
+    def test_unknown_genre_leaves_batch_failed(self):
+        from gui import services, state_store
+        bid = self._make_book("unknown")
+        with self.assertRaises(services.ServiceError):
+            services.retry_failed(bid)
+        st = state_store.load_state(bid)
+        self.assertEqual(st["chapter_states"]["c1-b0"]["status"], "failed",
+                         "续传失败后批卡在 pending，没人会再处理它")
+        self.assertEqual(st.get("status"), "error")
+
+    def test_valid_genre_passes_precheck(self):
+        from gui import services
+        bid = self._make_book("dushi-richang")
+        services._precheck_resumable(bid)   # 不抛即通过
+
+
 if __name__ == "__main__":
     unittest.main()

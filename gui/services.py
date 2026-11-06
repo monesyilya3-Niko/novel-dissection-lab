@@ -878,6 +878,23 @@ def retry_failed(book_id: str) -> dict[str, Any]:
     if not any(isinstance(v, dict) and v.get("status") == "failed"
                for v in _probe.values()):
         return {"retried": 0}
+
+    # 线程存活时主循环会按 pending 重扫，不必（也不能）再 resume。
+    rt = _runtime.get(book_id)
+    alive = bool(rt and rt.get("thread") and rt["thread"].is_alive())
+
+    # ⚠️ 线程已死时，必须在**改状态之前**确认能真的续传（2026-11-05 修）。
+    #
+    # 原实现先把 failed 改成 pending、再调 resume()。resume() 会做题材校验
+    # （未知题材直接 400）、书可用性校验等——一旦它抛错，刚才写下去的 pending
+    # 就永久留在状态里：主循环不在跑、没人会重扫，任务状态还是 error。
+    # 实测：一批 failed 的书 retry_failed → ServiceError「未知题材 'unknown'」，
+    # 批状态停在 pending，用户既看不到进度也无法推进。
+    #
+    # 现在先试跑续传的**前置校验**，通过后才改状态；改完再真正启动。
+    if not alive:
+        _precheck_resumable(book_id)
+
     # 原子改状态：分析线程可能正在同一 book_id 上推进批次，load→save 会覆盖。
     with state_store.update_state(book_id) as state:
         failed = [k for k, v in state.get("chapter_states", {}).items()
@@ -886,12 +903,35 @@ def retry_failed(book_id: str) -> dict[str, Any]:
             return {"retried": 0}
         for key in failed:
             state["chapter_states"][key]["status"] = "pending"
-    # L2：线程存活时主循环会按 pending 重扫，不必（也不能）再 resume。
-    rt = _runtime.get(book_id)
-    if rt and rt.get("thread") and rt["thread"].is_alive():
+    if alive:
         return {"retried": len(failed), "note": "线程运行中，将在当前循环内重扫"}
-    resume(book_id)
+    try:
+        resume(book_id)
+    except Exception:
+        # 兜底回滚：precheck 之后、真正启动之前仍可能失败（竞态/磁盘等）。
+        # 把刚改成 pending 的批退回 failed，避免"卡在 pending 无人处理"。
+        with state_store.update_state(book_id) as state:
+            for key in failed:
+                rec = state.get("chapter_states", {}).get(key)
+                if isinstance(rec, dict) and rec.get("status") == "pending":
+                    rec["status"] = "failed"
+        raise
     return {"retried": len(failed)}
+
+
+def _precheck_resumable(book_id: str) -> None:
+    """续传前置校验：不通过就抛错，**不产生任何状态写入**。
+
+    与 ``resume()`` 里真正启动前的那几项检查同口径（书可用 + 题材合法），
+    但不启动线程。抽出来是为了让 ``retry_failed`` 能在改状态前判定。
+    """
+    _get_book_or_raise(book_id)
+    state = state_store.load_state(book_id)
+    genre = state.get("genre") or "unknown"
+    if not engine_adapter.is_known_genre(genre):
+        raise ServiceError(
+            f"未知题材 {genre!r}，请从题材列表中选择（GET /api/genres）", 400)
+
 
 
 # ---------------------------------------------------------------------------
