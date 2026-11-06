@@ -623,6 +623,11 @@ def export_book_for_platform(platform_id: str, book_dir: str) -> dict[str, Any]:
 # LitRPG 属性面板与 Royal Road 格式化引擎
 # ---------------------------------------------------------------------------
 
+#: XML/HTML 非法控制字符（C0 段除 \t \n \r，外加 U+FFFE/U+FFFF）。
+#: 与 writing_extra._escape_xml 同口径——docx/epub/shunn 早已过滤，
+#: BBCode 路径也必须有，否则同一个字符在不同导出格式里表现不一致。
+_ILLEGAL_CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
+
 _STAT_BOX_BRACKET_RE = re.compile(
     r"(?m)^[ \t]*(\[|【)\s*(Status(?:\s+Window)?|Character\s+Sheet|System\s+(?:Notification|Prompt)|属性面板|角色面板|状态栏|系统提示)\s*(\]|】)[ \t]*\n(.*?)(?=(?:\n[ \t]*\n|\n[ \t]*(?:\[|【)|\Z))",
     re.DOTALL | re.IGNORECASE,
@@ -760,6 +765,17 @@ def format_royalroad_chapter(
         author_note_foot = ""
     if wrap_stat_boxes is None:
         wrap_stat_boxes = True
+    # 过滤 XML/HTML 非法控制字符（2026-11-05）。
+    #
+    # BBCode 最终会被 Royal Road 渲染成 HTML，而 C0 控制字符（\x00-\x08、
+    # \x0b、\x0c、\x0e-\x1f）在 HTML 里同样非法——原样输出会让浏览器显示
+    # 乱码方块，某些站点直接拒绝提交。docx/epub/shunn 走 _escape_xml 已经
+    # 过滤过，BBCode 这条路径漏了，口径不一致。
+    chapter_title = _ILLEGAL_CTRL_RE.sub("", chapter_title)
+    chapter_text = _ILLEGAL_CTRL_RE.sub("", chapter_text)
+    author_note_head = _ILLEGAL_CTRL_RE.sub("", author_note_head or "")
+    author_note_foot = _ILLEGAL_CTRL_RE.sub("", author_note_foot or "")
+
     body = (chapter_text or "").strip()
     if wrap_stat_boxes:
         stat_boxes = parse_stat_box(body)

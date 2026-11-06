@@ -151,6 +151,28 @@ class TestExportReturnsManuscript(unittest.TestCase):
         self.assertEqual(data["merged_text"], expected)
 
 
+class TestRoyalRoadControlChars(unittest.TestCase):
+    """BBCode 输出必须过滤 XML/HTML 非法控制字符（2026-11-05）。
+
+    BBCode 最终被 Royal Road 渲染成 HTML，C0 控制字符在 HTML 里同样非法。
+    docx/epub/shunn 走 _escape_xml 已过滤，BBCode 路径漏了——同一个字符
+    在不同导出格式里表现不一致。
+    """
+
+    def test_control_chars_removed(self):
+        out = platform_service.format_royalroad_chapter(
+            "标题\x0b", "正文\x0b垂直\x00空字符\x1f单元分隔")
+        bad = [hex(ord(c)) for c in out
+               if ord(c) < 0x20 and c not in "\n\t"]
+        self.assertEqual(bad, [], f"仍含非法控制字符: {bad}")
+
+    def test_newlines_preserved(self):
+        out = platform_service.format_royalroad_chapter("标题", "第一段\n第二段")
+        self.assertIn("\n", out)
+        self.assertIn("第一段", out)
+        self.assertIn("第二段", out)
+
+
 class TestDiagnoseChapter(unittest.TestCase):
     """网文签约过稿深度诊断测试。"""
 
