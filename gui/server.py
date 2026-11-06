@@ -442,7 +442,16 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _send_json(self, payload: dict, status: int = 200,
                    extra_headers: dict[str, str] | None = None) -> None:
-        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        # 序列化必须容错（2026-11-05）：payload 里可能含用户数据（正文、路径、
+        # 错误文案）。孤立代理字符（U+D800–U+DFFF）无法编码成 UTF-8——
+        # json.dumps 本身能产出一个含代理的 str，但 .encode("utf-8") 会抛
+        # UnicodeEncodeError。那一步在 send_response 之前，异常直接冒到
+        # do_GET 外层，连接断掉且没有任何响应体——用户看到的是"请求失败"，
+        # 而服务端日志只有一行栈。
+        #
+        # errors="replace" 只影响编码阶段，把不可编码的字符换成 U+FFFD；
+        # 正常文本（含 emoji、生僻字）不受影响。
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8", errors="replace")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         for k, v in (extra_headers or {}).items():

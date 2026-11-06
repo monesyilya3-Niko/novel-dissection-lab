@@ -20,6 +20,42 @@ from gui import services
 from gui.services import ServiceError
 
 
+class TestSendJsonEncodingFallback(unittest.TestCase):
+    """响应序列化必须容忍不可编码字符（2026-11-05）。
+
+    payload 里可能含用户数据（正文、路径、错误文案）。孤立代理字符
+    （U+D800-U+DFFF）无法编码成 UTF-8：json.dumps 能产出含代理的 str，
+    但 .encode("utf-8") 抛 UnicodeEncodeError。那一步在 send_response 之前，
+    异常直接冒到 do_GET 外层 —— 连接断掉且没有任何响应体，用户看到的是
+    "请求失败"，服务端日志只有一行栈。
+    """
+
+    def test_encode_with_replace_never_raises(self):
+        import json
+        sur = chr(0xD800)
+        payload = {"text": f"正文{sur}坏"}
+        raw = json.dumps(payload, ensure_ascii=False).encode("utf-8", errors="replace")
+        self.assertIsInstance(raw, bytes)
+        # 解码回来能拿到替换字符，其余内容完好
+        back = json.loads(raw.decode("utf-8"))
+        self.assertIn("正文", back["text"])
+        self.assertIn("坏", back["text"])
+
+    def test_normal_text_unaffected(self):
+        import json
+        payload = {"text": "正常中文 emoji 😀 生僻字 𠮷"}
+        raw = json.dumps(payload, ensure_ascii=False).encode("utf-8", errors="replace")
+        back = json.loads(raw.decode("utf-8"))
+        self.assertEqual(back["text"], "正常中文 emoji 😀 生僻字 𠮷")
+
+    def test_server_uses_replace_errors(self):
+        from pathlib import Path as _P
+        src = (_P(__file__).resolve().parent.parent / "gui" / "server.py").read_text(
+            encoding="utf-8")
+        self.assertIn('errors="replace"', src,
+                      "服务端响应序列化缺少编码兜底")
+
+
 class TestBookIdTraversal(unittest.TestCase):
     def test_unknown_book_id_404(self):
         # ../ 穿越 payload：必须 404（_get_book_or_raise），不能走到路径拼接
