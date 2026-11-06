@@ -34,6 +34,44 @@ def _signature(pattern: str) -> str:
     return s.replace("\\/", "/").replace("\\.", ".")
 
 
+class TestAdminAssetKindOptions(unittest.TestCase):
+    """管理后台的资产类型下拉必须与后端白名单一致（2026-11-05）。
+
+    原先前端写的是 'voice_card' / 'genre_prose_card'，不在后端
+    asset_index.ASSET_KINDS 里——选中即 400「未知资产类型」，整块变红色错误；
+    'report' 虽是虚拟 kind 能过，但恒为 0 条。
+    """
+
+    def test_frontend_kinds_subset_of_backend(self):
+        import re
+        from pathlib import Path as _P
+        root = _P(__file__).resolve().parent.parent
+        admin = (root / "gui/web/src/components/AdminWorkbench.tsx").read_text(
+            encoding="utf-8")
+        m = re.search(r"const ASSET_KINDS = \[(.*?)\]", admin, re.S)
+        self.assertIsNotNone(m, "找不到前端 ASSET_KINDS")
+        fe = [k.strip().strip("'\"") for k in m.group(1).replace("\n", " ").split(",")]
+        fe = [k for k in fe if k]
+
+        src = (root / "gui/asset_index.py").read_text(encoding="utf-8")
+        start = src.index("ASSET_KINDS = (")
+        depth = 0
+        end = start
+        for i in range(src.index("(", start), len(src)):
+            if src[i] == "(":
+                depth += 1
+            elif src[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        be = set(re.findall(r"[\"']([a-z_]+)[\"']", src[start:end]))
+
+        bad = [k for k in fe if k not in be]
+        self.assertEqual(bad, [],
+                         f"前端提供了后端不认的 kind：{bad}（后端合法：{sorted(be)}）")
+
+
 class TestApiDocCoverage(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

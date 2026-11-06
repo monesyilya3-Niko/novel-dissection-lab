@@ -474,7 +474,12 @@ function BooksPanel() {
 // 资产管理
 // ---------------------------------------------------------------------------
 
-const ASSET_KINDS = ['', 'voice_card', 'genre_pack', 'genre_prose_card', 'report']
+// 必须与后端 asset_index.ASSET_KINDS 完全一致（2026-11-05）。
+// 原值 'voice_card' / 'genre_prose_card' 不在白名单里，选中即 400
+// 「未知资产类型」——界面上整块变红色错误；'report' 虽能过但是虚拟 kind，
+// 恒为 0 条。
+const ASSET_KINDS = ['', 'voice', 'structure', 'commercial', 'craft',
+                     'genre_pack', 'prose_card', 'distilled', 'trope']
 
 function AssetsPanel() {
   const { t } = useI18n()
@@ -488,11 +493,16 @@ function AssetsPanel() {
   const getKindLabel = (k: string) => {
     switch (k) {
       case '': return t('admin_assets_kind_all', '全部')
-      case 'voice_card':
-      case 'voice': return t('admin_assets_kind_voice_card', '笔法卡')
+      case 'voice':
+      case 'voice_card': return t('admin_assets_kind_voice_card', '声线卡')
+      case 'structure': return t('admin_assets_kind_structure', '结构观测')
+      case 'commercial': return t('admin_assets_kind_commercial', '商业观测')
+      case 'craft': return t('admin_assets_kind_craft', '笔法卡')
       case 'genre_pack': return t('admin_assets_kind_genre_pack', '题材包')
-      case 'genre_prose_card':
-      case 'prose_card': return t('admin_assets_kind_genre_prose_card', '笔法卡片')
+      case 'prose_card':
+      case 'genre_prose_card': return t('admin_assets_kind_genre_prose_card', '题材文风卡')
+      case 'distilled': return t('admin_assets_kind_distilled', '蒸馏规则')
+      case 'trope': return t('admin_assets_kind_trope', '桥段')
       case 'report': return t('admin_assets_kind_report', '报告')
       default: return k
     }
