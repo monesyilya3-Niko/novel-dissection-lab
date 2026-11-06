@@ -3,7 +3,7 @@
 
 涵盖：
 1. 书名与作者清洗（clean_title_and_author 爬虫后缀过滤/书名作者分离/纯数字前缀剥离且保护汉字数词/10大题材启发式推断）；
-2. 严选把关规则（is_acceptable_webnovel 外国书黑名单/外国国籍标签/60章门槛/25万字门槛/千字均长门槛/首章规范启动校验）；
+2. 严选把关规则（is_acceptable_webnovel 外国书黑名单/外国国籍标签/60章门槛/30万字门槛/均章1500-4000字门槛/首章规范启动校验）；
 3. 文本与标识符工具（sanitize_book_id 确定性哈希标识/format_full_novel_text 章节段落规整化）；
 4. 双库原子入库与去重查重（check_book_exists 物理文件校验/ingest_book_atomic 双库原子双写与五维资产/伏笔链沉淀）；
 5. 台账同步（sync_full_work_log 从数据库权威生成 WORK_LOG_100_BOOKS.md 表格）；
@@ -111,23 +111,33 @@ class TestIsAcceptableWebnovel(unittest.TestCase):
         self.assertFalse(b100.is_acceptable_webnovel("世界名著选集", "名著选集", 90, 400000, "第1章"))
 
     def test_length_and_chapter_thresholds(self):
+        """门槛必须与 CORE_PHILOSOPHY.md 逐字对齐（2026-11-05）。
+
+        原实现是 250,000 字 / 均章 ≥1,000 字且**无上限**，与宪法
+        （≥300,000 字、≥60 章、均章 1,500~4,000 字）不一致——门槛放宽会让
+        25 万字的书混进「传世神作」库，均章 1,000 字则放进大量注水短章书。
+        """
         # 章节少于 60 章
-        self.assertFalse(b100.is_acceptable_webnovel("玄幻", "玄幻", 59, 300000, "第1章"))
-        # 总字数少于 250,000 字
-        self.assertFalse(b100.is_acceptable_webnovel("玄幻", "玄幻", 100, 249000, "第1章"))
-        # 单章平均字数低于 1,000 字
-        self.assertFalse(b100.is_acceptable_webnovel("玄幻", "玄幻", 300, 270000, "第1章"))  # 270000 / 300 = 900 < 1000
+        self.assertFalse(b100.is_acceptable_webnovel("玄幻", "玄幻", 59, 400000, "第1章"))
+        # 总字数少于 300,000 字
+        self.assertFalse(b100.is_acceptable_webnovel("玄幻", "玄幻", 100, 299999, "第1章"))
+        # 均章低于 1,500 字（300 章 / 30 万字 = 1,000）
+        self.assertFalse(b100.is_acceptable_webnovel("玄幻", "玄幻", 300, 300000, "第1章"))
+        # 均章高于 4,000 字（60 章 / 40 万字 ≈ 6,667）
+        self.assertFalse(b100.is_acceptable_webnovel("玄幻", "玄幻", 60, 400000, "第1章"))
+        # 标准长篇应通过（100 章 / 35 万字 = 均章 3,500）
+        self.assertTrue(b100.is_acceptable_webnovel("玄幻", "玄幻", 100, 350000, "第1章"))
 
     def test_first_chapter_clean_start(self):
         # 合法开头
-        self.assertTrue(b100.is_acceptable_webnovel("长篇神作", "长篇神作", 70, 350000, "第1章 惊变"))
-        self.assertTrue(b100.is_acceptable_webnovel("长篇神作", "长篇神作", 70, 350000, "序章 沧海桑田"))
-        self.assertTrue(b100.is_acceptable_webnovel("长篇神作", "长篇神作", 70, 350000, "楔子 诸神之战"))
-        self.assertTrue(b100.is_acceptable_webnovel("长篇神作", "长篇神作", 70, 350000, "Chapter 1 Begin"))
+        self.assertTrue(b100.is_acceptable_webnovel("长篇神作", "长篇神作", 100, 350000, "第1章 惊变"))
+        self.assertTrue(b100.is_acceptable_webnovel("长篇神作", "长篇神作", 100, 350000, "序章 沧海桑田"))
+        self.assertTrue(b100.is_acceptable_webnovel("长篇神作", "长篇神作", 100, 350000, "楔子 诸神之战"))
+        self.assertTrue(b100.is_acceptable_webnovel("长篇神作", "长篇神作", 100, 350000, "Chapter 1 Begin"))
 
         # 断头断章开头拒绝
-        self.assertFalse(b100.is_acceptable_webnovel("断头书", "断头书", 70, 350000, "第18章 中途再遇"))
-        self.assertFalse(b100.is_acceptable_webnovel("断头书", "断头书", 70, 350000, "无标题开头"))
+        self.assertFalse(b100.is_acceptable_webnovel("断头书", "断头书", 100, 350000, "第18章 中途再遇"))
+        self.assertFalse(b100.is_acceptable_webnovel("断头书", "断头书", 100, 350000, "无标题开头"))
 
 
 class TestBatch100BooksDatabaseOperations(unittest.TestCase):

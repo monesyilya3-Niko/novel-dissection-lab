@@ -3,7 +3,8 @@
 
 遵循《RULES_100_BOOKS.md》严格精密的质量铁律：
 1. 纯正主流中文原创网络小说（坚决剔除外国译本、公版名著及非小说）；
-2. 严守长篇门槛：单本字数 >= 250,000 字（主流 50万 ~ 500万字），章节数 >= 60 章；
+2. 严守长篇门槛（铁律四，与 CORE_PHILOSOPHY.md 逐字对齐）：单本字数 >= 300,000 字,
+   章节数 >= 60 章，均章 1,500 ~ 4,000 字；
 3. 精确提取作者名与 10 大品类映射；
 4. 双库原子双写（语料库 txt + SQLite books / essence_books / essence_assets / essence_chains）；
 5. 权威台账 WORK_LOG_100_BOOKS.md 实时与数据库同步，绝无虚假数据。
@@ -137,11 +138,16 @@ def is_acceptable_webnovel(raw_title: str, clean_title: str, chapters_cnt: int, 
         return False
     if any(k in raw_title for k in ('(美)', '(英)', '(俄)', '(日)', '·', '世界名著', '名著', '中短篇', '短篇', '选集', '全集')):
         return False
-    # 严格门槛：章节数 >= 60，且总字数 >= 250,000
-    if chapters_cnt < 60 or total_chars < 250000:
+    # 铁律四门槛，必须与 CORE_PHILOSOPHY.md / PROJECT_LAW.md 逐字对齐
+    # （2026-11-05）：单本 ≥300,000 字、≥60 章、均章 1,500~4,000 字。
+    #
+    # 原实现写的是 250,000 字 / 均章 ≥1,000 字，且**没有均章上限**——
+    # 与宪法不一致：门槛放宽会让 25 万字的书混进「传世神作」库，
+    # 均章 1,000 字则把大量注水短章书放进来。
+    if chapters_cnt < 60 or total_chars < 300000:
         return False
-    # 单章平均字数必须在 1,000 字以上（主流网络小说长篇标准）
-    if total_chars / max(chapters_cnt, 1) < 1000:
+    avg_len = total_chars / max(chapters_cnt, 1)
+    if not (1500 <= avg_len <= 4000):
         return False
     # 首章完整度强校验：严禁任何断头书（必须以第1章/序章/引子/楔子开头）
     if first_ch_name:
@@ -392,7 +398,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print("=" * 65)
     print("【100 本长篇主流网文语料库 & 精华库】严选建库批处理器")
-    print(f"目标数量: {args.limit} 本 | 准入门槛: 字数>=25万字 / 章节>=60章 | 代理: {PROXY_URL}")
+    print(f"目标数量: {args.limit} 本 | 准入门槛: 字数>=30万 / 章节>=60 / 均章1500-4000 | 代理: {PROXY_URL}")
     print("=" * 65)
 
     conn = init_db_connection()
