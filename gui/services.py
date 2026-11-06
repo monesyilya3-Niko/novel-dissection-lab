@@ -1311,6 +1311,16 @@ def _schedule_report_generation(book_id: str, book: dict[str, Any]) -> None:
                             st["report_error"] = str(exc)[:500]
                 return
             time.sleep(1.0)
+        # 24h 未收敛（极少见：拆书线程僵死 / 一直被暂停）（2026-11-05）。
+        # 原来直接 return，既不写状态也不告知——这个后台线程就此消失，
+        # 用户永远等不到报告，也不知道为什么。
+        try:
+            with state_store.update_state(book_id) as st:
+                st["report_error"] = (
+                    "报告生成等待超时（拆书在 24 小时内未完成，可能因长期暂停或线程僵死）。"
+                    "请检查任务状态后重试分析。")
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("写入报告超时标记失败 %s: %s", book_id, exc)
 
     threading.Thread(target=_watch, daemon=True, name=f"report-{book_id}").start()
 
