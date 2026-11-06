@@ -902,7 +902,7 @@ class AssetIndex:
                     fp = migrate.resolve_rel_path(r["path"])
                     if fp.is_file():
                         return {"kind": "report", "id": asset_id, "name": name,
-                                "markdown": fp.read_text(encoding="utf-8")}
+                                "markdown": fp.read_text(encoding="utf-8-sig")}
             return None
         if kind == "book":
             return None  # 书正文按需读 corpus，走 scan 回退。
@@ -927,7 +927,7 @@ class AssetIndex:
             if not fp.is_file():
                 raise KeyError(f"报告不存在: {name}")
             return {"kind": "report", "id": asset_id, "name": name,
-                    "markdown": fp.read_text(encoding="utf-8")}
+                    "markdown": fp.read_text(encoding="utf-8-sig")}
         if kind == "book":
             fp = config.CORPUS_DIR / f"{name}.txt"
             if not fp.is_file():
