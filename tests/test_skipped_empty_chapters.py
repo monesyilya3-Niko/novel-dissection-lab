@@ -54,6 +54,23 @@ class TestSplitChaptersAll(unittest.TestCase):
         text = "第1章\n\n" + "正文。" * 100 + "\n\n第2章\n\n" + "内容。" * 100
         self.assertEqual(engine_adapter.count_skipped_empty_chapters(text), 0)
 
+    def test_untitled_leading_block_not_counted_as_empty_chapter(self):
+        """开头的空白前导段不算「跳过的空章」（2026-11-05）。
+
+        稿子开头有空白行时，切章器会产出一个正文为空、标题为
+        「（无标题开头）」的前导段。它被 filter 掉后被原实现算成"跳过 1 章"，
+        用户看到提示却找不到哪一章少了。
+        """
+        from gui import engine_adapter
+        text = "\n\n第1章 开端\n正文一。\n\n第2章 再会\n正文二。"
+        self.assertEqual(engine_adapter.count_skipped_empty_chapters(text), 0)
+
+    def test_real_empty_chapter_still_counted(self):
+        """反向守卫：真正有标题的空章仍要如实上报。"""
+        from gui import engine_adapter
+        text = "第1章 开端\n正文一。\n\n第2章 空章\n\n第3章 再会\n正文三。"
+        self.assertEqual(engine_adapter.count_skipped_empty_chapters(text), 1)
+
 
 class TestImportReportsSkipped(unittest.TestCase):
     @classmethod

@@ -133,11 +133,19 @@ def count_skipped_empty_chapters(text: str) -> int:
 
     导入报告用：用户「导入了 50 章却只看到 48 章」时，需要一句解释，
     否则会以为丢内容了。空章过滤本身是正确的——拆书无从分析空正文。
+
+    ⚠️ 「（无标题开头）」前导段不算（2026-11-05 修）：稿子开头有空白行时，
+    切章器会产出一个正文为空的前导段，它被 filter 掉后原实现算成"跳过 1 章"。
+    实测：`\\n\\n第1章…第2章…` → total=2 但 skipped_empty=1，
+    用户看到"跳过了 1 章"却找不到哪一章少了。
     """
     sampler = _get_sampler()
-    total = len(sampler.split_chapters_all(text))
+    all_chaps = sampler.split_chapters_all(text)
     kept = len(sampler.split_chapters(text))
-    return max(0, total - kept)
+    # 只统计**有标题**的空章；无标题前导段不参与
+    titled_total = sum(1 for title, _body in all_chaps
+                       if title and title != "（无标题开头）")
+    return max(0, titled_total - kept)
 
 
 def detect_volumes(chapters: list[tuple[str, str]]) -> list[tuple[int, int]]:
