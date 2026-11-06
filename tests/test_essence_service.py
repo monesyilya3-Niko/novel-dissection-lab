@@ -205,6 +205,25 @@ class TestEssenceService(unittest.TestCase):
         self.assertTrue(opening_slice["hook_detected"])
         self.assertIn("A", opening_slice["opening_grade"])
 
+    def test_create_chain_respects_explicit_reveal_chapter(self):
+        """用户填的「显露章」必须生效（2026-11-05）。
+
+        原实现一律取 (hook + payoff) // 2，而前端明明有「显露章」输入框——
+        用户填 5 保存后变成推导值，界面不回显也不报错，等于白填。
+        """
+        self._ensure_book("reveal_book")
+        c = essence_service.create_chain(
+            "reveal_book", "玉佩·identity",
+            hook_chapter=1, payoff_chapter=20, reveal_chapter=7)
+        self.assertEqual(c["revealChapter"], 7)
+
+    def test_create_chain_falls_back_to_midpoint(self):
+        """未填时仍走旧推导（埋点与收点的中点），保持向后兼容。"""
+        self._ensure_book("reveal_book2")
+        c = essence_service.create_chain(
+            "reveal_book2", "石珠·power", hook_chapter=1, payoff_chapter=20)
+        self.assertEqual(c["revealChapter"], 10)
+
     def test_adopt_asset_to_writing_workbench(self):
         # 1. 创建一条精华资产
         self._ensure_book("book_01")

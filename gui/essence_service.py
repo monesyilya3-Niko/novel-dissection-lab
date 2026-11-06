@@ -198,7 +198,15 @@ def _format_chain_dict(r: db.RowLike) -> dict[str, Any]:
     d["title"] = clue
     d["category"] = clue.split("·")[-1] if "·" in clue else "主线暗链"
     d["plantChapter"] = hook_ch
-    d["revealChapter"] = (hook_ch + payoff_ch) // 2
+    # 显露章：用户填了就用用户的，没填才按「埋—收」中点推导（2026-11-05）。
+    #
+    # 原实现一律取 (hook + payoff) // 2，而前端明明有个「显露章」输入框——
+    # 用户填 5 保存后变成推导值，界面不回显也不报错，等于白填。
+    _reveal = d.get("reveal_chapter")
+    if isinstance(_reveal, int) and not isinstance(_reveal, bool) and _reveal > 0:
+        d["revealChapter"] = _reveal
+    else:
+        d["revealChapter"] = (hook_ch + payoff_ch) // 2
     d["climaxChapter"] = payoff_ch
     d["description"] = f"{hook_txt}\n\n【伏笔解析】{analysis}".strip() if analysis else hook_txt
     d["createdAt"] = d.get("created_at", "")
@@ -401,8 +409,14 @@ def create_chain(
     payoff_text: str = "",
     status: str = "resolved",
     analysis: str = "",
+    reveal_chapter: int | None = None,
 ) -> dict[str, Any]:
-    """创建一条伏笔暗线回收记录。"""
+    """创建一条伏笔暗线回收记录。
+
+    ``reveal_chapter`` 是用户显式填写的"显露章"（2026-11-05 新增）。不给时
+    沿用旧的推导规则（埋点与收点的中点）——但注意旧实现**总是**推导，
+    而前端一直有这个输入框，用户填了等于白填。
+    """
     if not book_id or not isinstance(book_id, str):
         raise ServiceError("book_id 必须为非空字符串", 400)
     if not clue_name or not isinstance(clue_name, str):
@@ -425,7 +439,11 @@ def create_chain(
         chain_id = cur.lastrowid
 
     row = db.get_conn().execute("SELECT * FROM essence_chains WHERE id = ?", (chain_id,)).fetchone()
-    return _format_chain_dict(row)
+    # 把用户填的显露章带进格式化（DDL 里没有这一列，只能走内存传递）
+    raw = dict(row) if row is not None else {}
+    if reveal_chapter is not None:
+        raw["reveal_chapter"] = reveal_chapter
+    return _format_chain_dict(raw)
 
 
 def delete_chain(chain_id: int) -> dict[str, Any]:

@@ -1433,6 +1433,9 @@ def _h_essence_chain_create(_params: dict[str, Any], body: dict[str, Any]) -> di
         payoff_text=b.get("payoff_text", ""),
         status=b.get("status", "planted"),
         analysis=analysis_txt,
+        # 用户显式填写的显露章（2026-11-05）：此前 router 根本不读这个字段，
+        # 前端有输入框却永远不生效。
+        reveal_chapter=_safe_int_or_none(b.get("reveal_chapter"), "reveal_chapter"),
     ))
 
 
