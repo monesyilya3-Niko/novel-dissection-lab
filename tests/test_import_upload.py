@@ -288,6 +288,38 @@ class TestImportPathEndpoint(unittest.TestCase):
         got = self._chapter_text(data["data"]["book_id"], 1)
         self.assertIn("这是第一章正文内容。", got)
 
+    def test_windows_illegal_chars_rejected_with_actionable_message(self):
+        """文件名含 Windows 非法字符时必须 400 且说明原因（2026-11-05）。
+
+        原实现只过滤控制字符与 / \，于是 a|b.txt / a?b.txt 能过校验，
+        落盘时 OSError → 500「内部错误，请稍后重试」——用户以为程序坏了。
+        """
+        from gui import server
+        from gui.services import ServiceError
+        for name in ("a|b.txt", "a?b.txt", 'a"b.txt', "a<b.txt"):
+            with self.subTest(name=name):
+                with self.assertRaises(ServiceError) as cm:
+                    server._safe_upload_filename(name)
+                self.assertEqual(cm.exception.code, 400)
+                self.assertIn("非法字符", cm.exception.message)
+
+    def test_windows_reserved_names_rejected(self):
+        """CON / NUL 等保留设备名无论扩展名都建不出来，必须提前拒绝。"""
+        from gui import server
+        from gui.services import ServiceError
+        for name in ("CON.txt", "nul.txt", "AUX.md", "COM1.txt"):
+            with self.subTest(name=name):
+                with self.assertRaises(ServiceError) as cm:
+                    server._safe_upload_filename(name)
+                self.assertEqual(cm.exception.code, 400)
+                self.assertIn("保留名", cm.exception.message)
+
+    def test_normal_filenames_still_pass(self):
+        from gui import server
+        for name in ("正常稿.txt", "my-novel_v2.md", "第1章 开端.txt"):
+            with self.subTest(name=name):
+                self.assertEqual(server._safe_upload_filename(name), name)
+
     def test_directory_refused(self):
         status, data = self._post({"path": str(self.ext_dir)})
         self.assertIn(status, (400, 404), data)

@@ -51,6 +51,19 @@ TEXT_SUFFIXES: frozenset[str] = frozenset({".txt", ".md"})
 #: 统一成一个数字会让某个入口变得不合理（把整本导入压到 8MB，或让单章
 #: 校验放行 100MB 的垃圾文件）。
 MAX_FILE_BYTES = 8 * 1024 * 1024
+
+#: Windows 不能用作文件名/目录名的保留设备名（大小写不敏感）。
+#: 放这里是因为「用户提供的名字」有多个入口（上传文件名、写作项目名），
+#: 两处必须同口径——否则取一个 CON 当项目名能过、当上传名也能过，
+#: 直到落盘才 500（2026-11-05）。
+WIN_RESERVED_NAMES: frozenset[str] = frozenset({
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+})  # fmt: skip
+
+#: Windows 文件名非法字符（不含 ``/`` 与 ``\``，它们由调用方单独处理）。
+WIN_ILLEGAL_CHARS: frozenset[str] = frozenset('<>:"|?*')
 MAX_FILES = 2000
 MAX_TOTAL_BYTES = 64 * 1024 * 1024
 

@@ -57,15 +57,11 @@ def _active_writing_count() -> int:
         return sum(1 for t in _WRITING_TASKS.values() if t.get("status") in _ACTIVE_STATUSES)
 
 
-#: Windows 不能用作文件名/目录名的保留名（大小写不敏感，含扩展名形式也在内）
-_WIN_RESERVED_NAMES = frozenset({
-    "CON", "PRN", "AUX", "NUL",
-    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
-})  # fmt: skip
-
-#: Windows 文件名非法字符（不含已被单独拦截的 / 与 \）
-_WIN_ILLEGAL_CHARS = frozenset('<>:"|?*')
+#: Windows 保留名 / 非法字符：单一口径在 text_access（2026-11-05 统一）。
+#: 上传文件名与写作项目名是两个"用户提供名字"的入口，必须同口径——
+#: 否则同一个 CON 能当项目名过、当上传名也能过，直到落盘才 500。
+_WIN_RESERVED_NAMES = text_access.WIN_RESERVED_NAMES
+_WIN_ILLEGAL_CHARS = text_access.WIN_ILLEGAL_CHARS
 
 #: 单段路径名上限。Windows 常见限制 255 字符，但项目名还要拼进
 #: ``novel/<项目>/chapters/arc-1/chapter-001.txt``，留足余量取 64。
