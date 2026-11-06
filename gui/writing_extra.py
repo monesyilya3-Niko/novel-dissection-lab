@@ -54,10 +54,14 @@ _ILLEGAL_XML_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
 
 
 def _escape_xml(text: str) -> str:
-    """过滤 XML 1.0 非法字符并转义实体字符 (&, <, >)。"""
+    """过滤 XML 1.0 非法字符与孤立代理字符，并转义实体字符 (&, <, >)。"""
     if not text:
         return ""
     cleaned = _ILLEGAL_XML_CHARS_RE.sub("", text)
+    # 孤立代理（U+D800–U+DFFF）必须在 escape 之前剔掉：saxutils.escape 不做
+    # 编码检查，产出的字符串到序列化阶段才炸（surrogates not allowed），
+    # 那时已无从定位是哪一章（2026-11-05）。
+    cleaned = re.sub(r"[\ud800-\udfff]", "", cleaned)
     return xml.sax.saxutils.escape(cleaned)
 
 

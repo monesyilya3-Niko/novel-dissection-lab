@@ -735,6 +735,17 @@ def import_chapter(project: str, chapter_no: int, content: str,
         raise ServiceError(f"chapter_no 过大（最多 {_MAX_CHAPTER_NO}）", 400)
     if not content or not content.strip():
         raise ServiceError("content 不能为空", 400)
+    # 孤立代理字符（\ud800-\udfff）无法编码成 UTF-8（2026-11-05）。
+    #
+    # 这类字符正常来源不会产生（读文件时严格 utf-8 解码会拒绝），但前端贴文本、
+    # 或某些剪贴板工具会带进来。原来一路到落盘才抛 UnicodeEncodeError → 500
+    # 「内部错误」，用户不知道是文本里混了坏字符。
+    # 现在入口就明确拒绝，并指出位置。
+    _sur = next((i for i, ch in enumerate(content) if 0xD800 <= ord(ch) <= 0xDFFF), -1)
+    if _sur >= 0:
+        raise ServiceError(
+            f"正文含无法编码的字符（第 {_sur + 1} 个字符，U+{ord(content[_sur]):04X}），"
+            "请清理后重试", 400)
 
     novel_dir = config.NOVEL_DIR / project
     # 资产内容契约：voice 的加载与 kind 校验必须在 ensure_novel_structure/save_chapter

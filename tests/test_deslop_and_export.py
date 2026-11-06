@@ -383,6 +383,47 @@ class TestDeslopService(unittest.TestCase):
         self.assertGreater(resp["data"]["stats"]["word_count"], 0)
 
 
+class TestLoneSurrogateHandling(unittest.TestCase):
+    """孤立代理字符（U+D800-D+DFFF）不能进 XML / 不能以 500 收场（2026-11-05）。
+
+    这类字符无法编码成 UTF-8。正常读文件不会产生（严格解码会拒绝），
+    但前端贴文本、剪贴板工具可以带进来。原来的表现：落盘时
+    UnicodeEncodeError -> 500「内部错误」；若绕过去进了 docx/epub，
+    产出的 XML 直接非法。
+    """
+
+    SUR = chr(0xD800)   # 源码里不写真实代理字符（写不出来）
+
+    def test_escape_xml_strips_surrogates(self):
+        import xml.etree.ElementTree as ET
+
+        from gui import writing_extra
+        out = writing_extra._escape_xml(f"正文{self.SUR}孤立")
+        ET.fromstring(f"<r>{out}</r>")      # 不抛即合法
+        self.assertNotIn(self.SUR, out)
+
+    def test_import_chapter_rejects_with_400(self):
+        import tempfile
+        from pathlib import Path as _P
+
+        from gui import writing_service
+        from gui.services import ServiceError
+        from tests import _isolation
+        tmp = tempfile.mkdtemp(prefix="sur_")
+        iso = _isolation.isolate_paths(_P(tmp))
+        iso.__enter__()
+        try:
+            from gui import db
+            db.init_schema()
+            db.apply_migrations()
+            with self.assertRaises(ServiceError) as cm:
+                writing_service.import_chapter("p1", 1, f"第1章\n正文{self.SUR}坏")
+            self.assertEqual(cm.exception.code, 400)
+            self.assertIn("U+D800", cm.exception.message)
+        finally:
+            iso.__exit__(None, None, None)
+
+
 class TestWritingExportAndReorder(unittest.TestCase):
     def setUp(self):
         self._iso = _isolation.isolate_paths(Path(tempfile.mkdtemp(prefix="deslop_exp_")))
