@@ -1303,12 +1303,50 @@ def _assemble_after_analysis(book_id: str, genre: str,
     import json as _json
 
     def _merge(pass_name: str) -> dict[str, Any]:
-        """按 cN-bM 顺序把同 pass 的批级结果合并成一份整书 pass 输出。"""
+        """按 cN-bM 顺序把同 pass 的批级结果合并成一份整书 pass 输出。
+
+        ⚠️ 同一个键在不同批次里可能是 **list 也可能是 dict**（2026-11-05 修）：
+        模型有时写 ``{"characters": {"唐雨": {...}}}``，有时写
+        ``{"characters": [{"name": "边炀"}]}``。原实现先收集 lists、再用
+        ``merged.update(lists)`` 覆盖——实测前一批的唐雨整个消失，只剩边炀。
+
+        现在按"统一折算成 list"处理：dict 形态先转成 ``[{name: key, **v}]``
+        （与 normalize_pass2 对容器键的处理一致），再按 name 去重合并。
+        """
         base = config.ASSETS_ROOT / book_id
         if not base.is_dir():
             return {}
         merged: dict[str, Any] = {}
         lists: dict[str, list] = {}
+        dict_lists: dict[str, list] = {}
+
+        def _as_items(key: str, val: Any) -> list | None:
+            """把值折算成可合并的 list；不是列表语义时返回 None。
+
+            ⚠️ 只有 **dict-of-dict / dict-of-str**（容器键形态，如
+            ``{"唐雨": {...}}``）才折算成 ``[{name: 唐雨, ...}]``。
+            普通 list 原样返回——``banned.words`` 是字符串列表，
+            把它包装成 ``{"name": "不禁"}`` 会让校验器报"条目应为非空字符串"。
+            """
+            if isinstance(val, list):
+                return list(val)
+            if isinstance(val, dict):
+                # 只有当**所有**值都是 dict/str 时才视为"以角色名/条目名为键的容器"
+                if not val or not all(isinstance(b, (dict, str)) for b in val.values()):
+                    return None
+                out = []
+                for name, body in val.items():
+                    if isinstance(body, dict):
+                        item = dict(body)
+                        item.setdefault("name", name)
+                        out.append(item)
+                    elif isinstance(body, str):
+                        out.append({"name": name, "value": body})
+                    else:
+                        out.append({"name": name})
+                return out if out else None
+            return None
+
         for fp in sorted(base.glob(f"c*-b*-{pass_name}.json"),
                          key=lambda p: _batch_sort_key(p.name)):
             try:
@@ -1320,12 +1358,30 @@ def _assemble_after_analysis(book_id: str, genre: str,
             for k, v in part.items():
                 if k in _MERGE_SKIP_KEYS:
                     continue
-                if isinstance(v, list):
-                    lists.setdefault(k, []).extend(v)
+                items = _as_items(k, v)
+                if items is not None:
+                    dict_lists.setdefault(k, []).extend(items)
                 elif isinstance(v, dict):
                     merged.setdefault(k, {}).update(v)
                 else:
                     merged.setdefault(k, v)
+
+        # 列表型键：按 name 去重（同名保留先出现的，后续只补缺字段）
+        for k, items in dict_lists.items():
+            deduped: list[Any] = []
+            index: dict[str, int] = {}
+            for item in items:
+                name = item.get("name") if isinstance(item, dict) else None
+                if isinstance(name, str) and name in index:
+                    existing = deduped[index[name]]
+                    if isinstance(existing, dict):
+                        for kk, vv in item.items():
+                            existing.setdefault(kk, vv)
+                    continue
+                if isinstance(name, str):
+                    index[name] = len(deduped)
+                deduped.append(item)
+            lists[k] = deduped
         merged.update(lists)
         # 丢掉空值：纯拒答批次合并后只剩 {"characters": []}，而这个 dict
         # 在布尔上是 True——上层 ``if pass2 or pass3`` 仍会成立并产出空壳卡。

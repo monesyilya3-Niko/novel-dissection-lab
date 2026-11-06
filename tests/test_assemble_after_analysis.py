@@ -199,6 +199,52 @@ class TestAssembleAfterAnalysis(unittest.TestCase):
         self.assertEqual(names, {"林昭", "沈砚"},
                          "两批的角色必须都进 voice-card，合并时不能互相覆盖")
 
+    def test_mixed_dict_and_list_batches_are_merged(self):
+        """同一键一批是 dict、一批是 list 时必须合并，不能覆盖（2026-11-05）。
+
+        模型有时写 {"characters": {"唐雨": {...}}}，有时写
+        {"characters": [{"name": "边炀"}]}。原实现先收集 lists、再用
+        merged.update(lists) 覆盖——实测前一批的唐雨整个消失，只剩边炀。
+        """
+        self._write_batch(1, 0, "pass2_character", {
+            "characters": {"唐雨": {"role": "主角"}},
+        })
+        self._write_batch(1, 1, "pass2_character", {
+            "characters": [{"name": "边炀", "role": "配角"}],
+        })
+        self._write_batch(1, 0, "pass3_style", self._rich_pass3())
+
+        written = self.services._assemble_after_analysis(
+            self.book_id, "urban", self._chapters(3), self._state())
+        self.assertIn(f"{self.book_id}-voice-card.json", written)
+        card = json.loads(
+            (self.config.ASSETS_ROOT / f"{self.book_id}-voice-card.json")
+            .read_text(encoding="utf-8-sig"))
+        names = {v.get("name") for v in
+                 (card.get("dialogue", {}).get("character_voices") or [])}
+        self.assertEqual(names, {"唐雨", "边炀"},
+                         "dict 形态的批次被 list 形态覆盖了")
+
+    def test_string_lists_are_not_wrapped_as_named_entries(self):
+        """banned.words 这种字符串列表不能被包装成 {name: ...}（2026-11-05）。
+
+        否则校验器会报「条目应为非空字符串」——整张卡落不了盘。
+        """
+        self._write_batch(1, 0, "pass2_character", {
+            "characters": [{"name": "林昭", "role": "主角"}]})
+        p3 = self._rich_pass3()
+        p3["banned"] = {"words": ["不禁", "竟然"]}
+        self._write_batch(1, 0, "pass3_style", p3)
+
+        written = self.services._assemble_after_analysis(
+            self.book_id, "urban", self._chapters(3), self._state())
+        self.assertIn(f"{self.book_id}-voice-card.json", written)
+        card = json.loads(
+            (self.config.ASSETS_ROOT / f"{self.book_id}-voice-card.json")
+            .read_text(encoding="utf-8-sig"))
+        words = card["banned"]["never_used_words"]
+        self.assertTrue(all(isinstance(w, str) and w for w in words), words)
+
     def test_batch_order_is_numeric_not_lexicographic(self):
         """c10-b0 必须排在 c2-b0 之后（字典序会把 10 排到 2 前面）。"""
         from gui.services import _batch_sort_key
