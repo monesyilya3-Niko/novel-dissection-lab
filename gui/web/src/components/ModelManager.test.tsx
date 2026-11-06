@@ -27,16 +27,18 @@ vi.mock('../api/client', () => ({
 describe('ModelManager 模型管理面板', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // 后端返回的是 **dict**（scripts/model_config.PRESETS 原样透传），
+    // 不是数组。测试原先用数组 mock，正好掩盖了「presets.length 对 dict 是
+    // undefined → 快速预设整块不渲染」的缺陷（2026-11-05 修）。
     mockPresets.mockResolvedValue({
-      presets: [
-        {
-          name: 'deepseek-chat',
-          label: 'DeepSeek Chat',
+      presets: {
+        deepseek: {
+          label: 'DeepSeek 官方',
           protocol: 'openai',
-          baseUrl: 'https://api.deepseek.com/v1',
-          modelName: 'deepseek-chat',
+          base_url: 'https://api.deepseek.com/v1',
+          model_name: 'deepseek-chat',
         },
-      ],
+      },
     })
   })
 
@@ -103,17 +105,17 @@ describe('ModelManager 模型管理面板', () => {
     // 弹窗出现
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByText('快速选择预设：')).toBeInTheDocument()
-    expect(screen.getByText('DeepSeek Chat')).toBeInTheDocument()
+    expect(screen.getByText('DeepSeek 官方')).toBeInTheDocument()
 
     // 点击预设快速填充
-    fireEvent.click(screen.getByText('DeepSeek Chat'))
+    fireEvent.click(screen.getByText('DeepSeek 官方'))
 
     // 检查表单已自动填入
     const idInput = screen.getByLabelText('模型 ID') as HTMLInputElement
-    expect(idInput.value).toBe('deepseek-chat')
+    expect(idInput.value).toBe('deepseek')
 
     const labelInput = screen.getByLabelText('显示名称') as HTMLInputElement
-    expect(labelInput.value).toBe('DeepSeek Chat')
+    expect(labelInput.value).toBe('DeepSeek 官方')
 
     // 提交添加
     const submitBtn = screen.getByRole('button', { name: '添加' })
@@ -122,8 +124,8 @@ describe('ModelManager 模型管理面板', () => {
 
     await waitFor(() => {
       expect(mockAdd).toHaveBeenCalledWith({
-        id: 'deepseek-chat',
-        label: 'DeepSeek Chat',
+        id: 'deepseek',
+        label: 'DeepSeek 官方',
         protocol: 'openai',
         base_url: 'https://api.deepseek.com/v1',
         model_name: 'deepseek-chat',

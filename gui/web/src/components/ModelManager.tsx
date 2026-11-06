@@ -76,7 +76,22 @@ export default function ModelManager() {
   const loadPresets = useCallback(async () => {
     try {
       const data = await modelApi.presets()
-      setPresets((data.presets ?? []) as Preset[])
+      // 后端返回的是 **dict**（{id: {label, protocol, base_url, ...}}），
+      // 而这里原先当数组处理：presets.length 对 dict 是 undefined，
+      // 「快速预设」整块不渲染；即使渲染，presets.map 也会抛错。
+      // 实测后端 PRESETS = {"deepseek": {...}, ...}（2026-11-05 修）。
+      const raw = data.presets as unknown
+      const list: Preset[] = Array.isArray(raw)
+        ? (raw as Preset[])
+        : Object.entries((raw ?? {}) as Record<string, Record<string, unknown>>)
+          .map(([id, p]) => ({
+            name: id,
+            label: String(p.label ?? id),
+            protocol: String(p.protocol ?? 'openai'),
+            baseUrl: String(p.baseUrl ?? p.base_url ?? ''),
+            modelName: String(p.modelName ?? p.model_name ?? ''),
+          }))
+      setPresets(list)
     } catch { /* ignore */ }
   }, [])
 
