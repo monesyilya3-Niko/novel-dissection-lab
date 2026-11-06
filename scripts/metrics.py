@@ -274,7 +274,9 @@ def main(argv=None) -> int:
             print(f"[Error] 路径不存在: {p}", file=sys.stderr)
         return 1
 
-    files = sorted(p.glob("*.txt")) if p.is_dir() else [p]
+    # 与 chapter_loader / GUI 同口径：目录里同时收 .txt 与 .md（2026-11-05）
+    files = (sorted([*p.glob("*.txt"), *p.glob("*.md")])
+             if p.is_dir() else [p])
     all_metrics = {}
     for f in files:
         all_metrics[f.stem] = compute(chapter_loader.read_text_file(f))

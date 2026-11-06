@@ -161,10 +161,13 @@ def main(argv: list[str] | None = None) -> int:
     if not corpus_dir.is_dir():
         sys.exit(f"目录不存在: {corpus_dir}")
 
-    books = sorted(corpus_dir.glob("*.txt"))
+    # 正文后缀与 GUI / chapter_loader 同口径（2026-11-05）：
+    # 原实现只 glob *.txt，于是 GUI 能导入的 .md 书在批量拆书里"消失"。
+    books = sorted(
+        [*corpus_dir.glob("*.txt"), *corpus_dir.glob("*.md")])
     if not books:
-        sys.exit(f"目录中没有 TXT: {corpus_dir}")
-    print(f"发现 {len(books)} 本 TXT:")
+        sys.exit(f"目录中没有正文文件（.txt / .md）: {corpus_dir}")
+    print(f"发现 {len(books)} 本正文:")
 
     results = []
     for b in books:

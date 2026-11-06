@@ -165,14 +165,25 @@ def resolve_book_src(book: str) -> Path:
     if p.exists():
         return p
     corpus = ROOT / "corpus"
-    for cand in (corpus / f"{book}.txt", corpus / f"{book}_chosen.txt"):
-        if cand.exists():
-            return cand
+    # 后缀必须与 GUI 导入/正文读取同口径（2026-11-05）。
+    # 原实现只认 .txt：GUI 能导入 .md 书，CLI 却"找不到语料"——
+    # 同一份文件在两种入口一有一无。
+    for suffix in (".txt", ".md"):
+        for cand in (corpus / f"{book}{suffix}", corpus / f"{book}_chosen{suffix}"):
+            if cand.exists():
+                return cand
     if corpus.is_dir():
-        hits = [x for x in sorted(corpus.glob("*.txt")) if book in x.stem]
+        def _corpus_files():
+            out = []
+            for suffix in (".txt", ".md"):
+                out.extend(corpus.glob(f"*{suffix}"))
+            return sorted(out)
+
+        files = _corpus_files()
+        hits = [x for x in files if book in x.stem]
         if len(hits) == 1:
             return hits[0]
-        avail = ", ".join(x.stem for x in sorted(corpus.glob("*.txt")))
+        avail = ", ".join(x.stem for x in files)
         sys.exit(f"找不到语料: {book}\n"
                  f"  可传完整路径，或 corpus/ 下的书名。\n"
                  f"  当前可用: {avail if avail else '(空)'}")

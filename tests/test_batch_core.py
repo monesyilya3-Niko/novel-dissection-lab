@@ -173,7 +173,7 @@ class TestMainCLI(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             with self.assertRaises(SystemExit) as cm:
                 batch_mod.main([td, "--genre", "urban"])
-            self.assertIn("目录中没有 TXT", str(cm.exception))
+            self.assertIn("目录中没有正文文件", str(cm.exception))
 
     def test_main_dry_run_success(self):
         with tempfile.TemporaryDirectory() as td:
@@ -190,7 +190,7 @@ class TestMainCLI(unittest.TestCase):
 
             self.assertEqual(code, 0)
             out = buf.getvalue()
-            self.assertIn("发现 2 本 TXT:", out)
+            self.assertIn("发现 2 本正文:", out)
             self.assertIn("完成: 成功 0 / 2 本", out)  # dry-run 产物在 run_book 返回 None
 
     def test_main_with_reports(self):

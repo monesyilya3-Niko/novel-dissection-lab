@@ -474,13 +474,13 @@ class TestBatchEngine(unittest.TestCase):
                 batch_mod.main()
             self.assertIn("目录不存在", str(cm.exception))
 
-        # 2. 目录中没有 TXT
+        # 2. 目录中没有正文文件（.txt / .md）
         empty_dir = self.root_dir / "empty_corpus"
         empty_dir.mkdir()
         with mock.patch("sys.argv", ["batch.py", str(empty_dir), "--genre", "urban"]):
             with self.assertRaises(SystemExit) as cm:
                 batch_mod.main()
-            self.assertIn("目录中没有 TXT", str(cm.exception))
+            self.assertIn("目录中没有正文文件", str(cm.exception))
 
     def test_main_cli_success_with_report(self):
         corpus_dir = self.root_dir / "corpus_txt"
@@ -498,7 +498,7 @@ class TestBatchEngine(unittest.TestCase):
              mock.patch("sys.stdout", new_callable=io.StringIO) as fake_out:
             batch_mod.main()
             output = fake_out.getvalue()
-            self.assertIn("发现 1 本 TXT", output)
+            self.assertIn("发现 1 本正文", output)
             self.assertIn("完成: 成功 1 / 1 本", output)
             mock_gen_rep.assert_called_once()
 
