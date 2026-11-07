@@ -20,6 +20,41 @@ from gui import services
 from gui.services import ServiceError
 
 
+class TestSseEncodingFallback(unittest.TestCase):
+    """SSE 帧编码必须容错（2026-11-07）。
+
+    server.py 的 SSE 写入点用 json.dumps(...).encode()。事件里可能带用户数据
+    （书标题、错误文案），孤立代理字符（U+D800-U+DFFF）无法编码成 UTF-8。
+    而这个写入在 while 循环内，一次 UnicodeEncodeError 会被外层 OSError 捕获
+    并静默断开 SSE —— 前端表现为「进度突然不动了」，且没有任何错误提示。
+    """
+
+    def test_format_event_then_encode_with_replace(self):
+        from gui import sse
+        sur = chr(0xD800)
+        frame = sse.format_event({"message": f"正文{sur}坏"})
+        raw = frame.encode("utf-8", errors="replace")
+        self.assertIsInstance(raw, bytes)
+        self.assertIn(b"data: ", raw)
+        self.assertTrue(raw.endswith(b"\n\n"))
+
+    def test_server_sse_writes_use_replace(self):
+        from pathlib import Path as _P
+        src = (_P(__file__).resolve().parent.parent / "gui" / "server.py").read_text(
+            encoding="utf-8")
+        # SSE 段里所有 .encode() 都必须带 errors="replace"
+        lines = [ln for ln in src.splitlines() if ".wfile.write(" in ln or "encode(" in ln]
+        sse_encodes = [ln for ln in src.splitlines()
+                       if "wfile.write" in ln and "encode(" in ln]
+        self.assertTrue(sse_encodes, "找不到 SSE 写入点")
+        for ln in sse_encodes:
+            if "b\": ping" in ln or 'b": ping' in ln:
+                continue
+            self.assertIn('errors="replace"', ln,
+                          f"SSE 写入缺少编码兜底：{ln.strip()}")
+        self.assertTrue(lines)
+
+
 class TestSendJsonEncodingFallback(unittest.TestCase):
     """响应序列化必须容忍不可编码字符（2026-11-05）。
 

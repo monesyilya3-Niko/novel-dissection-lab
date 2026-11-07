@@ -47,7 +47,12 @@ class SseBroker:
 
 
 def format_event(event: dict[str, Any]) -> str:
-    """把一个事件 dict 序列化为 SSE 帧。"""
+    """把一个事件 dict 序列化为 SSE 帧。
+
+    ⚠️ 返回的是 str，调用方编码成 UTF-8 时必须用 ``errors="replace"``：
+    事件里可能带用户数据，孤立代理字符（U+D800–U+DFFF）无法编码。
+    server.py 的 SSE 写入点已经这么做了（2026-11-07）。
+    """
     return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
 

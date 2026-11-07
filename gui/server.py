@@ -516,7 +516,7 @@ class _Handler(BaseHTTPRequestHandler):
         task_type = query.get("task_type")
         q: queue.Queue = broker.subscribe()
         try:
-            self.wfile.write(f"data: {json.dumps({'status': 'connected', 'book_id': book_id, 'task_id': task_id}, ensure_ascii=False)}\n\n".encode())
+            self.wfile.write(f"data: {json.dumps({'status': 'connected', 'book_id': book_id, 'task_id': task_id}, ensure_ascii=False)}\n\n".encode("utf-8", errors="replace"))
             self.wfile.flush()
             while True:
                 try:
@@ -532,7 +532,13 @@ class _Handler(BaseHTTPRequestHandler):
                     continue
                 if not task_id and not book_id and task_type and event.get("task_type") != task_type:
                     continue
-                self.wfile.write(f"data: {json.dumps(event, ensure_ascii=False)}\n\n".encode())
+                # encode 必须容错（2026-11-07）：event 里可能带用户数据（书标题、
+                # 错误文案）。孤立代理字符无法编码成 UTF-8，而这里在 while 循环内，
+                # 一次 UnicodeEncodeError 会被外层 OSError 捕获并静默断开 SSE——
+                # 前端表现为「进度突然不动了」，且没有任何错误提示。
+                self.wfile.write(
+                    f"data: {json.dumps(event, ensure_ascii=False)}\n\n".encode(
+                        "utf-8", errors="replace"))
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
