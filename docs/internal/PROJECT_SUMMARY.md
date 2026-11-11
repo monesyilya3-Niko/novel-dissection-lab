@@ -76,7 +76,7 @@
 ### 4.1 环境
 
 ```bash
-PY="C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe"
+PY="python"
 cd "C:\Users\monesy\workspace\projects\novel-lab"
 ```
 
@@ -154,7 +154,7 @@ PROMPTS_DIR    = novel-lab/prompts/generated/
 
 | 项 | 值 |
 |---|---|
-| Python | `C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe`（实际 3.13.14） |
+| Python | `python`（实际 3.13.14） |
 | Node | v22.22.2 + npm 10.9.7 |
 | pip 镜像 | 阿里云（清华源 403） |
 | npm 镜像 | `registry.npmmirror.com` |

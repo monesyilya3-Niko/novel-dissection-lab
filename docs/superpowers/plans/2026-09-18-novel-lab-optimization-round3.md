@@ -21,9 +21,9 @@
 - `scripts/` 与 `gui/` 后端只用 Python 标准库。
 - 测试使用临时目录或内存对象；不触碰真实 `assets/`（除 Task 3.3 明确要求的资产再生成）、`gui_state/`、用户目录。
 - 每任务收尾运行全量 `run_tests.py`（当前基线 **648 tests OK**）；55 资产保持 **0 REJECT**。
-- 使用 `C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B`。
+- 使用 `python -B`。
 - 提交信息用英文小写前缀。
-- 不访问 `C:/Users/monesy/.workbuddy/` 与 `C:/Users/monesy/WorkBuddy/`。
+- 不访问 `~/.workbuddy/` 与 `~/WorkBuddy/`。
 
 ---
 

@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -23,7 +24,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = ROOT / "build"
 DIST_DIR = BUILD_DIR / "dist"
-DEFAULT_RUNTIME = Path(r"C:/Users/monesy/.niko/binaries/python/versions/3.13.12")
+# 便携版要打包一份 Python 运行时。默认从环境变量取，避免把开发机的绝对路径写死进仓库。
+# 用法：NOVEL_LAB_RUNTIME=/path/to/python ./build_portable.py
+DEFAULT_RUNTIME = Path(
+    os.environ.get("NOVEL_LAB_RUNTIME")
+    or (sys.prefix if sys.prefix and Path(sys.prefix).is_dir() else "")
+)
 
 # 运行时目录里不需要随包的部分
 RUNTIME_EXCLUDE = {"include", "Scripts", "share", "Tools", "__pycache__"}
@@ -78,7 +84,7 @@ endlocal
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runtime", type=Path, default=DEFAULT_RUNTIME,
-                    help="捆绑的 CPython 目录（默认本机 .niko 运行时）")
+                    help="捆绑的 CPython 目录（默认取 NOVEL_LAB_RUNTIME 环境变量或当前解释器）")
     args = ap.parse_args()
 
     if sys.platform != "win32":

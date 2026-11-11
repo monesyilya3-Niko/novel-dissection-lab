@@ -247,7 +247,7 @@
   - 新增 6 条测试，含**反向守护**（有 pass 产出的书必须**仍然**报采样漂移，防止把守卫改成永远通过）；反向验证：仅移除该前提守卫时 1 条用例失败，还原后全绿。
 - **铁律一实现过严导致 `聚合` 命令完全不可用**：`pass5_aggregate.main()` 原先把 mismatch 判定放在 `--books` 过滤**之前**，只要 `assets/` 下存在任何异题材 voice-card 就 `sys.exit(1)`——即使用户已显式限定书目。本项目常态就是多题材并存（3 个题材），于是 `聚合` **完全不可用**，`novel.py 状态` 里那句「拆 ≥3 本同题材后跑 'novel 聚合'」成了死路。现判定对象修正为**本次聚合的 source_books**，与 `PROJECT_LAW.md` 铁律一原文对齐：`--books` 显式指定的书必须属于目标题材（否则硬失败，防静默漏掉）；未显式指定时范围外的书**打印列出**但不阻断。
 - **索引只增不删（永久漂移）**：`run_migrate()` 只有 UPSERT，从不删除已消失文件的对应行。删除报告后 `reports` 表仍留 8 条指向不存在文件的记录，GUI 会列出幽灵报告，而 `--check` 只能报告差异、**无任何修复手段**。现由 `--prune` 收敛。
-- **`MODELS.md` 与配置事实不符**：该文档声称「2026-09-01 起不调用任何外部 LLM API」，但 `config/models.json` 已配置 `workbuddy-deepseek`，且 `config/.secrets.bin` 中实测存有该模型的密钥（`secret_store.load_secrets()` 可读到条目），GUI `/api/overview` 返回 `model_configured: true`。现更正为实测状态，原声明保留为历史沿革。
+- **`MODELS.md` 与配置事实不符**：该文档曾声称「不调用任何外部 LLM API」，但 `config/models.json` 实际已配置外部模型，且密钥存储中存有对应条目，GUI `/api/overview` 返回 `model_configured: true`。现更正为实测状态，原声明保留为历史沿革。
 - **`CHANGELOG` 重复的 `[Unreleased]` 段落**：旧段落排在 `[1.1.0]` 之后、与文件顶部重复，且条目已被 1.1.0/1.1.2 摘要覆盖。改为 `## [历史存档] 1.1.0 发布前的详细条目草稿`，**内容原样保留**（比摘要更详细）。
 - `pyproject.toml` 的 `exclude` 移除了两个不存在的目录（`.worktrees`、`指纹拆书`）。
 - `gui/web/test-results/.last-run.json` 从版本库移除跟踪（`test-results/` 本就在 `.gitignore` 中，但该文件已被跟踪，导致每次跑 e2e 都弄脏工作区）。

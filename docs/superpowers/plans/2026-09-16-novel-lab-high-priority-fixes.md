@@ -14,7 +14,7 @@
 
 - `scripts/` 与 `gui/` 后端只能使用 Python 标准库；不得引入 `psutil`、`jsonschema`、`pytest` 等第三方包。
 - 所有测试使用临时目录或内存对象，不触碰真实 `assets/`、`gui_state/`、`gui/state/`、用户小说目录或个人目录。
-- 使用受管解释器：`C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B`。
+- 使用受管解释器：`python -B`。
 - 当前全量测试基线是 **401 个用例**，不是历史文档中的 373/397；每个任务结束都必须运行对应专项测试，收尾必须运行全量测试。
 - 不修改现有小说正文或生产资产 JSON 内容；不得重建本轮之外的便携版 `build/dist/novel-lab-portable-v1.0.0`。
 - 资产 kind 的新值 `distilled`、`prose_card_index` 仅用于 `assets` 表/索引；不得加入 `migrate.GENRE_KIND_ENUM`，因为它只表示题材来源 kind。
@@ -89,7 +89,7 @@ class TestDistilledValidation(unittest.TestCase):
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_validate.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_validate.py" -v
 ```
 
 Expected: FAIL，当前没有 `validate_asset_data`、`distilled` kind 和 index kind。
@@ -112,9 +112,9 @@ Expected: FAIL，当前没有 `validate_asset_data`、`distilled` kind 和 index
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_validate.py" -v
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B C:/Users/monesy/niko/novel-lab/novel.py 校验 C:/Users/monesy/niko/novel-lab/assets/campus-redemption-voice-card-distilled.json
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B C:/Users/monesy/niko/novel-lab/novel.py 校验 C:/Users/monesy/niko/novel-lab/assets/genre-prose-card-index.json
+python -B -m unittest discover -s <old-clone>/tests -p "test_validate.py" -v
+python -B <old-clone>/novel.py 校验 <old-clone>/assets/campus-redemption-voice-card-distilled.json
+python -B <old-clone>/novel.py 校验 <old-clone>/assets/genre-prose-card-index.json
 ```
 
 Expected: 专项测试 PASS；两条 CLI 命令分别输出 `校验类型: distilled` 与 `校验类型: genre-prose-card-index`，退出码为 0。
@@ -122,8 +122,8 @@ Expected: 专项测试 PASS；两条 CLI 命令分别输出 `校验类型: disti
 - [ ] **Step 5: 提交独立变更**
 
 ```text
-git -C C:/Users/monesy/niko/novel-lab add schema/distilled.schema.json schema/genre-prose-card-index.schema.json scripts/validate.py tests/test_validate.py
-git -C C:/Users/monesy/niko/novel-lab commit -m "fix: add dedicated distilled asset validation"
+git -C <old-clone> add schema/distilled.schema.json schema/genre-prose-card-index.schema.json scripts/validate.py tests/test_validate.py
+git -C <old-clone> commit -m "fix: add dedicated distilled asset validation"
 ```
 
 ---
@@ -192,7 +192,7 @@ class TestChapterLoader(unittest.TestCase):
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_chapter_loader.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_chapter_loader.py" -v
 ```
 
 Expected: FAIL，当前没有 `chapter_loader`，现有递归扫描会静默覆盖同章号。
@@ -220,9 +220,9 @@ Expected: FAIL，当前没有 `chapter_loader`，现有递归扫描会静默覆�
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_chapter_loader.py" -v
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_regressions.py" -v
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_logic_check.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_chapter_loader.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_regressions.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_logic_check.py" -v
 ```
 
 Expected: 全部 PASS；递归结构既有测试仍能发现 nested `arc-N` 章节，备份目录不再参与加载。
@@ -230,8 +230,8 @@ Expected: 全部 PASS；递归结构既有测试仍能发现 nested `arc-N` 章�
 - [ ] **Step 6: 提交独立变更**
 
 ```text
-git -C C:/Users/monesy/niko/novel-lab add scripts/chapter_loader.py scripts/book_quality.py scripts/qc.py scripts/logic_check.py scripts/setting_check.py tests/test_chapter_loader.py tests/test_regressions.py
-git -C C:/Users/monesy/niko/novel-lab commit -m "fix: make chapter loading deterministic and backup-safe"
+git -C <old-clone> add scripts/chapter_loader.py scripts/book_quality.py scripts/qc.py scripts/logic_check.py scripts/setting_check.py tests/test_chapter_loader.py tests/test_regressions.py
+git -C <old-clone> commit -m "fix: make chapter loading deterministic and backup-safe"
 ```
 
 ---
@@ -284,7 +284,7 @@ class TestDialogueQuotes(unittest.TestCase):
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_dialogue_quotes.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_dialogue_quotes.py" -v
 ```
 
 Expected: FAIL，当前 `chapter_check` 对 `「」`/`『』` 返回 0 对话字符。
@@ -305,8 +305,8 @@ Expected: FAIL，当前 `chapter_check` 对 `「」`/`『』` 返回 0 对话字
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_dialogue_quotes.py" -v
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_thresholds.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_dialogue_quotes.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_thresholds.py" -v
 ```
 
 Expected: 全部 PASS，既有阈值判定不改变，新增四类引号用例通过。
@@ -314,8 +314,8 @@ Expected: 全部 PASS，既有阈值判定不改变，新增四类引号用例�
 - [ ] **Step 5: 提交独立变更**
 
 ```text
-git -C C:/Users/monesy/niko/novel-lab add scripts/metrics.py scripts/chapter_check.py tests/test_dialogue_quotes.py tests/test_thresholds.py
-git -C C:/Users/monesy/niko/novel-lab commit -m "fix: count Chinese dialogue quote styles consistently"
+git -C <old-clone> add scripts/metrics.py scripts/chapter_check.py tests/test_dialogue_quotes.py tests/test_thresholds.py
+git -C <old-clone> commit -m "fix: count Chinese dialogue quote styles consistently"
 ```
 
 ---
@@ -358,7 +358,7 @@ class TestDistillGate(unittest.TestCase):
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_distill_gate.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_distill_gate.py" -v
 ```
 
 Expected: FAIL，当前 `distill.py` 没有 `write_distilled_outputs`，且没有 distilled 校验门禁。
@@ -377,7 +377,7 @@ Expected: FAIL，当前 `distill.py` 没有 `write_distilled_outputs`，且没�
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_distill*.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_distill*.py" -v
 ```
 
 Expected: 全部 PASS；现有蒸馏聚合/检索/渲染测试不回归，新增门禁测试确认 invalid payload 不写盘。
@@ -385,8 +385,8 @@ Expected: 全部 PASS；现有蒸馏聚合/检索/渲染测试不回归，新增
 - [ ] **Step 5: 提交独立变更**
 
 ```text
-git -C C:/Users/monesy/niko/novel-lab add scripts/distill.py tests/test_distill.py tests/test_distill_gate.py
-git -C C:/Users/monesy/niko/novel-lab commit -m "fix: gate distilled outputs before writing"
+git -C <old-clone> add scripts/distill.py tests/test_distill.py tests/test_distill_gate.py
+git -C <old-clone> commit -m "fix: gate distilled outputs before writing"
 ```
 
 ---
@@ -428,8 +428,8 @@ git -C C:/Users/monesy/niko/novel-lab commit -m "fix: gate distilled outputs bef
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_migrate.py" -v
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_asset_index.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_migrate.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_asset_index.py" -v
 ```
 
 Expected: FAIL，当前 index 是 `trope`，distilled 是基础卡 kind。
@@ -454,9 +454,9 @@ Expected: FAIL，当前 index 是 `trope`，distilled 是基础卡 kind。
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_migrate.py" -v
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_asset_index.py" -v
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_config_isolation.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_migrate.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_asset_index.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_config_isolation.py" -v
 ```
 
 Expected: 全部 PASS；测试仍只在临时 SQLite 中运行，真实 `gui_state` 不新增记录。
@@ -464,8 +464,8 @@ Expected: 全部 PASS；测试仍只在临时 SQLite 中运行，真实 `gui_sta
 - [ ] **Step 6: 提交独立变更**
 
 ```text
-git -C C:/Users/monesy/niko/novel-lab add gui/asset_index.py gui/migrate.py gui/services.py tests/test_asset_index.py tests/test_migrate.py
-git -C C:/Users/monesy/niko/novel-lab commit -m "fix: separate distilled and prose index asset kinds"
+git -C <old-clone> add gui/asset_index.py gui/migrate.py gui/services.py tests/test_asset_index.py tests/test_migrate.py
+git -C <old-clone> commit -m "fix: separate distilled and prose index asset kinds"
 ```
 
 ---
@@ -511,8 +511,8 @@ self.assertIn("distilled", str(ctx.exception))
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_quality_service.py" -v
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_writing_service.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_quality_service.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_writing_service.py" -v
 ```
 
 Expected: 新增测试 FAIL，当前 `_load_asset_json` 不区分文件内容 kind。
@@ -529,9 +529,9 @@ Expected: 新增测试 FAIL，当前 `_load_asset_json` 不区分文件内容 ki
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_quality_service.py" -v
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_writing_service.py" -v
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_phase2_api.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_quality_service.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_writing_service.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_phase2_api.py" -v
 ```
 
 Expected: 全部 PASS；错误 kind 被同步拒绝，合法 distilled 注入仍生成包含“蒸馏规则”的 prompt。
@@ -539,8 +539,8 @@ Expected: 全部 PASS；错误 kind 被同步拒绝，合法 distilled 注入仍
 - [ ] **Step 5: 提交独立变更**
 
 ```text
-git -C C:/Users/monesy/niko/novel-lab add gui/services.py gui/quality_service.py gui/writing_service.py gui/router.py tests/test_quality_service.py tests/test_writing_service.py
-git -C C:/Users/monesy/niko/novel-lab commit -m "fix: reject mismatched assets in scoring services"
+git -C <old-clone> add gui/services.py gui/quality_service.py gui/writing_service.py gui/router.py tests/test_quality_service.py tests/test_writing_service.py
+git -C <old-clone> commit -m "fix: reject mismatched assets in scoring services"
 ```
 
 ---
@@ -574,7 +574,7 @@ git -C C:/Users/monesy/niko/novel-lab commit -m "fix: reject mismatched assets i
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/node/versions/22.22.2-2/npm.cmd --prefix C:/Users/monesy/niko/novel-lab/gui/web run build
+~/.niko/binaries/node/versions/22.22.2-2/npm.cmd --prefix <old-clone>/gui/web run build
 ```
 
 Expected: 当前基线构建成功；记录构建前 git status，避免把历史无关 dist 变化混入提交。
@@ -592,9 +592,9 @@ Expected: 当前基线构建成功；记录构建前 git status，避免把历�
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/node/versions/22.22.2-2/npm.cmd --prefix C:/Users/monesy/niko/novel-lab/gui/web run build
-git -C C:/Users/monesy/niko/novel-lab status --short
-git -C C:/Users/monesy/niko/novel-lab diff --stat
+~/.niko/binaries/node/versions/22.22.2-2/npm.cmd --prefix <old-clone>/gui/web run build
+git -C <old-clone> status --short
+git -C <old-clone> diff --stat
 ```
 
 Expected: TypeScript/Vite 构建退出码 0；只有预期的 TSX/TS 文件与对应 `gui/web/dist/assets/*` hash 文件变化；不修改 portable build。
@@ -602,8 +602,8 @@ Expected: TypeScript/Vite 构建退出码 0；只有预期的 TSX/TS 文件与�
 - [ ] **Step 5: 提交独立变更**
 
 ```text
-git -C C:/Users/monesy/niko/novel-lab add gui/web/src/types.ts gui/web/src/components/WritingWorkbench.tsx gui/web/src/components/AdvancedWorkbench.tsx gui/web/src/components/QualityWorkbench.tsx gui/web/dist
-git -C C:/Users/monesy/niko/novel-lab commit -m "feat: expose distilled assets separately in GUI"
+git -C <old-clone> add gui/web/src/types.ts gui/web/src/components/WritingWorkbench.tsx gui/web/src/components/AdvancedWorkbench.tsx gui/web/src/components/QualityWorkbench.tsx gui/web/dist
+git -C <old-clone> commit -m "feat: expose distilled assets separately in GUI"
 ```
 
 ---
@@ -650,7 +650,7 @@ class TestAssetContractE2E(unittest.TestCase):
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -m unittest discover -s C:/Users/monesy/niko/novel-lab/tests -p "test_asset_contract_e2e.py" -v
+python -B -m unittest discover -s <old-clone>/tests -p "test_asset_contract_e2e.py" -v
 ```
 
 Expected: PASS；任何 distilled 都不再被当成单书 voice-card 消费。
@@ -671,7 +671,7 @@ Expected: PASS；任何 distilled 都不再被当成单书 voice-card 消费。
 Run:
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B C:/Users/monesy/niko/novel-lab/run_tests.py
+python -B <old-clone>/run_tests.py
 ```
 
 Expected: exit code 0，输出 `Ran 401+ tests` 与 `OK`；若新增测试数量变化，以实际 `Ran N tests` 为准，不在文档中继续写死 401。
@@ -681,9 +681,9 @@ Expected: exit code 0，输出 `Ran 401+ tests` 与 `OK`；若新增测试数量
 Run：
 
 ```text
-C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B -c "import json, subprocess; from pathlib import Path; root=Path(r'C:/Users/monesy/niko/novel-lab'); py=r'C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe'; bad=[]; counts={};\nfor p in sorted((root/'assets').glob('*.json')):\n r=subprocess.run([py, str(root/'scripts'/'validate.py'), str(p)], capture_output=True, text=True, encoding='utf-8');\n line=next((x for x in (r.stdout+r.stderr).splitlines() if x.startswith('校验类型:')), ''); counts[line.split(':',1)[1].split('|',1)[0].strip() if ':' in line else 'unknown']=counts.get(line.split(':',1)[1].split('|',1)[0].strip() if ':' in line else 'unknown',0)+1;\n if r.returncode==1: bad.append((p.name, line));\nprint('assets', len(list((root/'assets').glob('*.json')))); print('kinds', counts); print('rejects', bad)"
-git -C C:/Users/monesy/niko/novel-lab diff --check
-git -C C:/Users/monesy/niko/novel-lab status --short --untracked-files=all
+python -B -c "import json, subprocess; from pathlib import Path; root=Path(r'<old-clone>'); py=r'python'; bad=[]; counts={};\nfor p in sorted((root/'assets').glob('*.json')):\n r=subprocess.run([py, str(root/'scripts'/'validate.py'), str(p)], capture_output=True, text=True, encoding='utf-8');\n line=next((x for x in (r.stdout+r.stderr).splitlines() if x.startswith('校验类型:')), ''); counts[line.split(':',1)[1].split('|',1)[0].strip() if ':' in line else 'unknown']=counts.get(line.split(':',1)[1].split('|',1)[0].strip() if ':' in line else 'unknown',0)+1;\n if r.returncode==1: bad.append((p.name, line));\nprint('assets', len(list((root/'assets').glob('*.json')))); print('kinds', counts); print('rejects', bad)"
+git -C <old-clone> diff --check
+git -C <old-clone> status --short --untracked-files=all
 ```
 
 Expected: 55 个资产；4 个 distilled 与 index 不再出现在 REJECT；既有合法单书资产仍通过；`diff --check` 无空白错误；没有小说正文、个人目录或 portable build 变化。
@@ -691,8 +691,8 @@ Expected: 55 个资产；4 个 distilled 与 index 不再出现在 REJECT；既�
 - [ ] **Step 6: 最终提交并记录结果**
 
 ```text
-git -C C:/Users/monesy/niko/novel-lab add tests/test_asset_contract_e2e.py tests/test_distill.py tests/test_stdlib_only.py CHANGELOG.md
-git -C C:/Users/monesy/niko/novel-lab commit -m "test: close novel-lab asset contract regression loop"
+git -C <old-clone> add tests/test_asset_contract_e2e.py tests/test_distill.py tests/test_stdlib_only.py CHANGELOG.md
+git -C <old-clone> commit -m "test: close novel-lab asset contract regression loop"
 ```
 
 提交前在会话工作区的复核产物中记录：实际测试数量、资产 kind 分布、拒绝数、GUI 构建结果、未解决问题；不要把生产校验产生的报告写回 `novel-lab/assets/`。

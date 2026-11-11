@@ -16,7 +16,7 @@
 - 不得修改既有函数签名与返回结构；新增信息一律以**追加字段**方式提供。
 - 不得改动严重度判定规则与 12 维评分权重/阈值。
 - 测试使用临时目录或内存对象，不触碰真实 `assets/`、`gui_state/`、用户目录。
-- 使用受管解释器：`C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe -B`。
+- 使用受管解释器：`python -B`。
 - 当前基线：**Ran 558 tests / OK**；55 个生产资产 **0 REJECT**。
 - 每任务收尾运行全量 `run_tests.py`；提交信息用英文小写前缀（`fix:` / `feat:` / `test:` / `chore:` / `data:`）。
 

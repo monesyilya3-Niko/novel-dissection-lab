@@ -135,14 +135,14 @@ git config core.hooksPath .githooks
 
 | 项 | 值 |
 |---|---|
-| 项目根（唯一权威工作副本） | `C:\Users\monesy\workspace\projects\novel-lab` |
-| 主解释器 | `C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe` |
-| 解释器版本 | **实际 3.13.14**（目录名 3.13.12 是历史 artifact，属正常） |
-| 项目 venv | `C:/Users/monesy/.niko/binaries/python/envs/default`（3.13.14，含 fontTools / numpy / Pillow，仅番茄抓书用） |
-| Node | `C:/Program Files/nodejs`（实测 v24.21.0 + npm 11.19.0） |
-| npm 镜像 | 实测 `~/.npmrc` 为 `https://registry.npmjs.org/`（官方源本机 `npm ci` 实测可用；旧的 npmmirror 口径已过时） |
-| pip 镜像 | 实测 `pip config list` 为空（未配置镜像，走默认源） |
-| GitHub | 直连可用（2026-10-08 实测 `git push` 到 origin 成功）；备用镜像 `ghfast.top` |
+| 项目根 | 仓库根目录（`git rev-parse --show-toplevel`） |
+| 主解释器 | `python`（PATH 上的 Python 3.10+；无第三方依赖） |
+| 解释器版本 | 开发机实测 3.13.x；CI 覆盖 3.11 / 3.12 / 3.13 |
+| 项目 venv | 可选；仅番茄抓书脚本需要 fontTools / numpy / Pillow，核心链路不需要 |
+| Node | 仅重建前端时需要（开发机实测 v24.x + npm 11.x） |
+| npm 镜像 | 默认官方源 `https://registry.npmjs.org/`，`npm ci` 可用 |
+| pip 镜像 | 不需要——后端零第三方依赖 |
+| GitHub | 直连可用；受限网络下可用备用镜像 `ghfast.top` |
 
 #### ✅ 旧副本已于 2026-11-03 清理（本节原为「本机有第二个克隆」）
 

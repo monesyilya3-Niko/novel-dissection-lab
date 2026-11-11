@@ -1,20 +1,20 @@
 {
   "version": 1,
   "models": {
-    "workbuddy-deepseek": {
+    "example-deepseek": {
       "protocol": "openai",
-      "base_url": "https://work.xclawxx.top/v1",
-      "model_name": "DeepSeek-V4-Pro-plus",
-      "api_key_env": "OPENAI_API_KEY",
-      "price_in_per_1m": 18.0,
-      "price_out_per_1m": 72.0,
-      "context_window": 128000
+      "base_url": "https://api.deepseek.com/v1",
+      "model_name": "deepseek-chat",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "price_in_per_1m": 2.0,
+      "price_out_per_1m": 8.0,
+      "context_window": 65536
     }
   },
   "roles": {
-    "default": "workbuddy-deepseek",
-    "cheap": "workbuddy-deepseek",
-    "strong": "workbuddy-deepseek"
+    "default": "example-deepseek",
+    "cheap": "example-deepseek",
+    "strong": "example-deepseek"
   },
   "routes": {
     "pass1_structure": "cheap",

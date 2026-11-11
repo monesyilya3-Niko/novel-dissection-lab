@@ -1,28 +1,28 @@
 # 模型配置说明
 
-> **当前状态（2026-09-23 实测，取代下方历史声明）**
+> **当前状态**
 >
-> 本仓库**已配置 1 个外部模型**，本手册**当前有效**，不是存档：
+> 本仓库**自带一份模型配置模板**（`config/models.json`，入库跟踪），
+> 只含占位地址与预设结构，**不含任何真实密钥或私有中转站地址**。
 >
-> | 项 | 实测值 |
+> | 项 | 说明 |
 > |---|---|
-> | 模型 id | `workbuddy-deepseek` |
-> | 协议 / model_name | `openai` / `DeepSeek-V4-Pro-plus` |
-> | 配置来源 | `config/models.json`（入库跟踪） |
-> | 密钥 | `config/.secrets.bin`（DPAPI 密文，**不入库**）；`secret_store.load_secrets()` 实测可读到 `workbuddy-deepseek` 条目 |
-> | GUI 判定 | `/api/overview` 返回 `model_configured: true` |
-> | roles / routes | default / cheap / strong 均指向该模型；pass1-5、writing、consistency_check 均有路由 |
+> | 配置来源 | `config/models.json`（入库跟踪，模板） |
+> | 实际生效配置 | 用户目录下的 `models.json`（`resolve_models_file()` 优先读它，见下） |
+> | 密钥 | 环境变量优先；其次 `config/.secrets.json`（**不入库**） |
+> | GUI 判定 | `/api/overview` 返回 `model_configured` |
 >
-> ⚠️ **历史声明（已被上述实测取代，保留以存档决策脉络）**：
-> 「2026-09-01 起本手册仅作参考存档：外部模型（mimo/ds）及密钥已按用户指令删除，
-> 当前项目**不调用任何外部 LLM API**——拆书分析与写作由内置智能在会话内直接完成。」
-> 该声明在 2026-09-01 当时为真；后续重新配置了 `workbuddy-deepseek`，故不再成立。
-> 无模型时（密钥缺失 / 额度失败）仍会走会话内接管路径，见 `AGENTS.md` 与 `scripts/write.py::main`（未配置模型时会生成 `AI接管任务.md` 清单）。
+> **配置查找顺序**：用户数据目录 `%LOCALAPPDATA%\暮冬念春\config\models.json` 优先，
+> 不存在时回落到仓库内 `config/models.json` 模板。所以仓库里的模板可以放心入库，
+> 你的真实地址与模型不会跟着提交。
+>
+> 无模型时（密钥缺失 / 额度失败）仍会走会话内接管路径，见 `AGENTS.md` 与
+> `scripts/write.py::main`（未配置模型时会生成 `AI接管任务.md` 清单）。
 
 零依赖，只用 Python 标准库。不需要 `pip install` 任何东西。
 
 ```
-PY=C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe
+PY=python            # 或你的解释器绝对路径
 cd novel-lab/scripts
 ```
 

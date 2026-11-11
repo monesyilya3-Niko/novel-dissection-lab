@@ -73,18 +73,8 @@ resolve_python() {
         fi
     done
 
-    # 4) 硬编码兜底（最后手段，仅兼容旧环境；带警告）
-    for cand in \
-        "C:/Users/monesy/.niko/binaries/python/versions/3.13.12/python.exe" \
-        "C:/Users/monesy/.niko/binaries/python/envs/default/Scripts/python.exe" \
-        "C:/Users/monesy/.niko/binaries/python/envs/default/bin/python"
-    do
-        if [ -x "$cand" ]; then
-            echo "[pre-commit] 警告：回退到硬编码解释器 $cand（建议迁移到 .venv 或 PATH）。" >&2
-            printf '%s\n' "$cand"
-            return 0
-        fi
-    done
+    # 4) 最后手段：项目内 venv（已在第 2 步覆盖，此处保留空分支以便未来扩展）
+    :
 
     return 1
 }
