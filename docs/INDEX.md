@@ -13,7 +13,8 @@
 | 1 | [README.md](README.md) ｜ [EN](README.en.md) | 这是什么、怎么装、怎么跑 |
 | 2 | [CORE_PHILOSOPHY.md](CORE_PHILOSOPHY.md) ｜ [EN](CORE_PHILOSOPHY_EN.md) | 👑 为什么这样设计——最高宪章，四条铁律 |
 | 3 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | 完整使用手册、流程图、快捷键 |
-| 4 | [docs/internal/HANDOFF_2026-11-06.md](docs/internal/HANDOFF_2026-11-06.md) | **接手开发先读这份**——最新状态、踩坑记录 |
+| 4 | [docs/internal/HANDOFF_2026-11-11.md](docs/internal/HANDOFF_2026-11-11.md) | **接手开发先读这份**——54 个提交的完整记录、41 项修复、仓库整理与双语化、已知环境问题 |
+| 5 | [docs/internal/HANDOFF_2026-11-06.md](docs/internal/HANDOFF_2026-11-06.md) | 上一份交接（40 项修复的详细分类） |
 
 > AI 协作者请改为从 [AGENTS.md](AGENTS.md) 开始，那是可执行的硬约束。
 
