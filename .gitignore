@@ -90,3 +90,19 @@ dist-installer/
 
 # 一次性本地工作脚本（codemod 等，不入库）
 scratch/
+
+# === 工具缓存与本地环境（2026-11-11 补齐）===
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+coverage.xml
+htmlcov/
+.mypy_cache/
+node_modules/
+
+# 操作系统杂项
+.DS_Store
+Thumbs.db
+desktop.ini

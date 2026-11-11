@@ -250,7 +250,6 @@ git config core.hooksPath .githooks
 | `docs/internal/RULES.md` | 可执行规则全集（操作层细则） | ✅ 大体可用 |
 | `AGENTS.md` | 本文件（AI 协作者入口 + 当前实测口径） | ✅ 权威 |
 | `docs/internal/PROJECT_SUMMARY.md` | 项目总结 | ✅ 已重写（2026-09-11，基于实测） |
-| `docs/internal/HANDOFF.md` | 交接文档（2026-09-11 版） | ⚠️ 数字已过时，看下一行 |
 | `docs/internal/HANDOFF_2026-11-06.md` | **最新交接报告**（40 项修复的分类清单 / 新增守卫 / 段错误根因与最小复现 / heredoc 转义坑） | ✅ **新会话先读这份** |
 | `docs/internal/HANDOFF_2026-11-02.md` | 上一份交接（架构 / 实测口径 / 拆书操作路径仍有效） | ✅ 架构部分仍权威 |
 | `docs/DESIGN_gui_phase2_writing_quality.md` | 阶段二设计（W10-W18） | ✅ 权威 |

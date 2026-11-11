@@ -90,7 +90,7 @@
 
 **结论**：
 - 要 NSIS 安装器（用户要的"双击安装、开始菜单/桌面图标"体验）：要么在 Linux 装 Wine（2.0+，注意 wine32 顺序坑），要么用 Docker `electronuserland/builder:wine` 镜像，要么直接上 **GitHub Actions `windows-latest`** 原生构建。
-- **最省事且最可靠的是 GitHub Actions `windows-latest`**：仓库是 public（`monesyilya3-Niko/novel-lab`），Actions 免费；Windows 原生构建同时解决 §1 中 PyInstaller 的"必须在 Windows 构建"问题（若选路线 A）。多篇实战一致推荐 CI 矩阵按 OS 分 runner：https://github.com/unn-devotek/fcm-fallout-chat-mod/blob/HEAD/cross-platform-overlay/BUILD.md
+- **最省事且最可靠的是 GitHub Actions `windows-latest`**：仓库是 public（`monesyilya3-Niko/novel-dissection-lab`），Actions 免费；Windows 原生构建同时解决 §1 中 PyInstaller 的"必须在 Windows 构建"问题（若选路线 A）。多篇实战一致推荐 CI 矩阵按 OS 分 runner：https://github.com/unn-devotek/fcm-fallout-chat-mod/blob/HEAD/cross-platform-overlay/BUILD.md
 - 若选路线 B + `zip` 目标，可先在 Linux 本机快速产出免安装包用于冒烟测试，零 Wine 依赖（未验证，需真实跑通）。
 
 代码签名（ Authenticode ）：一期可不做。未签名包 Windows SmartScreen 会弹"未知发布者"警告（"更多信息 → 仍要运行"可过）。签名证书约 $200–500/年（OV），或 SignPath 免费开源计划（有项目在用，见下 §5）。**未验证**：未实际购买/申请过，不写流程细节。

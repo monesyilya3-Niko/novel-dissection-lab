@@ -117,7 +117,7 @@
 
 ## 8. 交付物
 
-- GitHub：`monesyilya3-Niko/novel-lab` / `feat/enterprise-hardening`（386 文件与本地 HEAD 全一致，已复验）
+- GitHub：`monesyilya3-Niko/novel-dissection-lab` / `feat/enterprise-hardening`（386 文件与本地 HEAD 全一致，已复验）
 - zip：`~/workspace/your_files/novel-lab-enterprise-hardening-20260928-v7.zip`（由最终 Git HEAD 经 `git archive` 生成；安装器 `novel-lab-installer-20260928-v7.sh` 内嵌同一 zip，经 SHA-256 校验）
 - SHA-256：见同目录 `SHA256SUMS.txt`（交付时生成）
 - 原始备份（禁止修改/删除，未动）：`~/workspace/user/files/novel-lab-backup-2026-09-27_2_37wf.zip`

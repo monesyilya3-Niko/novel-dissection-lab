@@ -1,35 +1,103 @@
-# 安全策略
+# 安全策略 · Security Policy
 
-## 安全模型声明
+**中文** ｜ [English](#english)
 
-novel-lab 设计为**单机本application**：
+---
+
+## 安全模型声明 · Security Model
+
+novel-lab 设计为**单机本机应用**（local-only application）：
 
 - HTTP 服务硬编码绑定 `127.0.0.1`，不接受外部网络连接
-- API 默认无认证（单机信任模型）；设置环境变量 `NOVEL_LAB_TOKEN` 后所有 `/api/*` 请求须携带 `X-Auth-Token` 头（SSE 可用 `?auth=` 查询参数），比较使用常数时间算法
+- API 默认无认证（单机信任模型）；设置环境变量 `NOVEL_LAB_TOKEN` 后
+  所有 `/api/*` 请求须携带 `X-Auth-Token` 头（SSE 可用 `?auth=` 查询参数），
+  比较使用常数时间算法
 - CORS 仅回显本机 Origin
 - 静态文件与 API 路径参数均做路径穿越防护；SQL 全参数化
-- API 密钥存储：Windows 下经 **DPAPI 加密**（`config/.secrets.bin`，与当前系统用户绑定，泄漏的密文无法在他人机器解密）；发现旧明文 `.secrets.json` 时自动迁移加密并删除。非 Windows 降级为 0600 权限明文 JSON。两类文件均被 `.gitignore` 排除，永不入库
+- API 密钥存储：Windows 下经 **DPAPI 加密**（`config/.secrets.bin`，与当前系统
+  用户绑定，泄漏的密文无法在他人机器解密）；发现旧明文 `.secrets.json` 时
+  自动迁移加密并删除。非 Windows 降级为 0600 权限明文 JSON。
+  两类文件均被 `.gitignore` 排除，**永不入库**
 
-**请不要把服务改绑到 0.0.0.0 或公网暴露**——这不在设计威胁模型内，等于把本机文件系统和已配置的 API 密钥暴露给局域网。
+> ⚠️ **请不要把服务改绑到 `0.0.0.0` 或公网暴露**——这不在设计威胁模型内，
+> 等于把本机文件系统和已配置的 API 密钥暴露给局域网。
 
-## 支持的版本
+---
+
+## 支持的版本 · Supported Versions
 
 | 版本 | 支持状态 |
 |---|---|
 | latest release | ✅ 安全修复 |
 | 更早版本 | ❌ 请升级 |
 
-## 报告漏洞
+---
+
+## 报告漏洞 · Reporting a Vulnerability
 
 **请勿公开 issue 报告安全漏洞。**
 
-使用 GitHub [Security Advisories → Report a vulnerability](https://github.com/monesyilya3-Niko/novel-lab/security/advisories/new) 私密报告（不使用公开 issue、不接受邮件报告）。
+使用 GitHub [Security Advisories → Report a vulnerability](https://github.com/monesyilya3-Niko/novel-dissection-lab/security/advisories/new)
+私密报告（不使用公开 issue、不接受邮件报告）。
 
-包含：影响版本、复现步骤、影响评估。收到后 72 小时内确认，修复协调后公开致谢（除非你希望匿名）。
+请包含：影响版本、复现步骤、影响评估。
+收到后 **72 小时内**确认，修复协调后公开致谢（除非你希望匿名）。
 
-## 密钥泄露应急
+---
+
+## 密钥泄露应急 · Key Leak Response
 
 若发现任何密钥进入版本历史：
 
-1. 立即在服务商控制台吊销该密钥（这是唯一可靠的补救）
+1. **立即在服务商控制台吊销该密钥**（这是唯一可靠的补救）
 2. 再按上述渠道报告，协助清理历史
+
+> Revoking the key at the provider is the only reliable remedy. Do that first.
+
+---
+
+## English
+
+### Security model
+
+novel-lab is designed as a **local-only application**:
+
+- The HTTP server binds to `127.0.0.1` — it never accepts external connections
+- The API has no authentication by default (single-machine trust model). Setting the
+  `NOVEL_LAB_TOKEN` environment variable requires every `/api/*` request to carry an
+  `X-Auth-Token` header (SSE may use the `?auth=` query parameter); comparison uses a
+  constant-time algorithm
+- CORS echoes only local origins
+- Both static file serving and API path parameters are guarded against path traversal;
+  all SQL is parameterized
+- **API key storage**: on Windows, keys are encrypted with **DPAPI**
+  (`config/.secrets.bin`, bound to the current OS user — leaked ciphertext cannot be
+  decrypted on another machine). Legacy plaintext `.secrets.json` is migrated and
+  deleted automatically. On non-Windows platforms the fallback is a `0600` plaintext
+  JSON file. Both are gitignored and never committed
+
+> ⚠️ **Do not rebind the server to `0.0.0.0` or expose it publicly.** That is outside
+> the threat model and would expose your local filesystem and configured API keys to
+> the local network.
+
+### Supported versions
+
+Only the latest release receives security fixes. Please upgrade if you are behind.
+
+### Reporting a vulnerability
+
+**Do not open a public issue.** Use GitHub
+[Security Advisories → Report a vulnerability](https://github.com/monesyilya3-Niko/novel-dissection-lab/security/advisories/new).
+
+Include the affected version, reproduction steps, and impact assessment. You will get
+an acknowledgement within **72 hours**. We credit reporters publicly after a coordinated
+fix unless you prefer to stay anonymous.
+
+### Key leak response
+
+If a key ever lands in version history:
+
+1. **Revoke it at the provider immediately** — that is the only reliable remedy
+2. Then report through the channel above so the history can be cleaned
+
+---
