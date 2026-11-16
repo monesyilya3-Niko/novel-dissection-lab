@@ -203,18 +203,74 @@ class TestEmptyContentNotRetryable(unittest.TestCase):
         self.assertEqual(len(attempts), 1, "空正文不该重试")
 
 
-class TestOtherProtocolsUnaffected(unittest.TestCase):
-    """anthropic / ollama 的空正文语义不同，本次不改它们的行为。"""
+class TestOtherProtocolsAlsoGuarded(unittest.TestCase):
+    """三个协议都要守：只修 openai 会留下两处同样的坑。"""
 
-    def test_anthropic_empty_text_still_returns(self):
-        """anthropic 协议本次不动——避免顺手改出未验证的行为。"""
+    def test_anthropic_empty_text_raises(self):
+        """anthropic 空 content block 列表 → 抛错，不再返回空串。
+
+        2026-11-16 补齐：上一轮只修了 openai，anthropic 的
+        ``"".join([])`` 同样会产出空串当成功。
+        """
         resp = {"content": [{"type": "text", "text": ""}],
                 "usage": {"input_tokens": 5, "output_tokens": 0}}
+        with mock.patch.object(llm_client, "_post_json", return_value=resp):
+            with self.assertRaises(llm_client.LLMError) as ctx:
+                llm_client._call_anthropic(
+                    _model(protocol="anthropic"), "k", "sys", "user",
+                    max_tokens=256, temperature=0.3)
+        self.assertIn("返回空正文", str(ctx.exception))
+
+    def test_anthropic_empty_block_list_raises(self):
+        """content 是空列表时，旧实现 join 出空串；现在必须抛错。"""
+        resp = {"content": [], "usage": {"input_tokens": 5, "output_tokens": 0}}
+        with mock.patch.object(llm_client, "_post_json", return_value=resp):
+            with self.assertRaises(llm_client.LLMError):
+                llm_client._call_anthropic(
+                    _model(protocol="anthropic"), "k", "sys", "user",
+                    max_tokens=256, temperature=0.3)
+
+    def test_anthropic_max_tokens_stop_suggests_larger(self):
+        """stop_reason=max_tokens 等价于 openai 的 finish_reason=length。"""
+        resp = {"content": [{"type": "text", "text": ""}],
+                "stop_reason": "max_tokens",
+                "usage": {"input_tokens": 5, "output_tokens": 256}}
+        with mock.patch.object(llm_client, "_post_json", return_value=resp):
+            with self.assertRaises(llm_client.LLMError) as ctx:
+                llm_client._call_anthropic(
+                    _model(protocol="anthropic"), "k", "sys", "user",
+                    max_tokens=256, temperature=0.3)
+        self.assertIn("调大", str(ctx.exception))
+
+    def test_anthropic_normal_text_passes(self):
+        """对照：正常正文照常返回。"""
+        resp = {"content": [{"type": "text", "text": "正常回复"}],
+                "usage": {"input_tokens": 5, "output_tokens": 3}}
         with mock.patch.object(llm_client, "_post_json", return_value=resp):
             r = llm_client._call_anthropic(
                 _model(protocol="anthropic"), "k", "sys", "user",
                 max_tokens=256, temperature=0.3)
-        self.assertEqual(r["text"], "")
+        self.assertEqual(r["text"], "正常回复")
+
+    def test_ollama_null_content_raises(self):
+        """ollama 的 message.content:null 同样必须抛错。"""
+        resp = {"message": {"role": "assistant", "content": None},
+                "prompt_eval_count": 5, "eval_count": 32, "done_reason": "length"}
+        with mock.patch.object(llm_client, "_post_json", return_value=resp):
+            with self.assertRaises(llm_client.LLMError) as ctx:
+                llm_client._call_ollama(
+                    _model(protocol="ollama"), "", "sys", "user",
+                    max_tokens=32, temperature=0.3)
+        self.assertIn("返回空正文", str(ctx.exception))
+
+    def test_ollama_normal_text_passes(self):
+        resp = {"message": {"role": "assistant", "content": "正常回复"},
+                "prompt_eval_count": 5, "eval_count": 3}
+        with mock.patch.object(llm_client, "_post_json", return_value=resp):
+            r = llm_client._call_ollama(
+                _model(protocol="ollama"), "", "sys", "user",
+                max_tokens=256, temperature=0.3)
+        self.assertEqual(r["text"], "正常回复")
 
 
 if __name__ == "__main__":

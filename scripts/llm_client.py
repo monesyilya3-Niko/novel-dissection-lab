@@ -251,6 +251,50 @@ def _post_json(url: str, payload: dict, headers: dict, timeout: int = 180) -> di
 # 协议适配
 # --------------------------------------------------------------------------
 
+def _reject_empty_text(text: str, model: dict, max_tokens: int, usage: dict,
+                       finish_reason=None, reasoning=None) -> None:
+    """空正文一律当失败抛出。三种协议共用（2026-11-16）。
+
+    背景：推理型模型把 max_tokens 全烧在思考上时返回 ``content: null`` +
+    ``finish_reason: "length"``。旧实现把 None 静默转成 ``""`` 当成功返回，
+    上层 ``run_pass`` 只看到「JSON 解析失败」，重试 3 轮后报「模型拒绝本 pass」
+    ——用户以为模型能力不行，实际是 max_tokens 给小了。
+
+    这个缺陷在三个协议里都存在（openai 的 content:null、anthropic 的空
+    content block 列表、ollama 的 message.content:null），所以抽成共用函数，
+    避免只修一处留下两处。
+
+    参数 finish_reason / reasoning 是协议特有的诊断信息，有就带上。
+    """
+    if text and text.strip():
+        return
+
+    detail = []
+    if finish_reason:
+        detail.append(f"finish_reason={finish_reason}")
+    detail.append(f"completion_tokens={usage.get('completion_tokens', 0)}")
+    detail.append(f"max_tokens={max_tokens}")
+    if reasoning:
+        detail.append(f"思考内容 {len(str(reasoning))} 字符")
+
+    hint = ""
+    # 三种协议的「输出被截断」标记各不相同，都要认：
+    #   openai    → finish_reason: "length"
+    #   anthropic → stop_reason:   "max_tokens"
+    #   ollama    → done_reason:   "length"
+    if finish_reason in ("length", "max_tokens"):
+        hint = (
+            "\n  这是 max_tokens 用尽：推理型模型把预算烧在思考上，"
+            "正文一个字都没留下。\n"
+            f"  改法：把 max_tokens 调大（当前 {max_tokens}，"
+            "推理模型建议 ≥ 4096），或换非推理模型。"
+        )
+    raise LLMError(
+        f"模型 '{model.get('model_name', '?')}' 返回空正文"
+        f"（{', '.join(detail)}）。{hint}"
+    )
+
+
 def _call_openai_compatible(model: dict, api_key: str, system: str,
                             user: str, max_tokens: int, temperature: float) -> dict:
     base = model["base_url"].rstrip("/")
@@ -307,28 +351,9 @@ def _call_openai_compatible(model: dict, api_key: str, system: str,
     #   max_tokens=32   → completion=32(满额)  textlen=0   <- 空正文
     #   max_tokens=256  → completion=97        textlen=39  <- 正常
     #   max_tokens=1024 → completion=95        textlen=41  <- 正常
-    if not text.strip():
-        finish = choice.get("finish_reason")
-        reasoning = msg.get("reasoning_content") or msg.get("reasoning")
-        detail = []
-        if finish:
-            detail.append(f"finish_reason={finish}")
-        detail.append(f"completion_tokens={usage.get('completion_tokens', 0)}")
-        detail.append(f"max_tokens={max_tokens}")
-        if reasoning:
-            detail.append(f"思考内容 {len(str(reasoning))} 字符")
-        hint = ""
-        if finish == "length":
-            hint = (
-                "\n  这是 max_tokens 用尽：推理型模型把预算烧在思考上，"
-                "正文一个字都没留下。\n"
-                f"  改法：把 max_tokens 调大（当前 {max_tokens}，"
-                "推理模型建议 ≥ 4096），或换非推理模型。"
-            )
-        raise LLMError(
-            f"模型 '{model.get('model_name', '?')}' 返回空正文"
-            f"（{', '.join(detail)}）。{hint}"
-        )
+    _reject_empty_text(text, model, max_tokens, usage,
+                       finish_reason=choice.get("finish_reason"),
+                       reasoning=msg.get("reasoning_content") or msg.get("reasoning"))
 
     return {
         "text": text,
@@ -372,6 +397,9 @@ def _call_anthropic(model: dict, api_key: str, system: str,
     usage = raw.get("usage") if isinstance(raw, dict) else {}
     if not isinstance(usage, dict):
         usage = {}
+    # anthropic 的 stop_reason 等价于 openai 的 finish_reason（"max_tokens" 表示截断）
+    _reject_empty_text(text, model, max_tokens, usage,
+                       finish_reason=raw.get("stop_reason") if isinstance(raw, dict) else None)
     return {
         "text": text,
         "prompt_tokens": usage.get("input_tokens", 0),
@@ -412,6 +440,10 @@ def _call_ollama(model: dict, api_key: str, system: str,
         raise LLMError(f"响应格式异常: {json.dumps(raw, ensure_ascii=False)[:400]}") from exc
     prompt_tokens = raw.get("prompt_eval_count", 0) if isinstance(raw, dict) else 0
     completion_tokens = raw.get("eval_count", 0) if isinstance(raw, dict) else 0
+    # ollama 用 done_reason 表示结束原因（"length" 表示 num_predict 用尽）
+    _reject_empty_text(text, model, max_tokens,
+                       {"completion_tokens": completion_tokens},
+                       finish_reason=raw.get("done_reason") if isinstance(raw, dict) else None)
     return {
         "text": text,
         "prompt_tokens": prompt_tokens,
