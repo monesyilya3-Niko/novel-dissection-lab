@@ -167,13 +167,23 @@ class TestCallOpenAICompatible(unittest.TestCase):
         self.assertEqual(headers["X-Custom-Trace"], "123")
 
     @mock.patch.object(llm_client, "_post_json")
-    def test_call_openai_content_none_handled(self, mock_post):
+    def test_call_openai_content_none_raises(self, mock_post):
+        """content 为 null 必须抛错，不能静默转成空字符串当成功。
+
+        2026-11-16 修正：旧断言是 ``assertEqual(res["text"], "")``，
+        锁住的正是缺陷本身——推理模型把 max_tokens 烧在思考上时返回
+        content: null，旧实现当成功返回，上层只看到「JSON 解析失败」，
+        重试 3 轮后报「模型拒绝本 pass」，用户以为模型能力不行。
+        详见 tests/test_llm_empty_content.py。
+        """
         mock_post.return_value = {
-            "choices": [{"message": {"content": None}}],
+            "choices": [{"message": {"content": None}, "finish_reason": "length"}],
+            "usage": {"prompt_tokens": 5, "completion_tokens": 10},
         }
         model = {"base_url": "http://localhost:8000/v1", "model_name": "local-llm"}
-        res = llm_client._call_openai_compatible(model, "", "", "ping", 10, 0)
-        self.assertEqual(res["text"], "")
+        with self.assertRaises(llm_client.LLMError) as ctx:
+            llm_client._call_openai_compatible(model, "", "", "ping", 10, 0)
+        self.assertIn("返回空正文", str(ctx.exception))
 
     @mock.patch.object(llm_client, "_post_json")
     def test_call_openai_malformed_responses(self, mock_post):

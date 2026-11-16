@@ -292,6 +292,44 @@ def _call_openai_compatible(model: dict, api_key: str, system: str,
     usage = raw.get("usage") if isinstance(raw, dict) else {}
     if not isinstance(usage, dict):
         usage = {}
+
+    # 空正文必须当失败，不能当成功（2026-11-16 实测定根因）。
+    #
+    # 推理型模型（deepseek-4.1-flash 等）把 max_tokens 全烧在思考上时，
+    # 返回的是 content: null + finish_reason: "length"，completion_tokens
+    # 顶到上限。旧实现把 None 静默转成 ""，当成功返回给上层。
+    #
+    # 后果链：run_pass 拿到空字符串 → extract_json 失败 → 重试 3 轮
+    # （同样烧满 3 次预算）→ 抛 PassRefused → 用户看到「模型拒绝本 pass」。
+    # 用户以为模型能力不行，实际是 max_tokens 给小了。
+    #
+    # 实测对照（同一模型、同一 prompt，只改 max_tokens）：
+    #   max_tokens=32   → completion=32(满额)  textlen=0   <- 空正文
+    #   max_tokens=256  → completion=97        textlen=39  <- 正常
+    #   max_tokens=1024 → completion=95        textlen=41  <- 正常
+    if not text.strip():
+        finish = choice.get("finish_reason")
+        reasoning = msg.get("reasoning_content") or msg.get("reasoning")
+        detail = []
+        if finish:
+            detail.append(f"finish_reason={finish}")
+        detail.append(f"completion_tokens={usage.get('completion_tokens', 0)}")
+        detail.append(f"max_tokens={max_tokens}")
+        if reasoning:
+            detail.append(f"思考内容 {len(str(reasoning))} 字符")
+        hint = ""
+        if finish == "length":
+            hint = (
+                "\n  这是 max_tokens 用尽：推理型模型把预算烧在思考上，"
+                "正文一个字都没留下。\n"
+                f"  改法：把 max_tokens 调大（当前 {max_tokens}，"
+                "推理模型建议 ≥ 4096），或换非推理模型。"
+            )
+        raise LLMError(
+            f"模型 '{model.get('model_name', '?')}' 返回空正文"
+            f"（{', '.join(detail)}）。{hint}"
+        )
+
     return {
         "text": text,
         "prompt_tokens": usage.get("prompt_tokens", 0),
@@ -465,7 +503,10 @@ def resolve_fallback_chain(task: str | None = None,
 _NON_RETRYABLE_MARKERS = ("http 401", "http 403", "insufficient")
 
 # 上下文预算：超预算的错误也不值得重试——同样的输入再发一次还是一样超。
-_NON_RETRYABLE_MARKERS = _NON_RETRYABLE_MARKERS + ("超出上下文预算", "context budget")
+# 空正文同理：max_tokens 不变、prompt 不变，重试只会再烧一次预算。
+_NON_RETRYABLE_MARKERS = _NON_RETRYABLE_MARKERS + (
+    "超出上下文预算", "context budget", "返回空正文",
+)
 
 # 中文语料的粗略 token 估算：1 个汉字 ≈ 1 token，ASCII 约 4 字符 ≈ 1 token。
 # 宁可高估（提前拦下）也不要低估（发出去被网关截断或静默返回空文本）。
@@ -557,8 +598,10 @@ def _chat_one(mid: str, model: dict, user: str, system: str,
               json_mode: bool | None, skip_unretryable: bool) -> dict:
     """对单个模型执行「重试 retries 次」逻辑。彻底失败则抛 LLMError。
 
-    skip_unretryable=True（启用备用链路时）→ 401/403/余额不足立即放弃该候选，
-    把重试机会留给下一个候选；False（单模型路径）→ 沿用改造前的重试语义。
+    skip_unretryable 保留在签名里是为了不破坏调用方，但它**不再影响重试**：
+    不可重试的错误（401/403/余额不足/超预算/空正文）在任何路径下都只发一次。
+    2026-11-16 修正——旧实现把它当成「是否允许重试」的开关，导致单模型路径
+    下 401 和空正文照样重试满 retries 次，白烧预算且掩盖真实原因。
     """
     protocol = model.get("protocol", "openai")
     handler = PROTOCOL_HANDLERS.get(protocol)
@@ -594,7 +637,14 @@ def _chat_one(mid: str, model: dict, user: str, system: str,
             return result
         except LLMError as e:
             last_err = e
-            if (skip_unretryable and not _is_retryable_error(e)) or attempt >= retries:
+            # 不可重试的错误（401/403/余额不足/超预算/空正文）无论走哪条路径
+            # 都不该重试：同样的输入再发一次，结果不会变，只会再烧一次预算。
+            #
+            # 2026-11-16 修正：旧实现把这个判断绑在 skip_unretryable 上，
+            # 导致单模型路径（skip_unretryable=False）下 401 和空正文照样
+            # 重试满 retries 次。skip_unretryable 的语义应该是「是否立刻换
+            # 候选模型」，不是「是否允许重试」——两者被混为一谈了。
+            if not _is_retryable_error(e) or attempt >= retries:
                 break
             time.sleep(2 ** attempt)
         except Exception as e:

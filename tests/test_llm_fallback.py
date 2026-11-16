@@ -285,8 +285,14 @@ class TestChatFallback(_FallbackTestBase):
                          "模型 'primary' 调用失败（重试 0 次）: HTTP 403: forbidden")
         self.assertEqual(h.calls["backup"], 0)
 
-    def test_allow_fallback_false_keeps_legacy_retry_semantics(self):
-        """allow_fallback=False 时连不可重试错误也照旧重试 retries 次（改造前语义）。"""
+    def test_allow_fallback_false_does_not_retry_unretryable(self):
+        """allow_fallback=False 时，不可重试错误（403）也只发一次。
+
+        2026-11-16 修正：旧断言是 ``assertEqual(h.calls["primary"], 3)``，
+        锁住的正是缺陷——403 重试 3 次结果不会变，只是白烧 3 次预算。
+        ``skip_unretryable`` 的语义应该是「是否立刻换候选模型」，
+        不是「是否允许重试」；两者在旧实现里被混为一谈了。
+        """
         cfg = _cfg([("primary", ["backup"]), ("backup", None)])
         h = self._install(cfg, {
             "primary": llm_client.LLMError("HTTP 403: forbidden"),
@@ -294,7 +300,7 @@ class TestChatFallback(_FallbackTestBase):
         })
         with self.assertRaises(llm_client.LLMError):
             llm_client.chat("你好", model_id="primary", retries=2, allow_fallback=False)
-        self.assertEqual(h.calls["primary"], 3)
+        self.assertEqual(h.calls["primary"], 1, "403 不该重试")
         self.assertEqual(h.calls["backup"], 0)
 
     def test_default_is_backward_compatible_on_success(self):
