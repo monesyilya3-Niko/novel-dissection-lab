@@ -464,9 +464,88 @@ def resolve_fallback_chain(task: str | None = None,
 # 不可重试的错误特征（小写匹配）：重试只是白等，直接换候选
 _NON_RETRYABLE_MARKERS = ("http 401", "http 403", "insufficient")
 
+# 上下文预算：超预算的错误也不值得重试——同样的输入再发一次还是一样超。
+_NON_RETRYABLE_MARKERS = _NON_RETRYABLE_MARKERS + ("超出上下文预算", "context budget")
+
+# 中文语料的粗略 token 估算：1 个汉字 ≈ 1 token，ASCII 约 4 字符 ≈ 1 token。
+# 宁可高估（提前拦下）也不要低估（发出去被网关截断或静默返回空文本）。
+_CJK_RATIO = 1.0
+_ASCII_CHARS_PER_TOKEN = 4
+
+# 给响应预留的余量：模型输出 + 协议开销（role 标记、JSON 包装等）。
+_RESPONSE_HEADROOM_TOKENS = 512
+
+
+def estimate_tokens(text: str) -> int:
+    """粗略估算一段文本的 token 数（纯标准库，不引入 tokenizer）。
+
+    估算口径刻意偏保守：中文按 1 字 1 token，ASCII 按 4 字符 1 token。
+    真实 tokenizer 对中文通常落在 0.6~1.5 token/字，取 1.0 是中间偏上的值。
+    """
+    if not text:
+        return 0
+    cjk = 0
+    ascii_chars = 0
+    for ch in text:
+        if "\u4e00" <= ch <= "\u9fff" or "\u3400" <= ch <= "\u4dbf":
+            cjk += 1
+        else:
+            ascii_chars += 1
+    return int(cjk * _CJK_RATIO) + (ascii_chars + _ASCII_CHARS_PER_TOKEN - 1) // _ASCII_CHARS_PER_TOKEN
+
+
+def check_context_budget(mid: str, model: dict, system: str, user: str,
+                         max_tokens: int) -> dict:
+    """发请求前校验 prompt + 预期输出是否装得进模型的上下文窗口。
+
+    返回 {"prompt_tokens", "max_tokens", "context_window", "ok"}。
+
+    背景（2026-11-16 实测，纠正了 11-11 的初判）
+    --------------------------------------------
+    11-11 观察到 pass1 真实调用返回 ``completion_tokens`` 满额而 ``text`` 为空，
+    当时归因为「313K 字符塞进 128K 窗口」。**这个归因是错的**：313,137 字符是
+    英文语料，按 4 字符/token 只合 78,524 tokens，128K 窗口装得下。
+
+    真正缺的是**任何**预算检查——``context_window`` 在配置里写了却从没被读过。
+    中文语料才是真会撑爆的场景：313,137 个汉字 ≈ 313,137 tokens，是窗口的 2.4 倍。
+    而 novel-lab 的主场景正是中文网文，所以这个缺口必须堵。
+
+    超限的请求网关不一定报错：可能返回空文本，也可能直接断开。上层
+    ``run_pass`` 只看到「JSON 解析失败」，重试 3 轮后抛 ``PassRefused``，
+    用户看到的是「模型拒绝本 pass」——指不到真正原因，还白烧 3 次请求的钱。
+    所以这里在发请求之前拦下，并明确告诉调用方：输入超了多少、该怎么改。
+    """
+    window = model.get("context_window")
+    prompt_tokens = estimate_tokens(system) + estimate_tokens(user)
+    info = {
+        "prompt_tokens": prompt_tokens,
+        "max_tokens": max_tokens,
+        "context_window": window,
+        "ok": True,
+    }
+    # 没配 context_window 的模型（自定义中转站常见）不做判断——不能凭猜测拦截。
+    if not isinstance(window, int) or window <= 0:
+        return info
+
+    budget = window - max_tokens - _RESPONSE_HEADROOM_TOKENS
+    info["budget"] = budget
+    if prompt_tokens <= budget:
+        return info
+
+    info["ok"] = False
+    raise LLMError(
+        f"输入超出上下文预算：模型 '{mid}' 窗口 {window} tokens，"
+        f"为输出预留 {max_tokens} + 开销 {_RESPONSE_HEADROOM_TOKENS} 后"
+        f"可用 {budget}，但本次 prompt 约 {prompt_tokens} tokens"
+        f"（超出约 {prompt_tokens - budget}）。\n"
+        f"  这不是模型拒答，是请求根本装不下——发出去只会拿回空文本。\n"
+        f"  改法：减少采样章节数（sampler 的采样量）、缩小单批输入，"
+        f"或换用 context_window 更大的模型。"
+    )
+
 
 def _is_retryable_error(exc: Exception) -> bool:
-    """该异常是否值得重试。401/403/余额不足 → False，其余（含网络层）→ True。"""
+    """该异常是否值得重试。401/403/余额不足/超预算 → False，其余（含网络层）→ True。"""
     if not isinstance(exc, LLMError):
         return True
     msg = str(exc).lower()
@@ -493,6 +572,10 @@ def _chat_one(mid: str, model: dict, user: str, system: str,
             f"  设置环境变量 {model.get('api_key_env', 'N/A')}，或运行:\n"
             f"  python model_config.py key {mid}"
         )
+
+    # 发请求前先校验装不装得下。超预算的请求网关不会报错，只会返回空文本，
+    # 上层看到的是「JSON 解析失败」，根本指不到真正原因（2026-11-11 实测）。
+    check_context_budget(mid, model, system, user, max_tokens)
 
     # json_mode 按调用覆盖（写作任务关闭，拆书任务沿用模型配置）
     if json_mode is not None:
