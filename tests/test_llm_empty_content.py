@@ -273,5 +273,50 @@ class TestOtherProtocolsAlsoGuarded(unittest.TestCase):
         self.assertEqual(r["text"], "正常回复")
 
 
+class TestConnectivityTestUsesEnoughTokens(unittest.TestCase):
+    """连通性测试不能用小 max_tokens——会把「预算给小了」误报成「模型不通」。"""
+
+    def test_test_model_requests_enough_tokens(self):
+        """2026-11-16 实测：max_tokens=32 时推理模型返回空正文。
+
+        旧值 32 会让 `python novel.py 模型` 把好模型报成不通，
+        用户照着提示去查密钥和网络，白折腾。
+        """
+        captured = {}
+
+        def fake_chat(**kwargs):
+            captured.update(kwargs)
+            return {"text": "正常", "prompt_tokens": 10, "completion_tokens": 2,
+                    "elapsed": 0.1, "cost": 0.0}
+
+        with mock.patch.object(llm_client, "load_models",
+                               return_value={"models": {"m1": {}}}), \
+             mock.patch.object(llm_client, "chat", side_effect=fake_chat):
+            res = llm_client.test_model("m1")
+
+        self.assertTrue(res["ok"])
+        self.assertGreaterEqual(
+            captured["max_tokens"], 4096,
+            "连通性测试的 max_tokens 太小：推理模型会把预算烧在思考上，"
+            "返回空正文，导致好模型被误报成不通")
+
+    def test_test_model_still_single_model(self):
+        """既有契约不回退：连通性测试必须只测一个模型。"""
+        captured = {}
+
+        def fake_chat(**kwargs):
+            captured.update(kwargs)
+            return {"text": "正常", "prompt_tokens": 1, "completion_tokens": 1,
+                    "elapsed": 0.1, "cost": 0.0}
+
+        with mock.patch.object(llm_client, "load_models",
+                               return_value={"models": {"m1": {}}}), \
+             mock.patch.object(llm_client, "chat", side_effect=fake_chat):
+            llm_client.test_model("m1")
+
+        self.assertFalse(captured["allow_fallback"],
+                         "连通性测试不能启用备用模型")
+
+
 if __name__ == "__main__":
     unittest.main()

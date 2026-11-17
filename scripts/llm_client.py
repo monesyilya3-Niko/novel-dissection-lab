@@ -762,7 +762,13 @@ def test_model(model_id: str) -> dict:
             user="请只回复两个字：正常",
             system="你是一个测试助手，严格按要求回复。",
             model_id=model_id,
-            max_tokens=32,
+            # 不能用小 max_tokens（2026-11-16 实测）：推理型模型会把预算全烧在
+            # 思考上，max_tokens=32 时返回 content:null + finish_reason:length，
+            # 空正文。旧值 32 会让连通性测试把「模型是好的，只是预算给小了」
+            # 误报成「模型不通」——用户照着提示去查密钥和网络，白折腾。
+            # 4096 对推理模型足够留出正文空间；普通模型按实际生成计费，
+            # 不是按 max_tokens 计费，多给额度不花钱。
+            max_tokens=4096,
             temperature=0,
             retries=0,
             # 连通性测试必须只测这一个模型：否则备用模型通了会被误报成主模型通了
