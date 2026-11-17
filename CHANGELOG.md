@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-17（跨平台干净环境契约对齐）
+
+### Fixed
+
+- **无用户 `models.json` 的干净 Linux/CI 环境兼容性修复**：`scripts/write.py` 将 `--max-attempts` 边界校验前置至所有运行分支之前；`scripts/llm_client.py` 明确分离 `any_model_configured()`（配置表存在性契约，保障 CLI 与测试桩路由）与 `any_model_ready()`（排除未填密钥仓库模板的真实可用性探针），使 Ubuntu Python 3.11/3.12/3.13 与 Windows 全矩阵门禁一致通过。
+
 ## [1.2.0] - 2026-11-17（企业级全栈升级与无外部模型闭环）
 
 本版聚焦「外部 LLM API Key 失效 / 402 欠费 / 纯离线场景下的全链路可用性」与「企业级安全、数据一致性及工程门禁升级」，新增 **3 个 REST API 端点**（134 → 137）、**1 项数据库迁移**（`0005_essence_chain_reveal`）及 **31 项后端回归测试**（2650 → 2681）。

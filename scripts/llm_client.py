@@ -169,11 +169,11 @@ def _is_unconfigured_repo_template(cfg: dict) -> bool:
 
 
 def any_model_configured() -> bool:
-    """是否配置了至少一个外部模型。无模型时 pipeline 走会话接管智能模式。
+    """是否配置了至少一个外部模型定义（含仓库内置模板，供 CLI 入口与测试桩路由判断）。
 
     环境变量 ``NOVEL_LAB_FORCE_NO_MODEL=1`` 强制视为「无模型」。
-    仓库内置模板 ``config/models.json`` 中的 ``example-deepseek`` 在未设置对应密钥且用户目录
-    尚未创建自定义 ``models.json`` 时，视为占位模板而非已配置模型（消除开箱假阳性）。
+    若需判断模型是否真正持有有效凭证（排除未填 Key 的 ``example-deepseek`` 模板），
+    请调用 ``any_model_ready()``。
     """
     import os
 
@@ -182,21 +182,20 @@ def any_model_configured() -> bool:
     try:
         cfg = load_models()
         models = cfg.get("models")
-        if not models or not isinstance(models, dict):
-            return False
-        if _is_unconfigured_repo_template(cfg):
-            return False
-        return True
+        return bool(models and isinstance(models, dict))
     except Exception:
         return False
 
 
 def any_model_ready() -> bool:
-    """是否存在至少一个已具备调用凭据（或本地免密）的模型。"""
+    """是否存在至少一个已具备调用凭据（或本地免密）的模型（排除未配 Key 的仓库模板）。"""
     if not any_model_configured():
         return False
     try:
-        models = load_models().get("models") or {}
+        cfg = load_models()
+        if _is_unconfigured_repo_template(cfg):
+            return False
+        models = cfg.get("models") or {}
         for mid, m in models.items():
             if not isinstance(m, dict):
                 continue

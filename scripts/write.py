@@ -198,6 +198,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.chapter > 100000:
         sys.exit(f"章节号过大（上限 100000），收到 {args.chapter}")
 
+    # 2026-11-04 / 2026-11-17：参数校验先于一切副作用与无模型降级分支，
+    # 确保无论本机是否已配置用户 models.json，非法 --max-attempts 一律立即拒绝。
+    max_attempts = getattr(args, "max_attempts", 3)
+    if not isinstance(max_attempts, int) or isinstance(max_attempts, bool):
+        raise SystemExit("[X] --max-attempts 必须为整数")
+    if not (1 <= max_attempts <= 10):
+        raise SystemExit(f"[X] --max-attempts 必须在 1-10 之间（实际 {max_attempts}）")
+
     prompt_path = Path(args.prompt)
     if not prompt_path.exists():
         sys.exit(f"写作 prompt 不存在: {prompt_path}（先跑 inject.py 生成）")
@@ -294,14 +302,6 @@ def main(argv: list[str] | None = None) -> int:
 
     # ---- 生成 + 自检 + 改写循环（目标 ≥ target_score）----
     target_score = getattr(args, "target_score", 90)
-    # 2026-11-04 修复（P0 数据丢失）：此前只有 `or 3`，它兜得住 0 却兜不住负数。
-    # `--max-attempts -5` 会让 range(1, -4) 为空 → 一次 LLM 都不调 → content 保持 ""
-    # → 下面 save_chapter 用空串覆盖已有章节，且打印「[3/4] 已入库」看不出异常。
-    max_attempts = getattr(args, "max_attempts", 3)
-    if not isinstance(max_attempts, int) or isinstance(max_attempts, bool):
-        raise SystemExit("[X] --max-attempts 必须为整数")
-    if not (1 <= max_attempts <= 10):
-        raise SystemExit(f"[X] --max-attempts 必须在 1-10 之间（实际 {max_attempts}）")
     content = ""
     for attempt in range(1, max_attempts + 1):  # 1 初稿 + (N-1) 改写
         print(f"[2/4] 生成 (第{attempt}稿): task='{args.task[:40]}...'")

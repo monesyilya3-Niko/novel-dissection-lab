@@ -47,14 +47,14 @@ import write  # noqa: E402
 
 
 class TestLLMClientEnterpriseUpgrades(unittest.TestCase):
-    def test_repo_template_without_key_is_not_configured(self):
+    def test_repo_template_without_key_is_not_ready(self):
         with tempfile.TemporaryDirectory() as td:
             non_existent_user_dir = Path(td) / "no_user_cfg"
             env_clean = {k: v for k, v in os.environ.items() if k not in ("DEEPSEEK_API_KEY", "NOVEL_LAB_FORCE_NO_MODEL")}
             with mock.patch.object(llm_client, "user_config_dir", return_value=non_existent_user_dir), \
                  mock.patch.object(llm_client, "load_secrets", return_value={}), \
                  mock.patch.dict(os.environ, env_clean, clear=True):
-                self.assertFalse(llm_client.any_model_configured())
+                self.assertTrue(llm_client.any_model_configured())
                 self.assertFalse(llm_client.any_model_ready())
 
     def test_repo_template_with_env_key_becomes_configured_and_ready(self):
