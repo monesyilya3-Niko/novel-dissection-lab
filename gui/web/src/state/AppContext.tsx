@@ -155,6 +155,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // 并带 message。原先前端完全不处理这个事件，用户只看到「报告未生成」，
       // 不知道是字数不到一万还是组装失败。
       if ((e.status as string) === 'report_error') {
+        refreshStatus()
         refreshBookResults()
         refreshOverview()
       }

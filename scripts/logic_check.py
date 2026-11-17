@@ -345,8 +345,13 @@ def _check_appellation_contradictions(texts: dict, entities: dict) -> list:
             cur_app = present[0][1]
             if canonical in prev_appellation:
                 prev_app = prev_appellation[canonical]
-                # 相邻章称呼切换且无过渡（两个称呼都非全名）
-                if prev_app != cur_app and ch - prev_ch[canonical] <= 1:
+                # 相邻章称呼切换且无过渡（两个称呼都非全名：全名↔昵称属正常叙事，不误报）
+                if (
+                    prev_app != cur_app
+                    and prev_app != canonical
+                    and cur_app != canonical
+                    and ch - prev_ch[canonical] <= 1
+                ):
                     issues.append({
                         "type": "appellation_contradiction",
                         "severity": "medium",

@@ -771,7 +771,9 @@ def _most_frequent_name(
 # ---------------------------------------------------------------------------
 
 def collect_assets(
-    genre: str, book_names: list[str] | None = None
+    genre: str,
+    book_names: list[str] | None = None,
+    assets_dir: Path | None = None,
 ) -> dict[str, dict[str, dict]]:
     """采集指定题材下各本书的四类资产。
 
@@ -781,11 +783,12 @@ def collect_assets(
     Args:
         genre: 题材 id（如 ``campus-redemption``）。
         book_names: 可选，限定书籍；None 表示自动发现全部同题材。
+        assets_dir: 可选，指定资产目录（GUI 运行时传入用户数据目录，默认仓库 assets/）。
 
     Returns:
         形如 ``{dimension: {book: asset_dict}}`` 的分组结果。
     """
-    assets_dir = Path(__file__).resolve().parent.parent / "assets"
+    assets_dir = Path(assets_dir) if assets_dir is not None else (Path(__file__).resolve().parent.parent / "assets")
     result: dict[str, dict[str, dict]] = {d: {} for d in DIMENSIONS}
     if not assets_dir.is_dir():
         return result
@@ -1553,14 +1556,16 @@ def score_confidence(rule: AggregatedRule) -> float:
 # ---------------------------------------------------------------------------
 
 def distill_genre(
-    genre: str, book_names: list[str] | None = None
+    genre: str,
+    book_names: list[str] | None = None,
+    assets_dir: Path | None = None,
 ) -> dict[str, dict]:
     """编排蒸馏全流程，返回按维度分组的 distilled dict。
 
     Returns:
         ``{dimension: distilled_dict}``，distilled_dict 遵循 §3.1 schema。
     """
-    assets = collect_assets(genre, book_names=book_names)
+    assets = collect_assets(genre, book_names=book_names, assets_dir=assets_dir)
     result: dict[str, dict] = {}
 
     for dimension in DIMENSIONS:

@@ -87,6 +87,7 @@ DEFAULT_ROUTES = {
     "pass2_character": "cheap",
     "pass3_style": "strong",
     "pass4_commercial": "strong",
+    "pass5_craft": "strong",
     "pass5_aggregate": "strong",
     "writing": "strong",
     "consistency_check": "cheap",
@@ -118,11 +119,12 @@ def describe_llm_degradation(error) -> str:
     if "尚未配置" in err:
         reason = "尚未配置外部模型"
         hint = "运行: python scripts/model_config.py add"
-    elif ("insufficient" in low or "余额" in err
-          or "HTTP 403" in err or "HTTP 401" in err):
+    elif ("insufficient" in low or "余额" in err or "欠费" in err
+          or "subscription_required" in low or "payment required" in low
+          or "http 402" in low or "http 403" in low or "http 401" in low):
         reason = "模型额度/权限不足"
-        hint = ("充值或更换可用模型；可配置备用链: "
-                "python scripts/model_config.py fallback <主模型> <备用...>")
+        hint = ("充值或更换可用模型（GUI「系统 → 模型管理」更新有效 API Key），也可直接使用离线量化拆解与 Prompt 手工接管模式；"
+                "CLI 可运行: python scripts/model_config.py key <模型id>")
     elif "连接失败" in err or "timed out" in low or "timeout" in low:
         reason = "网络连接失败"
         hint = "检查网络/代理后重试；配置备用模型可提高可用性"
@@ -148,22 +150,64 @@ def _ensure_config_dir():
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _is_unconfigured_repo_template(cfg: dict) -> bool:
+    """判断当前读到的是否只是仓库自带的未填密钥占位模板（example-deepseek）。"""
+    try:
+        if resolve_models_file() != MODELS_FILE:
+            return False
+        models = cfg.get("models")
+        if not isinstance(models, dict) or list(models.keys()) != ["example-deepseek"]:
+            return False
+        m = models["example-deepseek"]
+        if not isinstance(m, dict):
+            return False
+        if m.get("base_url") != "https://api.deepseek.com/v1":
+            return False
+        return not bool(resolve_api_key("example-deepseek", m))
+    except Exception:
+        return False
+
+
 def any_model_configured() -> bool:
-    """是否配置了至少一个外部模型。无模型时 pipeline 走 WorkBuddy 内置智能模式。
+    """是否配置了至少一个外部模型。无模型时 pipeline 走会话接管智能模式。
 
     环境变量 ``NOVEL_LAB_FORCE_NO_MODEL=1`` 强制视为「无模型」。
-    2026-11-02：测试需要在**有模型配置的开发机上**验证无模型降级路径
-    （write.py 的无模型接管清单、pipeline 的任务生成分支）。此前这些
-    测试直接读真实 config/models.json，于是开发机配好模型后它们会真的
-    去调 LLM 并超时——测试结果取决于机器状态，不可复现。
-    有了这个开关，测试显式声明"我要无模型"，与真实配置解耦。
+    仓库内置模板 ``config/models.json`` 中的 ``example-deepseek`` 在未设置对应密钥且用户目录
+    尚未创建自定义 ``models.json`` 时，视为占位模板而非已配置模型（消除开箱假阳性）。
     """
     import os
 
     if os.environ.get("NOVEL_LAB_FORCE_NO_MODEL") == "1":
         return False
     try:
-        return bool(load_models().get("models"))
+        cfg = load_models()
+        models = cfg.get("models")
+        if not models or not isinstance(models, dict):
+            return False
+        if _is_unconfigured_repo_template(cfg):
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def any_model_ready() -> bool:
+    """是否存在至少一个已具备调用凭据（或本地免密）的模型。"""
+    if not any_model_configured():
+        return False
+    try:
+        models = load_models().get("models") or {}
+        for mid, m in models.items():
+            if not isinstance(m, dict):
+                continue
+            if m.get("protocol") == "ollama":
+                return True
+            base = str(m.get("base_url") or "").lower()
+            if not m.get("api_key_env") and ("127.0.0.1" in base or "localhost" in base):
+                return True
+            if resolve_api_key(mid, m):
+                return True
+        return False
     except Exception:
         return False
 
@@ -226,14 +270,59 @@ def resolve_api_key(model_id: str, model: dict) -> str:
 # HTTP
 # --------------------------------------------------------------------------
 
+def _should_bypass_proxy_extra(url: str) -> bool:
+    """补充标准库 urllib 对 CIDR 格式 NO_PROXY（如 192.168.0.0/16）与 [::1] 的绕过支持。"""
+    import ipaddress
+    import urllib.parse
+
+    no_proxy = os.environ.get("NO_PROXY") or os.environ.get("no_proxy") or ""
+    if not no_proxy:
+        return False
+    parsed = urllib.parse.urlsplit(url)
+    host = (parsed.hostname or "").strip("[]").lower()
+    if not host:
+        return False
+    entries = [e.strip() for e in no_proxy.split(",") if e.strip()]
+    if "*" in entries:
+        return True
+    try:
+        host_ip = ipaddress.ip_address(host)
+    except ValueError:
+        host_ip = None
+
+    for entry in entries:
+        clean = entry.strip("[]").lower()
+        if clean == host:
+            return True
+        if host_ip is not None and "/" in clean:
+            try:
+                net = ipaddress.ip_network(clean, strict=False)
+                if host_ip in net:
+                    return True
+            except ValueError:
+                continue
+    return False
+
+
 def _post_json(url: str, payload: dict, headers: dict, timeout: int = 180) -> dict:
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
     for k, v in headers.items():
         req.add_header(k, v)
+    use_direct = False
+    if _should_bypass_proxy_extra(url):
+        from urllib.parse import urlsplit as _urlsplit
+        netloc = _urlsplit(url).netloc
+        if not urllib.request.proxy_bypass(netloc):
+            use_direct = True
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        ctx = (
+            urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=timeout)
+            if use_direct
+            else urllib.request.urlopen(req, timeout=timeout)
+        )
+        with ctx as resp:
             raw_bytes = resp.read()
             try:
                 return json.loads(raw_bytes.decode("utf-8"))
@@ -241,10 +330,15 @@ def _post_json(url: str, payload: dict, headers: dict, timeout: int = 180) -> di
                 preview = raw_bytes[:400].decode("utf-8", errors="replace")
                 raise LLMError(f"响应非合法 JSON: {preview}") from exc
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")[:600]
+        try:
+            body = e.read().decode("utf-8", errors="replace")[:600]
+        except OSError:
+            body = str(e.reason or "")[:600]
         raise LLMError(f"HTTP {e.code}: {body}") from None
     except urllib.error.URLError as e:
         raise LLMError(f"连接失败: {e.reason}") from None
+    except (TimeoutError, OSError) as e:
+        raise LLMError(f"连接失败: {e}") from None
 
 
 # --------------------------------------------------------------------------
@@ -532,13 +626,29 @@ def resolve_fallback_chain(task: str | None = None,
 
 
 # 不可重试的错误特征（小写匹配）：重试只是白等，直接换候选
-_NON_RETRYABLE_MARKERS = ("http 401", "http 403", "insufficient")
+_NON_RETRYABLE_MARKERS = (
+    "http 401", "http 402", "http 403",
+    "insufficient", "subscription_required", "payment required",
+    "缺少 api key",
+)
 
 # 上下文预算：超预算的错误也不值得重试——同样的输入再发一次还是一样超。
 # 空正文同理：max_tokens 不变、prompt 不变，重试只会再烧一次预算。
 _NON_RETRYABLE_MARKERS = _NON_RETRYABLE_MARKERS + (
     "超出上下文预算", "context budget", "返回空正文",
 )
+
+_AUTH_OR_QUOTA_MARKERS = (
+    "http 401", "http 402", "http 403",
+    "insufficient", "subscription_required", "payment required",
+    "缺少 api key", "尚未配置任何模型",
+)
+
+
+def is_auth_or_quota_error(exc_or_msg: object) -> bool:
+    """判断异常或报错文本是否属于全局鉴权/额度/缺 Key 类致命错误（用于批量循环首轮熔断）。"""
+    msg = str(exc_or_msg or "").lower()
+    return any(m in msg for m in _AUTH_OR_QUOTA_MARKERS)
 
 # 中文语料的粗略 token 估算：1 个汉字 ≈ 1 token，ASCII 约 4 字符 ≈ 1 token。
 # 宁可高估（提前拦下）也不要低估（发出去被网关截断或静默返回空文本）。

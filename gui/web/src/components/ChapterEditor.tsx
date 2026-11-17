@@ -123,7 +123,7 @@ export default function ChapterEditor({
     content: value ? textToHtml(value) : '',
     editorProps: {
       attributes: {
-        style: `min-height: ${minHeight}px; outline: none; font-size: 14px; line-height: 1.9; color: ${ink.text};`,
+        style: `min-height: ${minHeight}px; outline: none; font-size: 14px; line-height: 1.9; color: inherit;`,
       },
     },
     onUpdate: ({ editor }) => {
@@ -241,13 +241,15 @@ export default function ChapterEditor({
   return (
     <Box
       sx={{
-        border: `1px solid ${ink.hairline}`,
+        border: '1px solid',
+        borderColor: 'divider',
         borderRadius: 2,
-        backgroundColor: ink.surface,
+        bgcolor: 'background.paper',
+        color: 'text.primary',
         '& .tiptap p': { margin: '0 0 0.9em 0' },
-        '& .tiptap p.is-editor-empty:first-child::before': {
+        '& .tiptap p.is-editor-empty:first-of-type::before': {
           content: 'attr(data-placeholder)',
-          color: ink.textTertiary,
+          color: 'text.disabled',
           float: 'left',
           height: 0,
           pointerEvents: 'none',

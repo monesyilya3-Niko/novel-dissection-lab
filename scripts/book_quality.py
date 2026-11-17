@@ -371,21 +371,19 @@ def check_word_padding(texts: dict) -> list:
     issues = []
     chapters = sorted(texts.keys())
     
-    # 检测无意义重复描写（同一段内相同句子出现≥2次）
+    # 检测无意义重复描写（同一章内相同长段落出现≥2次，按唯一段落去重报告防重复放大）
+    from collections import Counter
     for ch in chapters:
         text = texts[ch]
-        paras = text.split('\n')
-        for para in paras:
-            p = para.strip()
-            if len(p) > 20:
-                # 检查同一段内重复
-                if paras.count(para) >= 2:
-                    issues.append({
-                        "type": "paragraph_repeat",
-                        "severity": "high",
-                        "chapter": ch,
-                        "detail": f"Ch{ch} 段落「{p[:30]}…」重复出现"
-                    })
+        paras = [line.strip() for line in text.split('\n') if len(line.strip()) > 20]
+        for p, cnt in Counter(paras).items():
+            if cnt >= 2:
+                issues.append({
+                    "type": "paragraph_repeat",
+                    "severity": "high",
+                    "chapter": ch,
+                    "detail": f"Ch{ch} 段落「{p[:30]}…」重复出现 {cnt} 次"
+                })
     
     # 检测废话段落（全是环境描写，无情节推进）
     env_patterns = [

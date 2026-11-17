@@ -15,9 +15,42 @@ import ModelManager from './ModelManager'
 import { friendlyError } from '../api/client'
 import { useI18n } from '../state/I18nContext'
 
+export function requestSystemTab(tabIndex: number): void {
+  try {
+    sessionStorage.setItem('novellab.pendingSystemTab', String(tabIndex))
+    window.dispatchEvent(new CustomEvent('novellab:system-tab', { detail: { tab: tabIndex } }))
+  } catch {
+    /* ignore in isolated tests */
+  }
+}
+
 export default function SystemWorkbench() {
   const { t } = useI18n()
-  const [tab, setTab] = useState(0)
+  const [tab, setTab] = useState(() => {
+    try {
+      const pending = sessionStorage.getItem('novellab.pendingSystemTab')
+      if (pending !== null) {
+        sessionStorage.removeItem('novellab.pendingSystemTab')
+        const n = Number(pending)
+        if (Number.isInteger(n) && n >= 0 && n <= 3) return n
+      }
+    } catch {
+      /* ignore */
+    }
+    return 0
+  })
+
+  useEffect(() => {
+    const onTab = (e: Event) => {
+      const idx = (e as CustomEvent<{ tab: number }>).detail?.tab
+      if (typeof idx === 'number' && idx >= 0 && idx <= 3) {
+        try { sessionStorage.removeItem('novellab.pendingSystemTab') } catch { /* ignore */ }
+        setTab(idx)
+      }
+    }
+    window.addEventListener('novellab:system-tab', onTab)
+    return () => window.removeEventListener('novellab:system-tab', onTab)
+  }, [])
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: 1, borderColor: 'divider', pr: 1 }}>

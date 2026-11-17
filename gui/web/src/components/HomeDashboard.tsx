@@ -130,23 +130,65 @@ export default function HomeDashboard() {
             </IconButton>
           </Tooltip>
           <Chip
-            label={overview.modelConfigured ? t('home_model_configured') : t('home_model_not_configured')}
-            color={overview.modelConfigured ? 'success' : 'warning'}
+            label={
+              !overview.modelConfigured
+                ? t('home_model_not_configured')
+                : overview.modelReady === false
+                  ? t('home_model_missing_key', '模型待填密钥')
+                  : t('home_model_configured')
+            }
+            color={overview.modelConfigured && overview.modelReady !== false ? 'success' : 'warning'}
             size="small"
-            sx={{ fontWeight: 600 }}
+            onClick={() => {
+              try {
+                sessionStorage.setItem('novellab.pendingSystemTab', '2')
+                window.dispatchEvent(new CustomEvent('novellab:system-tab', { detail: { tab: 2 } }))
+              } catch { /* ignore */ }
+              setWorkbench('system')
+            }}
+            sx={{ fontWeight: 600, cursor: 'pointer' }}
           />
         </Box>
         <Divider sx={{ mt: 2 }} />
       </Box>
 
-      {!overview.modelConfigured && (
-        <Alert severity="warning" sx={{ mb: 3, borderRadius: 3 }}>
+      {(!overview.modelConfigured || overview.modelReady === false) && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 3, borderRadius: 3, alignItems: 'center' }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() => {
+                try {
+                  sessionStorage.setItem('novellab.pendingSystemTab', '2')
+                  window.dispatchEvent(new CustomEvent('novellab:system-tab', { detail: { tab: 2 } }))
+                } catch { /* ignore */ }
+                setWorkbench('system')
+              }}
+            >
+              {t('home_goto_models_btn', '管理模型密钥')}
+            </Button>
+          }
+        >
           {t('home_model_alert')}
         </Alert>
       )}
 
       {/* —— 使用旅程进度条（WS-A4）：model → analyze → write+qc，置于 alert 之下、KPI 之上 —— */}
-      <JourneyStepper overview={overview} onNavigate={(k) => setWorkbench(k as WorkbenchKey)} />
+      <JourneyStepper
+        overview={overview}
+        onNavigate={(k) => {
+          if (k === 'system') {
+            try {
+              sessionStorage.setItem('novellab.pendingSystemTab', '2')
+              window.dispatchEvent(new CustomEvent('novellab:system-tab', { detail: { tab: 2 } }))
+            } catch { /* ignore */ }
+          }
+          setWorkbench(k as WorkbenchKey)
+        }}
+      />
 
       {/* —— KPI 卡片 —— */}
       <Grid container spacing={2.5} sx={{ mb: 3 }}>

@@ -506,6 +506,7 @@ def load_task(book_id: str) -> dict[str, Any]:
             except json.JSONDecodeError as exc:
                 _log.warning(f"SQLite batch_state 损坏，批进度丢失 book_id={book_id}: {exc}")
                 batch_state = {}
+        json_extra = load_state(book_id)
         return {
             "book_id": row.get("book_id", book_id),
             "status": row.get("status", "idle"),
@@ -516,10 +517,10 @@ def load_task(book_id: str) -> dict[str, Any]:
             "chapter_states": batch_state if isinstance(batch_state, dict) else {},
             "state_revision": int(row.get("state_revision", 0)),
             "last_error": row.get("last_error"),
-            "asset_index": {},  # L1：SQLite 路径无此列，显式返回空 dict 保持字段存在
-            # report_error 只存在于 JSON 副本（SQLite 无此列）。不补的话
-            # /api/status 在权威路径下永远拿不到报告失败原因（2026-11-05）。
-            "report_error": (load_state(book_id).get("report_error") or ""),
+            "asset_index": json_extra.get("asset_index") if isinstance(json_extra.get("asset_index"), dict) else {},
+            # report_error / takeover_guide_path 只存在于 JSON 副本（SQLite 无此列）。
+            "report_error": (json_extra.get("report_error") or ""),
+            "takeover_guide_path": (json_extra.get("takeover_guide_path") or ""),
         }
     # 回退 JSON。
     return load_state(book_id)

@@ -159,6 +159,17 @@ class TestDesktopPackagingManifest(unittest.TestCase):
             len(list((BACKEND / "samples").glob("*.txt"))), shipped,
             "打包示例语料数应与仓库 samples/ 实测一致")
 
+    def test_corpus_never_packaged(self):
+        """安全红线（2026-11-17 审计）：开发机本地 corpus/ 下的私有版权语料绝不得进安装包。"""
+        corpus_files = [p for p in (BACKEND / "corpus").rglob("*") if p.is_file()] if (BACKEND / "corpus").exists() else []
+        self.assertEqual(corpus_files, [], f"安装包内泄漏了本机 corpus/ 语料文件: {corpus_files}")
+
+    def test_synonyms_packaged(self):
+        """跨书蒸馏依赖根目录 synonyms.json，打包后必须存在于 backend/synonyms.json。"""
+        if (ROOT / "synonyms.json").is_file():
+            self.assertTrue((BACKEND / "synonyms.json").is_file(),
+                            "安装包内缺失 backend/synonyms.json，跨书蒸馏同义词合并将静默失效")
+
 
     """桌面版"选择路径"桥必须真的进包。
 
@@ -290,6 +301,37 @@ process.exit(bad ? 1 : 0);
         block = self.main[start:end]
         self.assertIn("event.preventDefault()", block, "未阻止导航")
         self.assertIn("shell.openExternal(url)", block, "外部链接未转交系统浏览器")
+        self.assertIn("isSafeExternalUrl(url)", block, "外部链接未经过 HTTP/HTTPS 协议白名单校验")
+
+    def test_external_url_protocol_allowlist(self):
+        """安全守卫（2026-11-17）：shell.openExternal 只允许 http:/https:，严禁放行本地协议。"""
+        import subprocess
+        script = """
+const backendOrigin = 'http://127.0.0.1:8000';
+const isSafeExternalUrl = (url) => {
+  try {
+    const u = new URL(url);
+    return u.origin !== backendOrigin && (u.protocol === 'https:' || u.protocol === 'http:');
+  } catch (_) { return false; }
+};
+const cases = [
+  ['https://github.com/monesyilya3-Niko/novel-dissection-lab', true],
+  ['http://example.com/docs', true],
+  ['http://127.0.0.1:8000/other', false],
+  ['file:///C:/Windows/System32/calc.exe', false],
+  ['javascript:alert(1)', false],
+  ['ms-msdt:id=PCWDiagnostic', false],
+  ['smb://192.168.1.1/share', false],
+  ['not a valid url', false],
+];
+let bad = 0;
+for (const [u, want] of cases) {
+  if (isSafeExternalUrl(u) !== want) { console.error('FAIL', u); bad++; }
+}
+process.exit(bad ? 1 : 0);
+"""
+        r = subprocess.run(["node", "-e", script], capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 0, f"协议白名单校验异常:\n{r.stdout}{r.stderr}")
 
 
 class TestDesktopIconConfig(unittest.TestCase):

@@ -13,9 +13,10 @@ import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
 import LinearProgress from '@mui/material/LinearProgress'
 import Chip from '@mui/material/Chip'
+import * as clientMod from '../api/client'
 import { qualityApi, assetApi, subscribeTaskEvents } from '../api/client'
 import { hasDesktopBridge, pickPath, type PickKind } from '../desktopBridge'
-import type { QualityTaskState, QcReportItem } from '../types'
+import type { QualityTaskState, QcReportItem, WritingProject } from '../types'
 import { friendlyError } from '../api/client'
 import QcVisuals from './QcVisuals'
 import PoisonCheckPanel from './PoisonCheckPanel'
@@ -41,6 +42,48 @@ function PathPickerButton({ kind, onPicked }: { kind: PickKind; onPicked: (path:
     >
       {kind === 'dir' ? t('quality_btn_pick_dir') : t('quality_btn_pick_file')}
     </Button>
+  )
+}
+
+function ProjectQuickSelect({ onPick }: { onPick: (dir: string) => void }) {
+  const { t } = useI18n()
+  const [projects, setProjects] = useState<WritingProject[]>([])
+  const [selected, setSelected] = useState('')
+
+  useEffect(() => {
+    let wApi: { projects?: () => Promise<WritingProject[]> } | undefined
+    try {
+      wApi = (clientMod as Record<string, unknown>).writingApi as { projects?: () => Promise<WritingProject[]> } | undefined
+    } catch {
+      return
+    }
+    if (typeof wApi?.projects !== 'function') return
+    let cancelled = false
+    wApi.projects()
+      .then((ps) => { if (!cancelled) setProjects((ps ?? []).filter((p) => !p.readOnly)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  if (projects.length === 0) return null
+  return (
+    <TextField
+      select
+      size="small"
+      sx={{ minWidth: 190 }}
+      label={t('quality_pick_project_label', '快速选择写作项目')}
+      value={selected}
+      onChange={(e) => {
+        const val = e.target.value
+        setSelected(val)
+        if (val) onPick(`novel/${val}`)
+      }}
+    >
+      <MenuItem value="">{t('quality_check_option_none', '无')}</MenuItem>
+      {projects.map((p) => (
+        <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+      ))}
+    </TextField>
   )
 }
 
@@ -273,7 +316,8 @@ function BookQualityPanel() {
   return (
     <Box>
       <Typography variant="h6" gutterBottom>{t('quality_book_title')}</Typography>
-      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+        <ProjectQuickSelect onPick={setTarget} />
         <TextField label={t('quality_book_target_label')} value={target} onChange={(e) => setTarget(e.target.value)} sx={{ minWidth: 320 }} size="small" />
         <PathPickerButton kind="dir" onPicked={setTarget} />
         <Button variant="contained" onClick={doBook} disabled={!target.trim() || loading}>
@@ -366,7 +410,8 @@ function QcPanel() {
   return (
     <Box>
       <Typography variant="h6" gutterBottom>{t('quality_qc_title')}</Typography>
-      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+        <ProjectQuickSelect onPick={setTarget} />
         <TextField label={t('quality_qc_target_label')} value={target} onChange={(e) => setTarget(e.target.value)} sx={{ minWidth: 320 }} size="small" />
         <PathPickerButton kind="dir" onPicked={setTarget} />
         <Button variant="contained" onClick={doQc} disabled={!target.trim() || running}>

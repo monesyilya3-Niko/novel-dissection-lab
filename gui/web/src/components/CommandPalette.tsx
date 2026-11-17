@@ -177,7 +177,11 @@ export default function CommandPalette() {
       icon: <EditNoteIcon fontSize="small" />,
       group: gCreation,
       keywords: 'studio 沉浸 创作室 写作 writing immersion draft editor',
-      run: () => setWorkbench('writing'),
+      run: () => {
+        try { sessionStorage.setItem('novellab.pendingWritingMode', 'studio') } catch { /* ignore */ }
+        setWorkbench('writing')
+        requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('novellab:writing-mode', { detail: { mode: 'studio' } })))
+      },
     })
     list.push({
       id: 'creation-go-pipeline',
@@ -185,7 +189,11 @@ export default function CommandPalette() {
       icon: <ViewModuleIcon fontSize="small" />,
       group: gCreation,
       keywords: 'pipeline 工坊 流水线 craft inject generate pipeline workflow',
-      run: () => setWorkbench('writing'),
+      run: () => {
+        try { sessionStorage.setItem('novellab.pendingWritingMode', 'pipeline') } catch { /* ignore */ }
+        setWorkbench('writing')
+        requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('novellab:writing-mode', { detail: { mode: 'pipeline' } })))
+      },
     })
     list.push({
       id: 'creation-go-analysis',
@@ -564,12 +572,15 @@ export function CommandPaletteTrigger() {
         px: 1.5,
         py: 0.75,
         borderRadius: 2,
-        border: '1px solid rgba(255,255,255,0.3)',
-        color: 'rgba(255,255,255,0.85)',
+        border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.28)' : 'rgba(17,24,39,0.2)'}`,
+        color: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.88)' : 'text.primary',
         cursor: 'pointer',
         fontSize: 13,
         minWidth: 180,
-        '&:hover': { borderColor: 'rgba(255,255,255,0.6)', bgcolor: 'rgba(255,255,255,0.1)' },
+        '&:hover': {
+          borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.55)' : 'rgba(17,24,39,0.45)',
+          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(17,24,39,0.05)',
+        },
       }}
     >
       <SearchIcon fontSize="small" />
@@ -578,7 +589,14 @@ export function CommandPaletteTrigger() {
       </Box>
       <Typography
         variant="caption"
-        sx={{ px: 0.75, py: 0.25, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', fontSize: 10 }}
+        sx={{
+          px: 0.75,
+          py: 0.25,
+          borderRadius: 1,
+          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(17,24,39,0.08)',
+          fontFamily: 'monospace',
+          fontSize: 10,
+        }}
       >
         ⌘K
       </Typography>

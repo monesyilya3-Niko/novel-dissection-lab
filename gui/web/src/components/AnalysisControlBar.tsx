@@ -36,11 +36,13 @@ const STATUS_COLOR: Record<TaskStatus, 'default' | 'primary' | 'success' | 'erro
 export interface AnalysisControlBarProps {
   /** 一键分析完成后回调（切到结果页）。 */
   onGoResult: () => void
+  /** 切到进度/离线接管页回调（可选）。 */
+  onGoProgress?: () => void
 }
 
-export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarProps) {
+export default function AnalysisControlBar({ onGoResult, onGoProgress }: AnalysisControlBarProps) {
   const { t } = useI18n()
-  const { book, overview, status, runFullAnalysis } = useApp()
+  const { book, overview, status, batchStates, runFullAnalysis, pauseAnalysis, resumeAnalysis, retryFailed } = useApp()
   const [genres, setGenres] = useState<string[]>([])
   const [genre, setGenre] = useState('')
   const [inferredFromFilename, setInferredFromFilename] = useState<string | null>(null)
@@ -92,15 +94,20 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
 
   const taskStatus: TaskStatus = status?.status ?? 'idle'
   const isRunning = taskStatus === 'running'
+  const isPaused = taskStatus === 'paused'
+  const hasFailed = useMemo(
+    () => Object.values(batchStates ?? {}).some((b) => b?.status === 'failed'),
+    [batchStates],
+  )
 
   const disabledReason = useMemo(() => {
     if (!book) return t('analysis_need_file')
     if (!genre) return t('analysis_need_genre')
-    if (overview && !overview.modelConfigured) return t('analysis_need_model')
+    if (overview && (!overview.modelConfigured || overview.modelReady === false)) return t('analysis_need_model')
     return ''
   }, [book, genre, overview, t])
 
-  const isDisabled = busy || isRunning || !genre || Boolean(overview && !overview.modelConfigured)
+  const isDisabled = busy || isRunning || !genre || Boolean(overview && (!overview.modelConfigured || overview.modelReady === false))
 
   const doRun = async () => {
     if (!genre) {
@@ -176,6 +183,33 @@ export default function AnalysisControlBar({ onGoResult }: AnalysisControlBarPro
               {isRunning ? t('analysis_btn_running') : t('analysis_btn_start')}
             </Button>
           </DisabledTooltipButton>
+          {isRunning && typeof pauseAnalysis === 'function' && (
+            <Button size="small" variant="outlined" color="warning" onClick={() => void pauseAnalysis()}>
+              {t('analysis_btn_pause', '暂停')}
+            </Button>
+          )}
+          {isPaused && typeof resumeAnalysis === 'function' && (
+            <Button size="small" variant="outlined" color="primary" onClick={() => void resumeAnalysis()}>
+              {t('analysis_btn_resume', '继续')}
+            </Button>
+          )}
+          {!isRunning && hasFailed && typeof retryFailed === 'function' && (
+            <Button size="small" variant="outlined" color="error" onClick={() => void retryFailed()}>
+              {t('analysis_btn_retry_failed', '重试失败批')}
+            </Button>
+          )}
+          {bookId && onGoProgress && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('novellab:run-offline-analysis', { detail: { genre: genre || 'unknown' } }))
+                onGoProgress()
+              }}
+            >
+              {t('analysis_btn_offline', '离线量化拆解 & 接管包')}
+            </Button>
+          )}
         </>
       )}
 

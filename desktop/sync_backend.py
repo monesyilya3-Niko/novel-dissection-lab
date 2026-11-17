@@ -5,7 +5,9 @@
 - gui/ → desktop/backend/gui/（Python 后端，排除 __pycache__）
 - scripts/ → desktop/backend/scripts/（引擎脚本）
 - gui/web/dist/ → desktop/backend/gui/web/dist/（预构建前端）
-- assets/、corpus/、reports/ → desktop/backend/（内置数据，随首次启动迁移到用户目录）
+- assets/、reports/ → desktop/backend/（内置数据，随首次启动迁移到用户目录；
+  注意：严禁同步本机私有版权语料目录 corpus/，仅创建空目录占位）
+- synonyms.json → desktop/backend/synonyms.json（跨书蒸馏同义词表）
 - assets-manifest.json → desktop/backend/assets-manifest.json（内置资产版本清单）
 - build/python-win/ → desktop/backend/python-win/（Windows embeddable Python；
   main.js 打包后 spawn resources/backend/python-win/python.exe，缺失则安装包
@@ -143,9 +145,19 @@ def main() -> int:
     total += sync_dir(ROOT / "config", BACKEND / "config", "config/")
     # 内置数据资产：repo 根 assets/ -> backend/assets/（首次启动迁移到用户目录）
     total += sync_dir(ROOT / "assets", BACKEND / "assets", "assets/")
-    # 语料与报告：corpus/、reports/ 同理
-    total += sync_dir(ROOT / "corpus", BACKEND / "corpus", "corpus/")
+    # 安全红线（版权隔离）：corpus/ 在开发机本地可能包含受版权保护的小说原文，
+    # 严禁随安装包打包分发（仅保留空目录壳，示例语料统一走下方原创 samples/）。
+    backend_corpus = BACKEND / "corpus"
+    if backend_corpus.exists():
+        shutil.rmtree(backend_corpus)
+    backend_corpus.mkdir(parents=True, exist_ok=True)
     total += sync_dir(ROOT / "reports", BACKEND / "reports", "reports/")
+    # 跨书蒸馏同义词表：distill_core.SYNONYMS_PATH 按项目根读取 synonyms.json
+    synonyms = ROOT / "synonyms.json"
+    if synonyms.is_file():
+        shutil.copy2(synonyms, BACKEND / "synonyms.json")
+        print(f"synonyms.json → {(BACKEND / 'synonyms.json').relative_to(ROOT)}")
+        total += 1
     # 内置提示词模板：repo 根 prompts/*.md -> backend/prompts/
     # （pipeline.load_prompt 按 PROMPTS_DIR 读取 pass1~pass5 模板拼 LLM 请求。
     #  2026-10-13 审计 ELE-01 发现此前**完全没同步**：装机版的「拆书」/「分析」

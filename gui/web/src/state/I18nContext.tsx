@@ -88,20 +88,20 @@ export function I18nProvider({
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
 
+const FALLBACK_T = (key: string, fallback?: string, params?: TranslationParams): string => {
+  const entry = TRANSLATIONS[key]
+  const raw = entry && entry['zh-CN'] !== undefined ? entry['zh-CN'] : (fallback ?? key)
+  return interpolateParams(raw, params)
+}
+
+const FALLBACK_I18N_STATE: I18nState = {
+  locale: 'zh-CN',
+  setLocale: () => {},
+  toggleLocale: () => {},
+  t: FALLBACK_T,
+}
+
 export function useI18n(): I18nState {
   const ctx = useContext(I18nContext)
-  if (!ctx) {
-    // 降级兜底：在未挂载 Provider 的隔离单测中提供安全 fallback
-    return {
-      locale: 'zh-CN',
-      setLocale: () => {},
-      toggleLocale: () => {},
-      t: (key: string, fallback?: string, params?: TranslationParams) => {
-        const entry = TRANSLATIONS[key]
-        const raw = entry && entry['zh-CN'] !== undefined ? entry['zh-CN'] : (fallback ?? key)
-        return interpolateParams(raw, params)
-      },
-    }
-  }
-  return ctx
+  return ctx ?? FALLBACK_I18N_STATE
 }

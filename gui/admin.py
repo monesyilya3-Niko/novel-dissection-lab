@@ -278,8 +278,12 @@ def authenticate(username: str, password: str, ip: str) -> dict[str, Any]:
             audit(username or "-", ip, "admin.login.failed", "用户名或密码错误")
             raise ServiceError("用户名或密码错误", 401)
         _failed_logins.pop(ip, None)
-        session_id = secrets.token_urlsafe(32)
         now = time.time()
+        # 顺带清理已过期会话，防止长期运行后 _sessions 无限增长
+        expired_sids = [sid for sid, info in _sessions.items() if now > info.get("expires_at", 0)]
+        for sid in expired_sids:
+            _sessions.pop(sid, None)
+        session_id = secrets.token_urlsafe(32)
         _sessions[session_id] = {
             "username": data["username"],
             "created_at": now,
@@ -626,7 +630,7 @@ def get_dashboard() -> dict[str, Any]:
         "uptimeSeconds": int(time.time() - _STARTED_AT),
         "books": {
             "total": len(books),
-            "analyzing": sum(1 for b in books if b.get("status") == "analyzing"),
+            "analyzing": sum(1 for b in books if b.get("status") in ("analyzing", "running")),
             "items": items,
         },
         "assetsTotal": overview.get("total_assets", 0),
@@ -699,9 +703,17 @@ def delete_book(book_id: str, username: str, ip: str) -> dict[str, Any]:
 
     同一 book_id 的并发删除被 book 级锁串行化：先完成的删干净，后到的
     读不到状态文件会报 404（书已不存在，语义真实），不会出现“两边都删
-    一半”的交错。
+    一半”的交错。对从未存在过的随机 book_id 先做无锁/轻量存在性预判，
+    避免为不存在的 ID 无限分配常驻锁对象。
     """
     book_id = _validate_book_id(book_id)
+    with _lock:
+        has_lock = book_id in _delete_locks
+    if not has_lock and not (
+        (config.STATE_JSON_DIR / f"gui_state_{book_id}.json").is_file()
+        or (config.STATE_ROOT / f"gui_state_{book_id}.json").is_file()
+    ):
+        raise ServiceError(f"书籍不存在: {book_id}", 404)
     with _book_delete_lock(book_id):
         return _delete_book_locked(book_id, username, ip)
 
@@ -743,7 +755,8 @@ def _delete_book_locked(book_id: str, username: str, ip: str) -> dict[str, Any]:
         raise ServiceError(f"书籍不存在: {book_id}", 404)
 
     # 分析中的书籍禁止删除（避免与后台任务竞态；前端按钮只是第一道防线）。
-    if isinstance(state, dict) and state.get("status") == "analyzing":
+    # 生产状态名是 "running"，旧协议/测试兼容 "analyzing"。
+    if isinstance(state, dict) and state.get("status") in ("analyzing", "running"):
         raise ServiceError("书籍正在分析中，无法删除", 409)
 
     removed: list[str] = []
@@ -816,8 +829,32 @@ def _delete_book_locked(book_id: str, username: str, ip: str) -> dict[str, Any]:
     except OSError as e:
         warnings.append(f"资产目录未删（{e}）: assets/{book_id}/ —— 请手动删除该目录")
 
-    # 6) 内存缓存。
-    services._BOOKS.pop(book_id, None)
+    # 5b) 整书组装资产卡 assets/{book_id}-*.json 与报告 reports/{book_id}-*.md
+    for suffix in ("voice-card", "structure-obs", "commercial-obs", "craft-card"):
+        afp = config.ASSETS_ROOT / f"{book_id}-{suffix}.json"
+        if afp.exists() or afp.is_symlink():
+            rm_st, note = _remove_guarded(afp, config.ASSETS_ROOT)
+            if rm_st == "removed":
+                removed.append(afp.name)
+            elif rm_st not in ("missing",):
+                warnings.append(f"整书资产卡未删（{note}）: {afp.name}")
+    for r_suffix in ("拆书报告", "笔法分析"):
+        rfp = config.REPORTS_DIR / f"{book_id}-{r_suffix}.md"
+        if rfp.exists() or rfp.is_symlink():
+            rm_st, note = _remove_guarded(rfp, config.REPORTS_DIR)
+            if rm_st == "removed":
+                removed.append(rfp.name)
+            elif rm_st not in ("missing",):
+                warnings.append(f"报告文件未删（{note}）: {rfp.name}")
+
+    # 6) 内存缓存与资产索引。
+    with services._books_lock:
+        services._BOOKS.pop(book_id, None)
+    try:
+        from gui import asset_index
+        asset_index.index.invalidate()
+    except Exception:  # noqa: BLE001
+        pass
 
     status = "ok" if not warnings else "partial"
     detail = f"{book_id}（{removed}）"

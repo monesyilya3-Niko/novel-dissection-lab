@@ -694,7 +694,8 @@ def run_migrate() -> dict[str, Any]:
         if bid:
             book_ids_with_assets.add(bid)
 
-    all_corpus_book_ids = {fp.stem for fp in corpus_files}
+    corpus_by_stem = {fp.stem: fp for fp in corpus_files}
+    all_corpus_book_ids = set(corpus_by_stem)
 
     unrecognized: list[str] = []
 
@@ -703,11 +704,11 @@ def run_migrate() -> dict[str, Any]:
         for bid in sorted(book_ids_with_assets):
             _upsert_book(conn, bid, bid, None, None, "done")
         for bid in sorted(all_corpus_book_ids - book_ids_with_assets):
-            src = _rel_path(config.CORPUS_DIR / f"{bid}.txt")
+            src = _rel_path(corpus_by_stem[bid])
             _upsert_book(conn, bid, bid, src, None, "idle")
         # 兜底：corpus 里已拆书也补 source_path。
         for bid in sorted(all_corpus_book_ids & book_ids_with_assets):
-            src = _rel_path(config.CORPUS_DIR / f"{bid}.txt")
+            src = _rel_path(corpus_by_stem[bid])
             _upsert_book(conn, bid, bid, src, None, "done")
 
         # 2) 资产卡。

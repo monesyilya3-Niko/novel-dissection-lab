@@ -65,21 +65,21 @@ MAX_CANDIDATES = 50
 # 每条候选带上的「相关章节原文片段」长度上限（字/段）
 SNIPPET_MAX_CHARS = 800
 
-# 判定类任务参数（确定性判断，控制成本）
+# 判定类任务参数（确定性判断，控制成本；推理模型需要足够空间完成思考）
 JUDGE_TASK = "consistency_check"
-JUDGE_MAX_TOKENS = 512
+JUDGE_MAX_TOKENS = 4096
 JUDGE_TEMPERATURE = 0.0
 
 # severity 优先级：critical > high > medium > low（候选截断排序用）
 _SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
-# 关键字回退词表（解析失败时的兜底判定）
+# 关键字回退词表（解析失败时的兜底判定：去掉单字宽泛词"设定"/"合理"，防误杀真矛盾）
 _FALSE_POSITIVE_KEYWORDS = [
-    "闪回", "倒叙", "伏笔", "回忆", "合理", "设定", "误报", "不矛盾", "非矛盾",
-    "梦境", "幻觉", "想象", "假设", "错觉", "误解",
+    "闪回", "倒叙", "伏笔", "误报", "不矛盾", "非矛盾", "并非矛盾",
+    "属于正常设定", "完全合理", "梦境", "幻觉", "想象", "假设", "错觉", "误解",
 ]
 _REAL_KEYWORDS = [
-    "确实矛盾", "硬伤", "矛盾", "冲突", "不一致", "前后矛盾", "确为矛盾",
+    "确实矛盾", "确为矛盾", "真矛盾", "硬伤", "前后矛盾", "不一致", "矛盾", "冲突",
 ]
 
 # 提取「首个 {...}」子串的正则（宽容解析第一步）
@@ -369,7 +369,7 @@ def _judge_candidates(issues: list, task: str = JUDGE_TASK,
     cost_total = 0.0
     undetermined = 0  # 调用失败 / 解析失败（默认 real_contradiction 保守保留）的数量
 
-    for idx in candidate_indices:
+    for pos_in_cand, idx in enumerate(candidate_indices):
         issue = issues[idx]
         prompt = _build_user_prompt(issue, texts_map)
         try:
@@ -379,9 +379,13 @@ def _judge_candidates(issues: list, task: str = JUDGE_TASK,
                 task=task,
                 max_tokens=JUDGE_MAX_TOKENS,
                 temperature=JUDGE_TEMPERATURE,
-                json_mode=True,
+                json_mode=None,
             )
-        except Exception:
+        except Exception as exc:
+            # 若遇全局鉴权/额度/缺 Key 致命错误，立即熔断剩余候选，避免连撞 50 次
+            if getattr(llm_client, "is_auth_or_quota_error", lambda _e: False)(exc):
+                undetermined += (total_candidates - pos_in_cand)
+                break
             # 单条调用失败（L2 降级）：保守保留该条，计入 undetermined
             undetermined += 1
             continue

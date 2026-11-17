@@ -922,22 +922,50 @@ def _today_str() -> str:
     return date.today().isoformat()
 
 
-def _require_project(project: str) -> str:
-    """项目名校验（与 writing_service._sanitize_project 同规则）。"""
+def _sanitize_project_base(project: str, *, allow_default: bool = False) -> str:
+    """统一项目名安全校验（与 writing_service._sanitize_project 对齐，阻断盘符穿越与保留名）。"""
+    from gui import text_access
+
     if not isinstance(project, str):
         raise ServiceError("project 必须为字符串", 400)
     if not project or not project.strip():
         raise ServiceError("project 不能为空", 400)
     p = project.strip()
-    if any(ch in p for ch in ("/", "\\", "..", "\x00", "\n", "\r")):
-        raise ServiceError(f"非法项目名: {project!r}", 400)
     if p == "default":
+        if allow_default:
+            return p
         raise ServiceError("default 为 CLI 只读项目", 400)
+    if (p in (".", "..") or p.endswith(".")
+            or any(ch in p for ch in ("/", "\\", "..", ":", "\x00", "\n", "\r"))
+            or any(ord(ch) < 32 or ord(ch) == 127 for ch in p)):
+        raise ServiceError(f"非法项目名: {project!r}", 400)
+    bad = sorted(set(p) & text_access.WIN_ILLEGAL_CHARS)
+    if bad:
+        raise ServiceError(f"项目名不能包含 {' '.join(bad)}（Windows 文件名非法字符）", 400)
+    if p.split(".")[0].upper() in text_access.WIN_RESERVED_NAMES:
+        raise ServiceError(f"项目名不能使用 Windows 保留名 {p!r}", 400)
+    if len(p) > 64:
+        raise ServiceError(f"项目名过长（{len(p)} 字符，上限 64）", 400)
+    nd = config.NOVEL_DIR
+    try:
+        resolved = (nd / p).resolve()
+        if not resolved.is_relative_to(nd.resolve()):
+            raise ServiceError(f"非法项目名: {project!r}", 400)
+    except OSError as exc:
+        raise ServiceError(f"非法项目名: {exc}", 400) from exc
     return p
 
 
-def _novel_dir(project: str) -> Path:
-    return config.NOVEL_DIR / _require_project(project)
+def _require_project(project: str) -> str:
+    """可写项目名校验（禁止 default）。"""
+    return _sanitize_project_base(project, allow_default=False)
+
+
+def _novel_dir(project: str, *, allow_default: bool = False) -> Path:
+    p = _sanitize_project_base(project, allow_default=allow_default)
+    if p == "default":
+        return config.NOVEL_DIR
+    return config.NOVEL_DIR / p
 
 
 # ---------------------------------------------------------------------------
@@ -1287,7 +1315,7 @@ def _chapter_no_from_name(stem: str) -> int | None:
     return None
 
 
-def _iter_chapter_files(project: str) -> list[tuple[int, Path]]:
+def _iter_chapter_files(project: str, *, allow_default: bool = False) -> list[tuple[int, Path]]:
     """按章节号排序列出章节文件。
 
     同一章号出现多个文件时（如 ``001.txt`` 与 ``第1章.txt`` 并存），
@@ -1300,7 +1328,7 @@ def _iter_chapter_files(project: str) -> list[tuple[int, Path]]:
     同时换成统一的扫描后，``备份/`` 等排除目录也被正确跳过（原先 rglob 会
     把 ``chapters/备份/chapter-002.txt`` 当成正式章节导出）。
     """
-    novel_dir = _novel_dir(project)
+    novel_dir = _novel_dir(project, allow_default=allow_default)
     chapters_dir = novel_dir / "chapters"
     if not chapters_dir.is_dir():
         return []
@@ -1386,6 +1414,48 @@ def get_chapter_words(project: str, chapter_no: int) -> int | None:
             except OSError:
                 return 0
     return None
+
+
+def list_project_chapters(project: str) -> list[dict[str, Any]]:
+    """列出项目已落盘章节清单（支持 default 只读项目与各新建项目）。"""
+    clean_proj = _sanitize_project_base(project, allow_default=True)
+    out: list[dict[str, Any]] = []
+    for no, fp in _iter_chapter_files(clean_proj, allow_default=True):
+        try:
+            text = _read_chapter(fp)
+            st = fp.stat()
+            first_line = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
+            title = first_line[:40] if (first_line and len(first_line) <= 40) else f"第{no}章"
+            out.append({
+                "chapter_no": no,
+                "filename": fp.name,
+                "title": title,
+                "word_count": count_words(text),
+                "char_count": len(text),
+                "updated_at": int(st.st_mtime),
+            })
+        except (OSError, ServiceError):
+            continue
+    return out
+
+
+def get_project_chapter(project: str, chapter_no: int) -> dict[str, Any]:
+    """读取项目指定章节的正文全文（供沉浸式工作台刷新/切换章节时回显）。"""
+    clean_proj = _sanitize_project_base(project, allow_default=True)
+    if isinstance(chapter_no, bool) or not isinstance(chapter_no, int) or chapter_no < 1:
+        raise ServiceError("chapter_no 必须为正整数", 400)
+    for no, fp in _iter_chapter_files(clean_proj, allow_default=True):
+        if no == chapter_no:
+            content = _read_chapter(fp)
+            return {
+                "project": clean_proj,
+                "chapter_no": no,
+                "filename": fp.name,
+                "content": content,
+                "word_count": count_words(content),
+                "char_count": len(content),
+            }
+    raise ServiceError(f"第 {chapter_no} 章尚未保存落盘", 404)
 
 
 def get_stats(project: str, days: int = 30) -> dict[str, Any]:

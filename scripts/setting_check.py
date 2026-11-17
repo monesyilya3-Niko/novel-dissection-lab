@@ -73,20 +73,26 @@ except ImportError:  # 直接以脚本方式运行时的兜底（独立可用）
 # 规则格式约定：「禁止出现枪械」→ 关键词「枪械」；「校园题材，无超自然」→
 # 关键词「超自然」。检测正文是否出现关键词。
 _PROHIBIT_RE = re.compile(r'(?:禁止|严禁|不得|不能|不要|避免|切勿)\s*(?:出现|提及|描写|使用)?\s*([\u4e00-\u9fff、，,]{1,12})')
+_PROHIBIT_PREFIX_RE = re.compile(r'^(?:禁止|严禁|不得|不能|不要|避免|切勿)\s*(?:出现|提及|描写|使用)?\s*')
 
 
 def _extract_banned_keywords(rule: str) -> list:
     """从一条 world_rule 提取用于检测的禁用关键词列表。"""
-    kws = []
+    raw_kws = []
     for m in _PROHIBIT_RE.finditer(rule):
-        kws.append(m.group(1))
-    # 兜底：若规则含「无 X」/「没有 X」，把 X 视为禁用词
-    for m in re.finditer(r'(?:无|没有|不存在)\s*([\u4e00-\u9fff]{1,8})', rule):
-        kws.append(m.group(1))
+        for part in re.split(r"[、，,；;\s]+", m.group(1)):
+            cleaned = _PROHIBIT_PREFIX_RE.sub("", part.strip()).strip()
+            if cleaned:
+                raw_kws.append(cleaned)
+    # 兜底：若规则含「无 X」/「没有 X」，在标点/行首边界处提取，避免匹配「无辜」「无奈」等常用词
+    for m in re.finditer(r'(?:^|[，。；、：\s])(?:无|没有|不存在)\s*([\u4e00-\u9fff]{2,8})', rule):
+        cand = m.group(1)
+        if not cand.startswith(("辜", "奈", "论", "数", "意", "法", "所谓", "比", "限", "关")):
+            raw_kws.append(cand)
     # 去重 + 过滤停用字（避免「出现」「提及」这类被误当关键词）
     STOP = {"出现", "提及", "描写", "使用", "任何", "所有"}
-    kws = [k for k in dict.fromkeys(kws) if k and k not in STOP]
-    return kws
+    kws = [k.strip() for k in raw_kws if k and k.strip() and k.strip() not in STOP]
+    return list(dict.fromkeys(kws))
 
 
 def _check_world_rules(texts: dict, world_rules: list) -> list:

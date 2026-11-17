@@ -503,9 +503,13 @@ def main():
         #      而此时报告**已发布**，用户以为整个分析失败。
         #      Hook 是辅助信息，不该拖垮主流程；改为捕获后降级为提示。
         print("\n[Hook] 自动质检:")
-        corpus_file = ROOT / "corpus" / f"{name}.txt"
+        corpus_file = src if src.is_file() else (ROOT / "corpus" / f"{name}.txt")
         if not corpus_file.exists():
-            print(f"  ⚠ 未执行：corpus/{name}.txt 不存在（质检需要语料原文）")
+            md_alt = ROOT / "corpus" / f"{name}.md"
+            if md_alt.exists():
+                corpus_file = md_alt
+        if not corpus_file.exists():
+            print(f"  ⚠ 未执行：corpus/{name}.txt（或 .md）不存在（质检需要语料原文）")
             print("    如需质检，请把语料放到 corpus/ 后单独跑 `novel 质检 <目录>`")
         else:
             try:

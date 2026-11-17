@@ -352,7 +352,13 @@ def apply_migrations() -> list[int]:
         conn.execute("BEGIN IMMEDIATE")
         try:
             for stmt in split_sql_statements(sql_path.read_text(encoding="utf-8")):
-                conn.execute(stmt)
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as exc:
+                    # 兼容 reset_all() 清空 schema_migrations 后重跑迁移的幂等性（与 IF NOT EXISTS 对齐）
+                    if "duplicate column name" in str(exc).lower() and "add column" in stmt.lower():
+                        continue
+                    raise
             conn.execute(
                 "INSERT INTO schema_migrations (version, name) VALUES (?, ?)",
                 (version, name),

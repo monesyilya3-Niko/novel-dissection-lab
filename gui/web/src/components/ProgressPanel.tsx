@@ -1,11 +1,17 @@
-// 分析进度面板：总进度条 + 章×批状态矩阵。
-import { useMemo } from 'react'
+// 分析进度面板：总进度条 + 错误/离线接管诊断 + 章×批状态矩阵。
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import LinearProgress from '@mui/material/LinearProgress'
 import Tooltip from '@mui/material/Tooltip'
+import Alert from '@mui/material/Alert'
+import Button from '@mui/material/Button'
+import Paper from '@mui/material/Paper'
+import CircularProgress from '@mui/material/CircularProgress'
 import { useApp } from '../state/AppContext'
 import { useI18n } from '../state/I18nContext'
+import { friendlyError, runOfflineAnalysis } from '../api/client'
+import type { OfflineAnalysisResult } from '../types'
 import { palette } from '../theme'
 
 const STATUS_I18N_KEYS: Record<string, string> = {
@@ -29,6 +35,34 @@ const CELL_COLOR: Record<string, string> = {
 export default function ProgressPanel() {
   const { t, locale } = useI18n()
   const { book, batchStates, status } = useApp()
+  const [offlineBusy, setOfflineBusy] = useState(false)
+  const [offlineErr, setOfflineErr] = useState('')
+  const [offlineData, setOfflineData] = useState<OfflineAnalysisResult | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const handleOffline = useCallback(async (genre = 'unknown') => {
+    if (!book?.bookId || typeof runOfflineAnalysis !== 'function') return
+    setOfflineBusy(true)
+    setOfflineErr('')
+    setCopied(false)
+    try {
+      const res = await runOfflineAnalysis(book.bookId, genre)
+      setOfflineData(res)
+    } catch (e) {
+      setOfflineErr(friendlyError(e))
+    } finally {
+      setOfflineBusy(false)
+    }
+  }, [book?.bookId])
+
+  useEffect(() => {
+    const onOffline = (e: Event) => {
+      const g = (e as CustomEvent<{ genre?: string }>).detail?.genre || 'unknown'
+      void handleOffline(g)
+    }
+    window.addEventListener('novellab:run-offline-analysis', onOffline)
+    return () => window.removeEventListener('novellab:run-offline-analysis', onOffline)
+  }, [handleOffline])
 
   const { done, total } = useMemo(() => {
     if (!book) return { done: 0, total: 0 }
@@ -72,6 +106,67 @@ export default function ProgressPanel() {
       <Typography variant="caption" color="text.secondary">
         {t('analysis_prog_status_current')}：{currentStatusLabel} · {t('analysis_prog_checkpoint')} {status?.cursor || '-'}
       </Typography>
+
+      {status?.lastError && (
+        <Alert
+          severity="error"
+          sx={{ mt: 2 }}
+          action={
+            typeof runOfflineAnalysis === 'function' ? (
+              <Button color="inherit" size="small" disabled={offlineBusy} onClick={() => void handleOffline()}>
+                {offlineBusy ? <CircularProgress size={14} /> : t('analysis_btn_offline', '离线量化拆解 & 接管包')}
+              </Button>
+            ) : undefined
+          }
+        >
+          {friendlyError(status.lastError)}
+          {status.takeoverGuidePath ? `\n已自动生成离线接管清单：${status.takeoverGuidePath}` : ''}
+        </Alert>
+      )}
+
+      {status?.reportError && (
+        <Alert severity="warning" sx={{ mt: 1.5 }}>
+          {status.reportError}
+        </Alert>
+      )}
+
+      {offlineErr && (
+        <Alert severity="error" sx={{ mt: 1.5 }} onClose={() => setOfflineErr('')}>
+          {offlineErr}
+        </Alert>
+      )}
+
+      {offlineData && (
+        <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+            <Typography variant="subtitle2" fontWeight={700}>
+              {t('analysis_offline_done_title', '离线量化拆解与 AI 接管任务包已就绪')}
+            </Typography>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => {
+                void navigator.clipboard.writeText(offlineData.guideMarkdown)
+                setCopied(true)
+              }}
+            >
+              {copied ? '已复制 ✓' : t('analysis_copy_guide', '复制 AI 接管指令包')}
+            </Button>
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            全书 {offlineData.totalChapters} 章 · 分层采样 {offlineData.selectedCount} 章（{offlineData.sampleWords.toLocaleString()} 字）
+            {' · '}平均句长 {String(offlineData.metrics?.avgSentenceLen ?? offlineData.metrics?.avg_sentence_len ?? '-')}
+            {' · '}对白占比 {String(offlineData.metrics?.dialogueRatio ?? offlineData.metrics?.dialogue_ratio ?? '-')}
+            {' · '}词汇丰富度 TTR {String(offlineData.metrics?.charTtr ?? offlineData.metrics?.char_ttr ?? '-')}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            落盘路径：{offlineData.guidePath}
+          </Typography>
+          <Box sx={{ maxHeight: 220, overflow: 'auto', bgcolor: 'action.hover', p: 1.5, borderRadius: 1 }}>
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 12 }}>{offlineData.guideMarkdown}</pre>
+          </Box>
+        </Paper>
+      )}
 
       {/* 章×批矩阵 */}
       <Box sx={{ mt: 3 }}>

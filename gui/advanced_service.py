@@ -145,15 +145,22 @@ def aggregate_genre(genre: str) -> dict[str, Any]:
     if not _re.fullmatch(r"[A-Za-z0-9_-]+", genre):
         raise ServiceError(f"非法 genre 名: {genre!r}", 400)
 
-    # 聚合需调用 pass5_aggregate 的 CLI 入口（GUI 内直接调用尚未封装）
+    # 聚合需调用 pass5_aggregate 的 CLI 入口；此处同步附带离线特征共性与阈值分布预览
     out_path = config.ASSETS_ROOT / f"{genre}-genre-pack.json"
+    preview = {}
+    try:
+        preview = engine_adapter.preview_aggregate_genre(genre)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("生成题材聚合预览失败 %s: %s", genre, exc)
 
-    # 简化：标记为需要 CLI 执行
     return {
         "genre": genre,
         "books": books,
         "book_count": len(books),
-        "note": f"请在 CLI 执行：python novel.py 聚合 --genre {genre}",
+        "thresholds": preview.get("thresholds", {}),
+        "feature_rates": preview.get("feature_rates", {}),
+        "prompt": preview.get("prompt", ""),
+        "note": f"已在本地完成 {len(books)} 本书特征共性统计；如需 LLM 生成正式题材包可执行：python novel.py 聚合 --genre {genre}",
         "target_path": str(out_path),
     }
 
@@ -188,43 +195,73 @@ def batch_status() -> dict[str, Any]:
 # M4: 资产写入
 # ---------------------------------------------------------------------------
 
+def _resolve_asset_fp(raw_id_or_name: str, *, allow_kind_prefix: bool, label: str) -> tuple[str, Path]:
+    """统一资产名/ID 校验与路径消解（拦截路径穿越、Windows 盘符注入 `D:foo` 与控制字符）。"""
+    from gui import text_access
+
+    if not isinstance(raw_id_or_name, str):
+        raise ServiceError(f"非法{label}: {raw_id_or_name}", 400)
+    if allow_kind_prefix and ":" in raw_id_or_name:
+        _prefix, _, name = raw_id_or_name.partition(":")
+        if ":" in name:
+            raise ServiceError(f"非法{label}: {raw_id_or_name}", 400)
+    else:
+        name = raw_id_or_name
+    if (not name or name in (".", "..")
+            or any(ch in name for ch in ("/", "\\", "..", ":", "\x00", "\n", "\r"))
+            or any(ch in text_access.WIN_ILLEGAL_CHARS for ch in name)
+            or name.split(".")[0].upper() in text_access.WIN_RESERVED_NAMES):
+        raise ServiceError(f"非法{label}: {raw_id_or_name}", 400)
+    assets_root = config.ASSETS_ROOT
+    assets_root.mkdir(parents=True, exist_ok=True)
+    fp = (assets_root / f"{name}.json").resolve()
+    if not fp.is_relative_to(assets_root.resolve()):
+        raise ServiceError(f"非法{label}: {raw_id_or_name}", 400)
+    return name, fp
+
+
+def _atomic_write_asset(fp: Path, content: dict[str, Any]) -> None:
+    import os
+    import threading
+
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    tmp = fp.with_name(f"{fp.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    tmp.write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, fp)
+
+
 def update_asset(kind: str, asset_id: str, content: dict[str, Any]) -> dict[str, Any]:
-    """更新资产 JSON 内容。"""
+    """更新资产 JSON 内容（原子写入 + 索引与题材缓存同步）。"""
     if not content or not isinstance(content, dict):
         raise ServiceError("content 必须为 JSON 对象", 400)
 
-    name = asset_id.split(":")[-1] if ":" in asset_id else asset_id
-    if not name or any(ch in name for ch in ("/", "\\", "..", "\x00")):
-        raise ServiceError(f"非法资产 ID: {asset_id}", 400)
-
-    fp = (config.ASSETS_ROOT / f"{name}.json").resolve()
-    if not fp.is_relative_to(config.ASSETS_ROOT.resolve()):
-        raise ServiceError(f"非法资产 ID: {asset_id}", 400)
+    name, fp = _resolve_asset_fp(asset_id, allow_kind_prefix=True, label="资产 ID")
     if not fp.is_file():
         raise ServiceError(f"资产不存在: {asset_id}", 404)
 
-    # 写入
-    fp.write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
+    errs, warns = engine_adapter.validate_asset_card(content, fp.name)
+    _atomic_write_asset(fp, content)
 
-    # 重索引
     migrate.sync_asset(fp)
+    from gui import asset_index
+    asset_index.index.invalidate()
+    engine_adapter.invalidate_genre_cache()
 
-    return {"name": name, "path": migrate.rel_path(fp), "updated": True}
+    return {
+        "name": name,
+        "path": migrate.rel_path(fp),
+        "updated": True,
+        "validation_warnings": list(errs) + list(warns),
+    }
 
 
 def delete_asset(kind: str, asset_id: str) -> dict[str, Any]:
-    """删除资产（移到回收站而非硬删除）。"""
-    name = asset_id.split(":")[-1] if ":" in asset_id else asset_id
-    if not name or any(ch in name for ch in ("/", "\\", "..", "\x00")):
-        raise ServiceError(f"非法资产 ID: {asset_id}", 400)
-
-    fp = (config.ASSETS_ROOT / f"{name}.json").resolve()
-    if not fp.is_relative_to(config.ASSETS_ROOT.resolve()):
-        raise ServiceError(f"非法资产 ID: {asset_id}", 400)
+    """删除资产（移到回收站 + 同步清理 SQLite 与内存索引）。"""
+    name, fp = _resolve_asset_fp(asset_id, allow_kind_prefix=True, label="资产 ID")
     if not fp.is_file():
         raise ServiceError(f"资产不存在: {asset_id}", 404)
 
-    # 移到 trash 目录（软删除）
+    rel_fp = migrate.rel_path(fp)
     trash_dir = config.STATE_ROOT / "trash"
     trash_dir.mkdir(parents=True, exist_ok=True)
     import uuid
@@ -232,23 +269,43 @@ def delete_asset(kind: str, asset_id: str) -> dict[str, Any]:
     dst = trash_dir / f"{name}-{ts}-{uuid.uuid4().hex[:6]}.json"
     shutil.move(str(fp), str(dst))
 
+    try:
+        from gui import db
+        if db._db_ready():
+            with db.tx() as conn:
+                conn.execute(
+                    "DELETE FROM assets WHERE path = ? OR asset_key = ? OR asset_key LIKE ?",
+                    (rel_fp, f"{kind}:{name}", f"%:{name}"),
+                )
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("清理已删资产的 SQLite 索引行失败 %s: %s", name, exc)
+
+    from gui import asset_index
+    asset_index.index.invalidate()
+    engine_adapter.invalidate_genre_cache()
+
     return {"name": name, "trashed_to": migrate.rel_path(dst), "deleted": True}
 
 
 def create_asset(name: str, kind: str, content: dict[str, Any]) -> dict[str, Any]:
-    """新建资产。"""
-    if not isinstance(name, str):
-        raise ServiceError(f"非法资产名: {name}", 400)
-    if not name or any(ch in name for ch in ("/", "\\", "..", "\x00")):
-        raise ServiceError(f"非法资产名: {name}", 400)
+    """新建资产（防盘符穿越 + 原子写入 + 索引同步）。"""
+    clean_name, fp = _resolve_asset_fp(name, allow_kind_prefix=False, label="资产名")
     if not content or not isinstance(content, dict):
         raise ServiceError("content 必须为 JSON 对象", 400)
 
-    fp = config.ASSETS_ROOT / f"{name}.json"
     if fp.exists():
-        raise ServiceError(f"资产已存在: {name}", 409)
+        raise ServiceError(f"资产已存在: {clean_name}", 409)
 
-    fp.write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
+    errs, warns = engine_adapter.validate_asset_card(content, fp.name)
+    _atomic_write_asset(fp, content)
     migrate.sync_asset(fp)
+    from gui import asset_index
+    asset_index.index.invalidate()
+    engine_adapter.invalidate_genre_cache()
 
-    return {"name": name, "path": migrate.rel_path(fp), "created": True}
+    return {
+        "name": clean_name,
+        "path": migrate.rel_path(fp),
+        "created": True,
+        "validation_warnings": list(errs) + list(warns),
+    }

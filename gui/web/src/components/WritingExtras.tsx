@@ -77,6 +77,7 @@ export default function WritingExtras() {
 
   useEffect(() => {
     loadProjects()
+    return () => { projectsReqIdRef.current += 1 }
   }, [loadProjects])
 
   return (
@@ -244,6 +245,7 @@ function OutlinePanel({ project }: { project: string }) {
 
   useEffect(() => {
     load()
+    return () => { reqIdRef.current += 1 }
   }, [load])
 
   const openCreate = () => {
@@ -579,6 +581,7 @@ function CharacterPanel({ project }: { project: string }) {
 
   useEffect(() => {
     load()
+    return () => { reqIdRef.current += 1 }
   }, [load])
 
   const openCreate = () => {
@@ -839,6 +842,7 @@ function NotePanel({ project }: { project: string }) {
 
   useEffect(() => {
     load()
+    return () => { reqIdRef.current += 1 }
   }, [load])
 
   const openCreate = () => {
@@ -1040,6 +1044,7 @@ function DashboardPanel({ project }: { project: string }) {
 
   useEffect(() => {
     load()
+    return () => { statsReqIdRef.current += 1 }
   }, [load])
 
   const runTensionAnalysis = async (text: string, bm = benchmark) => {

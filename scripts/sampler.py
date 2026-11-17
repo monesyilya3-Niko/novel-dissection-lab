@@ -214,12 +214,29 @@ def extract_dialogue(chapters, indices):
                     "line": quote,
                     "after": _context_after(body, m.end()),
                 })
+        # 补充单行内 ASCII 成对直双引号（英文语料或直引号排版的中文网文，限制不跨换行防误吞整章）
+        for m in re.finditer(r'"([^"\r\n]{2,300})"', body):
+            quote = m.group(0).strip()
+            out.append({
+                "chapter": i + 1,
+                "title": title,
+                "before": _context_before(body, m.start()),
+                "line": quote,
+                "after": _context_after(body, m.end()),
+            })
     return out
 
 
 def build_slices(chapters, sel):
-    indices = sorted(sel)
     n = len(chapters)
+    if n == 0:
+        return {
+            "pass1_structure": {"note": "结构层：采样章全本 + 章末500字原文", "chapters": []},
+            "pass2_character": {"note": "人物层：对话行 + 前后各一句", "dialogues": []},
+            "pass3_style": {"note": "文风层：中段连续3章全文 + 1章高潮全文", "chapters": []},
+            "pass4_commercial": {"note": "商业层：前10章全文 + 卷末 + 全书末章", "chapters": []},
+        }
+    indices = sorted(i for i in sel if 0 <= i < n)
     mid_center = int(n * 0.5)
     style_idx = list(range(max(0, mid_center - 1), min(n - 1, mid_center + 1) + 1))[:3]
     climax_idx = [n - 1]
@@ -282,11 +299,16 @@ def main(argv: list[str] | None = None) -> int:
     for i in indices:
         (ch_dir / f"{i + 1:03d}.txt").write_text(chapters[i][1], encoding="utf-8")
 
+    sample_words = sum(
+        len(str(c.get("text", "")).replace("\n", "").replace(" ", ""))
+        for c in slices.get("pass1_structure", {}).get("chapters", [])
+    )
     manifest = {
         "book": name,
         "total_chapters": len(chapters),
         "selected_count": len(indices),
         "selected_indices": [i + 1 for i in indices],
+        "sample_words": sample_words,
         "reasons": {str(i + 1): sel[i] for i in indices},
     }
     (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")

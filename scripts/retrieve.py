@@ -332,26 +332,29 @@ def _cosine_sim(q: Counter, q_norm: float, d: Counter, d_norm: float) -> float:
 # 索引构建
 # ---------------------------------------------------------------------------
 
-def build_index(assets: dict[str, dict[str, dict]], persist_path: str | None = None) -> Index:
-    """把四类资产构建为倒排索引。
+def _assets_signature(assets: Any) -> str:
+    """计算输入资产集合的轻量内容摘要，防止磁盘持久化缓存过期不刷新。"""
+    if not isinstance(assets, dict):
+        return "empty"
+    import hashlib
+    h = hashlib.sha256()
+    for dim in sorted(assets.keys()):
+        grp = assets.get(dim)
+        if not isinstance(grp, dict):
+            continue
+        h.update(str(dim).encode("utf-8"))
+        try:
+            h.update(json.dumps(grp, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+        except TypeError:
+            h.update(repr(grp).encode("utf-8"))
+    return h.hexdigest()[:16]
 
-    兼容两种输入结构：
-        * ``{dimension: distilled_dict}``（``distill_genre`` 的产出，每维度一篇文档，
-          asset_id 取 ``meta.id``）；
-        * ``{dimension: {book: asset_dict}}``（``collect_assets`` 的产出，每书一篇
-          文档，asset_id 取 ``meta.id``，缺失则 ``<dimension>-<book>`` 兜底）。
 
-    Args:
-        assets: 资产字典。
-        persist_path: 可选持久化路径。传入时：
-            * 若该文件已存在且为合法索引缓存，则直接加载并返回（跳过重建）；
-            * 否则构建后把倒排索引序列化写入该路径，下次可直接加载。
-
-    Returns:
-        Index 实例。assets 非 dict（如 None）时返回空索引，不 crash。
-    """
+def build_index(assets: dict[str, Any], persist_path: str | None = None) -> Index:
+    """基于输入资产构建倒排索引（兼容 distilled 与原始资产两种结构）。"""
+    sig = _assets_signature(assets)
     if persist_path:
-        cached = _load_index(persist_path)
+        cached = _load_index(persist_path, expected_sig=sig if isinstance(assets, dict) and assets else None)
         if cached is not None:
             return cached
 
@@ -415,18 +418,15 @@ def build_index(assets: dict[str, dict[str, dict]], persist_path: str | None = N
     index.norms = [_norm(doc.ngrams) for doc in index.docs]
 
     if persist_path:
-        _save_index(index, persist_path)
+        _save_index(index, persist_path, sig=sig)
 
     return index
 
 
-def _save_index(index: Index, persist_path: str) -> None:
-    """把索引序列化为 JSON 写入 ``persist_path``（可重建缓存，非资产）。
-
-    只持久化检索所需的最小结构（inverted / doc_freq / docs 的核心字段 / norms）。
-    idf_cache 可在加载后惰性重建，不持久化。
-    """
+def _save_index(index: Index, persist_path: str, sig: str = "") -> None:
+    """把索引序列化为 JSON 写入 ``persist_path``（可重建缓存，非资产）。"""
     payload = {
+        "signature": sig,
         "inverted": index.inverted,
         "doc_freq": index.doc_freq,
         "norms": index.norms,
@@ -450,14 +450,17 @@ def _save_index(index: Index, persist_path: str) -> None:
         fh.write("\n")
 
 
-def _load_index(persist_path: str) -> Index | None:
-    """从 ``persist_path`` 加载索引；不存在或损坏返回 None。"""
+def _load_index(persist_path: str, expected_sig: str | None = None) -> Index | None:
+    """从 ``persist_path`` 加载索引；不存在、损坏或签名失配时返回 None。"""
     path = Path(persist_path)
     if not path.exists():
         return None
     try:
         with path.open("r", encoding="utf-8") as fh:
             payload = json.load(fh)
+        saved_sig = payload.get("signature")
+        if expected_sig and saved_sig and saved_sig != expected_sig:
+            return None
         index = Index(
             inverted={k: list(v) for k, v in payload.get("inverted", {}).items()},
             doc_freq={k: int(v) for k, v in payload.get("doc_freq", {}).items()},

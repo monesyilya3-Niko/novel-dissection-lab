@@ -520,6 +520,7 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as err:
             print(f"  扫描数据块 {start_byte} 出现重试: {err}")
             time.sleep(2.0)
+            continue
 
         current_offset += chunk_size
 
@@ -527,6 +528,7 @@ def main(argv: list[str] | None = None) -> int:
     if current_count < args.limit and current_book_title and len(current_book_chapters) >= 60:
         clean_t, author, genre = clean_title_and_author(current_book_title)
         first_ch = current_book_chapters[0].get("chapter", "").strip() if current_book_chapters else ""
+        book_chars = sum(len(c.get("text", "")) for c in current_book_chapters)
         if is_acceptable_webnovel(current_book_title, clean_t, len(current_book_chapters), book_chars, first_ch):
             b_id = sanitize_book_id(clean_t)
             if not check_book_exists(conn, b_id, clean_t) and not args.dry_run:

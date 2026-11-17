@@ -14,6 +14,7 @@ import {
   RadarComponent,
   VisualMapComponent,
   MarkLineComponent,
+  MarkPointComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
@@ -30,10 +31,12 @@ echarts.use([
   RadarComponent,
   VisualMapComponent,
   MarkLineComponent,
+  MarkPointComponent,
   CanvasRenderer,
 ])
 import { chartDefaults } from '../../theme'
 import { useThemeMode } from '../../state/ThemeModeContext'
+import { useI18n } from '../../state/I18nContext'
 
 export interface BaseChartProps {
   /** ECharts option（series/data 由调用方传入）。 */
@@ -66,6 +69,7 @@ export default function BaseChart({
   style,
 }: BaseChartProps) {
   const { isDark } = useThemeMode()
+  const { locale } = useI18n()
   const elRef = useRef<HTMLDivElement>(null)
   const instRef = useRef<echarts.ECharts | null>(null)
 
@@ -79,19 +83,19 @@ export default function BaseChart({
     [option, isDark],
   )
 
-  // 初始化 / dispose（仅挂载期执行一次）
+  // 初始化 / dispose（随语言切换重建 locale）
   useEffect(() => {
     if (!elRef.current) return
     const inst = echarts.init(elRef.current, undefined, {
       renderer: 'canvas',
-      locale: 'ZH',
+      locale: locale === 'en-US' ? 'EN' : 'ZH',
     })
     instRef.current = inst
     return () => {
       inst.dispose()
       instRef.current = null
     }
-  }, [])
+  }, [locale])
 
   // option / 主题变化 → setOption
   useEffect(() => {

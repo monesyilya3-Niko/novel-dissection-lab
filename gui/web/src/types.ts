@@ -79,6 +79,9 @@ export interface StatusInfo {
   cursor: string
   done: number
   total: number
+  lastError?: string
+  reportError?: string
+  takeoverGuidePath?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +126,41 @@ export interface Overview {
   totalAssets: number
   assetsByKind: Record<string, number>
   modelConfigured: boolean
+  modelReady?: boolean
   recentActivity: string[]
+}
+
+export interface OfflineAnalysisResult {
+  bookId: string
+  title: string
+  genre: string
+  totalChapters: number
+  selectedCount: number
+  selectedIndices: number[]
+  sampleWords: number
+  metrics: Record<string, unknown>
+  sampledDir: string
+  rawDir: string
+  guidePath: string
+  guideMarkdown: string
+}
+
+export interface SavedChapterSummary {
+  chapterNo: number
+  filename: string
+  title: string
+  wordCount: number
+  charCount: number
+  updatedAt: number
+}
+
+export interface SavedChapterDetail {
+  project: string
+  chapterNo: number
+  filename: string
+  content: string
+  wordCount: number
+  charCount: number
 }
 
 export interface ChapterScore {

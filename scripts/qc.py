@@ -533,11 +533,11 @@ def run_qc(chapter_dir: str, *, voice_card_path: str = None, genre_pack_path: st
     for d in dims:
         all_issues.extend(d.issues)
 
-    # 判定（复用 book_quality 统一规则：critical>0→FAIL, high>=5→FAIL, high>0→WARN, else PASS）
-    verdict = _judge(all_issues)
-
     # 阈值信息（单一事实来源 = chapter_check.resolve_thresholds）
     pass_line, warn_line = chapter_check.resolve_thresholds(genre_pack)
+
+    # 判定（复用 book_quality 统一规则 + 结合总分达标线）
+    verdict = _judge(all_issues, total_score=total_score, pass_line=pass_line, warn_line=warn_line)
 
     meta = {
         "total_chapters": len(texts),
@@ -602,6 +602,8 @@ def _resolve_book_title(novel_dir, voice_card, chapter_dir) -> str:
                 pass
     if voice_card:
         meta = voice_card.get("meta", {})
+        if meta.get("source_title"):
+            return meta["source_title"]
         if meta.get("name"):
             return meta["name"]
     # 目录名兜底
@@ -617,16 +619,23 @@ def _severity_count(issues: list) -> dict:
     return c
 
 
-def _judge(issues: list) -> str:
-    """统一判定规则（复用 book_quality）。"""
+def _judge(
+    issues: list,
+    total_score: float | None = None,
+    pass_line: float | None = None,
+    warn_line: float | None = None,
+) -> str:
+    """统一判定规则（兼容单参调用，传入 total_score 时同步校验及格线）。"""
     sev = _severity_count(issues)
     critical = sev.get("critical", 0)
     high = sev.get("high", 0)
-    if critical > 0:
+    if critical > 0 or high >= 5:
         return "FAIL"
-    if high >= 5:
+    if total_score is not None and warn_line is not None and total_score < warn_line:
         return "FAIL"
     if high > 0:
+        return "WARN"
+    if total_score is not None and pass_line is not None and total_score < pass_line:
         return "WARN"
     return "PASS"
 
@@ -742,13 +751,13 @@ def main(argv: list[str] | None = None) -> int:
         enable_llm_hook=args.llm_hook,
     )
 
-    # 落盘 reports/qc/<书名>-qc.json + .md
+    # 落盘 reports/qc/<书名>-qc.json + .md（净化书名非法文件名字符防路径穿越或 Windows OSError）
+    safe_title = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', "_", report.book_title or "book").replace("..", "_").strip(" ._") or "book"
     if not args.no_save:
         out_dir = ROOT / "reports" / "qc"
         out_dir.mkdir(parents=True, exist_ok=True)
-        title = report.book_title or "book"
-        json_path = out_dir / f"{title}-qc.json"
-        md_path = out_dir / f"{title}-qc.md"
+        json_path = out_dir / f"{safe_title}-qc.json"
+        md_path = out_dir / f"{safe_title}-qc.md"
         json_path.write_text(to_json(report), encoding="utf-8")
         md_path.write_text(to_markdown(report), encoding="utf-8")
 
@@ -758,7 +767,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(to_markdown(report))
         if not args.no_save:
-            print(f"\n报告已落盘: reports/qc/{report.book_title or 'book'}-qc.{{json,md}}")
+            print(f"\n报告已落盘: reports/qc/{safe_title}-qc.{{json,md}}")
 
     return 0 if report.verdict == "PASS" else 1
 

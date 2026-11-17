@@ -61,23 +61,36 @@ def ensure_novel_structure(novel_dir: Path, name: str = "新书"):
 
 
 def save_chapter(novel_dir: Path, chapter_no: int, content: str) -> Path:
-    """写入 chapters/arc-N/chapter-NNN.txt，更新 state.json。"""
+    """写入 chapters/arc-N/chapter-NNN.txt，更新 state.json（覆盖前备份原稿并按增量记账）。"""
     arc = (chapter_no - 1) // 30 + 1
     arc_dir = novel_dir / "chapters" / f"arc-{arc}"
     arc_dir.mkdir(exist_ok=True)
     ch_file = arc_dir / f"chapter-{chapter_no:03d}.txt"
-    ch_file.write_text(content, encoding="utf-8")
+    old_len = 0
+    if ch_file.exists():
+        try:
+            old_text = ch_file.read_text(encoding="utf-8")
+            old_len = len(old_text)
+            if old_text and old_text != content:
+                bak = arc_dir / f"chapter-{chapter_no:03d}.txt.bak"
+                bak.write_text(old_text, encoding="utf-8")
+        except OSError:
+            old_len = 0
+    tmp_ch = ch_file.with_name(f".ch-{chapter_no:03d}-{os.getpid()}-{threading.get_ident()}.tmp")
+    tmp_ch.write_text(content, encoding="utf-8")
+    tmp_ch.replace(ch_file)
 
     state_file = novel_dir / "state.json"
     state = json.loads(state_file.read_text(encoding="utf-8"))
     state["current_chapter"] = chapter_no
     state["current_arc"] = arc
-    # 2026-09-05 修复（C4）：word_count_today 跨日清零（原版只累加永不清零，长期失真）
+    # 2026-09-05 修复（C4）：word_count_today 跨日清零；2026-11-17 修复：重复覆盖同一章只记净增量
     today = datetime.now().strftime("%Y-%m-%d")
     if state.get("last_write_date") != today:
         state["word_count_today"] = 0
         state["last_write_date"] = today
-    state["word_count_today"] = state.get("word_count_today", 0) + len(content)
+    delta = len(content) - old_len
+    state["word_count_today"] = max(0, state.get("word_count_today", 0) + delta)
     state["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
     tmp_file = state_file.with_name(f".state-{os.getpid()}-{threading.get_ident()}.tmp")
     tmp_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -247,11 +260,11 @@ def main(argv: list[str] | None = None) -> int:
 
     # 2026-09-01 起：无外部模型模式——生成本地 AI 接管写作任务清单后优雅退出，
     # 正文生成与改写由 WorkBuddy 内置智能在会话内完成（与 pipeline.py 拆书降级对称）。
-    if not llm_client.any_model_configured():
+    def _write_takeover_guide(reason_note: str) -> Path:
         arc = (args.chapter - 1) // 30 + 1
         guide = novel_dir / "AI接管写作任务.md"
         guide.write_text(
-            "# WorkBuddy 内置智能接管写作任务（无外部模型模式）\n\n"
+            f"# 会话内智能接管写作任务（{reason_note}）\n\n"
             f"书名: {args.novel_name} | 第 {args.chapter} 章 | 目标 {args.words} 字\n"
             f"写作 prompt（system）: {prompt_path.resolve()}\n"
             + (f"voice-card（一致性自检用）: {Path(args.voice).resolve()}\n" if args.voice else "")
@@ -267,11 +280,15 @@ def main(argv: list[str] | None = None) -> int:
             "6. 未达标则按扣分点改写后重检（对照「三维度改写循环」标准，最多 3 轮）\n\n"
             "## 写作要求全文（原 LLM user prompt）\n"
             "---\n" + user + "\n---\n\n"
-            "本文件由 write.py 自动生成（无外部模型降级模式）。\n",
+            "本文件由 write.py 自动生成（降级接管模式）。\n",
             encoding="utf-8")
+        return guide
+
+    if not llm_client.any_model_configured():
+        guide = _write_takeover_guide("无外部模型模式")
         print("[2/4] 未配置外部模型 —— 已生成 AI 接管写作任务清单")
         print(f"      → {guide}")
-        print("      写作由 WorkBuddy 会话内完成，写完用 novel.py 检查 自检")
+        print("      写作由会话内或外部 AI 完成，写完用 novel.py 检查 自检")
         print("      （恢复外部模型可运行: python scripts/model_config.py add）")
         return 0
 
@@ -293,8 +310,10 @@ def main(argv: list[str] | None = None) -> int:
                                 max_tokens=args.words * 3, temperature=0.8, json_mode=False)
         except llm_client.LLMError as exc:
             print(llm_client.describe_llm_degradation(exc), file=sys.stderr)
-            print("[X] 写作生成中断；可改用无模型接管清单模式（先卸载/清空模型配置触发）"
-                  "或修复模型后续跑", file=sys.stderr)
+            guide = _write_takeover_guide(f"外部模型调用失败：{str(exc)[:100]}")
+            print(f"[X] 写作生成中断；已自动生成 AI 接管写作任务清单：{guide}\n"
+                  "    可直接复制清单中的 Prompt 到外部 AI 完成本章写作，或修复模型密钥后续跑",
+                  file=sys.stderr)
             return 1
         content = r["text"].strip()
         print(f"      → {len(content)} 字, {r['elapsed']}s, tokens {r['prompt_tokens']}+{r['completion_tokens']}")

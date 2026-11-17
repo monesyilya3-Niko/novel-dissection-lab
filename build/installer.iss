@@ -6,9 +6,9 @@
 ; - 卸载只删除安装时文件；运行时产生的用户数据（gui_state/ 等）默认保留
 
 #define AppName "novel-lab"
-#define AppVersion "1.1.0"
+#define AppVersion "1.2.0"
 #define AppPublisher "monesyilya3-Niko"
-#define AppURL "https://github.com/monesyilya3-Niko/novel-lab"
+#define AppURL "https://github.com/monesyilya3-Niko/novel-dissection-lab"
 #define StageDir "dist\novel-lab-portable-v" + AppVersion
 
 [Setup]
@@ -38,12 +38,12 @@ Source: "{#StageDir}\python-runtime\*"; DestDir: "{app}\python-runtime"; Flags: 
 Source: "{#StageDir}\Start.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\python-runtime\pythonw.exe"; Parameters: "-m gui.server"; WorkingDir: "{app}\app"; Comment: "novel-lab 工作台（浏览器访问 http://127.0.0.1:8000/）"
+Name: "{group}\{#AppName}"; Filename: "{app}\python-runtime\pythonw.exe"; Parameters: "gui\launch.py"; WorkingDir: "{app}\app"; Comment: "novel-lab 工作台（浏览器访问 http://127.0.0.1:8000/）"
 Name: "{group}\卸载 {#AppName}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\python-runtime\pythonw.exe"; Parameters: "-m gui.server"; WorkingDir: "{app}\app"; Tasks: desktopicon
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\python-runtime\pythonw.exe"; Parameters: "gui\launch.py"; WorkingDir: "{app}\app"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\python-runtime\python.exe"; Parameters: "-m gui.server"; WorkingDir: "{app}\app"; Flags: nowait postinstall skipifsilent; Description: "立即启动 novel-lab"; 
+Filename: "{app}\python-runtime\python.exe"; Parameters: "gui\launch.py"; WorkingDir: "{app}\app"; Flags: nowait postinstall skipifsilent; Description: "立即启动 novel-lab"; 
 
 [UninstallDelete]
 ; 构建中间产物（如有）随卸载清理；用户数据 gui_state/ 不在安装清单内，默认保留

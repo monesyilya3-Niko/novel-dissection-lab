@@ -21,6 +21,7 @@ import KeyIcon from '@mui/icons-material/Key'
 import { modelApi } from '../api/client'
 import { friendlyError } from '../api/client'
 import { useI18n } from '../state/I18nContext'
+import { useAppOptional } from '../state/AppContext'
 
 interface ModelInfo {
   id: string
@@ -43,6 +44,7 @@ interface Preset {
 
 export default function ModelManager() {
   const { t } = useI18n()
+  const app = useAppOptional()
   const [models, setModels] = useState<ModelInfo[]>([])
   const [presets, setPresets] = useState<Preset[]>([])
   const [loading, setLoading] = useState(true)
@@ -59,7 +61,7 @@ export default function ModelManager() {
 
   // Form state
   const [form, setForm] = useState({
-    id: '', label: '', protocol: 'openai', baseUrl: '', modelName: '', note: '',
+    id: '', label: '', protocol: 'openai', baseUrl: '', modelName: '', note: '', apiKey: '',
   })
 
   const loadModels = useCallback(async () => {
@@ -100,7 +102,7 @@ export default function ModelManager() {
     loadPresets()
   }, [loadModels, loadPresets])
 
-  const resetForm = () => setForm({ id: '', label: '', protocol: 'openai', baseUrl: '', modelName: '', note: '' })
+  const resetForm = () => setForm({ id: '', label: '', protocol: 'openai', baseUrl: '', modelName: '', note: '', apiKey: '' })
 
   const openAdd = () => {
     resetForm()
@@ -111,17 +113,18 @@ export default function ModelManager() {
   const openEdit = (m: ModelInfo) => {
     setForm({
       id: m.id, label: m.label, protocol: m.protocol,
-      baseUrl: m.baseUrl, modelName: m.modelName, note: m.note || '',
+      baseUrl: m.baseUrl, modelName: m.modelName, note: m.note || '', apiKey: '',
     })
     setEditing(m)
     setShowAdd(true)
   }
 
   const applyPreset = (p: Preset) => {
-    setForm({
+    setForm((prev) => ({
+      ...prev,
       id: p.name, label: p.label, protocol: p.protocol,
       baseUrl: p.baseUrl, modelName: p.modelName, note: '',
-    })
+    }))
   }
 
   const saveModel = async () => {
@@ -135,6 +138,7 @@ export default function ModelManager() {
         base_url: form.baseUrl, model_name: form.modelName,
       }
       if (form.note) body.note = form.note
+      if (!editing && form.apiKey.trim()) body.api_key = form.apiKey.trim()
 
       if (editing) {
         await modelApi.update(editing.id, body)
@@ -143,7 +147,8 @@ export default function ModelManager() {
       }
       setMessage(editing ? t('model_mgr_msg_updated') : t('model_mgr_msg_added'))
       setShowAdd(false)
-      loadModels()
+      await loadModels()
+      void app?.refreshOverview()
     } catch (e) {
       setError(friendlyError(e))
     } finally {
@@ -153,10 +158,13 @@ export default function ModelManager() {
 
   const deleteModel = async (id: string) => {
     if (!confirm(t('model_mgr_confirm_delete') + id + '？')) return
+    setMessage('')
+    setError('')
     try {
       await modelApi.delete(id)
       setMessage(`${id}${t('model_mgr_msg_deleted')}`)
-      loadModels()
+      await loadModels()
+      void app?.refreshOverview()
     } catch (e) {
       setError(friendlyError(e))
     }
@@ -165,12 +173,15 @@ export default function ModelManager() {
   const saveKey = async () => {
     if (!showKey || !apiKey || saving) return
     setSaving(true)
+    setMessage('')
+    setError('')
     try {
       await modelApi.setKey(showKey, apiKey)
       setMessage(t('model_mgr_msg_key_saved'))
       setShowKey(null)
       setApiKey('')
-      loadModels()
+      await loadModels()
+      void app?.refreshOverview()
     } catch (e) {
       setError(friendlyError(e))
     } finally {
@@ -181,12 +192,16 @@ export default function ModelManager() {
   const testModel = async (id: string) => {
     setTesting(id)
     setMessage('')
+    setError('')
     try {
       const data = await modelApi.test(id)
-      if (data.success) {
+      const nestedOk = (data.result as Record<string, unknown> | undefined)?.ok
+      const nestedErr = (data.result as Record<string, unknown> | undefined)?.error
+      if (data.success && nestedOk !== false) {
         setMessage(`${id}${t('model_mgr_msg_test_ok')}`)
       } else {
-        setError(`${id}${t('model_mgr_msg_test_fail')}${String(data.error ?? '未知错误')}`)
+        const rawReason = String(data.error || nestedErr || '未知错误')
+        setError(`${id}${t('model_mgr_msg_test_fail')}${friendlyError(rawReason)}`)
       }
     } catch (e) {
       setError(friendlyError(e))
@@ -289,6 +304,13 @@ export default function ModelManager() {
             value={form.modelName} onChange={(e) => setForm({ ...form, modelName: e.target.value })}
             helperText={t('model_mgr_field_name_helper')}
           />
+          {!editing && form.protocol !== 'ollama' && (
+            <TextField
+              label={t('model_mgr_key_field')} fullWidth size="small" type="password" sx={{ mb: 1.5 }}
+              value={form.apiKey} onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+              helperText={t('model_mgr_key_helper')}
+            />
+          )}
           <TextField
             label={t('model_mgr_field_note')} fullWidth size="small"
             value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })}

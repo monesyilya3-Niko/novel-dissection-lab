@@ -259,9 +259,23 @@ def _has_payload(out: dict) -> bool:
     return False
 
 
+def _extract_output_schema_spec(template: str) -> str:
+    """从 USER 模板中提取【输出 JSON 结构】及后续字段说明，确保模型拿到精确 JSON 契约。"""
+    if not template:
+        return ""
+    for marker in ("【输出 JSON 结构】", "【输出要求】", "【输出格式】"):
+        idx = template.find(marker)
+        if idx >= 0:
+            return template[idx:].strip()
+    return ""
+
+
 def run_pass(kind: str, slices: dict, metrics: dict, dry_run: bool,
              model_id: str | None, user_override: str | None = None) -> dict:
     system, template = load_prompt(kind)
+    schema_spec = _extract_output_schema_spec(template)
+    if schema_spec and "【输出" not in system:
+        system = f"{system}\n\n{schema_spec}"
     user = user_override if user_override is not None else build_user_input(kind, slices, metrics)
     mid, model = llm_client.resolve_model(task=kind, model_id=model_id)
     print(f"  [Pass] {kind} → 模型 {mid} ({model['model_name']})  | user 约 {len(user)//1000}K 字")
@@ -455,6 +469,8 @@ def assemble_voice_card_v2(name: str, genre: str, manifest: dict,
                            emotion: dict, imagery: dict, banned: dict,
                            metrics: dict) -> dict:
     """组装 voice-card（v2：接收归一化后的结构，不依赖 pass 原始输出键名）。"""
+    import assemble as _assemble_mod
+    narration = _assemble_mod._backfill_rhythm(dict(narration or {}), metrics or {})
     n_chapters = manifest["selected_count"]
     # 确保 voices 注入到 dialogue 的 character_voices 中
     if voices and not dialogue.get("character_voices"):
@@ -570,14 +586,10 @@ def main(argv: list[str] | None = None) -> int:
     for kind in ("pass1_structure", "pass2_character", "pass3_style", "pass4_commercial"):
         try:
             results[kind] = run_pass(kind, slices, m, args.dry_run, args.model_id)
-        except llm_client.LLMError as exc:
+        except (llm_client.LLMError, PassRefused, RuntimeError) as exc:
             # 评估报告 item 10：额度/网络失败时显式降级提示，不静默半截交付
             print(llm_client.describe_llm_degradation(exc), file=sys.stderr)
             print(f"[X] 五遍扫描在 {kind} 中断；已完成的 pass 若已落盘可续跑", file=sys.stderr)
-            # 2026-09-21 新增：模型不可用时不能只报错就退出——直接生成会话内接管清单，
-            # 让「模型不可用 → 会话内智能接管」这条路径可执行（原实现只打印提示）。
-            # 异常消息会嵌套重复（"调用失败（重试 2 次）: 调用失败（重试 2 次）: HTTP 403 …"），
-            # 剥掉重复前缀，让清单里的原因可读。
             core = re.sub(r"模型 '[^']*' 调用失败（重试 \d+ 次）: ", "",
                           str(exc)).strip()
             guide = write_ai_takeover_guide(
@@ -631,13 +643,9 @@ def main(argv: list[str] | None = None) -> int:
         vc_path = ASSETS_DIR / f"{name}-voice-card.json"
         so_path = ASSETS_DIR / f"{name}-structure-obs.json"
         co_path = ASSETS_DIR / f"{name}-commercial-obs.json"
-        for p, obj in ((vc_path, voice), (so_path, struct_obs), (co_path, comm_obs)):
-            p.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"      {vc_path.name} ({len(json.dumps(voice, ensure_ascii=False))//1024}K)")
-        print(f"      {so_path.name}")
-        print(f"      {co_path.name}")
+        cc_path = ASSETS_DIR / f"{name}-craft-card.json"
 
-        # 5. Pass5 笔法分析 + craft-card 组装
+        # 5. Pass5 笔法分析 + craft-card 组装（校验先于写盘：全部组装并校验通过后再统一写入 ASSETS_DIR）
         print("[5/7] Pass5 笔法分析:")
         # 构建资产摘要供 Pass5 参考
         asset_summary = json.dumps({
@@ -650,8 +658,18 @@ def main(argv: list[str] | None = None) -> int:
         # 将资产摘要注入 pass5 的 user input
         pass5_user = build_user_input("pass5_craft", slices, m)
         pass5_user = f"【前四遍扫描摘要】\n{asset_summary}\n\n【采样章节全文】\n{pass5_user}"
-        pass5_result = run_pass("pass5_craft", slices, m, args.dry_run, args.model_id,
-                                user_override=pass5_user)
+        try:
+            pass5_result = run_pass("pass5_craft", slices, m, args.dry_run, args.model_id,
+                                    user_override=pass5_user)
+        except (llm_client.LLMError, PassRefused, RuntimeError) as exc:
+            print(llm_client.describe_llm_degradation(exc), file=sys.stderr)
+            print("[X] 五遍扫描在 pass5_craft 中断；已完成的 pass1-4 已在 raw 目录保留", file=sys.stderr)
+            core = re.sub(r"模型 '[^']*' 调用失败（重试 \d+ 次）: ", "", str(exc)).strip()
+            guide = write_ai_takeover_guide(
+                name, args.genre, len(sel), len(chapters), raw_dir,
+                f"外部模型调用失败（pass5_craft）：{core[:140]}")
+            print(f"[→] 已生成会话内接管清单：{guide}", file=sys.stderr)
+            return 1
         if not args.dry_run:
             (raw_dir / "pass5_craft.json").write_text(
                 json.dumps(pass5_result, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -765,80 +783,68 @@ def main(argv: list[str] | None = None) -> int:
             except ImportError:
                 print("  ⚠ deep_analyze 模块缺失，跳过深度分析校验")
 
-            cc_path = ASSETS_DIR / f"{name}-craft-card.json"
-            cc_path.write_text(json.dumps(craft_card, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"      {cc_path.name} ({len(json.dumps(craft_card, ensure_ascii=False))//1024}K)")
+            # 6. 校验先于副作用（内存 Schema 校验 + 合规扫描，全部通过后才写入 ASSETS_DIR）
+            print("[6/7] Schema 校验:")
+            vc_errs = 0
+            staged_assets = [
+                (vc_path, "voice-card", voice),
+                (so_path, None, struct_obs),
+                (co_path, None, comm_obs),
+                (cc_path, "craft-card", craft_card),
+            ]
+            for p, kind, obj in staged_assets:
+                if kind and kind in validate_mod.DISPATCH:
+                    validate_mod.DISPATCH[kind](obj)
+                    # 注意：DISPATCH 各函数首行调用 reset() 会重绑新列表，必须直接读取 ERRORS 而非按旧长度切片
+                    cur_errs = list(validate_mod.ERRORS)
+                    if cur_errs:
+                        vc_errs += len(cur_errs)
+                        print(f"      ✗ {p.name}: {len(cur_errs)} 条硬错误")
+                        for e in cur_errs[:5]:
+                            print(f"        {e}")
+                    else:
+                        print(f"      ✓ {p.name}: schema 校验通过")
+                else:
+                    print(f"      ✓ {p.name}: 观测文件（单本中间产物），schema 校验延后至聚合")
+            if vc_errs:
+                sys.exit("资产校验失败，请检查上面错误（未写入 assets/）。")
 
-            # 生成笔法报告内容 + 单份字数提示（**不落盘**）
-            #
-            # ⚠️ 不再直接写 reports/（2026-10-13 审计修复 CLI-16）：
-            # 原实现把笔法分析直写 REPORTS_DIR，而「分析」命令随后会**重新生成**
-            # 一份（novel.py 用 report_craft.py 写入 staging 再原子发布）——
-            # 于是 reports/ 里先躺着一份未经验收的次品：若合计不足 10000，
-            # 「分析」的闸门正确判失败并 EXIT=1、输出明说"交付阻断（不产出
-            # 半成品）"，但用户打开 reports/ 会发现那份不达标的报告好端端
-            # 躺在交付目录里，且没有任何提示说明它未经验收。
-            #
-            # 职责划分：pipeline 是拆书引擎（产 assets/），报告交付由
-            # 「分析」（staging + 原子发布 + 铁律二闸门）与「拆书」命令负责。
-            # GUI 只调 pipeline 的函数（load_prompt/run_pass/assemble_*），
-            # 从不走 main()，故本改动不影响 GUI。
+            # 7. 合规（在 staging 临时目录调 run_compliance，不通过绝不污染 ASSETS_DIR）
+            print("[7/7] 合规扫描:")
+            import tempfile as _tempfile
+            compliance_failed = False
+            with _tempfile.TemporaryDirectory(prefix="nl_stage_") as _stage_dir:
+                _st = Path(_stage_dir)
+                for p, _kind, obj in staged_assets:
+                    (_st / p.name).write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+                for p in (vc_path, cc_path):
+                    code = run_compliance(_st / p.name, src)
+                    if code == 1:
+                        compliance_failed = True
+                        print(f"      ✗ {p.name}: 合规 REJECT（关键资产，阻塞入库）")
+                for p in (so_path, co_path):
+                    code = run_compliance(_st / p.name, src)
+                    if code == 1:
+                        print(f"      ⚠ {p.name}: 合规 REJECT（观测文件，不阻塞入库，建议人工修复）")
+            if compliance_failed:
+                sys.exit("关键资产合规扫描未通过，入库被阻塞（未写入 assets/）。")
+
+            # 门禁全部通过，正式落盘 ASSETS_DIR
+            for p, _kind, obj in staged_assets:
+                p.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+                print(f"      ✓ 已入库 {p.name}")
+
             try:
                 import report_craft as rc_mod
                 report = rc_mod.render_craft_report(craft_card)
                 report_len = len(report)
                 print(f"      笔法报告已就绪（{report_len} 字符，未落盘——"
                       f"由 `novel 分析` 统一交付）")
-                # 铁律二：单份字数提示（合计校验由 novel.py「分析」在
-                # 拆书报告 + 笔法报告都生成后统一执行）。
                 if report_len < 10000:
                     print(f"  ⚠ 笔法分析单份 {report_len} 字符 < 10000，"
                           f"合计校验以 novel.py「分析」命令为准")
             except Exception as e:
                 print(f"      ⚠ 笔法报告生成失败: {e}")
-
-        # 6. 校验（voice-card 严格校验；craft-card 也校验；观测文件延后）
-        print("[6/7] Schema 校验:")
-        vc_errs = 0
-        all_assets = [(vc_path, "voice-card"), (so_path, None), (co_path, None)]
-        if not args.dry_run:
-            cc_path = ASSETS_DIR / f"{name}-craft-card.json"
-            if cc_path.exists():
-                all_assets.append((cc_path, "craft-card"))
-        for p, kind in all_assets:
-            if kind and kind in validate_mod.DISPATCH:
-                errs_before = list(validate_mod.ERRORS)
-                validate_mod.DISPATCH[kind](json.loads(p.read_text(encoding="utf-8")))
-                new_errs = validate_mod.ERRORS[len(errs_before):]
-                if new_errs:
-                    vc_errs += len(new_errs)
-                    print(f"      ✗ {p.name}: {len(new_errs)} 条硬错误")
-                else:
-                    print(f"      ✓ {p.name}: schema 校验通过")
-            else:
-                print(f"      ✓ {p.name}: 观测文件（单本中间产物），schema 校验延后至聚合")
-        if vc_errs:
-            sys.exit("资产校验失败，请检查上面错误。")
-
-        # 7. 合规（voice-card/craft-card 失败阻塞；obs 文件只警告）
-        print("[7/7] 合规扫描:")
-        critical_assets = [vc_path]
-        cc_path = ASSETS_DIR / f"{name}-craft-card.json"
-        if cc_path.exists():
-            critical_assets.append(cc_path)
-        obs_assets = [so_path, co_path]
-        compliance_failed = False
-        for p in critical_assets:
-            code = run_compliance(p, src)
-            if code == 1:
-                compliance_failed = True
-                print(f"      ✗ {p.name}: 合规 REJECT（关键资产，阻塞入库）")
-        for p in obs_assets:
-            code = run_compliance(p, src)
-            if code == 1:
-                print(f"      ⚠ {p.name}: 合规 REJECT（观测文件，不阻塞入库，建议人工修复）")
-        if compliance_failed:
-            sys.exit("关键资产合规扫描未通过，入库被阻塞。")
     else:
         print("      [dry-run] 跳过组装/校验/合规（未调用 LLM）")
         print("      → 真实运行需先配置模型 key：")

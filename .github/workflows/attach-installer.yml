@@ -19,7 +19,7 @@ on:
       tag:
         description: '目标 Release tag'
         required: true
-        default: 'v2.0.2'
+        default: 'v1.2.0'
 
 permissions:
   contents: write
@@ -39,13 +39,21 @@ jobs:
       - name: Upload to release (API, explicit ASCII name)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          FILE="暮冬念春-Setup-2.0.2-win64.exe"
-          ASSET_NAME="mudong-nianchun-Setup-2.0.2-win64.exe"
+          FILE=$(ls *-Setup-*-win64.exe | head -n 1)
+          if [ -z "$FILE" ]; then
+            echo "::error::未在 artifact 中找到 *-Setup-*-win64.exe"
+            exit 1
+          fi
+          VER="${TAG#v}"
+          ASSET_NAME="novel-lab-Setup-${VER}-win64.exe"
           ls -la "$FILE"
-          sha256sum "$FILE"
-          RELEASE_ID=$(gh api "repos/${{ github.repository }}/releases/tags/${{ inputs.tag }}" --jq .id)
+          EXPECTED_SIZE=$(stat -c%s "$FILE")
+          EXPECTED_SHA=$(sha256sum "$FILE" | awk '{print $1}')
+          echo "Local file: $FILE ($EXPECTED_SIZE bytes, sha256:$EXPECTED_SHA)"
+          RELEASE_ID=$(gh api "repos/${{ github.repository }}/releases/tags/${TAG}" --jq .id)
           NAME=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$ASSET_NAME")
           echo "uploading $FILE as asset: $ASSET_NAME to release $RELEASE_ID"
           curl -sS -X POST \
@@ -54,12 +62,15 @@ jobs:
             --data-binary "@${FILE}" \
             "https://uploads.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}/assets?name=${NAME}" \
             | tee upload_result.json
-          python3 - <<'EOF'
-          import json
+          EXPECTED_ASSET="$ASSET_NAME" EXPECTED_SIZE="$EXPECTED_SIZE" EXPECTED_SHA="$EXPECTED_SHA" python3 - <<'EOF'
+          import json, os
           d = json.load(open("upload_result.json"))
-          assert d.get("name") == "mudong-nianchun-Setup-2.0.2-win64.exe", f"name unexpected: {d.get('name')}"
-          assert d.get("size") == 93327513, f"size mismatch: {d.get('size')}"
-          assert d.get("digest") == "sha256:8babe6e78fde661245179b3beab97d77b5a832a33dd3cb99dd09ca89e4e83c35", "digest mismatch"
+          want_name = os.environ["EXPECTED_ASSET"]
+          want_size = int(os.environ["EXPECTED_SIZE"])
+          want_digest = "sha256:" + os.environ["EXPECTED_SHA"]
+          assert d.get("name") == want_name, f"name unexpected: {d.get('name')} != {want_name}"
+          assert d.get("size") == want_size, f"size mismatch: {d.get('size')} != {want_size}"
+          assert d.get("digest") == want_digest, f"digest mismatch: {d.get('digest')} != {want_digest}"
           print("OK:", d["name"], d["size"], "bytes", d["digest"])
           print("download:", d["browser_download_url"])
           EOF

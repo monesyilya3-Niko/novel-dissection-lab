@@ -275,3 +275,45 @@ describe('资产详情必须跳过 camelCase 转换（2026-11-05）', () => {
     expect((res as unknown as Record<string, unknown>).totalBooks).toBe(3)
   })
 })
+
+describe('friendlyError 企业级 LLM 故障分类与 getStatus 错误透传', () => {
+  it('HTTP 402 SUBSCRIPTION_REQUIRED 与上游 401 API Key 失效给出模型管理与离线模式指引', () => {
+    const msg402 = friendlyError(new ApiError('HTTP 402: SUBSCRIPTION_REQUIRED', 400))
+    expect(msg402).toContain('API Key')
+    expect(msg402).toContain('离线')
+
+    const msg401Upstream = friendlyError('HTTP 401: invalid_api_key (invalid token)')
+    expect(msg401Upstream).not.toContain('?auth=')
+    expect(msg401Upstream).toContain('API Key')
+  })
+
+  it('context_window 预算超限不被误判为 100MB 文件上传超限', () => {
+    const msg = friendlyError(new ApiError('Request exceeds maximum context_window size (65536)', 400))
+    expect(msg).not.toContain('100MB')
+    expect(msg).toContain('上下文')
+  })
+
+  it('getStatus 保留后端返回的 last_error 与 takeover_guide_path', async () => {
+    vi.mocked(fetch).mockImplementationOnce(
+      mockFetchOnce({
+        code: 0,
+        message: '',
+        data: {
+          book_id: 'b1',
+          status: 'error',
+          cursor: 'c1-b0',
+          done: 0,
+          total: 4,
+          last_error: 'HTTP 402: SUBSCRIPTION_REQUIRED',
+          report_error: '',
+          takeover_guide_path: 'corpus/raw/b1/AI接管任务.md',
+        },
+      }) as never,
+    )
+    vi.resetModules()
+    const mod = await import('./client')
+    const st = await mod.getStatus('b1')
+    expect(st.lastError).toBe('HTTP 402: SUBSCRIPTION_REQUIRED')
+    expect(st.takeoverGuidePath).toBe('corpus/raw/b1/AI接管任务.md')
+  })
+})

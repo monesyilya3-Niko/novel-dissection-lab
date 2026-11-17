@@ -11,7 +11,7 @@
 """
 from __future__ import annotations
 
-import os
+import json
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -356,6 +356,26 @@ def any_model_configured() -> bool:
     return _get_llm_client().any_model_configured()
 
 
+def any_model_ready() -> bool:
+    """是否存在至少一个已具备可用密钥（或本地免密）的模型。"""
+    llm = _get_llm_client()
+    fn = getattr(llm, "any_model_ready", None)
+    return bool(fn()) if callable(fn) else bool(llm.any_model_configured())
+
+
+def is_auth_or_quota_error(exc: BaseException | str) -> bool:
+    """判断异常是否属于不可通过继续跑下一批恢复的鉴权/欠费/无模型错误。"""
+    msg = str(exc or "")
+    low = msg.lower()
+    return any(tok in low for tok in (
+        "http 401", "http 402", "http 403", "subscription_required",
+        "payment required", "insufficient_quota", "insufficient balance",
+        "invalid_api_key", "authentication",
+    )) or any(tok in msg for tok in (
+        "尚未配置任何模型", "未配置 API Key", "余额不足", "欠费",
+    ))
+
+
 def list_models() -> list[dict[str, Any]]:
     """列出已配置模型（不含密钥），供 /api/config/models 使用。"""
     llm = _get_llm_client()
@@ -398,7 +418,13 @@ def render_craft_report(craft: dict[str, Any]) -> str:
     return _get_report_craft().render_craft_report(craft)
 
 
-def combined_report_ok(book_chars: int, craft_chars: int) -> dict[str, Any]:
+def combined_report_ok(
+    book_chars: int,
+    craft_chars: int,
+    *,
+    book_text: str | None = None,
+    craft_text: str | None = None,
+) -> dict[str, Any]:
     """铁律二判定（纯长度，不读盘）——供 GUI **写盘前**校验使用。
 
     2026-09-23 新增（总工排查）：GUI 原先「先写盘 → 再校验」，校验失败只抑制
@@ -408,7 +434,9 @@ def combined_report_ok(book_chars: int, craft_chars: int) -> dict[str, Any]:
     Returns:
         dict: {book_chars, craft_chars, total, ok, min_chars}
     """
-    return _get_report().combined_report_ok(book_chars, craft_chars)
+    return _get_report().combined_report_ok(
+        book_chars, craft_chars, book_text=book_text, craft_text=craft_text
+    )
 
 
 def check_report_min_length(reports_dir, name: str) -> dict[str, Any]:
@@ -574,38 +602,102 @@ def model_presets() -> dict[str, Any]:
 def distill_run(genre: str, book_names: list[str] | None = None) -> dict[str, Any]:
     """题材蒸馏（复用 distill.run_distill）。供 advanced_service。
 
-    scripts/distill.run_distill 把产物写进仓库 ``novel-lab/assets/``（硬编码），
-    而 GUI 数据面（扫描/状态/详情/索引）一律走 ``config.ASSETS_ROOT``（用户数据
-    目录）。这里把写出的文件搬运到 ASSETS_ROOT 再返回，保证 distill_status()
-    可见、migrate.sync_asset() 索引的路径可被 resolve_rel_path 逆解析。
-    （采集侧 distill_core.collect_assets 同样硬编码仓库目录，需 scripts 侧接受
-    assets_dir 参数才能根治——本层在不改 scripts 的前提下无法修正。）
+    直接把 ``config.ASSETS_ROOT`` 传给 ``run_distill(..., assets_dir=..., require_non_empty=True)``，
+    使采集输入与落盘输出统一锚定用户资产目录，并在 0 规则空壳时直接抛 ``ValueError`` 拦截。
     """
-    result = _get_distill().run_distill(genre, book_names=book_names)
-    relocated: list[str] = []
-    try:
-        dest_root = config.ASSETS_ROOT
-        dest_root.mkdir(parents=True, exist_ok=True)
-        for fp_str in result.get("written", []):
-            src = Path(fp_str)
-            dst = dest_root / src.name
-            try:
-                if src.resolve() == dst.resolve():
-                    relocated.append(str(dst))
-                    continue
-                # 原子搬运：先写临时文件再 rename，避免半成品；成功后删源。
-                tmp = dst.with_name(dst.name + ".reloc-tmp")
-                tmp.write_bytes(src.read_bytes())
-                os.replace(tmp, dst)
-                src.unlink()
-                relocated.append(str(dst))
-            except OSError:
-                # 搬运失败则保留原路径（至少不丢产物）。
-                relocated.append(fp_str)
-    except OSError:
-        relocated = [str(p) for p in result.get("written", [])]
-    result["written"] = relocated
+    dest_root = config.ASSETS_ROOT
+    dest_root.mkdir(parents=True, exist_ok=True)
+    result = _get_distill().run_distill(
+        genre,
+        book_names=book_names,
+        assets_dir=dest_root,
+        require_non_empty=True,
+    )
+    result["written"] = [str(Path(p)) for p in result.get("written", [])]
     return result
+
+
+def preview_aggregate_genre(genre: str) -> dict[str, Any]:
+    """离线统计同题材多本书特征共性与阈值分布（不调 LLM，供 GUI 聚合预览）。"""
+    import pass5_aggregate as _agg  # type: ignore
+
+    books, mismatches = _agg.collect_books(genre, None, assets_dir=config.ASSETS_ROOT)
+    if len(books) < 3:
+        return {"books": [b["name"] for b in books], "mismatches": mismatches, "thresholds": {}}
+    rates = _agg.extract_features(books)
+    thresholds = _agg.summarize_thresholds(rates)
+    prompt = _agg.build_prompt(books, thresholds)
+    return {
+        "books": [b["name"] for b in books],
+        "mismatches": mismatches,
+        "feature_rates": {k: round(v, 3) for k, v in sorted(rates.items(), key=lambda x: -x[1])},
+        "thresholds": thresholds,
+        "prompt": prompt,
+    }
+
+
+def run_offline_analysis(
+    book_id: str,
+    title: str,
+    chapters: list[Any],
+    genre: str = "unknown",
+    reason: str = "离线量化拆解与 AI 接管模式",
+) -> dict[str, Any]:
+    """无外部模型时的离线拆解闭环：分层采样 + 全书量化 + 生成 AI 接管任务清单。"""
+    ch_tuples: list[tuple[str, str]] = []
+    for i, c in enumerate(chapters):
+        if isinstance(c, (tuple, list)) and len(c) >= 2:
+            ch_tuples.append((str(c[0] or f"第{i + 1}章"), str(c[1] or "")))
+        elif isinstance(c, dict):
+            ch_tuples.append((str(c.get("title") or f"第{i + 1}章"), str(c.get("text") or "")))
+    full_text = "\n\n".join(f"{t}\n{b}" for t, b in ch_tuples)
+    sampler_mod = _get_sampler()
+    sel = sampler_mod.select(ch_tuples) if ch_tuples else []
+    slices = sampler_mod.build_slices(ch_tuples, sel) if ch_tuples else {}
+    sample_words = sum(
+        len(str(c.get("text", "")).replace("\n", "").replace(" ", ""))
+        for c in slices.get("pass1_structure", {}).get("chapters", [])
+    )
+    manifest = {
+        "book": book_id,
+        "title": title,
+        "total_chapters": len(ch_tuples),
+        "selected_count": len(sel),
+        "selected_indices": [i + 1 for i in sorted(sel)],
+        "sample_words": sample_words,
+    }
+    sampled_dir = config.CORPUS_DIR / "sampled" / book_id
+    sampled_dir.mkdir(parents=True, exist_ok=True)
+    (sampled_dir / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    (sampled_dir / "slices.json").write_text(
+        json.dumps(slices, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    metrics = compute_metrics(full_text)
+    metrics_dir = config.CORPUS_DIR / "metrics"
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    (metrics_dir / f"{book_id}.json").write_text(
+        json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    ai_dir = config.CORPUS_DIR / "raw" / book_id
+    guide_path = _get_pipeline().write_ai_takeover_guide(
+        book_id, genre or "unknown", len(sel), len(ch_tuples), ai_dir, reason
+    )
+    guide_md = guide_path.read_text(encoding="utf-8") if guide_path.is_file() else ""
+    return {
+        "book_id": book_id,
+        "title": title,
+        "genre": genre or "unknown",
+        "total_chapters": len(ch_tuples),
+        "selected_count": len(sel),
+        "selected_indices": manifest["selected_indices"],
+        "sample_words": sample_words,
+        "metrics": metrics,
+        "sampled_dir": str(sampled_dir),
+        "raw_dir": str(ai_dir),
+        "guide_path": str(guide_path),
+        "guide_markdown": guide_md,
+    }
 
 
 def compliance_scan_asset(asset: dict[str, Any], ngram: set) -> tuple:
@@ -828,9 +920,13 @@ def _get_genre_registry():
 
 
 def known_genres() -> list[str]:
-    """返回已知题材 slug 列表（排序，稳定）。"""
+    """返回已知题材 slug 列表（合并内置仓库与用户 ASSETS_ROOT，排序稳定）。"""
     try:
-        return sorted(_get_genre_registry().known_genres())
+        reg = _get_genre_registry()
+        fn = getattr(reg, "known_genres_in", None)
+        if callable(fn):
+            return sorted(fn(config.ASSETS_ROOT))
+        return sorted(reg.known_genres())
     except Exception:
         # 精简打包/资产缺失时用兜底集，保证 API 可用
         from scripts.genre_registry import FALLBACK_CORE_GENRES
@@ -842,10 +938,22 @@ def is_known_genre(genre: str) -> bool:
     if not isinstance(genre, str) or not genre.strip():
         return False
     try:
-        return bool(_get_genre_registry().is_known_genre(genre.strip()))
+        reg = _get_genre_registry()
+        fn = getattr(reg, "is_known_genre_in", None)
+        if callable(fn):
+            return bool(fn(genre.strip(), config.ASSETS_ROOT))
+        return bool(reg.is_known_genre(genre.strip()))
     except Exception:
         from scripts.genre_registry import FALLBACK_CORE_GENRES
         return genre.strip() in FALLBACK_CORE_GENRES
+
+
+def invalidate_genre_cache() -> None:
+    """写删资产后清空 genre_registry 元数据缓存。"""
+    try:
+        _get_genre_registry().invalidate_meta_cache()
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------

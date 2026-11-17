@@ -95,29 +95,26 @@ def run_book(src: Path | str, genre: str, model_id: str | None = None, dry_run: 
                                          voices, narration, dialogue, emotion, imagery, banned, m)
     so = pipeline.assemble_obs("structure", name, genre, results["pass1_structure"])
     co = pipeline.assemble_obs("commercial", name, genre, results["pass4_commercial"])
-    assets_dir = ROOT / "assets"
-    assets_dir.mkdir(parents=True, exist_ok=True)
-    for p, obj in ((assets_dir / f"{name}-voice-card.json", vc),
-                   (assets_dir / f"{name}-structure-obs.json", so),
-                   (assets_dir / f"{name}-commercial-obs.json", co)):
-        p.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"      ✓ {p.name}")
-
-    # 5. 校验（voice-card 严格）
+    # 5. 校验先于副作用（voice-card 严格校验 + 合规扫描通过后再写入 assets/）
     print("  [5/6] Schema 校验:")
-    errs_before = len(validate_mod.ERRORS)
     validate_mod.DISPATCH["voice-card"](vc)
-    new_errs = validate_mod.ERRORS[errs_before:]
+    new_errs = list(validate_mod.ERRORS)
     print(f"      {'✓ voice-card 通过' if not new_errs else f'✗ {len(new_errs)} 条错误'}")
+    if new_errs:
+        print(f"  ✗ {name} Schema 校验失败，未写入 assets/")
+        return None
 
     # 6. 合规
     print("  [6/6] 合规扫描:")
     ok = True
-    for p in (assets_dir / f"{name}-voice-card.json",
-              assets_dir / f"{name}-structure-obs.json",
-              assets_dir / f"{name}-commercial-obs.json"):
-        asset = json.loads(p.read_text(encoding="utf-8"))
-        ngram = compliance_mod.build_ngram_index(text)
+    assets_dir = ROOT / "assets"
+    ngram = compliance_mod.build_ngram_index(text)
+    staged = (
+        (assets_dir / f"{name}-voice-card.json", vc),
+        (assets_dir / f"{name}-structure-obs.json", so),
+        (assets_dir / f"{name}-commercial-obs.json", co),
+    )
+    for p, asset in staged:
         errs, warns = compliance_mod.scan_asset(asset, ngram)
         if errs:
             ok = False
@@ -125,8 +122,13 @@ def run_book(src: Path | str, genre: str, model_id: str | None = None, dry_run: 
         else:
             print(f"      ✓ {p.name}: 合规（{len(warns)} 警告）")
     if not ok:
-        print(f"  ✗ {name} 合规失败，未产出报告")
+        print(f"  ✗ {name} 合规失败，未产出资产与报告")
         return None
+
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    for p, obj in staged:
+        p.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"      ✓ 已入库 {p.name}")
 
     return {"voice": vc, "structure": so, "commercial": co, "name": name}
 

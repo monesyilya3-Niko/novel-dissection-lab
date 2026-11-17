@@ -230,22 +230,31 @@ function LibraryList() {
   const { t } = useI18n()
   const { book, openBook } = useApp()
   const [items, setItems] = useState<LibraryBook[]>([])
-  const [loading, setLoading] = useState(true)
+  const bookId = book?.bookId
+  const [loadedOnce, setLoadedOnce] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    setLoading(true)
-    listBooks()
-      .then((bs) => setItems(bs))
-      .catch((e) => setError(friendlyError(e)))
-      .finally(() => setLoading(false))
-  }, [])
-
   useEffect(() => {
-    load()
-  }, [load, book?.bookId])
+    let cancelled = false
+    listBooks()
+      .then((bs) => {
+        if (!cancelled) {
+          setItems(bs)
+          setError(null)
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(friendlyError(e))
+      })
+      .finally(() => {
+        if (!cancelled) setLoadedOnce(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [bookId])
 
-  if (loading && items.length === 0) return null
+  if (!loadedOnce && items.length === 0) return null
   if (error) return null
   if (items.length === 0) return null
 

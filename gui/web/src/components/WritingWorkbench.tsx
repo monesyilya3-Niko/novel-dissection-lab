@@ -171,9 +171,30 @@ export default function WritingWorkbench({
   // 若环境未提供 getProjectMeta（如仅针对资产注入面板的遗留测试），自动以工坊流水线模式运行保持兼容
   const defaultMode =
     initialMode ?? (typeof writingApi?.getProjectMeta === 'function' ? 'studio' : 'pipeline')
-  const [mode, setMode] = useState<'studio' | 'pipeline'>(defaultMode)
+  const [mode, setMode] = useState<'studio' | 'pipeline'>(() => {
+    try {
+      const pending = sessionStorage.getItem('novellab.pendingWritingMode')
+      if (pending === 'studio' || pending === 'pipeline') {
+        sessionStorage.removeItem('novellab.pendingWritingMode')
+        return pending
+      }
+    } catch { /* ignore */ }
+    return defaultMode
+  })
   const [pipelineTab, setPipelineTab] = useState(initialPipelineTab)
   const sel = useWritingAssets()
+
+  useEffect(() => {
+    const onMode = (e: Event) => {
+      const nextMode = (e as CustomEvent<{ mode: 'studio' | 'pipeline' }>).detail?.mode
+      if (nextMode === 'studio' || nextMode === 'pipeline') {
+        try { sessionStorage.removeItem('novellab.pendingWritingMode') } catch { /* ignore */ }
+        setMode(nextMode)
+      }
+    }
+    window.addEventListener('novellab:writing-mode', onMode)
+    return () => window.removeEventListener('novellab:writing-mode', onMode)
+  }, [])
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -309,6 +330,7 @@ function InjectPanel({ sel }: { sel: WritingAssetSelection }) {
   const { voice, setVoice, genrePack, setGenrePack, craft, setCraft } = sel
   const { distilled, setDistilled, proseCard, setProseCard } = sel
   const [prompt, setPrompt] = useState('')
+  const [copiedPrompt, setCopiedPrompt] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -319,12 +341,15 @@ function InjectPanel({ sel }: { sel: WritingAssetSelection }) {
     [sel.voiceGenre, byKind],
   )
 
+  const canInject = Boolean(voice || genrePack || craft || distilled || proseCard)
+
   const doInject = async () => {
     setLoading(true)
     setError('')
+    setCopiedPrompt(false)
     try {
       const r = await writingApi.inject({
-        voice, genre_pack: genrePack || undefined, craft: craft || undefined,
+        voice: voice || '', genre_pack: genrePack || undefined, craft: craft || undefined,
         distilled: distilled || undefined, prose_card: proseCard || undefined, save: true,
       })
       setPrompt(r.prompt)
@@ -381,14 +406,27 @@ function InjectPanel({ sel }: { sel: WritingAssetSelection }) {
             </MenuItem>
           ))}
         </TextField>
-        <Button variant="contained" onClick={doInject} disabled={!voice || loading}>
+        <Button variant="contained" onClick={doInject} disabled={!canInject || loading}>
           {loading ? <CircularProgress size={20} /> : t('gen_generate_prompt', '生成 Prompt')}
         </Button>
       </Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {prompt && (
         <Paper sx={{ p: 2, maxHeight: 400, overflow: 'auto', bgcolor: 'background.paper' }}>
-          <Typography variant="caption" color="text.secondary">{prompt.length} 字符</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="caption" color="text.secondary">{prompt.length} 字符</Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<ContentCopyIcon fontSize="small" />}
+              onClick={() => {
+                void navigator.clipboard.writeText(prompt)
+                setCopiedPrompt(true)
+              }}
+            >
+              {copiedPrompt ? '已复制 ✓' : '复制完整 Prompt'}
+            </Button>
+          </Box>
           <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, margin: 0 }}>{prompt}</pre>
         </Paper>
       )}
@@ -626,7 +664,40 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
               {taskState.guidePath && <><br />指引已落盘：{taskState.guidePath}</>}
             </Alert>
           )}
-          {taskState.status === 'error' && <Alert severity="error" sx={{ mt: 1 }}>{taskState.error}</Alert>}
+          {taskState.status === 'error' && (
+            <Alert severity="error" sx={{ mt: 1 }}>{friendlyError(taskState.error)}</Alert>
+          )}
+          {(taskState.status === 'degraded' || taskState.status === 'error') && (taskState.guideMarkdown || taskState.prompt) && (
+            <Box sx={{ mt: 1.5 }}>
+              <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                {taskState.guideMarkdown && (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={<ContentCopyIcon fontSize="small" />}
+                    onClick={() => void navigator.clipboard.writeText(taskState.guideMarkdown!)}
+                  >
+                    复制 AI 接管任务包（含要点与 Prompt）
+                  </Button>
+                )}
+                {taskState.prompt && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<ContentCopyIcon fontSize="small" />}
+                    onClick={() => void navigator.clipboard.writeText(taskState.prompt!)}
+                  >
+                    仅复制 System Prompt
+                  </Button>
+                )}
+              </Box>
+              <Box sx={{ maxHeight: 200, overflow: 'auto', bgcolor: 'action.hover', p: 1.5, borderRadius: 1 }}>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 12 }}>
+                  {taskState.guideMarkdown || taskState.prompt}
+                </pre>
+              </Box>
+            </Box>
+          )}
           {taskState.chapterPath && taskState.status === 'done' && (
             <Alert severity="success" sx={{ mt: 1 }}>已落盘：{taskState.chapterPath}</Alert>
           )}
@@ -848,6 +919,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   const [characters, setCharacters] = useState<CharacterCard[]>([])
   const [notes, setNotes] = useState<NoteItem[]>([])
   const [stats, setStats] = useState<WritingStats | null>(null)
+  const [savedChapters, setSavedChapters] = useState<Array<{ chapterNo: number; title: string; wordCount: number }>>([])
 
   // 中栏编辑状态
   const [chapterNo, setChapterNo] = useState<number>(1)
@@ -856,9 +928,42 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     '寒风呼啸，少年林凡握紧手中残破铁剑，凝视着眼前深不见底的万丈深渊。宗门考核长老的冷笑声犹在耳畔，但他胸膛内那颗沉寂已久的神秘石珠，正隐隐泛起滚烫的微光。'
   )
   const [saving, setSaving] = useState<boolean>(false)
+  const [copyingPrompt, setCopyingPrompt] = useState<boolean>(false)
 
   // 本地草稿自动暂存 Key（防丢稿机制）
   const getDraftKey = (proj: string, ch: number) => `novel_draft_${proj}_ch${ch}`
+  const loadedChapterKeyRef = useRef<string>('')
+
+  // 切换项目或章号时：优先恢复未入库的本地草稿；若无草稿则自动拉取服务端已入库章节（修复刷新丢稿）
+  useEffect(() => {
+    if (!currentProject) return
+    const key = `${currentProject}::${chapterNo}`
+    loadedChapterKeyRef.current = key
+    let localDraft = ''
+    try {
+      localDraft = localStorage.getItem(getDraftKey(currentProject, chapterNo)) || ''
+    } catch { /* ignore */ }
+    if (localDraft) {
+      setContent(localDraft)
+      return
+    }
+    if (typeof writingApi.getChapter === 'function') {
+      let cancelled = false
+      writingApi.getChapter(currentProject, chapterNo)
+        .then((res) => {
+          if (!cancelled && loadedChapterKeyRef.current === key && typeof res?.content === 'string') {
+            setContent(res.content)
+          }
+        })
+        .catch(() => {
+          // 服务端尚未落盘该章：第 1 章保留初始示例便于快速体验，其余新章置空
+          if (!cancelled && loadedChapterKeyRef.current === key && chapterNo > 1) {
+            setContent('')
+          }
+        })
+      return () => { cancelled = true }
+    }
+  }, [currentProject, chapterNo])
 
   // 监听内容变动，自动同步到本地草稿缓存
   useEffect(() => {
@@ -987,13 +1092,16 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   const loadProjectData = useCallback(async (projName: string) => {
     if (!projName) return
     try {
-      const [metaRes, outlineRes, charRes, noteRes, statsRes, chainRes] = await Promise.all([
+      const [metaRes, outlineRes, charRes, noteRes, statsRes, chainRes, chapsRes] = await Promise.all([
         writingApi.getProjectMeta(projName).catch(() => null),
         writingApi.outlines(projName).catch(() => []),
         writingApi.characters(projName).catch(() => []),
         writingApi.notes(projName).catch(() => []),
         writingApi.stats(projName, 30).catch(() => null),
         essenceApi?.listChains ? essenceApi.listChains(projName).catch(() => ({ chains: [] })) : Promise.resolve({ chains: [] }),
+        typeof writingApi.listChapters === 'function'
+          ? writingApi.listChapters(projName).catch(() => ({ chapters: [] }))
+          : Promise.resolve({ chapters: [] }),
       ])
       setMeta(metaRes)
       if (metaRes) {
@@ -1006,6 +1114,11 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       setCharacters(charRes || [])
       setNotes(noteRes || [])
       setStats(statsRes)
+      setSavedChapters((chapsRes?.chapters || []).map((c) => ({
+        chapterNo: c.chapterNo,
+        title: c.title,
+        wordCount: c.wordCount,
+      })))
       // 只展示当前项目关联书籍的暗线（2026-11-05 修）。
       // 原来查不到就回退到「全库暗线」，于是 A 项目的「草蛇灰线」里会冒出
       // B 书的伏笔，按章号高亮时还会误命中，数据看起来像串了。
@@ -2206,6 +2319,56 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
                       </MenuItem>
                     ))}
                   </TextField>
+                  <Button
+                    variant="contained"
+                    disabled={copyingPrompt || (!sel.voice && !sel.genrePack && !sel.proseCard)}
+                    startIcon={<ContentCopyIcon fontSize="small" />}
+                    onClick={async () => {
+                      setCopyingPrompt(true)
+                      try {
+                        const r = await writingApi.inject({
+                          voice: sel.voice || '',
+                          genre_pack: sel.genrePack || undefined,
+                          prose_card: sel.proseCard || undefined,
+                          craft: sel.craft || undefined,
+                          distilled: sel.distilled || undefined,
+                          project: currentProject || undefined,
+                          chapter_no: chapterNo,
+                          task_outline: chapterTitle,
+                        })
+                        await navigator.clipboard.writeText(r.prompt)
+                        setToast(`已复制第 ${chapterNo} 章完整写作 Prompt（${r.prompt.length} 字），可直接发给任意对话 AI`)
+                      } catch (e) {
+                        setError(friendlyError(e))
+                      } finally {
+                        setCopyingPrompt(false)
+                      }
+                    }}
+                  >
+                    {copyingPrompt ? '组装中…' : '一键复制本章完整 Prompt（离线/外部 AI）'}
+                  </Button>
+                  {savedChapters.length > 0 && (
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                        已入库章节（点击快速切换回显）：
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {savedChapters.map((sc) => (
+                          <Chip
+                            key={sc.chapterNo}
+                            size="small"
+                            color={sc.chapterNo === chapterNo ? 'primary' : 'default'}
+                            variant={sc.chapterNo === chapterNo ? 'filled' : 'outlined'}
+                            label={`第${sc.chapterNo}章 (${sc.wordCount}字)`}
+                            onClick={() => {
+                              setChapterNo(sc.chapterNo)
+                              setChapterTitle(sc.title || `第${sc.chapterNo}章`)
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
                   <Button variant="outlined" onClick={onSwitchPipeline} startIcon={<TuneIcon />}>
                     前往工坊高级生成器
                   </Button>

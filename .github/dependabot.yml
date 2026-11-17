@@ -10,6 +10,22 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # 跨大版本破坏性升级需独立窗口人工迁移验证，避免每周自动创建必红 PR
+    ignore:
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@mui/material"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@mui/icons-material"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@emotion/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@emotion/styled"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

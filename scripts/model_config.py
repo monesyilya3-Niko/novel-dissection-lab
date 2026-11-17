@@ -28,13 +28,15 @@ for _p in (str(ROOT_DIR), str(SCRIPTS_DIR)):
 import secret_store  # noqa: E402  （独立模块，llm_client 内部为延迟 import，不能从它转出）
 from llm_client import (  # noqa: E402
     DEFAULT_ROUTES,
-    MODELS_FILE,
-    SECRETS_FILE,
+    MODELS_FILE,  # noqa: F401 — 保留公开重导出供外部/测试契约使用
+    SECRETS_FILE,  # noqa: F401 — 保留公开重导出供外部/测试契约使用
     load_models,
     load_secrets,
+    resolve_secrets_dir,
     save_models,
     save_secrets,
     test_model,
+    user_config_dir,
 )
 
 # 常见服务商预设。省去翻文档找 base_url 的功夫
@@ -168,6 +170,7 @@ TASK_LABELS = {
     "pass2_character": "拆书·人物层（抽取型）",
     "pass3_style": "拆书·文风层（判断型）",
     "pass4_commercial": "拆书·商业层（判断型）",
+    "pass5_craft": "拆书·笔法层（判断型）",
     "pass5_aggregate": "题材包聚合（判断型）",
     "writing": "章节生成",
     "consistency_check": "风格一致性自检",
@@ -313,7 +316,8 @@ def cmd_add(args):
         cfg["roles"] = {"default": mid, "cheap": mid, "strong": mid}
         print("\n[i] 首个模型，已自动绑定为 default / cheap / strong")
     save_models(cfg)
-    print(f"\n[OK] 模型 '{mid}' 已添加 → {MODELS_FILE}")
+    actual_models_file = user_config_dir() / "models.json"
+    print(f"\n[OK] 模型 '{mid}' 已添加 → {actual_models_file}")
 
     # 密钥
     if p.get("protocol") != "ollama" and p.get("api_key_env") != "":
@@ -331,7 +335,12 @@ def cmd_add(args):
             s = load_secrets()
             s[mid] = key
             save_secrets(s)
-            print(f"[OK] 密钥已存入 {SECRETS_FILE}（{secret_store.storage_mode()}）")
+            sec_dir = resolve_secrets_dir()
+            try:
+                mode_str = secret_store.storage_mode(sec_dir)
+            except TypeError:
+                mode_str = secret_store.storage_mode()
+            print(f"[OK] 密钥已存入 {sec_dir}（{mode_str}）")
 
     print(f"\n下一步: python model_config.py test {mid}")
     return 0

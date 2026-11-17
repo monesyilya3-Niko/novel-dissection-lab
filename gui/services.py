@@ -567,6 +567,57 @@ def start_analysis(book_id: str, genre: str, model_id: str | None = None,
     return {"task_id": book_id, "cursor": cursor, "status": "running"}
 
 
+def _record_batch_failure(
+    book_id: str,
+    book: dict[str, Any],
+    chapters: list[Any],
+    genre: str,
+    ci: int,
+    bi: int,
+    done: int,
+    total_batches: int,
+    ctx: dict[str, Any],
+    exc: Exception,
+) -> bool:
+    """记录单批失败；若命中鉴权/欠费熔断则生成离线接管指引并返回 True（主循环立即退出）。"""
+    err_text = str(exc)[:500]
+    if engine_adapter.is_auth_or_quota_error(exc):
+        guide_rel = ""
+        try:
+            off = engine_adapter.run_offline_analysis(
+                book_id,
+                book.get("title") or book_id,
+                chapters,
+                genre,
+                reason=f"外部模型不可用：{err_text[:160]}",
+            )
+            guide_rel = off.get("guide_path") or ""
+        except Exception as off_exc:  # noqa: BLE001
+            _log.warning("生成离线接管指引失败 %s: %s", book_id, off_exc)
+        with state_store.update_state(book_id) as state:
+            state_store.set_batch_state(state, ci, bi, "failed")
+            state["status"] = "error"
+            state["last_error"] = err_text
+            if guide_rel:
+                state["takeover_guide_path"] = guide_rel
+        _sync_book_status(book_id, "error")
+        broker.publish({
+            "book_id": book_id,
+            "status": "error",
+            "chapter_index": ci,
+            "batch_index": bi,
+            "done": done,
+            "total": total_batches,
+            "message": err_text,
+        })
+        return True
+    with state_store.update_state(book_id) as state:
+        state_store.set_batch_state(state, ci, bi, "failed")
+        state["last_error"] = err_text
+    _publish(book_id, ci, bi, "failed", done + 1, total_batches, ctx)
+    return False
+
+
 def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: int, ctx: dict[str, Any]) -> None:
     """后台串行分析主循环。"""
     try:
@@ -635,11 +686,9 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
                             except ValueError:
                                 last_asset = str(ap)
                     except Exception as exc:  # noqa: BLE001
-                        with state_store.update_state(book_id) as state:
-                            state_store.set_batch_state(state, ci, bi, "failed")
-                            state["last_error"] = str(exc)[:500]
+                        if _record_batch_failure(book_id, book, chapters, genre, ci, bi, done, total_batches, ctx, exc):
+                            return
                         done += 1
-                        _publish(book_id, ci, bi, "failed", done, total_batches, ctx)
                         continue
 
                     # 记录成功（资产取 pass1 作为代表，asset_index 只记批）
@@ -660,10 +709,33 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
                 _log.warning("重扫已达上限 %d 轮，仍有 pending 批，停止", _MAX_RESCAN_ROUNDS)
                 break
 
-        # 全部完成
+        # 统计最终成功/失败批数：若全部失败（0 批成功且存在 failed），绝不伪装成 done！
+        final_state = state_store.load_state(book_id)
+        ch_states = (final_state.get("chapter_states") or {}).values()
+        success_total = sum(1 for v in ch_states if (v or {}).get("status") == "success")
+        failed_total = sum(1 for v in ch_states if (v or {}).get("status") == "failed")
+        if failed_total > 0 and success_total == 0:
+            err_msg = final_state.get("last_error") or f"全部 {failed_total} 个批次均分析失败"
+            with state_store.update_state(book_id) as state:
+                state["status"] = "error"
+                state["last_error"] = err_msg
+            _sync_book_status(book_id, "error")
+            broker.publish({
+                "book_id": book_id,
+                "status": "error",
+                "chapter_index": 0,
+                "batch_index": 0,
+                "done": 0,
+                "total": total_batches,
+                "message": err_msg,
+            })
+            return
+
+        # 全部完成（或部分批次成功）
         with state_store.update_state(book_id) as state:
             state["status"] = "done"
-            state.pop("last_error", None)
+            if failed_total == 0:
+                state.pop("last_error", None)
         # 同步 books 表状态（2026-11-05 修）。
         #
         # /api/books 的 status 取自 SQLite books.status，而分析完成原先只改
@@ -681,6 +753,7 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
             _log.warning("分析后组装资产失败（批级产物仍完整）: %s", exc)
         _publish(book_id, 0, 0, "done", done, total_batches, ctx)
     except Exception as exc:  # noqa: BLE001
+        _log.exception("拆书任务未捕获异常 book_id=%s", book_id)
         err_msg = str(exc)[:500]
         with state_store.update_state(book_id) as state:
             state["status"] = "error"
@@ -990,7 +1063,27 @@ def get_status(book_id: str | None = None) -> dict[str, Any]:
         # 报告生成失败原因（2026-11-05）：铁律二未过 / 组装异常时写进状态文件的
         # report_error 从没有 API 出口——前端即使想显示也拿不到。
         "report_error": state.get("report_error") or "",
+        "takeover_guide_path": state.get("takeover_guide_path") or "",
     }
+
+
+def offline_analyze_book(book_id: str, genre: str = "unknown") -> dict[str, Any]:
+    """无外部 LLM 时的纯离线量化拆解 + 采样切片 + AI 接管任务包生成。"""
+    book = _get_book_or_raise(book_id)
+    g = (genre or "").strip() or "unknown"
+    if g != "unknown" and not engine_adapter.is_known_genre(g):
+        raise ServiceError(f"未知题材: {g!r}", 400)
+    res = engine_adapter.run_offline_analysis(
+        book_id,
+        book.get("title") or book_id,
+        book.get("chapters") or [],
+        g,
+        reason="用户在 GUI 触发离线量化拆解与 AI 接管任务生成",
+    )
+    with state_store.update_state(book_id) as state:
+        state["genre"] = g
+        state["takeover_guide_path"] = res.get("guide_path") or ""
+    return res
 
 
 # ---------------------------------------------------------------------------
@@ -1007,7 +1100,8 @@ def get_overview() -> dict[str, Any]:
     else:
         books = state_store.list_books_summary()
         ov["total_books"] = len(books)
-    ov["model_configured"] = engine_adapter.any_model_configured() or ov.get("model_configured", False)
+    ov["model_configured"] = engine_adapter.any_model_configured()
+    ov["model_ready"] = engine_adapter.any_model_ready()
     return ov
 
 
@@ -1551,8 +1645,10 @@ def _generate_reports_inner(book_id: str, book: dict[str, Any]) -> None:
     #    笔法报告（craft-card 缺失则留空提示，不阻断）。
     craft_md = engine_adapter.render_craft_report(craft) if craft else ""
 
-    # 2. 铁律二：合计 ≥10000 字符硬校验（与 CLI 共用同一实现，写盘**之前**判定）。
-    chk = engine_adapter.combined_report_ok(len(book_md), len(craft_md))
+    # 2. 铁律二：合计 ≥10000 字符（或英文 ≥5000 词）硬校验（写盘**之前**判定）。
+    chk = engine_adapter.combined_report_ok(
+        len(book_md), len(craft_md), book_text=book_md, craft_text=craft_md
+    )
     if not chk.get("ok"):
         msg = (f"铁律二未通过：拆书报告 {chk['book_chars']} 字 + 笔法分析 "
                f"{chk['craft_chars']} 字 = 合计 {chk['total']} 字 < 硬门槛 "

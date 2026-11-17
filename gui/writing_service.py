@@ -297,6 +297,7 @@ def create_project(name: str) -> dict[str, Any]:
         raise ServiceError("项目名不能包含 / 或 \\", 400)
     if clean == "default":
         raise ServiceError("default 为 CLI 只读保留项目，不能新建", 400)
+    clean = _sanitize_project(clean)
 
     nd = config.NOVEL_DIR
     try:
@@ -322,31 +323,100 @@ def create_project(name: str) -> dict[str, Any]:
     return {"id": clean, "name": clean, "read_only": False}
 
 
-def inject(voice: str, structure: str | None = None, commercial: str | None = None,
+def _build_project_context_section(
+    project: str | None,
+    chapter_no: int | None = None,
+    task_outline: str | None = None,
+) -> str:
+    """组装项目大纲、核心人物卡与本章细纲上下文，供无外部 LLM 时一键复制完整 Prompt。"""
+    sections: list[str] = []
+    if project and isinstance(project, str) and project.strip() and project.strip() != "default":
+        try:
+            from gui import writing_extra
+            outlines = writing_extra.list_outlines(project.strip())
+            chars = writing_extra.list_characters(project.strip())
+            if chars:
+                c_lines = []
+                for ch in chars[:12]:
+                    role = f"（{ch.get('role')}）" if ch.get("role") else ""
+                    desc = str(ch.get("description") or "").strip()
+                    c_lines.append(f"- **{ch.get('name')}**{role}：{desc}" if desc else f"- **{ch.get('name')}**{role}")
+                sections.append("### 项目人物设定\n" + "\n".join(c_lines))
+            if outlines:
+                o_lines = []
+                for o in outlines[:20]:
+                    kind_lbl = "卷纲" if o.get("kind") == "volume" else "章纲"
+                    summ = str(o.get("summary") or "").strip()
+                    o_lines.append(f"- [{kind_lbl}] {o.get('title')}：{summ}" if summ else f"- [{kind_lbl}] {o.get('title')}")
+                sections.append("### 项目大纲脉络\n" + "\n".join(o_lines))
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("加载项目上下文失败（跳过）%s: %s", project, exc)
+    if chapter_no is not None or (task_outline and str(task_outline).strip()):
+        head = f"### 本次写作任务（第 {chapter_no} 章）" if chapter_no else "### 本次写作任务"
+        body = str(task_outline or "").strip() or "按上方大纲与声线约束完成本章正文。"
+        sections.append(f"{head}\n{body}")
+    if not sections:
+        return ""
+    return "\n\n## 当前项目创作上下文\n\n" + "\n\n".join(sections) + "\n"
+
+
+def list_project_chapters(project: str) -> list[dict[str, Any]]:
+    """列出项目已保存章节。"""
+    from gui import writing_extra
+    return writing_extra.list_project_chapters(project)
+
+
+def get_project_chapter(project: str, chapter_no: int) -> dict[str, Any]:
+    """读取项目指定章节正文。"""
+    from gui import writing_extra
+    return writing_extra.get_project_chapter(project, chapter_no)
+
+
+def inject(voice: str = "", structure: str | None = None, commercial: str | None = None,
            genre_pack: str | None = None, craft: str | None = None,
            distilled: str | None = None, prose_card: str | None = None,
            context_intent: str | None = None, tracking_state: str | None = None,
-           save: bool = False) -> dict[str, Any]:
-    """资产 → 写作 system prompt。
+           save: bool = False, project: str | None = None,
+           chapter_no: int | None = None, task_outline: str | None = None) -> dict[str, Any]:
+    """资产 → 写作 system prompt（支持有声线卡或纯题材包/文风卡/蒸馏卡驱动，并可拼入项目上下文）。"""
+    has_any = any(bool(x and str(x).strip()) for x in (voice, structure, commercial, genre_pack, craft, distilled, prose_card))
+    if not has_any:
+        raise ServiceError("请至少选择一张声线卡、题材包、文风卡或蒸馏卡", 400)
 
-    每个资产参数只接受对应 kind 的内容：distilled 必须走 ``distilled`` 参数
-    （不得塞进 voice/structure/commercial/craft），``prose_card`` 必须是文风卡本身
-    而非题材索引；错配由 ``_load_asset_of_kind`` 同步拒绝为 400。
-    """
-    voice_data = _load_asset_of_kind(voice, "voice")
     structure_data = _load_asset_of_kind(structure, "structure") if structure else None
     commercial_data = _load_asset_of_kind(commercial, "commercial") if commercial else None
     genre_pack_data = _load_asset_json(genre_pack) if genre_pack else None
     craft_data = _load_asset_of_kind(craft, "craft") if craft else None
     distilled_data = _load_asset_of_kind(distilled, "distilled") if distilled else None
     prose_card_data = _load_asset_of_kind(prose_card, "prose_card") if prose_card else None
-    # 铁律一：注入时按题材匹配，禁止跨题材污染（kind 校验只防错配，不防跨题材）。
-    # prose_card 豁免：文风卡是风格参照，允许跨题材选用。
-    _require_genre_match(voice_data, {
-        "structure": structure_data, "commercial": commercial_data,
-        "genre_pack": genre_pack_data, "craft": craft_data,
-        "distilled": distilled_data,
-    })
+
+    injected_kinds: list[str] = []
+    if voice and str(voice).strip():
+        voice_data = _load_asset_of_kind(voice, "voice")
+        injected_kinds.append("voice")
+        # 铁律一：注入时按题材匹配，禁止跨题材污染（prose_card 豁免）。
+        _require_genre_match(voice_data, {
+            "structure": structure_data, "commercial": commercial_data,
+            "genre_pack": genre_pack_data, "craft": craft_data,
+            "distilled": distilled_data,
+        })
+    else:
+        inferred_genre = (
+            _asset_genre(genre_pack_data or {})
+            or _asset_genre(distilled_data or {})
+            or _asset_genre(craft_data or {})
+            or _asset_genre(prose_card_data or {})
+            or ""
+        )
+        voice_data = {
+            "meta": {"title": project or "题材驱动创作", "genre": inferred_genre},
+            "narration": {},
+            "dialogue": {"character_voices": []},
+            "emotion_handling": {},
+            "imagery": {},
+            "banned": {},
+        }
+
     prompt = engine_adapter.build_writing_prompt(
         voice_data,
         structure=structure_data,
@@ -358,7 +428,10 @@ def inject(voice: str, structure: str | None = None, commercial: str | None = No
         tracking_state=_load_asset_json(tracking_state) if tracking_state else None,
         genre_prose_card=prose_card_data,
     )
-    injected_kinds = ["voice"]
+    extra_ctx = _build_project_context_section(project, chapter_no, task_outline)
+    if extra_ctx:
+        prompt = prompt.rstrip() + extra_ctx
+
     if structure:
         injected_kinds.append("structure")
     if commercial:
@@ -375,7 +448,7 @@ def inject(voice: str, structure: str | None = None, commercial: str | None = No
     saved_path = None
     if save:
         config.PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
-        title = voice_data.get("meta", {}).get("title", "writing")
+        title = voice_data.get("meta", {}).get("title", "writing") or "writing"
         safe = re.sub(r'[^\w\-]', '_', title)[:60]
         fp = config.PROMPTS_DIR / f"{safe}-writing-prompt.md"
         fp.write_text(prompt, encoding="utf-8")
@@ -434,10 +507,11 @@ def score(voice: str, text: str | None = None, chapter_path: str | None = None,
     pass_line, _ = engine_adapter.resolve_thresholds(genre_pack_data)
 
     cons_score = cons["score"]
-    quality_score = qc.get("score", 0)
     verdict = qc.get("verdict", "FAIL")
     if cons_score < 60:
         verdict = "FAIL"
+    elif cons_score < 75 and verdict == "PASS":
+        verdict = "WARN"
 
     return {
         "consistency": {"score": cons_score, "dims": dims, "details": cons.get("details", []), "radar": radar},
@@ -618,8 +692,10 @@ def generate(voice: str, project: str, chapter_no: int, task: str,
     else:
         system = prompt
 
-    pass_line, _ = engine_adapter.resolve_thresholds(
-        _load_asset_json(genre_pack) if genre_pack else None)
+    pass_line, _ = engine_adapter.resolve_thresholds(gp_data)
+
+    # 先清理终态任务，防止无模型降级分支与正常分支使注册表无限增长
+    _prune_terminal_tasks()
 
     task_id = f"w-{uuid.uuid4().hex[:12]}"
 
@@ -776,10 +852,10 @@ def import_chapter(project: str, chapter_no: int, content: str,
     }
 
     if voice_data is not None:
+        gp_data = _load_asset_json(genre_pack) if genre_pack else None
         cons = engine_adapter.score_text(voice_data, content, label=f"第{chapter_no}章")
-        qc = engine_adapter.chapter_check(content, None)
-        pass_line, _ = engine_adapter.resolve_thresholds(
-            _load_asset_json(genre_pack) if genre_pack else None)
+        qc = engine_adapter.chapter_check(content, gp_data)
+        pass_line, _ = engine_adapter.resolve_thresholds(gp_data)
         result["consistency_score"] = cons["score"]
         result["quality_score"] = qc.get("score", 0)
         result["quality_verdict"] = qc.get("verdict", "?")
@@ -798,6 +874,7 @@ def _run_generate(task_id: str, voice_data: dict, system: str, req: dict) -> Non
     target_score = req["target_score"]
     pass_line = req["pass_line"]
     max_attempts = req.get("max_attempts") or 3  # 1 初稿 + (N-1) 改写
+    gp_data = _load_asset_json(req["genre_pack"]) if req.get("genre_pack") else None
 
     try:
         user = f"请写第{chapter_no}章。{req['task']}\n目标字数约{req['words']}字。"
@@ -834,7 +911,7 @@ def _run_generate(task_id: str, voice_data: dict, system: str, req: dict) -> Non
             with _WRITING_LOCK:
                 _WRITING_TASKS[task_id]["status"] = "scoring"
             cons = engine_adapter.score_text(voice_data, content, label=f"第{chapter_no}章")
-            qc = engine_adapter.chapter_check(content, None)
+            qc = engine_adapter.chapter_check(content, gp_data)
             cons_score = cons["score"]
             qc_score = qc.get("score", 0)
             cons_ok = cons_score >= target_score
@@ -922,9 +999,29 @@ def _run_generate(task_id: str, voice_data: dict, system: str, req: dict) -> Non
         })
 
     except Exception as exc:  # noqa: BLE001
+        _log.warning("写作生成异常 task_id=%s: %s", task_id, exc)
+        # 外部模型失效（如 HTTP 402/401/超时）时，同步落盘 AI 接管指引并把已组装的
+        # System Prompt 挂入任务状态，使用户无需重填表单即可一键复制交给外部对话 AI 完成写作。
+        chapter_path = (novel_dir / "chapters" / f"arc-{_arc_for_chapter(chapter_no)}"
+                        / f"chapter-{chapter_no:03d}.txt")
+        guide = _build_degrade_guide(
+            {"project": project, "chapter_no": chapter_no, "task": req.get("task", ""),
+             "target_score": target_score, "pass_line": pass_line},
+            system, chapter_path, pass_line)
+        guide_rel = None
+        try:
+            guide_path = novel_dir / "AI接管写作任务.md"
+            guide_path.write_text(guide, encoding="utf-8")
+            guide_rel = migrate.rel_path(guide_path)
+        except OSError:
+            pass
         with _WRITING_LOCK:
             _WRITING_TASKS[task_id]["status"] = "error"
             _WRITING_TASKS[task_id]["error"] = str(exc)
+            _WRITING_TASKS[task_id]["prompt"] = system
+            _WRITING_TASKS[task_id]["guide_markdown"] = guide
+            if guide_rel:
+                _WRITING_TASKS[task_id]["guide_path"] = guide_rel
         sse.broker.publish({
             "task_type": "writing", "task_id": task_id,
             "phase": "error", "error": str(exc),

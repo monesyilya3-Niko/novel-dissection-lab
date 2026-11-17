@@ -4,6 +4,25 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-17（企业级全栈升级与无外部模型闭环）
+
+本版聚焦「外部 LLM API Key 失效 / 402 欠费 / 纯离线场景下的全链路可用性」与「企业级安全、数据一致性及工程门禁升级」，新增 **3 个 REST API 端点**（134 → 137）、**1 项数据库迁移**（`0005_essence_chain_reveal`）及 **31 项后端回归测试**（2650 → 2681）。
+
+### Added — 无外部模型闭环与 AI 接管工作流
+
+- **纯离线拆书分析闭环（`POST /api/analyze/offline`）**：在未配置模型或 API Key 失效时，支持一键执行离线分层采样、客观量化指标测算（对话占比、句长分布、体感词密度等）并生成可直接投喂给任意对话型 AI 的《AI接管任务.md》与切片包。
+- **LLM 401/402/403 智能熔断与降级兜底**：`scripts/llm_client.py` 与 `gui/services.py` 识别鉴权失败、余额不足（HTTP 402）与占位符模板配置，立即停止无意义重试并触发离线切片与接管指南生成；写作台 `_run_generate` 在模型失败时自动保留组装好的结构化 Prompt 与创作指南，支持前端一键复制接管。
+- **创作室章节持久化与跨面板联动**：新增 `GET /api/writing/projects/<project>/chapters` 与 `GET /api/writing/projects/<project>/chapters/<chapter_no>`，沉浸创作室支持章节列表读取、落盘保存与一键复制组装 Prompt；资产注入（`inject`）改为声线卡可选并自动融合项目大纲与人物设定；质检台新增项目与章节快捷选择器。
+- **模型连通性深度探针（`any_model_ready`）**：区分「仅配置条目」与「真正持有有效凭证可调用」，首页仪表盘、模型管理器与首启向导实时联动刷新状态。
+
+### Fixed & Security — 企业级安全与数据一致性加固
+
+- **安装包版权语料泄漏根除（P0）**：修复 `desktop/sync_backend.py` 将本地 `corpus/` 原文打包进安装目录的隐患；补齐 `synonyms.json` 同步；修复 `build/build_portable.py` 与 `build/installer.iss` 启动入口统一走 `gui\launch.py`。
+- **Electron 桌面端与本地 HTTP 安全防线**：`desktop/main.js` 增加 `http:`/`https:` 外链协议白名单、多显示器脱屏坐标自愈与启动超时清理；`gui/server.py` 注入安全响应头（`X-Content-Type-Options` / `X-Frame-Options` / `Referrer-Policy`），并在全量 `/api/*` 请求（含 `GET` 与 `OPTIONS`）实施 Loopback `Host` DNS Rebinding 防护与跨源 `Origin` 拦截；`scripts/llm_client.py` 脱敏代理 URL 凭据日志。
+- **引擎铁律与检测精度强化**：`scripts/report.py` 补齐英文报告 5,000 词铁律二门禁；`scripts/distill.py` 锚定运行时 `ASSETS_ROOT` 并阻断空提取伪装成功；`scripts/setting_check.py` 修复多分隔符禁用词切分与常见双字词误报；`scripts/retrieve.py` 增加资产文件签名缓存失效机制。
+- **状态与数据库一致性**：迁移 `0005` 为 `essence_chains` 补齐 `reveal_chapter` 持久化列并支持幂等迁移；修复 `advanced_service` Windows 盘符冒号路径穿越、删除资产残留 SQLite 索引、外部目录质检临时副本残留及管理员删书锁泄漏问题。
+- **前端体验打磨**：修复浅色主题顶栏图标白底白字不可见、暗色模式编辑器配色、拆书工作台原文阅读与资产结果面板挂载、分析控制栏暂停/续跑/重试/离线分析全按钮闭环及全量中英双语词条对齐。
+
 ## [1.1.0] - 2026-11-11（稳定性大修：116 项修复）
 
 本版是把 1.0.0 之后累积的 **116 个提交**（90 fix / 8 feat）正式收进版本号。

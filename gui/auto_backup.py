@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 
@@ -16,26 +17,32 @@ from gui.logging_setup import get_logger
 
 _log = get_logger("auto_backup")
 
+_backup_lock = threading.Lock()
 _last_backup_date: str | None = None
 
 
 def startup_backup() -> Path | None:
     """执行一次备份并登记日期。返回备份路径，无可备份库/失败返回 None。"""
     global _last_backup_date
-    try:
-        from gui import migrate  # 延迟导入：避免 import 环（migrate → db → config）
-        p = migrate.backup()
-        _last_backup_date = time.strftime("%Y-%m-%d")
-        if p is not None:
-            _log.info("自动备份完成: %s", p.name)
-        return p
-    except Exception as exc:  # noqa: BLE001 — 备份失败不阻断服务
-        _log.warning("自动备份失败（不影响服务）: %s", exc)
-        return None
+    with _backup_lock:
+        try:
+            from gui import migrate  # 延迟导入：避免 import 环（migrate → db → config）
+            p = migrate.backup()
+            _last_backup_date = time.strftime("%Y-%m-%d")
+            if p is not None:
+                _log.info("自动备份完成: %s", p.name)
+            return p
+        except Exception as exc:  # noqa: BLE001 — 备份失败不阻断服务
+            _log.warning("自动备份失败（不影响服务）: %s", exc)
+            return None
 
 
 def daily_backup_if_due() -> None:
     """跨天后的首个请求触发当日备份（幂等，代价为一次日期比较）。"""
-    if _last_backup_date == time.strftime("%Y-%m-%d"):
+    today = time.strftime("%Y-%m-%d")
+    if _last_backup_date == today:
         return
+    with _backup_lock:
+        if _last_backup_date == today:
+            return
     startup_backup()

@@ -5705,6 +5705,103 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '列表是空的？说明还没有书跑完 pass1-5，先去「分析」工作台完成拆书。',
     'en-US': 'Empty? No book has finished pass1-5 yet — run Analysis first.',
   },
+  // ── 企业级补全词条（缺失键补齐 + 402/离线接管/章节持久化） ──
+  admin_assets_kind_structure: {
+    'zh-CN': '结构观测',
+    'en-US': 'Structure Obs',
+  },
+  admin_assets_kind_commercial: {
+    'zh-CN': '商业观测',
+    'en-US': 'Commercial Obs',
+  },
+  admin_assets_kind_craft: {
+    'zh-CN': '笔法卡',
+    'en-US': 'Craft Card',
+  },
+  admin_assets_kind_distilled: {
+    'zh-CN': '蒸馏规则',
+    'en-US': 'Distilled Rules',
+  },
+  admin_assets_kind_trope: {
+    'zh-CN': '桥段库',
+    'en-US': 'Trope Library',
+  },
+  platform_export_download: {
+    'zh-CN': '下载合规投稿包',
+    'en-US': 'Download Submission Bundle',
+  },
+  studio_chain_need_book: {
+    'zh-CN': '请先选择这条伏笔所属的精华库书籍（伏笔档案按书归档，不挂在写作项目下）',
+    'en-US': 'Please select the Essence Library book for this foreshadowing chain first',
+  },
+  studio_chain_book_label: {
+    'zh-CN': '归属精华书籍',
+    'en-US': 'Essence Book',
+  },
+  studio_chain_book_empty: {
+    'zh-CN': '精华库暂无书籍，请先在「精华库」归档一本小说',
+    'en-US': 'No books in Essence Library yet — archive one first',
+  },
+  studio_chain_book_hint: {
+    'zh-CN': '伏笔回收链与精华书籍绑定，便于跨章节追踪埋点与回收',
+    'en-US': 'Foreshadowing chains bind to an Essence book for cross-chapter tracking',
+  },
+  error_action_llm_quota_or_402: {
+    'zh-CN': '外部模型密钥已失效或订阅/余额不足（HTTP 401/402/403）。请前往「系统 → 模型管理」更新有效 API Key，或直接使用内置「离线量化拆解 / 复制写作 Prompt」无模型模式继续工作。',
+    'en-US': 'External LLM API key is expired or out of quota/subscription (HTTP 401/402/403). Update your API key in System → Models, or continue with Offline Quantitative Analysis & Prompt Takeover mode.',
+  },
+  error_action_llm_context_exceeded: {
+    'zh-CN': '输入文本超出当前模型的上下文窗口上限，请减小批次大小或切换长上下文模型',
+    'en-US': 'Input exceeds the model context window. Reduce batch size or switch to a larger-context model',
+  },
+  error_action_llm_empty_output: {
+    'zh-CN': '模型返回了空内容（可能因推理耗尽 max_tokens 或触发内容过滤），请重试或更换模型',
+    'en-US': 'Model returned empty text (possibly due to reasoning exhausting max_tokens or content filtering). Retry or switch models',
+  },
+  analysis_tab_reader: {
+    'zh-CN': '原文阅读',
+    'en-US': 'Reader',
+  },
+  analysis_tab_detail: {
+    'zh-CN': '批次明细',
+    'en-US': 'Batch Details',
+  },
+  analysis_btn_offline: {
+    'zh-CN': '离线量化拆解 & 接管包',
+    'en-US': 'Offline Metrics & Takeover Pack',
+  },
+  analysis_btn_pause: {
+    'zh-CN': '暂停',
+    'en-US': 'Pause',
+  },
+  analysis_btn_resume: {
+    'zh-CN': '继续',
+    'en-US': 'Resume',
+  },
+  analysis_btn_retry_failed: {
+    'zh-CN': '重试失败批',
+    'en-US': 'Retry Failed',
+  },
+  analysis_offline_done_title: {
+    'zh-CN': '离线量化拆解与 AI 接管任务包已就绪（零外部 LLM 依赖）',
+    'en-US': 'Offline Quantitative Analysis & AI Takeover Pack Ready (Zero External LLM Needed)',
+  },
+  analysis_copy_guide: {
+    'zh-CN': '复制 AI 接管指令包',
+    'en-US': 'Copy AI Takeover Guide',
+  },
+  home_model_missing_key: {
+    'zh-CN': '模型待填密钥',
+    'en-US': 'API Key Needed',
+  },
+  home_goto_models_btn: {
+    'zh-CN': '管理模型密钥',
+    'en-US': 'Manage API Keys',
+  },
+  quality_pick_project_label: {
+    'zh-CN': '快速选择写作项目',
+    'en-US': 'Quick Select Writing Project',
+  },
 }
 
 // ---------------------------------------------------------------------------

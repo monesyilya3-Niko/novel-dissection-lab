@@ -285,6 +285,13 @@ def test_model(model_id: str) -> dict[str, Any]:
 
     try:
         result = engine_adapter.model_test(mid)
+        if isinstance(result, dict) and result.get("ok") is False:
+            return {
+                "id": mid,
+                "success": False,
+                "error": str(result.get("error") or "模型连通性测试失败"),
+                "result": result,
+            }
         return {"id": mid, "success": True, "result": result}
     except Exception as e:
         return {"id": mid, "success": False, "error": str(e)}

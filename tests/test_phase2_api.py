@@ -78,7 +78,8 @@ class TestRouteRegistration(unittest.TestCase):
                       if '/api/writing/' in r[1].pattern or '/api/quality/' in r[1].pattern]
         # 2026-10-23：新增商业网文读者留存流失预测（POST /api/writing/reader-retention），35→36。
         # 2026-11-03：新增写作任务取消（POST /api/writing/tasks/{id}/cancel），36→37。
-        self.assertEqual(len(new_routes), 37, f"Expected 36 routes, got {len(new_routes)}")
+        # 2026-11-17：新增项目章节列表与单章正文读取（GET /api/writing/projects/.../chapters[/{no}]），37→39。
+        self.assertEqual(len(new_routes), 39, f"Expected 39 routes, got {len(new_routes)}")
 
 
 class TestWritingEndpoints(unittest.TestCase):

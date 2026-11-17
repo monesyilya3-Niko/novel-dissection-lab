@@ -20,8 +20,9 @@ ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "assets"
 REPORTS_DIR = ROOT / "reports"
 
-# 铁律二：报告字符数硬门槛（字符数口径）
+# 铁律二：报告篇幅硬门槛（中文 ≥10,000 字符；英文 ≥5,000 单词，对齐 CORE_PHILOSOPHY.md）
 MIN_REPORT_CHARS = 10000
+MIN_REPORT_EN_WORDS = 5000
 
 # 报告文件命名（单一来源：CLI 与 GUI 共用，避免两处硬编码漂移）
 REPORT_NAME_BOOK = "{name}-拆书报告.md"
@@ -36,31 +37,55 @@ def _report_char_len(path: Path) -> int:
         return 0
 
 
-def combined_report_ok(book_chars: int, craft_chars: int) -> dict[str, Any]:
+def _count_english_words(text: str) -> int:
+    return len(re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?", text or ""))
+
+
+def _is_predominantly_english(text: str) -> bool:
+    if not text:
+        return False
+    cjk = sum(1 for c in text if "\u4e00" <= c <= "\u9fff")
+    en_words = _count_english_words(text)
+    return en_words > 0 and en_words > cjk * 2
+
+
+def combined_report_ok(
+    book_chars: int,
+    craft_chars: int,
+    *,
+    book_text: str | None = None,
+    craft_text: str | None = None,
+) -> dict[str, Any]:
     """铁律二判定（**纯长度，不读盘**）——供「写盘前校验」使用。
 
-    2026-09-23 新增（总工排查）：GUI 的 ``_generate_reports`` 原先是「先写盘 → 再校验」，
-    校验不通过只抑制 ``report_ready`` 事件，**不达标的两份报告仍留在 reports/ 里冒充
-    合格品**。实测后果：6 本书里 4 本合计仅 5612–7024 字（门槛 10000），全部躺在
-    交付目录里，且没有任何机制回头复核。
-
-    要把它改成「校验通过才落盘」，就必须有一个不依赖磁盘的判定入口；门槛与口径
-    仍由本模块单一来源提供，避免 GUI 另写一份阈值。
-
-    Args:
-        book_chars: 拆书报告字符数
-        craft_chars: 笔法分析字符数
-    Returns:
-        dict: {book_chars, craft_chars, total, ok, min_chars, missing}
+    支持中英双轨（对齐 CORE_PHILOSOPHY.md §1 铁律二）：
+    - 默认/中文报告：合计字符数 >= 10,000；
+    - 当传入 book_text/craft_text 且检测为纯英文报告时：合计英文词数 >= 5,000（避免 1,800 词英文报告凑够 10,000 字符蒙混过关）。
     """
-    book = int(book_chars or 0)
-    craft = int(craft_chars or 0)
+    book = int(book_chars or (len(book_text) if book_text else 0))
+    craft = int(craft_chars or (len(craft_text) if craft_text else 0))
     total = book + craft
     missing = []
     if book <= 0:
         missing.append("book")
     if craft <= 0:
         missing.append("craft")
+
+    combined_str = f"{book_text or ''}\n{craft_text or ''}".strip()
+    if combined_str and _is_predominantly_english(combined_str):
+        en_words = _count_english_words(combined_str)
+        ok = en_words >= MIN_REPORT_EN_WORDS
+        return {
+            "book_chars": book,
+            "craft_chars": craft,
+            "total": total,
+            "english_words": en_words,
+            "min_english_words": MIN_REPORT_EN_WORDS,
+            "ok": ok,
+            "min_chars": MIN_REPORT_CHARS,
+            "missing": missing,
+        }
+
     ok = total >= MIN_REPORT_CHARS
     return {
         "book_chars": book,
@@ -73,33 +98,19 @@ def combined_report_ok(book_chars: int, craft_chars: int) -> dict[str, Any]:
 
 
 def check_combined_report_length(reports_dir, name: str) -> dict[str, Any]:
-    """铁律二「真·合计口径」校验：拆书报告 + 笔法分析 合计 ≥ MIN_REPORT_CHARS。
-
-    【为何必须有此共享函数】该硬校验原先只内联在 CLI 的 ``novel.py 分析`` 里，
-    GUI 的 ``services._generate_reports`` 直接生成并发布报告，完全没有合计校验，
-    导致铁律二在 GUI 路径被整条绕过（低于 10000 字符的报告照样交付）。
-    现在 CLI 与 GUI 都调本函数，保证「同一条规则、两处一致执行」。
-
-    Args:
-        reports_dir: 报告目录（``config.REPORTS_DIR``）
-        name: 书名/书 id（不含后缀）
-
-    Returns:
-        dict: {
-            "book_chars": 拆书报告字符数,
-            "craft_chars": 笔法分析字符数,
-            "total": 合计字符数,
-            "ok": 是否达标,
-            "missing": 缺失的报告名列表,
-            "book_path": ..., "craft_path": ...
-        }
-    """
+    """铁律二「真·合计口径」校验：拆书报告 + 笔法分析 合计达标。"""
     base = Path(reports_dir)
     book_path = base / REPORT_NAME_BOOK.format(name=name)
     craft_path = base / REPORT_NAME_CRAFT.format(name=name)
-    # 判定口径统一走 combined_report_ok（单一来源），本函数只负责「读盘 + 附加路径」。
-    result = combined_report_ok(
-        _report_char_len(book_path), _report_char_len(craft_path))
+    try:
+        b_txt = book_path.read_text(encoding="utf-8") if book_path.is_file() else ""
+    except (OSError, UnicodeDecodeError):
+        b_txt = ""
+    try:
+        c_txt = craft_path.read_text(encoding="utf-8") if craft_path.is_file() else ""
+    except (OSError, UnicodeDecodeError):
+        c_txt = ""
+    result = combined_report_ok(len(b_txt), len(c_txt), book_text=b_txt, craft_text=c_txt)
     result["book_path"] = str(book_path)
     result["craft_path"] = str(craft_path)
     return result

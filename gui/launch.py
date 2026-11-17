@@ -85,7 +85,9 @@ def _start_parent_watchdog(server) -> None:
         return
 
     from gui import server as _server_mod
+    from gui.logging_setup import get_logger as _get_logger
     is_alive = _server_mod._pid_is_alive
+    _wlog = _get_logger("watchdog")
 
     def _watch() -> None:
         while True:
@@ -95,8 +97,8 @@ def _start_parent_watchdog(server) -> None:
                     print("[GUI] 父进程已退出，后端自动停止（释放锁与端口）")
                     server.shutdown()
                     return
-            except Exception:  # noqa: BLE001 — 看护失败不应影响服务
-                return
+            except Exception as exc:  # noqa: BLE001 — 瞬时异常只记日志，不终止看护循环
+                _wlog.warning("父进程探活瞬时异常（继续看护）: %s", exc)
 
     threading.Thread(target=_watch, daemon=True, name="parent-watchdog").start()
 
@@ -121,7 +123,10 @@ def main(argv: list[str] | None = None) -> int:
 
     import secrets
 
+    from gui.logging_setup import setup_logging
     from gui.server import GuiServer
+
+    setup_logging()
 
     # Electron 模式（--no-browser）：生成身份握手 token，防止端口被抢占伪造。
     # 服务端部署（--server）不生成：没有 Electron 消费端去取 stdout 里的令牌，

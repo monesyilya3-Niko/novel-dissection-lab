@@ -3,7 +3,7 @@
 // 后端零依赖（纯标准库），随包携带 Windows embeddable Python，用户机器无需装 Python。
 'use strict'
 
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain, screen, shell } = require('electron')
 const { spawn } = require('child_process')
 const path = require('path')
 const http = require('http')
@@ -82,15 +82,20 @@ function startBackend() {
     } catch (e) {
       return reject(e)
     }
-    backend.on('error', (e) => reject(e))
+    backend.on('error', (e) => {
+      clearTimeout(startupTimer)
+      reject(e)
+    })
     const onData = (d) => {
       out += d.toString()
+      if (out.length > 16384) out = out.slice(-16384)
       const parsed = parseUrlFromOutput(out)
       // 必须 URL 和 token 都到齐才继续：两行 print 可能分属不同管道
       // 数据块，若只拿到 URL 就摘监听，token 会永远收不到导致 403。
       if (parsed && parsed.url && parsed.token) {
         backendUrl = parsed.url
         handshakeToken = parsed.token
+        clearTimeout(startupTimer)
         backend.stdout.off('data', onData)
         backend.stderr.off('data', onData)
         waitForHttp(parsed.url, 30000).then(resolve).catch(reject)
@@ -99,9 +104,14 @@ function startBackend() {
     backend.stdout.on('data', onData)
     backend.stderr.on('data', onData)
     backend.on('exit', (code) => {
-      if (!backendUrl) reject(new Error(`后端启动失败，退出码 ${code}\n${out.slice(-500)}`))
+      if (!backendUrl) {
+        clearTimeout(startupTimer)
+        reject(new Error(`后端启动失败，退出码 ${code}\n${out.slice(-500)}`))
+      }
     })
-    setTimeout(() => { if (!backendUrl) reject(new Error('后端启动超时（60s）')) }, 60000)
+    const startupTimer = setTimeout(() => {
+      if (!backendUrl) reject(new Error('后端启动超时（60s）'))
+    }, 60000)
   })
 }
 
@@ -121,6 +131,19 @@ function loadWindowState() {
     if (typeof s.height === 'number' && s.height >= 640) defaults.height = s.height
     if (typeof s.x === 'number') defaults.x = s.x
     if (typeof s.y === 'number') defaults.y = s.y
+    // 多显示器防护：若上次保存在副屏、拔掉副屏后重启，坐标可能落在所有可见工作区之外。
+    if (typeof defaults.x === 'number' && typeof defaults.y === 'number') {
+      const displays = screen.getAllDisplays()
+      const visible = displays.some(({ workArea }) => {
+        const ix = Math.min(defaults.x + defaults.width, workArea.x + workArea.width) - Math.max(defaults.x, workArea.x)
+        const iy = Math.min(defaults.y + defaults.height, workArea.y + workArea.height) - Math.max(defaults.y, workArea.y)
+        return ix >= 100 && iy >= 100
+      })
+      if (!visible) {
+        defaults.x = undefined
+        defaults.y = undefined
+      }
+    }
   } catch (_) { /* 首次启动或配置损坏，用默认值 */ }
   return defaults
 }
@@ -216,17 +239,28 @@ function createWindow() {
       return false
     }
   }
+  const isSafeExternalUrl = (url) => {
+    try {
+      const u = new URL(url)
+      // 安全白名单：严禁向 shell.openExternal 透传 file:/ms-msdt:/smb:/javascript: 等本地协议
+      return u.origin !== backendOrigin && (u.protocol === 'https:' || u.protocol === 'http:')
+    } catch (_) {
+      return false
+    }
+  }
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (isInternalUrl(url)) return
     event.preventDefault()
-    // 仅跨源的转交系统浏览器；同源的其它路径直接拦掉（开浏览器无意义）。
-    if (new URL(url).origin !== backendOrigin) {
+    // 仅跨源且为安全 HTTP(S) 协议时转交系统浏览器；同源非入口或危险协议一律拦掉。
+    if (isSafeExternalUrl(url)) {
       shell.openExternal(url)
     }
   })
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (!isInternalUrl(url)) {
-      shell.openExternal(url)
+      if (isSafeExternalUrl(url)) {
+        shell.openExternal(url)
+      }
       return { action: 'deny' }
     }
     return { action: 'allow' }

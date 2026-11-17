@@ -232,7 +232,8 @@ def _h_asset(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
 
 def _h_models(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     return ok({"models": engine_adapter.list_models(),
-               "any_configured": engine_adapter.any_model_configured()})
+               "any_configured": engine_adapter.any_model_configured(),
+               "any_ready": engine_adapter.any_model_ready()})
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +301,17 @@ def _h_full_analysis(params: dict[str, Any], body: dict[str, Any]) -> dict[str, 
     return ok(services.run_full_analysis(book_id, genre, model_id))
 
 
+def _h_offline_analysis(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    b = body or {}
+    book_id = b.get("book_id", "")
+    genre = b.get("genre", "unknown")
+    if not book_id or not isinstance(book_id, str):
+        raise ServiceError("缺少 book_id", 400)
+    if genre is not None and not isinstance(genre, str):
+        raise ServiceError("genre 必须为字符串", 400)
+    return ok(services.offline_analyze_book(book_id, genre or "unknown"))
+
+
 def _h_genres(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     """P0-4：题材列表（前端下拉唯一来源，与后端校验同源）。"""
     from gui import engine_adapter
@@ -321,6 +333,23 @@ def _h_writing_project_create(_params: dict[str, Any], body: dict[str, Any]) -> 
     return ok(writing_service.create_project(b.get("name") or ""))
 
 
+def _h_writing_project_chapters(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from urllib.parse import unquote
+
+    from gui import writing_service
+    project = unquote(params.get("project") or "")
+    return ok({"project": project, "chapters": writing_service.list_project_chapters(project)})
+
+
+def _h_writing_project_chapter_get(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from urllib.parse import unquote
+
+    from gui import writing_service
+    project = unquote(params.get("project") or "")
+    cno = _safe_int(params.get("chapter_no"), 1, "chapter_no")
+    return ok(writing_service.get_project_chapter(project, cno))
+
+
 def _h_writing_inject(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_service
     b = body or {}
@@ -329,7 +358,10 @@ def _h_writing_inject(_params: dict[str, Any], body: dict[str, Any]) -> dict[str
         commercial=b.get("commercial"), genre_pack=b.get("genre_pack"),
         craft=b.get("craft"), distilled=b.get("distilled"),
         prose_card=b.get("prose_card"), context_intent=b.get("context_intent"),
-        tracking_state=b.get("tracking_state"), save=bool(b.get("save"))))
+        tracking_state=b.get("tracking_state"), save=bool(b.get("save")),
+        project=b.get("project"),
+        chapter_no=_safe_int_or_none(b.get("chapter_no"), "chapter_no"),
+        task_outline=b.get("task_outline")))
 
 
 def _safe_int(value: Any, default: int, field: str) -> int:
@@ -1434,8 +1466,11 @@ def _h_essence_chain_create(_params: dict[str, Any], body: dict[str, Any]) -> di
         status=b.get("status", "planted"),
         analysis=analysis_txt,
         # 用户显式填写的显露章（2026-11-05）：此前 router 根本不读这个字段，
-        # 前端有输入框却永远不生效。
-        reveal_chapter=_safe_int_or_none(b.get("reveal_chapter"), "reveal_chapter"),
+        # 前端有输入框却永远不生效。同时兼容 snake_case 与 camelCase。
+        reveal_chapter=_safe_int_or_none(
+            b.get("reveal_chapter") if b.get("reveal_chapter") is not None else b.get("revealChapter"),
+            "reveal_chapter",
+        ),
     ))
 
 
@@ -1509,9 +1544,12 @@ ROUTES: list[tuple[str, re.Pattern, Callable[[dict, dict], dict]]] = [
     ("GET", re.compile(r"^/api/book/(?P<book_id>[^/]+)/results$"), _h_book_results),
     ("GET", re.compile(r"^/api/book/(?P<book_id>[^/]+)/scores$"), _h_book_scores),
     ("POST", re.compile(r"^/api/analyze/full$"), _h_full_analysis),
+    ("POST", re.compile(r"^/api/analyze/offline$"), _h_offline_analysis),
     # W15 阶段二：写作（M2）
     ("GET", re.compile(r"^/api/writing/projects$"), _h_writing_projects),
     ("POST", re.compile(r"^/api/writing/projects$"), _h_writing_project_create),
+    ("GET", re.compile(r"^/api/writing/projects/(?P<project>[^/]+)/chapters$"), _h_writing_project_chapters),
+    ("GET", re.compile(r"^/api/writing/projects/(?P<project>[^/]+)/chapters/(?P<chapter_no>\d+)$"), _h_writing_project_chapter_get),
     ("POST", re.compile(r"^/api/writing/inject$"), _h_writing_inject),
     ("POST", re.compile(r"^/api/writing/generate$"), _h_writing_generate),
     ("GET", re.compile(r"^/api/writing/tasks/(?P<task_id>[^/]+)$"), _h_writing_task),

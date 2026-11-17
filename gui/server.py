@@ -173,11 +173,28 @@ class _Handler(BaseHTTPRequestHandler):
             if not supplied or not hmac.compare_digest(supplied, handshake):
                 self._send_json(router.err(403, "握手失败：非法客户端"), 403)
                 return False
-        # CSRF 纵深防御（非 Electron 模式）：/api/* 写操作要求 Origin 来自本机。
-        # Electron 模式已有握手 token，浏览器直连模式靠此挡 CSRF。
-        # 无 Origin 的视为非浏览器客户端（curl/脚本），不受影响。
-        if not handshake and self.command in ("POST", "PUT", "DELETE"):
-            if path == "/api" or path.startswith("/api/"):
+        # 防 DNS Rebinding 与跨站数据窃取（非 Electron 本机监听模式）：
+        # 1) 当服务绑定回环地址时，/api/* 的 Host 头必须是本机地址；
+        # 2) 携带 Origin 头的 /api/* 请求（含 GET/SSE）必须来自本机源；
+        # 3) 写操作额外校验 Origin 或 Referer。
+        if not handshake and (path == "/api" or path.startswith("/api/")):
+            srv_addr = getattr(getattr(self, "server", None), "server_address", ("127.0.0.1", 0))
+            bind_host = str(srv_addr[0] if isinstance(srv_addr, tuple) and srv_addr else "127.0.0.1").lower()
+            if bind_host in ("127.0.0.1", "localhost", "::1"):
+                host_hdr = (self.headers.get("Host") or "").strip()
+                if host_hdr:
+                    try:
+                        req_host = (urlparse(f"http://{host_hdr}").hostname or "").lower()
+                    except Exception:  # noqa: BLE001
+                        req_host = ""
+                    if req_host not in ("127.0.0.1", "localhost", "::1", "[::1]"):
+                        self._send_json(router.err(403, "拒绝非本机 Host 请求（防 DNS Rebinding）"), 403)
+                        return False
+                origin_hdr = self.headers.get("Origin") or ""
+                if origin_hdr and not self._is_same_host_origin(origin_hdr):
+                    self._send_json(router.err(403, "跨站请求被拒绝"), 403)
+                    return False
+            if self.command in ("POST", "PUT", "DELETE"):
                 origin = self.headers.get("Origin") or self.headers.get("Referer") or ""
                 if origin and not self._is_same_host_origin(origin):
                     self._send_json(router.err(403, "跨站请求被拒绝"), 403)
@@ -338,6 +355,21 @@ class _Handler(BaseHTTPRequestHandler):
             _log.exception("请求处理异常: %s %s", self.command, self.path)
             self._send_json(router.err(500, "内部错误，请稍后重试"), 500)
 
+    def do_OPTIONS(self) -> None:
+        """同机预检支持（如 Vite dev / 本地自动化客户端带自定义头请求）。"""
+        self.send_response(204)
+        self._send_security_headers()
+        origin = self.headers.get("Origin") or ""
+        if origin and self._is_same_host_origin(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers",
+                             "Content-Type, X-Auth-Token, X-Handshake-Token")
+            self.send_header("Access-Control-Max-Age", "600")
+            self.send_header("Vary", "Origin")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     # ------------------------------------------------------------------
     # 管理员登录 / 登出（Cookie 会话，需在 router 分发前处理 Set-Cookie）
     # ------------------------------------------------------------------
@@ -440,6 +472,12 @@ class _Handler(BaseHTTPRequestHandler):
             _log.exception("请求处理异常: %s %s", self.command, self.path)
             self._send_json(router.err(500, "内部错误，请稍后重试"), 500)
 
+    def _send_security_headers(self) -> None:
+        """统一基础安全响应头：防 MIME 嗅探、防恶意内嵌劫持、禁 Referer 外泄。"""
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+
     def _send_json(self, payload: dict, status: int = 200,
                    extra_headers: dict[str, str] | None = None) -> None:
         # 序列化必须容错（2026-11-05）：payload 里可能含用户数据（正文、路径、
@@ -454,6 +492,7 @@ class _Handler(BaseHTTPRequestHandler):
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8", errors="replace")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self._send_security_headers()
         for k, v in (extra_headers or {}).items():
             self.send_header(k, v)
         # 【修复 M8】不再无条件返回 `Access-Control-Allow-Origin: *`。
@@ -505,6 +544,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "keep-alive")
+        self._send_security_headers()
         # HIGH：SSE 也必须走本机 Origin 回显，不能 ACAO: *（与 M8 一致）
         origin = self.headers.get("Origin", "")
         if origin and self._is_same_host_origin(origin):
@@ -583,10 +623,11 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
+        self._send_security_headers()
         # 缓存策略：index.html 不缓存；带哈希的资源文件可长期缓存
         if target.name == "index.html":
             self.send_header("Cache-Control", "no-cache, must-revalidate")
-        elif "/assets/" in str(target) and any(c in target.name for c in "-_"):
+        elif "/assets/" in target.as_posix() and any(c in target.name for c in "-_"):
             # Vite 产出的资源文件名含哈希，内容变更时文件名也会变
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         else:

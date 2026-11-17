@@ -648,15 +648,8 @@ class AssetIndex:
         return out
 
     def _model_configured(self) -> bool:
-        fp = config.CONFIG_DIR / "models.json"
-        if not fp.is_file():
-            return False
-        try:
-            data = json.loads(fp.read_text(encoding="utf-8-sig"))
-        except (json.JSONDecodeError, OSError):
-            return False
-        models = data.get("models", {})
-        return isinstance(models, dict) and len(models) > 0
+        from gui import engine_adapter
+        return engine_adapter.any_model_configured()
 
     @staticmethod
     def _classify_asset_name(name: str) -> str | None:
@@ -931,7 +924,11 @@ class AssetIndex:
         if kind == "book":
             fp = config.CORPUS_DIR / f"{name}.txt"
             if not fp.is_file():
-                raise KeyError(f"语料不存在: {name}")
+                alt = config.CORPUS_DIR / f"{name}.md"
+                if alt.is_file():
+                    fp = alt
+                else:
+                    raise KeyError(f"语料不存在: {name}")
             # 只读前 2000 字符做预览：文本模式 read(n) 按字符计数，与
             # read_text()[:2000] 输出一致，但内存占用恒定（不随文件大小增长）。
             try:

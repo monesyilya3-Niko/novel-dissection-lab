@@ -75,7 +75,7 @@ if not exist "%PY%" (
     exit /b 1
 )
 cd /d "%~dp0app"
-"%PY%" -m gui.server
+"%PY%" gui\launch.py
 if errorlevel 1 pause
 endlocal
 """

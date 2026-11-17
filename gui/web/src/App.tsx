@@ -207,6 +207,7 @@ function AppShell() {
       )}
       <AppBar position="static" elevation={0} sx={{
         background: (theme) => theme.palette.mode === 'dark' ? ink.nightCard : ink.surface,
+        color: (theme) => theme.palette.mode === 'dark' ? ink.moonWhite : ink.text,
         borderBottom: (theme) => `1px solid ${theme.palette.mode === 'dark' ? ink.nightLine : ink.hairline}`,
       }}>
       {initError && (

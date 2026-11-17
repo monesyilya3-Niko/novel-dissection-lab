@@ -308,7 +308,7 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 
 ---
 
-## 5. 全量 REST API 端点清单（134 端点速查）
+## 5. 全量 REST API 端点清单（137 端点速查）
 
 > 端点总数以 `len(gui.router.ROUTES)` 实测为准，`tests/test_doc_metrics.py` 守着本行数字。
 
@@ -332,6 +332,7 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 | | `GET` | `/api/book/{book_id}/results` | 拆书明细结果 |
 | | `GET` | `/api/book/{book_id}/scores` | 拆书打分分布 |
 | | `POST` | `/api/analyze/full` | 全量深度分析流程 |
+| | `POST` | `/api/analyze/offline` | **无外部 LLM 离线量化拆解与 AI 接管任务包生成** |
 | **资产中心** | `GET` | `/api/asset` | 单个资产卡片查询 |
 | | `GET` | `/api/assets` | 资产库分页与分类列表 |
 | | `GET` | `/api/assets/{kind}/{id}` | 资产详情获取 |
@@ -342,6 +343,10 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 | | `GET` | `/api/reports/{id}` | 拆书报告详情 |
 | **创作工作台** | `GET` | `/api/writing/projects` | 写作项目列表 |
 | | `POST` | `/api/writing/projects` | 新建写作项目 |
+| | `GET` | `/api/writing/projects/{project}/chapters` | 项目已落盘章节清单 |
+| | `GET` | `/api/writing/projects/{project}/chapters/{chapter_no}` | 读取项目单章已落盘正文 |
+| | `GET` | `/api/writing/projects/{project}/meta` | 读取项目元数据配置 |
+| | `POST` | `/api/writing/projects/{project}/meta` | 更新项目元数据配置 |
 | | `POST` | `/api/writing/inject` | 资产注入生成 System Prompt |
 | | `POST` | `/api/writing/generate` | 章节智能起草（支持无模型降级） |
 | | `GET` | `/api/writing/tasks/{task_id}` | 查询写作生成任务状态 |

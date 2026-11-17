@@ -86,7 +86,15 @@ export default function OnboardingWizard({
     // （react-hooks 编译器规则会直接报错，且渲染期取时间确实会破坏纯函数性）。
     writeStorage(STORAGE_KEY_V2, JSON.stringify({ done: true, dismissedAt: Date.now() } satisfies OnboardState))
     onDone()
-    if (target) onNavigate(target)
+    if (target) {
+      if (target === 'system') {
+        try {
+          sessionStorage.setItem('novellab.pendingSystemTab', '2')
+          window.dispatchEvent(new CustomEvent('novellab:system-tab', { detail: { tab: 2 } }))
+        } catch { /* ignore */ }
+      }
+      onNavigate(target)
+    }
   }, [onDone, onNavigate])
 
   const nextActions: NextAction[] = useMemo(() => [

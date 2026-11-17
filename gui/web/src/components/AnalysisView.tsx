@@ -7,22 +7,37 @@ import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
 import ImportPanel from './ImportPanel'
 import ChapterList from './ChapterList'
+import ReaderPanel from './ReaderPanel'
+import ResultPanel from './ResultPanel'
 import ProgressPanel from './ProgressPanel'
 import AnalysisResultView from './AnalysisResultView'
 import AnalysisControlBar from './AnalysisControlBar'
+import { useApp } from '../state/AppContext'
 import { useI18n } from '../state/I18nContext'
 
-type SubTab = 'import' | 'progress' | 'result'
+type SubTab = 'import' | 'reader' | 'progress' | 'detail' | 'result'
 
 export default function AnalysisView() {
   const { t } = useI18n()
+  const { selectedChapter } = useApp()
   const [subTab, setSubTab] = useState<SubTab>('import')
+  const [lastSelectedChapter, setLastSelectedChapter] = useState<number | null>(selectedChapter ?? null)
+
+  // 左侧点击章节时自动打开原文阅读器（渲染期比对，避免在 effect 内同步 setState）
+  if ((selectedChapter ?? null) !== lastSelectedChapter) {
+    setLastSelectedChapter(selectedChapter ?? null)
+    if (selectedChapter != null && subTab === 'import') {
+      setSubTab('reader')
+    }
+  }
 
   // 命令面板深度跳转：novellab:analysis-tab { tab }
   useEffect(() => {
     const handler = (e: Event) => {
       const tab = (e as CustomEvent<{ tab: SubTab }>).detail?.tab
-      if (tab === 'import' || tab === 'progress' || tab === 'result') setSubTab(tab)
+      if (tab === 'import' || tab === 'reader' || tab === 'progress' || tab === 'detail' || tab === 'result') {
+        setSubTab(tab)
+      }
     }
     window.addEventListener('novellab:analysis-tab', handler)
     return () => window.removeEventListener('novellab:analysis-tab', handler)
@@ -63,19 +78,23 @@ export default function AnalysisView() {
             alignItems: 'center',
           }}
         >
-          <Tabs value={subTab} onChange={(_e, v) => setSubTab(v as SubTab)} sx={{ minHeight: 40 }}>
+          <Tabs value={subTab} onChange={(_e, v) => setSubTab(v as SubTab)} sx={{ minHeight: 40 }} variant="scrollable" scrollButtons="auto">
             <Tab value="import" label={t('analysis_tab_import')} sx={{ minHeight: 40 }} />
+            <Tab value="reader" label={t('analysis_tab_reader', '原文阅读')} sx={{ minHeight: 40 }} />
             <Tab value="progress" label={t('analysis_tab_progress')} sx={{ minHeight: 40 }} />
+            <Tab value="detail" label={t('analysis_tab_detail', '批次明细')} sx={{ minHeight: 40 }} />
             <Tab value="result" label={t('analysis_tab_result')} sx={{ minHeight: 40 }} />
           </Tabs>
           <Box sx={{ flex: 1 }} />
           <ContextHelpButton guideKey="analysis" title={t('analysis_help_title')} />
           {/* 一键分析：直接在当前工作台内触发，完成后切到结果页（由 SSE done 自动刷新） */}
-          <AnalysisControlBar onGoResult={() => setSubTab('result')} />
+          <AnalysisControlBar onGoResult={() => setSubTab('result')} onGoProgress={() => setSubTab('progress')} />
         </Box>
         <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
           {subTab === 'import' && <ImportPanel />}
+          {subTab === 'reader' && <ReaderPanel />}
           {subTab === 'progress' && <ProgressPanel />}
+          {subTab === 'detail' && <ResultPanel />}
           {subTab === 'result' && <AnalysisResultView />}
         </Box>
       </Box>

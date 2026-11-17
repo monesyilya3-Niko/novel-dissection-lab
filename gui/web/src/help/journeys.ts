@@ -52,8 +52,9 @@ export const JOURNEY_DEFINITIONS: JourneyDefinition[] = [
  */
 export function getJourneyStatuses(overview: Overview | null): JourneyStatus[] {
   if (!overview) return ['pending', 'pending', 'pending']
-  const s1: JourneyStatus = overview.modelConfigured ? 'done' : 'pending'
-  const s2: JourneyStatus = overview.totalBooks > 0 ? 'done' : (overview.modelConfigured ? 'active' : 'pending')
+  const modelOk = Boolean(overview.modelConfigured && overview.modelReady !== false)
+  const s1: JourneyStatus = modelOk ? 'done' : 'pending'
+  const s2: JourneyStatus = overview.totalBooks > 0 ? 'done' : (modelOk ? 'active' : 'pending')
   const hasRecentActivity = Array.isArray(overview.recentActivity) && overview.recentActivity.length > 0
   const s3Done = (overview.totalAssets >= 4 && overview.totalBooks > 0) || (hasRecentActivity && overview.totalAssets > 0)
   const s3: JourneyStatus = s3Done ? 'done' : (overview.totalBooks > 0 ? 'active' : 'pending')

@@ -9,9 +9,9 @@ export const GENRE_KEYWORDS: Record<string, string[]> = {
 
   // 仙侠 / 玄幻 / 奇幻
   'xianxia': ['仙侠', '修真', '修仙', '渡劫', '御剑', '宗门', '仙尊', '飞升', '金丹', '元婴'],
-  'xuanhuan': ['玄幻', '斗破', '武魂', '斗罗', '斗气', '魂兽', '至尊', '玄幻'],
+  'xuanhuan': ['玄幻', '斗破', '武魂', '斗罗', '斗气', '魂兽', '至尊'],
   'xuanhuan-naodong': ['玄幻脑洞'],
-  'xifang-qihuan': ['西幻', '奇幻', '魔法', '精灵', '法师', '巫师', '龙骑士', '奇幻'],
+  'xifang-qihuan': ['西幻', '奇幻', '魔法', '精灵', '法师', '巫师', '龙骑士'],
   'wuxia-chuantong': ['武侠', '江湖', '剑客', '侠客', '武林', '华山', '武当'],
   'wuxianliu': ['无限流', '副本', '主神', '轮回', '轮回者'],
 
@@ -37,7 +37,7 @@ export const GENRE_KEYWORDS: Record<string, string[]> = {
 
   // 科幻
   'kehuan-moshi': ['末世', '丧尸', '末日', '废土'],
-  'kehuan-xingji': ['星际', '机甲', '星舰', '虫族', '星际'],
+  'kehuan-xingji': ['星际', '机甲', '星舰', '虫族'],
 
   // 历史 / 穿越
   'lishi': ['历史', '三国', '大明', '大唐', '大秦'],
@@ -45,7 +45,7 @@ export const GENRE_KEYWORDS: Record<string, string[]> = {
   'kuaichuan': ['快穿', '宿主', '攻略', '穿书'],
 
   // 悬疑 / 灵异 / 盗墓 / 刑侦
-  'xuanyi-lingyi': ['灵异', '捉鬼', '驱邪', '阴魂', '灵异'],
+  'xuanyi-lingyi': ['灵异', '捉鬼', '驱邪', '阴魂'],
   'xuanyi-daomu': ['盗墓', '古墓', '摸金', '下墓', '盗墓笔记'],
   'xuanyi-xingzhen': ['刑侦', '探案', '悬疑刑侦'],
   'xuanyi-naodong': ['悬疑脑洞'],
@@ -53,7 +53,7 @@ export const GENRE_KEYWORDS: Record<string, string[]> = {
   // 游戏 / 电竞
   'youxi-wangyou': ['网游', '游戏', '公会', '打怪', '副本', '升级'],
   'youxi-tiyu': ['体育', '竞技'],
-  'dianjing': ['电竞', '战队', '选手', '夺冠', '联赛', '电竞'],
+  'dianjing': ['电竞', '战队', '选手', '夺冠', '联赛'],
 
   // 言情 / 重生 等细分
   'realistic-romance': ['现实言情', '言情'],

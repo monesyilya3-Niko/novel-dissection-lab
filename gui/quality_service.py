@@ -243,6 +243,19 @@ def _copy_external_chapter_dir(root: Path, scratch_dir: Path) -> Path:
             f"目录里没有可质检的章节文件：{root}；"
             "确认章节是 .txt 或 .md 且文件名带章节序号，"
             "并且不在备份/build 这类被排除的子目录里", 400)
+
+    # 若外部项目目录附带 settings/entities.json，一并复制进隔离副本（支撑 L3 设定/实体一致性检测）
+    entities_src = root / "settings" / "entities.json"
+    if entities_src.is_file() and not entities_src.is_symlink():
+        try:
+            esize = entities_src.stat().st_size
+            if esize <= 5 * 1024 * 1024 and total_bytes + esize <= _EXTERNAL_MAX_BYTES:
+                entities_dst = dest_root / "settings" / "entities.json"
+                entities_dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(entities_src, entities_dst)
+        except OSError:
+            pass
+
     _log.info(f"外部目录已隔离复制 {root} → {dest_root}（{copied} 章，{total_bytes} 字节）")
     return dest_root
 
@@ -562,7 +575,17 @@ def qc(target: str | None = None, text: str | None = None,
     gp_path = _asset_path(genre_pack)
     asset_path = _asset_path(asset)
     book_path = _asset_path(book)
-    nd = str(resolve_chapter_target(novel_dir)) if novel_dir else None
+    nd: str | None = None
+    nd_external_copy: str | None = None
+    if novel_dir:
+        try:
+            nd_fp = resolve_chapter_target(novel_dir)
+        except Exception:
+            _cleanup_external_copy(external_copy)
+            raise
+        if _is_external_scratch_copy(nd_fp):
+            nd_external_copy = str(nd_fp)
+        nd = str(nd_fp)
 
     # MEDIUM：先清理终态任务
     _prune_terminal_tasks()
@@ -570,6 +593,8 @@ def qc(target: str | None = None, text: str | None = None,
     # HIGH：并发上限检查 + 登记必须在同一临界区（TOCTOU 修复）
     with _QUALITY_LOCK:
         if _active_quality_count() >= _MAX_CONCURRENT_QUALITY:
+            _cleanup_external_copy(external_copy)
+            _cleanup_external_copy(nd_external_copy)
             raise ServiceError(f"质检任务已达上限 {_MAX_CONCURRENT_QUALITY}，请等待当前任务完成", 429)
         _QUALITY_TASKS[task_id] = {
             "task_id": task_id, "status": "running", "phase": "qc",
@@ -581,12 +606,14 @@ def qc(target: str | None = None, text: str | None = None,
 
     thread = threading.Thread(
         target=_run_qc_task,
-        args=(task_id, chapter_dir, voice_path, gp_path, asset_path, book_path, nd, llm_hook, display_target, external_copy),
+        args=(task_id, chapter_dir, voice_path, gp_path, asset_path, book_path, nd, llm_hook, display_target, external_copy, nd_external_copy),
         daemon=True, name=f"qc-{task_id}")
     try:
         thread.start()
     except RuntimeError as exc:
-        # HIGH：start 失败必须释放并发槽位
+        # HIGH：start 失败必须释放并发槽位并回收外部隔离副本
+        _cleanup_external_copy(external_copy)
+        _cleanup_external_copy(nd_external_copy)
         with _QUALITY_LOCK:
             _QUALITY_TASKS[task_id]["status"] = "error"
             _QUALITY_TASKS[task_id]["error"] = "线程启动失败"
@@ -608,7 +635,8 @@ def _run_qc_task(task_id: str, chapter_dir: str, voice_path: str | None,
                  gp_path: str | None, asset_path: str | None,
                  book_path: str | None, novel_dir: str | None,
                  llm_hook: bool, display_target: str,
-                 external_copy: str | None = None) -> None:
+                 external_copy: str | None = None,
+                 nd_external_copy: str | None = None) -> None:
     """后台线程：跑 qc 并落盘报告。"""
     from gui import sse
 
@@ -676,3 +704,4 @@ def _run_qc_task(task_id: str, chapter_dir: str, voice_path: str | None,
         if task_scratch.is_dir():
             shutil.rmtree(task_scratch, ignore_errors=True)
         _cleanup_external_copy(external_copy)  # P1-5：外部隔离副本用后即删
+        _cleanup_external_copy(nd_external_copy)

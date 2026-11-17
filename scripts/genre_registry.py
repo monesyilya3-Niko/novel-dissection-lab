@@ -214,6 +214,29 @@ def is_known_genre(genre: str, metas: list[tuple[str, dict]] | None = None) -> b
     return str(genre) in known_genres(metas)
 
 
+def known_genres_in(extra_dir: Path | None = None) -> frozenset[str]:
+    """合并仓库默认 ASSETS_DIR 与可选用户数据目录 extra_dir 的全部合法题材。"""
+    base = set(known_genres())
+    if extra_dir is not None:
+        extra_path = Path(extra_dir)
+        if extra_path.is_dir() and extra_path.resolve() != ASSETS_DIR.resolve():
+            extra_metas: list[tuple[str, dict]] = []
+            for p in sorted(extra_path.glob("*.json")):
+                try:
+                    data = json.loads(p.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    continue
+                if isinstance(data, dict) and isinstance(data.get("meta"), dict):
+                    extra_metas.append((p.name, data["meta"]))
+            if extra_metas:
+                base |= set(known_genres(extra_metas))
+    return frozenset(base)
+
+
+def is_known_genre_in(genre: str, extra_dir: Path | None = None) -> bool:
+    return str(genre) in known_genres_in(extra_dir)
+
+
 def malformed_prose_ids(metas: list[tuple[str, dict]] | None = None) -> list[tuple[str, str]]:
     """返回 (文件名, 非法 meta.id) —— 供守卫测试与 CLI 使用。"""
     metas = _iter_asset_meta() if metas is None else metas

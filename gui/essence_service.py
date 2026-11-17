@@ -425,24 +425,37 @@ def create_chain(
     _require_book_exists(book_id)
 
     now = _now_iso()
+    rev_val = int(reveal_chapter) if (reveal_chapter is not None and not isinstance(reveal_chapter, bool)) else None
     with db.tx() as conn:
-        cur = conn.execute(
-            """
-            INSERT INTO essence_chains
-                (book_id, hook_chapter, payoff_chapter, hook_text, payoff_text,
-                 clue_name, status, analysis, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (book_id, int(hook_chapter), int(payoff_chapter), hook_text.strip(),
-             payoff_text.strip(), clue_name.strip(), status, analysis.strip(), now),
-        )
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(essence_chains)").fetchall()}
+        if "reveal_chapter" in cols:
+            cur = conn.execute(
+                """
+                INSERT INTO essence_chains
+                    (book_id, hook_chapter, payoff_chapter, reveal_chapter, hook_text, payoff_text,
+                     clue_name, status, analysis, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (book_id, int(hook_chapter), int(payoff_chapter), rev_val, hook_text.strip(),
+                 payoff_text.strip(), clue_name.strip(), status, analysis.strip(), now),
+            )
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO essence_chains
+                    (book_id, hook_chapter, payoff_chapter, hook_text, payoff_text,
+                     clue_name, status, analysis, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (book_id, int(hook_chapter), int(payoff_chapter), hook_text.strip(),
+                 payoff_text.strip(), clue_name.strip(), status, analysis.strip(), now),
+            )
         chain_id = cur.lastrowid
 
     row = db.get_conn().execute("SELECT * FROM essence_chains WHERE id = ?", (chain_id,)).fetchone()
-    # 把用户填的显露章带进格式化（DDL 里没有这一列，只能走内存传递）
     raw = dict(row) if row is not None else {}
-    if reveal_chapter is not None:
-        raw["reveal_chapter"] = reveal_chapter
+    if rev_val is not None and raw.get("reveal_chapter") is None:
+        raw["reveal_chapter"] = rev_val
     return _format_chain_dict(raw)
 
 

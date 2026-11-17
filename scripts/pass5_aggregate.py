@@ -36,16 +36,17 @@ SUGGEST_THRESHOLD = 0.4  # 40-80% → 建议项
 # 资产收集
 # --------------------------------------------------------------------------
 
-def collect_books(genre: str, book_names: list | None) -> tuple:
+def collect_books(genre: str, book_names: list | None, assets_dir: Path | None = None) -> tuple:
     """收集同题材全部 voice-card。
 
     返回 ``(books, mismatches)`` 二元组：
         books: [{'name':..., 'voice':{...}, 'struct':{...}, 'comm':{...}}, ...]
         mismatches: [(name, actual_genre), ...] 混入的异题材书（铁律一：不再静默跳过）。
     """
+    target_assets = Path(assets_dir) if assets_dir is not None else ASSETS
     books = []
     mismatches = []
-    vc_files = sorted(ASSETS.glob("*-voice-card.json"))
+    vc_files = sorted(target_assets.glob("*-voice-card.json"))
     for vc_f in vc_files:
         name = vc_f.name.replace("-voice-card.json", "")
         # 跳过合成测试数据（无法删除的遗留文件）
@@ -60,11 +61,11 @@ def collect_books(genre: str, book_names: list | None) -> tuple:
         if book_names and name not in book_names:
             continue
         struct = {}
-        sf = ASSETS / f"{name}-structure-obs.json"
+        sf = target_assets / f"{name}-structure-obs.json"
         if sf.exists():
             struct = json.loads(sf.read_text(encoding="utf-8"))
         comm = {}
-        cf = ASSETS / f"{name}-commercial-obs.json"
+        cf = target_assets / f"{name}-commercial-obs.json"
         if cf.exists():
             comm = json.loads(cf.read_text(encoding="utf-8"))
         books.append({"name": name, "voice": vc, "struct": struct, "comm": comm})
@@ -263,12 +264,23 @@ def main(argv: list[str] | None = None) -> int:
     # 2. LLM 聚合
     print("\n[2/3] LLM 聚合题材包:")
     prompt = build_prompt(books, thresholds)
-    r = llm_client.chat(user=prompt, system="你是网文题材分析师，只输出严格 JSON。",
-                        task="pass5_aggregate", max_tokens=8192, temperature=0.3)
+    if not llm_client.any_model_configured():
+        print("  [降级] 未配置外部模型，跳过 LLM 聚合。您可复制上方跨书统计特征手工编纂题材包。", file=sys.stderr)
+        return 1
+    try:
+        r = llm_client.chat(user=prompt, system="你是网文题材分析师，只输出严格 JSON。",
+                            task="pass5_aggregate", max_tokens=8192, temperature=0.3)
+    except llm_client.LLMError as exc:
+        print(llm_client.describe_llm_degradation(exc), file=sys.stderr)
+        return 1
     print(f"      → tokens {r['prompt_tokens']}+{r['completion_tokens']}, {r['elapsed']}s")
 
     import pipeline as pipeline_mod
-    pack = pipeline_mod.extract_json(r["text"])
+    try:
+        pack = pipeline_mod.extract_json(r["text"])
+    except ValueError as exc:
+        print(f"  ✗ 模型输出未能解析为合法 JSON: {exc}", file=sys.stderr)
+        return 1
 
     # 3. 校验 + 合规
     print("\n[3/3] 校验与合规:")

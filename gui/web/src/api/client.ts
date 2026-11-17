@@ -45,16 +45,60 @@ export function onAdminUnauthorized(fn: (() => void) | null) {
   adminUnauthorizedHandler = fn
 }
 
+/** 识别上游 LLM 密钥失效/欠费/上下文超限/空输出等典型故障并给出可操作提示。 */
+function classifyLlmOrInfraMessage(msg: string): string | null {
+  const lower = msg.toLowerCase()
+  // 上游 LLM 402 / 订阅过期 / 欠费 / API Key 失效
+  if (
+    lower.includes('http 402')
+    || lower.includes('subscription_required')
+    || lower.includes('payment required')
+    || lower.includes('insufficient_quota')
+    || lower.includes('insufficient balance')
+    || lower.includes('invalid_api_key')
+    || msg.includes('余额不足')
+    || msg.includes('欠费')
+    || msg.includes('未配置 API Key')
+    || (lower.includes('http 401') && !msg.includes('NOVEL_LAB_TOKEN') && !msg.includes('访问令牌'))
+    || (lower.includes('http 403') && (lower.includes('api') || lower.includes('forbidden') || msg.includes('模型')))
+  ) {
+    return `${tGlobal('error_action_llm_quota_or_402')}（${msg}）`
+  }
+  // 上下文窗口预算超限（必须在 file size 判断前拦截，避免 "exceeds context window size" 误报成 100MB 文件过大）
+  if (
+    lower.includes('context_window')
+    || lower.includes('context window')
+    || lower.includes('maximum context length')
+    || msg.includes('上下文窗口')
+  ) {
+    return `${tGlobal('error_action_llm_context_exceeded')}（${msg}）`
+  }
+  // 推理模型耗尽 max_tokens / 空输出
+  if (
+    msg.includes('返回空文本')
+    || msg.includes('未返回任何正文')
+    || (lower.includes('finish_reason') && lower.includes('length'))
+  ) {
+    return `${tGlobal('error_action_llm_empty_output')}（${msg}）`
+  }
+  return null
+}
+
 /** 把底层异常翻译为用户可读中文（AsyncBoundary/告警条统一展示）。 */
 export function friendlyError(e: unknown): string {
+  if (typeof e === 'string' && e.trim()) {
+    return classifyLlmOrInfraMessage(e) ?? e
+  }
   if (e instanceof ApiError) {
     const msg = e.message || ''
     const lower = msg.toLowerCase()
     // 访问令牌缺失/错误：服务端开了 NOVEL_LAB_TOKEN，客户端却没带上正确令牌。
     // 不解释的话用户只看到「缺少或非法访问令牌」，不知道要怎么做。
-    if (e.code === 401 && (msg.includes('令牌') || lower.includes('auth token') || lower.includes('token'))) {
+    if (e.code === 401 && (msg.includes('NOVEL_LAB_TOKEN') || msg.includes('访问令牌') || lower.includes('auth token'))) {
       return '访问令牌无效或已过期——请在页面地址后追加 ?auth=<服务端 NOVEL_LAB_TOKEN> 后重新打开页面'
     }
+    const llmHint = classifyLlmOrInfraMessage(msg)
+    if (llmHint) return llmHint
     // 以下提示走 i18n：此前是硬编码中文，英文界面下错误提示仍是中文。
     if (lower.includes('100mb') || lower.includes('file too large')
         || (lower.includes('exceeds') && lower.includes('size'))
@@ -79,6 +123,8 @@ export function friendlyError(e: unknown): string {
     return '无法连接服务——请确认暮冬念春正在运行'
   }
   if (e instanceof Error && e.message) {
+    const llmHint = classifyLlmOrInfraMessage(e.message)
+    if (llmHint) return llmHint
     const lm = e.message.toLowerCase()
     if (lm.includes('eaddrinuse') || lm.includes('address already in use')) return '端口被占用，请关闭占用程序或更换端口后重试'
     if (lm.includes('file too large') || lm.includes('exceeds') && lm.includes('size')) return e.message + '，请拆分后重试'
@@ -388,6 +434,9 @@ export async function getStatus(bookId?: string): Promise<StatusInfo> {
     cursor: data.cursor as string,
     done: data.done as number,
     total: data.total as number,
+    lastError: (data.lastError ?? '') as string,
+    reportError: (data.reportError ?? '') as string,
+    takeoverGuidePath: (data.takeoverGuidePath ?? '') as string,
   }
 }
 
@@ -505,6 +554,16 @@ export async function runFullAnalysis(
   )
 }
 
+export async function runOfflineAnalysis(
+  bookId: string,
+  genre = 'unknown',
+): Promise<import('../types').OfflineAnalysisResult> {
+  return request<import('../types').OfflineAnalysisResult>('POST', '/analyze/offline', {
+    book_id: bookId,
+    genre,
+  })
+}
+
 // ---------------------------------------------------------------------------
 // SSE
 // ---------------------------------------------------------------------------
@@ -561,6 +620,14 @@ export const writingApi = {
   projects: () => get<import('../types').WritingProject[]>('/writing/projects'),
   createProject: (name: string) =>
     post<import('../types').WritingProject>('/writing/projects', { name }),
+  listChapters: (project: string) =>
+    get<{ project: string; chapters: import('../types').SavedChapterSummary[] }>(
+      `/writing/projects/${encodeURIComponent(project)}/chapters`,
+    ),
+  getChapter: (project: string, chapterNo: number) =>
+    get<import('../types').SavedChapterDetail>(
+      `/writing/projects/${encodeURIComponent(project)}/chapters/${chapterNo}`,
+    ),
   inject: (body: Record<string, unknown>) => post<import('../types').InjectResult>('/writing/inject', body),
   generate: (body: Record<string, unknown>) => post<import('../types').WritingTaskState>('/writing/generate', body),
   taskState: (taskId: string) => get<import('../types').WritingTaskState>(`/writing/tasks/${taskId}`),

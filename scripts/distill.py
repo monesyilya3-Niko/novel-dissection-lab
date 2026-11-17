@@ -96,16 +96,29 @@ def write_distilled_outputs(distilled_by_dim: dict, assets_dir: Path) -> list[st
     return written
 
 
-def run_distill(genre: str, book_names: list[str] | None = None) -> dict:
+def run_distill(
+    genre: str,
+    book_names: list[str] | None = None,
+    assets_dir: Path | None = None,
+    require_non_empty: bool = False,
+) -> dict:
     """执行蒸馏，返回 ``{dimension: distilled_dict}`` 并落盘。"""
-    distilled_by_dim = distill_genre(genre, book_names=book_names)
-
-    # HIGH：genre 用于拼接输出路径，必须白名单校验防路径穿越
+    # HIGH：genre 用于拼接输出路径，必须白名单校验防路径穿越（先于计算与写盘）
     if not _GENRE_RE.fullmatch(genre):
         raise ValueError(f"非法 genre 名（仅允许字母/数字/下划线/连字符）: {genre!r}")
 
-    assets_dir = Path(__file__).resolve().parent.parent / "assets"
-    written = write_distilled_outputs(distilled_by_dim, assets_dir)
+    target_dir = Path(assets_dir) if assets_dir is not None else (Path(__file__).resolve().parent.parent / "assets")
+    distilled_by_dim = distill_genre(genre, book_names=book_names, assets_dir=target_dir)
+
+    if require_non_empty:
+        total_rules = sum(
+            int((distilled_by_dim.get(dim, {}).get("stats") or {}).get("total_rules") or 0)
+            for dim in DIMENSIONS
+        )
+        if total_rules == 0:
+            raise ValueError(f"蒸馏结果为 0 条规则：题材 {genre!r} 下没有可用于聚合的有效资产卡（未写入任何文件）")
+
+    written = write_distilled_outputs(distilled_by_dim, target_dir)
 
     return {
         "genre": genre,
@@ -153,30 +166,38 @@ def main(argv: list[str] | None = None) -> int:
         print("  请先用 `novel 拆书` 拆解该题材的书，或检查题材名是否写错。")
         return 1
 
-    result = run_distill(genre, book_names=args.books)
+    # 校验先于副作用：通过 run_distill(require_non_empty=True) 在写盘前拦截 0 规则空壳，
+    # 同时保留对返回结果的 total_rules 兜底检查以兼容测试桩对 run_distill 的直接 mock。
+    try:
+        result = run_distill(genre, book_names=args.books, require_non_empty=True)
+    except ValueError as exc:
+        print(f"\n✗ {exc}")
+        return 1
+
+    distilled_by_dim = result["dimensions"]
+    total_rules = sum(
+        int((distilled_by_dim.get(dim, {}).get("stats") or {}).get("total_rules") or 0)
+        for dim in DIMENSIONS
+    )
+    if total_rules == 0:
+        print("\n✗ 蒸馏结果为 0 条规则：该题材下没有可用于聚合的资产卡"
+              "（已拦截写盘，未产出空壳文件）。")
+        return 1
 
     for path in result["written"]:
         print(f"已落盘: {path}")
 
     # 简要摘要。
     print("\n蒸馏摘要:")
-    total_rules = 0
     for dimension in DIMENSIONS:
-        stats = result["dimensions"][dimension]["stats"]
-        meta = result["dimensions"][dimension]["meta"]
-        total_rules += int(stats["total_rules"] or 0)
+        stats = distilled_by_dim[dimension]["stats"]
+        meta = distilled_by_dim[dimension]["meta"]
         print(
             f"  [{dimension}] 书数={meta['books_count']} "
             f"规则={stats['total_rules']} (硬{stats['hard_rules']}/"
             f"软{stats['soft_rules']}/个人{stats['personal_styles']}) "
             f"冲突={stats['conflicts']} 盲区={stats['blindspots']}"
         )
-
-    # 题材合法但确实无资产时（如资产卡全被删），同样不该产出空壳当成功。
-    if total_rules == 0:
-        print("\n✗ 蒸馏结果为 0 条规则：该题材下没有可用于聚合的资产卡"
-              "（产出空壳会污染资产库）。已落盘的文件请手动删除。")
-        return 1
 
     return 0
 
