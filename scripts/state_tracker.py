@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -71,8 +72,12 @@ def _validate_snapshot_limits(
         ``(ok, warnings)``。``ok`` 为 False 表示存在超硬上限（8192 字节）的快照，
         必须拒绝写入；``warnings`` 为超目标上限（4096 字节）的快照名列表。
     """
+    if not isinstance(character_snapshots, dict):
+        raise ValueError("character_snapshots 必须为对象")
     warnings: list[str] = []
     for name, snapshot in character_snapshots.items():
+        if not isinstance(snapshot, dict):
+            raise ValueError(f"角色快照「{name}」必须为对象")
         size = _snapshot_bytes(snapshot)
         if size > SNAPSHOT_HARD_BYTES:
             return False, [f"角色快照「{name}」{size} 字节超硬上限 {SNAPSHOT_HARD_BYTES}"]
@@ -111,19 +116,25 @@ def load_state(state_path: str | os.PathLike) -> dict[str, Any]:
     path = Path(state_path)
     if not path.exists():
         return _empty_state()
-    with path.open("r", encoding="utf-8") as fh:
+    with path.open("r", encoding="utf-8-sig") as fh:
         return json.load(fh)
 
 
 def save_state(state: dict[str, Any], state_path: str | os.PathLike) -> None:
-    """原子写回权威状态文件（先写临时文件再替换）。"""
+    """原子写回权威状态文件（先写同目录唯一临时文件再替换）。"""
     path = Path(state_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8") as fh:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=str(path.parent), suffix=".tmp", delete=False
+    ) as fh:
+        tmp_path = Path(fh.name)
         json.dump(state, fh, ensure_ascii=False, indent=2)
         fh.write("\n")
-    os.replace(tmp, path)
+    try:
+        os.replace(tmp_path, path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -157,23 +168,41 @@ def apply_transaction(
     Raises:
         ValueError: 校验失败（stale 修订号、超容量、字段非法等），不写入。
     """
+    if not isinstance(state, dict):
+        raise ValueError("state 必须为对象")
+    if not isinstance(transaction, dict):
+        raise ValueError("transaction 必须为对象")
+
     schema_version = transaction.get("schema_version", _SCHEMA_VERSION)
-    if schema_version != _SCHEMA_VERSION:
+    if isinstance(schema_version, bool) or schema_version != _SCHEMA_VERSION:
         raise ValueError(f"不支持的 schema_version: {schema_version}")
 
     mode = transaction.get("mode", "append")
     if mode not in ("init", "append", "revision"):
         raise ValueError(f"非法 mode: {mode}")
 
+    if "chapter" in transaction and transaction["chapter"] is not None:
+        ch_val = transaction["chapter"]
+        if isinstance(ch_val, bool) or not isinstance(ch_val, int):
+            raise ValueError("chapter 必须为整数")
+
     # 1. 修订号校验（stale 防护）。init 时 state_revision 恒为 0。
     current_revision = state.get("state_revision", 0)
+    if isinstance(current_revision, bool) or not isinstance(current_revision, int):
+        raise ValueError("state_revision 必须为整数")
     if mode == "init":
-        expected = 0
+        if "expected_state_revision" in transaction and transaction["expected_state_revision"] is not None:
+            raw_exp = transaction["expected_state_revision"]
+            if isinstance(raw_exp, bool) or not isinstance(raw_exp, int):
+                raise ValueError("expected_state_revision 必须为整数")
+            expected = raw_exp
+        else:
+            expected = 0
     else:
         expected = transaction.get("expected_state_revision")
         if expected is None:
             raise ValueError("append/revision 事务缺少 expected_state_revision")
-        if not isinstance(expected, int):
+        if isinstance(expected, bool) or not isinstance(expected, int):
             raise ValueError("expected_state_revision 必须为整数")
     if expected != current_revision:
         raise ValueError(
@@ -182,7 +211,15 @@ def apply_transaction(
         )
 
     # 2. 角色快照容量校验（硬上限，超限拒绝）。
-    snapshots = transaction.get("character_snapshots", {})
+    if "character_snapshots" in transaction:
+        snapshots = transaction["character_snapshots"]
+        if not isinstance(snapshots, dict):
+            raise ValueError("character_snapshots 必须为对象")
+    else:
+        snapshots = {}
+    state_snaps = state.get("character_snapshots", {})
+    if not isinstance(state_snaps, dict):
+        raise ValueError("state.character_snapshots 必须为对象")
     ok, warnings = _validate_snapshot_limits(snapshots)
     if not ok:
         raise ValueError(warnings[0])
@@ -191,24 +228,38 @@ def apply_transaction(
         print(f"[state_tracker] 警告: {w}")
 
     # 3. 活跃角色上限校验。
-    active_names = transaction.get("context", {}).get("active_character_names", [])
+    if "context" in transaction:
+        ctx_in = transaction["context"]
+        if not isinstance(ctx_in, dict):
+            raise ValueError("context 必须为对象")
+    else:
+        ctx_in = {}
+    active_names = ctx_in.get("active_character_names", [])
     if not isinstance(active_names, list):
         raise ValueError("context.active_character_names 必须为列表")
     if len(active_names) > MAX_ACTIVE_CHARACTERS:
         raise ValueError(
             f"活跃角色 {len(active_names)} 人超上限 {MAX_ACTIVE_CHARACTERS}"
         )
-    # 活跃角色必须已有快照（init 除外，init 可先建快照）。
-    if mode != "init":
-        existing_snapshots = set(state.get("character_snapshots", {}).keys())
-        new_snapshots = set(snapshots.keys())
-        merged = existing_snapshots | new_snapshots
-        missing = [n for n in active_names if n not in merged]
-        if missing:
-            raise ValueError(f"活跃角色缺快照: {missing}")
+    # 活跃角色必须具备对应快照（含 init 模式：当场传入或既有快照之一存在）。
+    existing_snapshots = set(state_snaps.keys())
+    new_snapshots = set(snapshots.keys())
+    merged = existing_snapshots | new_snapshots
+    missing = [n for n in active_names if n not in merged]
+    if missing:
+        raise ValueError(f"活跃角色缺快照: {missing}")
 
     # 4. 应用 delta 到状态。
-    delta = transaction.get("delta", {})
+    if "delta" in transaction:
+        delta = transaction["delta"]
+        if not isinstance(delta, dict):
+            raise ValueError("delta 必须为对象")
+    else:
+        delta = {}
+    if "retired_characters" in delta and not isinstance(delta["retired_characters"], list):
+        raise ValueError("delta.retired_characters 必须为列表")
+    if "retired_context_items" in delta and not isinstance(delta["retired_context_items"], list):
+        raise ValueError("delta.retired_context_items 必须为列表")
     result_state = _apply_delta(state, delta, mode)
 
     # 4b. init 事务直接提交顶层 foreshadow / timeline_events 的「当前行」。
@@ -228,8 +279,10 @@ def apply_transaction(
                     raise ValueError(f"init 事务的 {field} 必须为列表或 null")
 
     # 5. 更新 context（init 收六项，commit 收前四项；其余由工具派生）。
-    ctx_in = transaction.get("context", {})
     ctx = result_state.setdefault("context", {})
+    if not isinstance(ctx, dict):
+        ctx = {}
+        result_state["context"] = ctx
     for field in ("position", "long_term_constraints", "active_character_names", "continuity_risks"):
         if field in ctx_in:
             ctx[field] = ctx_in[field]
@@ -259,7 +312,7 @@ def apply_transaction(
     # 8. 推进修订号与最后章。
     result_state["state_revision"] = current_revision + 1
     chapter = transaction.get("chapter")
-    if isinstance(chapter, int):
+    if isinstance(chapter, int) and not isinstance(chapter, bool):
         result_state["last_chapter"] = max(result_state.get("last_chapter", 0), chapter)
 
     # 9. 原子写回（可选）。
@@ -279,43 +332,71 @@ def _apply_delta(
 
     # 伏笔变更（upsert / delete）。
     foreshadow = result.setdefault("foreshadow", [])
+    if not isinstance(foreshadow, list):
+        raise ValueError("state.foreshadow 必须为列表")
+    fs_changes = delta.get("foreshadow_changes", [])
+    if not isinstance(fs_changes, list):
+        raise ValueError("delta.foreshadow_changes 必须为列表")
     foreshadow_index: dict[str, int] = {
-        f.get("id", ""): i for i, f in enumerate(foreshadow)
+        f.get("id", ""): i for i, f in enumerate(foreshadow) if isinstance(f, dict)
     }
-    for change in delta.get("foreshadow_changes", []):
+    for change in fs_changes:
+        if not isinstance(change, dict):
+            raise ValueError("delta.foreshadow_changes 元素必须为对象")
         action = change.get("action")
         fid = change.get("id")
+        if not isinstance(fid, str) or not fid.strip():
+            raise ValueError("foreshadow 变更缺少非空字符串 id")
         if action == "delete":
             if fid in foreshadow_index:
                 foreshadow.pop(foreshadow_index[fid])
-        else:  # upsert
+        else:  # upsert（合并部分更新，剥离临时动作标记 action）
+            clean_change = {k: v for k, v in change.items() if k != "action"}
             if fid in foreshadow_index:
-                foreshadow[foreshadow_index[fid]] = change
+                existing = foreshadow[foreshadow_index[fid]]
+                foreshadow[foreshadow_index[fid]] = {
+                    **(existing if isinstance(existing, dict) else {}),
+                    **clean_change,
+                }
             else:
-                foreshadow.append(change)
+                foreshadow.append(clean_change)
         # 重建索引（长度可能变化）。
         foreshadow_index = {
-            f.get("id", ""): i for i, f in enumerate(foreshadow)
+            f.get("id", ""): i for i, f in enumerate(foreshadow) if isinstance(f, dict)
         }
 
     # 时间线事件（upsert / delete）。
     timeline = result.setdefault("timeline_events", [])
+    if not isinstance(timeline, list):
+        raise ValueError("state.timeline_events 必须为列表")
+    tl_changes = delta.get("timeline_events", [])
+    if not isinstance(tl_changes, list):
+        raise ValueError("delta.timeline_events 必须为列表")
     timeline_index: dict[str, int] = {
-        e.get("id", ""): i for i, e in enumerate(timeline)
+        e.get("id", ""): i for i, e in enumerate(timeline) if isinstance(e, dict)
     }
-    for event in delta.get("timeline_events", []):
+    for event in tl_changes:
+        if not isinstance(event, dict):
+            raise ValueError("delta.timeline_events 元素必须为对象")
         action = event.get("action")
         eid = event.get("id")
+        if not isinstance(eid, str) or not eid.strip():
+            raise ValueError("timeline_events 变更缺少非空字符串 id")
         if action == "delete":
             if eid in timeline_index:
                 timeline.pop(timeline_index[eid])
         else:
+            clean_event = {k: v for k, v in event.items() if k != "action"}
             if eid in timeline_index:
-                timeline[timeline_index[eid]] = event
+                existing = timeline[timeline_index[eid]]
+                timeline[timeline_index[eid]] = {
+                    **(existing if isinstance(existing, dict) else {}),
+                    **clean_event,
+                }
             else:
-                timeline.append(event)
+                timeline.append(clean_event)
         timeline_index = {
-            e.get("id", ""): i for i, e in enumerate(timeline)
+            e.get("id", ""): i for i, e in enumerate(timeline) if isinstance(e, dict)
         }
 
     # 退役上下文条目：从 context 的约束/风险中移除。
@@ -485,6 +566,8 @@ def validate_revision(
         ``(是否通过, 说明)``。一致返回 ``(True, ...)``；不一致返回
         ``(False, 原因)``，提示调用方重新读取 state 并重构事务。
     """
+    if isinstance(expected_state_revision, bool) or not isinstance(expected_state_revision, int):
+        raise ValueError("expected_state_revision 必须为整数")
     current = state.get("state_revision", 0)
     if expected_state_revision == current:
         return True, f"修订号一致（state_revision={current}）"
@@ -537,7 +620,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "apply":
         state = load_state(args.state)
-        with Path(args.transaction).open("r", encoding="utf-8") as fh:
+        with Path(args.transaction).open("r", encoding="utf-8-sig") as fh:
             transaction = json.load(fh)
         try:
             new_state = apply_transaction(state, transaction, state_path=args.state)

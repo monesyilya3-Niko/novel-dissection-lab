@@ -118,4 +118,67 @@ describe('AdvancedWorkbench 高级功能工坊双语支持', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
     expect(screen.getByLabelText('Asset JSON Content')).toBeInTheDocument()
   })
+
+  it('AssetEditPanel 防跨资产误写守卫、未保存加载确认与 Ctrl+S 快捷保存', async () => {
+    vi.mocked(assetApi.list).mockResolvedValue({
+      items: [
+        { id: 'v1', name: '资产A', kind: 'voice' },
+        { id: 'v2', name: '资产B', kind: 'voice' },
+      ],
+    })
+    vi.mocked(assetApi.detail)
+      .mockResolvedValueOnce({ content: { owner: 'asset-A' } } as any)
+      .mockResolvedValueOnce({ content: { owner: 'asset-B' } } as any)
+    vi.mocked(assetApi.update).mockResolvedValue({ ok: true } as any)
+
+    const confirmSpy = vi.spyOn(window, 'confirm')
+
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <AdvancedWorkbench />
+      </I18nProvider>
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: '资产编辑' }))
+    const selectInput = await screen.findByLabelText('选择资产')
+
+    // 1. 选择资产 A 并点击加载
+    fireEvent.mouseDown(selectInput)
+    fireEvent.click(await screen.findByRole('option', { name: '资产A（声线卡）' }))
+    fireEvent.click(screen.getByRole('button', { name: '加载' }))
+
+    const editor = await screen.findByLabelText('资产 JSON 内容')
+    await waitFor(() => {
+      expect((editor as HTMLTextAreaElement).value).toContain('"asset-A"')
+    })
+
+    // 2. 修改资产 A 的 JSON，然后将下拉框切到资产 B（不点加载），直接按 Ctrl+S 保存
+    fireEvent.change(editor, { target: { value: '{\n  "owner": "asset-A-edited"\n}' } })
+    fireEvent.mouseDown(selectInput)
+    fireEvent.click(await screen.findByRole('option', { name: '资产B（声线卡）' }))
+
+    // 出现跨资产保护提示，且按 Ctrl+S 必须保存到已加载的 v1（绝不能误写到 v2！）
+    expect(screen.getByText(/当前编辑器仍为已加载资产「voice:v1」/)).toBeInTheDocument()
+    fireEvent.keyDown(editor, { key: 's', ctrlKey: true })
+
+    await waitFor(() => {
+      expect(assetApi.update).toHaveBeenCalledTimes(1)
+      expect(assetApi.update).toHaveBeenCalledWith('voice', 'v1', { owner: 'asset-A-edited' })
+    })
+
+    // 3. 再次改脏后点击「加载」资产 B：若取消确认则不丢弃修改；确认后才加载资产 B
+    fireEvent.change(editor, { target: { value: '{\n  "owner": "unsaved-change"\n}' } })
+    confirmSpy.mockReturnValueOnce(false)
+    fireEvent.click(screen.getByRole('button', { name: '加载' }))
+    expect(confirmSpy).toHaveBeenCalled()
+    expect((editor as HTMLTextAreaElement).value).toContain('unsaved-change')
+
+    confirmSpy.mockReturnValueOnce(true)
+    fireEvent.click(screen.getByRole('button', { name: '加载' }))
+    await waitFor(() => {
+      expect((editor as HTMLTextAreaElement).value).toContain('"asset-B"')
+    })
+
+    confirmSpy.mockRestore()
+  })
 })

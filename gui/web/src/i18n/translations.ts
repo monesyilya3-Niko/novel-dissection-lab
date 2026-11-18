@@ -5802,6 +5802,74 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '快速选择写作项目',
     'en-US': 'Quick Select Writing Project',
   },
+  essence_macro_btn_saved_asset: {
+    'zh-CN': '✓ 已入库',
+    'en-US': '✓ Saved',
+  },
+  analysis_offline_workbench_title: {
+    'zh-CN': 'Web-AI 离线接管拆书工作台（Pass 1–5）',
+    'en-US': 'Web-AI Offline Takeover Workbench (Pass 1–5)',
+  },
+  analysis_offline_run_btn: {
+    'zh-CN': '运行离线量化拆解 & AI 接管工作台',
+    'en-US': 'Run Offline Metrics & AI Takeover Workbench',
+  },
+  analysis_takeover_step1_title: {
+    'zh-CN': '第一步：选择拆书阶段（Pass 1–5）',
+    'en-US': 'Step 1: Select Deconstruction Pass (Pass 1–5)',
+  },
+  analysis_takeover_pass_saved: {
+    'zh-CN': '✓ 已入库',
+    'en-US': '✓ Saved',
+  },
+  analysis_takeover_pass_pending: {
+    'zh-CN': '待完成',
+    'en-US': 'Pending',
+  },
+  analysis_takeover_step2_title: {
+    'zh-CN': '第二步：复制本 Pass 完整投喂包（Prompt + 分层采样切片）',
+    'en-US': 'Step 2: Copy Full Pass Bundle (Prompt + Sampled Slices)',
+  },
+  analysis_takeover_copy_bundle_btn: {
+    'zh-CN': '复制本 Pass 完整投喂包',
+    'en-US': 'Copy Pass Prompt Bundle',
+  },
+  analysis_takeover_copied_bundle: {
+    'zh-CN': '已复制本 Pass 投喂包（{chars} 字）✓',
+    'en-US': 'Copied Pass Bundle ({chars} chars) ✓',
+  },
+  analysis_takeover_step3_title: {
+    'zh-CN': '第三步：粘贴 Web-AI 回复并保存本 Pass JSON',
+    'en-US': 'Step 3: Paste Web-AI Reply & Save Pass JSON',
+  },
+  analysis_takeover_paste_placeholder: {
+    'zh-CN': '将任意网页版 AI（ChatGPT / Claude / DeepSeek / 豆包等）返回的 JSON 或 ```json ... ``` 代码块直接粘贴到这里……',
+    'en-US': 'Paste the JSON or ```json ... ``` block returned by any Web AI (ChatGPT / Claude / DeepSeek / Gemini) here…',
+  },
+  analysis_takeover_save_pass_btn: {
+    'zh-CN': '保存本 Pass JSON',
+    'en-US': 'Save Pass JSON',
+  },
+  analysis_takeover_pass_save_ok: {
+    'zh-CN': '已保存 {passName}（字段数：{count}）',
+    'en-US': 'Saved {passName} ({count} top-level keys)',
+  },
+  analysis_takeover_step4_title: {
+    'zh-CN': '第四步：组装四维资产并生成万字双报告',
+    'en-US': 'Step 4: Assemble 4D Assets & Generate Reports',
+  },
+  analysis_takeover_finalize_btn: {
+    'zh-CN': '一键组装四维资产并生成万字双报告',
+    'en-US': 'Assemble 4D Assets & Generate Reports',
+  },
+  analysis_takeover_finalize_ok: {
+    'zh-CN': '已组装 {assets} 张资产卡，生成 {reports} 份报告（共 {chars} 字）',
+    'en-US': 'Assembled {assets} asset cards and generated {reports} reports ({chars} chars total)',
+  },
+  asset_edit_confirm_discard: {
+    'zh-CN': '当前资产有未保存的修改，确定放弃修改并切换/重新加载吗？',
+    'en-US': 'You have unsaved changes in the current asset. Discard changes and load another asset?',
+  },
 }
 
 // ---------------------------------------------------------------------------

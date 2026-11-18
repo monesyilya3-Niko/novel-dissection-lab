@@ -4,13 +4,20 @@ import CommandPalette, { CommandPaletteTrigger } from './CommandPalette'
 import { I18nProvider } from '../state/I18nContext'
 
 const mockSetWorkbench = vi.fn()
+const mockOpenHelp = vi.fn()
 const mockSetMode = vi.fn()
+const mockRequestSystemTab = vi.fn()
 let mockCurrentMode: 'light' | 'dark' = 'light'
 
 vi.mock('../state/AppContext', () => ({
   useApp: () => ({
     setWorkbench: mockSetWorkbench,
+    openHelp: mockOpenHelp,
   }),
+}))
+
+vi.mock('./SystemWorkbench', () => ({
+  requestSystemTab: (tab: number) => mockRequestSystemTab(tab),
 }))
 
 vi.mock('../state/ThemeModeContext', () => ({
@@ -34,9 +41,9 @@ describe('CommandPalette 全局命令面板双语国际化与功能测试', () =
       </I18nProvider>
     )
 
-    // 触发按钮文案
+    // 触发按钮文案（非 Mac 平台显示 Ctrl+K）
     expect(screen.getByText('搜索…')).toBeInTheDocument()
-    expect(screen.getByText('⌘K')).toBeInTheDocument()
+    expect(screen.getByText('Ctrl+K')).toBeInTheDocument()
 
     // 点击打开面板
     fireEvent.click(screen.getByText('搜索…'))
@@ -160,6 +167,29 @@ describe('CommandPalette 全局命令面板双语国际化与功能测试', () =
     // 等待 requestAnimationFrame 执行
     await waitFor(() => {
       expect(mockSetWorkbench).toHaveBeenCalledWith('writing')
+    })
+  })
+
+  it('触发按钮具备键盘可访问性 (Enter 键唤起面板) 且「配置模型」直达模型配置子页签', async () => {
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <CommandPaletteTrigger />
+        <CommandPalette />
+      </I18nProvider>
+    )
+
+    const trigger = screen.getByTestId('command-palette-trigger')
+    expect(trigger).toHaveAttribute('role', 'button')
+    expect(trigger).toHaveAttribute('tabIndex', '0')
+
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    const input = await screen.findByPlaceholderText('搜索工作台或操作…')
+    fireEvent.change(input, { target: { value: '配置模型' } })
+
+    fireEvent.click(screen.getByText('配置模型'))
+    await waitFor(() => {
+      expect(mockRequestSystemTab).toHaveBeenCalledWith(2)
+      expect(mockSetWorkbench).toHaveBeenCalledWith('system')
     })
   })
 })

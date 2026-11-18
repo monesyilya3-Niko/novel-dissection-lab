@@ -41,6 +41,7 @@ vi.mock('./api/client', () => ({
   getBookResults: vi.fn().mockResolvedValue(null),
   subscribeEvents: vi.fn().mockReturnValue(() => {}),
   systemApi: { settings: vi.fn().mockResolvedValue({}) },
+  adminApi: { me: vi.fn().mockResolvedValue({ loggedIn: false }) },
   // 2026-11-03：AppContext 初始化错误改走 friendlyError
   friendlyError: (e: unknown) => (e instanceof Error && e.message ? e.message : String(e)),
 }))
@@ -270,6 +271,22 @@ describe('App 顶层应用框架与导航集成测试', () => {
     })
 
     expect(await screen.findByText('欢迎使用暮冬念春')).toBeDefined()
+  })
+
+  it('未登录管理员时按 Alt+9 不会越权切换到 admin 工作台', async () => {
+    render(
+      <ThemeModeProvider>
+        <I18nProvider>
+          <App />
+        </I18nProvider>
+      </ThemeModeProvider>,
+    )
+
+    expect(await screen.findByTestId('workbench-home')).toBeDefined()
+
+    fireEvent.keyDown(window, { key: '9', altKey: true })
+    expect(screen.getByTestId('workbench-home')).toBeDefined()
+    expect(screen.queryByTestId('workbench-admin')).toBeNull()
   })
 })
 

@@ -22,7 +22,8 @@ import StepContent from '@mui/material/StepContent'
 import Paper from '@mui/material/Paper'
 import Divider from '@mui/material/Divider'
 import Button from '@mui/material/Button'
-import { ink, fontStack } from '../ink'
+import { alpha } from '@mui/material/styles'
+import { fontStack } from '../ink'
 import { useI18n, Locale } from '../state/I18nContext'
 
 export type HelpSection = 'start' | 'glossary' | 'guides' | 'faq'
@@ -658,16 +659,19 @@ function GlossaryPanel() {
         const defText = item.definition[locale] || item.definition['zh-CN']
         const exText = item.example ? (item.example[locale] || item.example['zh-CN']) : undefined
         return (
-          <Card key={termName} sx={{ mb: 2, border: `1px solid ${ink.line}` }}>
+          <Card key={termName} sx={{ mb: 2, border: '1px solid', borderColor: 'divider' }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                <Typography variant="h6" sx={{ fontFamily: fontStack.serif, color: ink.primary }}>
+                <Typography variant="h6" sx={{ fontFamily: fontStack.serif, color: 'primary.main' }}>
                   {termName}
                 </Typography>
                 <Chip
                   label={catLabelMap[item.category]}
                   size="small"
-                  sx={{ bgcolor: ink.primarySoft, color: ink.primary }}
+                  sx={{
+                    bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.18 : 0.1),
+                    color: 'primary.main',
+                  }}
                 />
                 {locale === 'zh-CN' && item.pinyin && (
                   <Typography variant="caption" color="text.secondary">{item.pinyin}</Typography>
@@ -677,7 +681,15 @@ function GlossaryPanel() {
                 {defText}
               </Typography>
               {exText && (
-                <Paper sx={{ p: 1.5, bgcolor: ink.goldSoft, border: `1px dashed ${ink.gold}` }} elevation={0}>
+                <Paper
+                  sx={{
+                    p: 1.5,
+                    bgcolor: (theme) => alpha(theme.palette.warning.main, theme.palette.mode === 'dark' ? 0.14 : 0.08),
+                    border: '1px dashed',
+                    borderColor: 'warning.main',
+                  }}
+                  elevation={0}
+                >
                   <Typography variant="body2" sx={{ lineHeight: 1.8 }}>
                     <strong>{t('help_glossary_example_prefix')}</strong>{exText}
                   </Typography>
@@ -705,10 +717,19 @@ function StartPanel() {
 
   return (
     <Box>
-      <Typography variant="h6" sx={{ fontFamily: fontStack.serif, mb: 2, color: ink.primary }}>
+      <Typography variant="h6" sx={{ fontFamily: fontStack.serif, mb: 2, color: 'primary.main' }}>
         {t('help_start_eco_title')}
       </Typography>
-      <Paper sx={{ p: 3, mb: 4, bgcolor: ink.primarySoft, border: `1px solid ${ink.line}` }} elevation={0}>
+      <Paper
+        sx={{
+          p: 3,
+          mb: 4,
+          bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.12 : 0.06),
+          border: '1px solid',
+          borderColor: 'divider',
+        }}
+        elevation={0}
+      >
         <Typography variant="body2" sx={{ lineHeight: 2.2, fontFamily: fontStack.mono, whiteSpace: 'pre-wrap' }}>
           {DATA_FLOW_DIAGRAM[locale] || DATA_FLOW_DIAGRAM['zh-CN']}
         </Typography>
@@ -720,10 +741,10 @@ function StartPanel() {
         </Typography>
       </Paper>
 
-      <Typography variant="h6" sx={{ fontFamily: fontStack.serif, mb: 2, color: ink.primary }}>
+      <Typography variant="h6" sx={{ fontFamily: fontStack.serif, mb: 2, color: 'primary.main' }}>
         {t('help_start_journey_title', '三步闭环（与首页进度条一致）')}
       </Typography>
-      <Paper sx={{ p: 2.5, mb: 4, border: `1px solid ${ink.line}` }} elevation={0}>
+      <Paper sx={{ p: 2.5, mb: 4, border: '1px solid', borderColor: 'divider' }} elevation={0}>
         <Stepper orientation="vertical" activeStep={-1}>
           {JOURNEY_DEFINITIONS.map((j, idx) => {
             const titleText = j.title[locale] || j.title['zh-CN']
@@ -746,7 +767,7 @@ function StartPanel() {
         </Stepper>
       </Paper>
 
-      <Typography variant="h6" sx={{ fontFamily: fontStack.serif, mb: 2, color: ink.primary }}>
+      <Typography variant="h6" sx={{ fontFamily: fontStack.serif, mb: 2, color: 'primary.main' }}>
         {t('help_start_workflows_title')}
       </Typography>
       {WORKFLOWS.map((w, i) => {
@@ -812,7 +833,7 @@ function GuidesPanel({ anchor }: { anchor: HelpAnchor }) {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2, lineHeight: 1.8 }}>
                 {guideIntro}
               </Typography>
-              <Typography variant="subtitle2" sx={{ mb: 1, color: ink.primary }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, color: 'primary.main' }}>
                 {t('help_guides_steps_header')}
               </Typography>
               <Stepper orientation="vertical" sx={{ mb: 2 }}>
@@ -835,7 +856,7 @@ function GuidesPanel({ anchor }: { anchor: HelpAnchor }) {
               </Stepper>
               {g.tips.length > 0 && (
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, color: ink.goldDeep }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: 'warning.main' }}>
                     {t('help_guides_tips_header')}
                   </Typography>
                   {g.tips.map((tipObj, tIdx) => {
@@ -850,7 +871,7 @@ function GuidesPanel({ anchor }: { anchor: HelpAnchor }) {
               )}
               {g.faq.length > 0 && (
                 <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 1, color: ink.primary }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: 'primary.main' }}>
                     {t('help_guides_faq_header')}
                   </Typography>
                   {g.faq.map((fItem, fIdx) => {
@@ -918,7 +939,7 @@ export default function HelpWorkbench({ initialTab = 'start', initialAnchor = nu
 
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto', p: 3, height: '100%', overflow: 'auto' }}>
-      <Typography variant="h5" sx={{ fontFamily: fontStack.serif, mb: 1, color: ink.ink }}>
+      <Typography variant="h5" sx={{ fontFamily: fontStack.serif, mb: 1, color: 'text.primary' }}>
         {t('help_title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -927,7 +948,7 @@ export default function HelpWorkbench({ initialTab = 'start', initialAnchor = nu
       <Tabs
         value={tab}
         onChange={(_, v) => setTab(v)}
-        sx={{ mb: 3, borderBottom: `1px solid ${ink.line}` }}
+        sx={{ mb: 3, borderBottom: '1px solid', borderColor: 'divider' }}
       >
         <Tab value="start" label={t('help_tab_start')} />
         <Tab value="glossary" label={t('help_tab_glossary')} />

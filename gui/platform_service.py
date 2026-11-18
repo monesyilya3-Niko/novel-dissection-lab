@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 
 from gui import engine_adapter, text_access
@@ -554,22 +555,42 @@ def export_book_for_platform(platform_id: str, book_dir: str) -> dict[str, Any]:
     # 任何按 ``第N章`` 命名的 10 章以上稿件，投稿稿章号全错。
     # 现在用 chapter_loader 的章号解析（它认 第N章 / chapter-N / 纯数字），
     # 取不到章号的文件（设定笔记、番外等）排到末尾并保持文件名序。
-    numbered = []
-    unnumbered = []
+    numbered: list[tuple[int, Path]] = []
+    unnumbered: list[Path] = []
     for fp in chapter_files:
         no = engine_adapter.chapter_number_from_path(fp)
-        (numbered if no is not None else unnumbered).append((no, fp))
+        if no is not None:
+            numbered.append((no, fp))
+        else:
+            unnumbered.append(fp)
     numbered.sort(key=lambda x: x[0])
-    ordered = [fp for _no, fp in numbered] + [fp for _no, fp in unnumbered]
+
+    used_nums: set[int] = {no for no, _ in numbered}
+    next_auto_num = max(used_nums, default=0) + 1
+    ordered_pairs: list[tuple[int, Path]] = []
+    seen_assigned: set[int] = set()
+    for no, fp in numbered:
+        if no in seen_assigned:
+            while next_auto_num in used_nums or next_auto_num in seen_assigned:
+                next_auto_num += 1
+            assigned = next_auto_num
+            next_auto_num += 1
+        else:
+            assigned = no
+        seen_assigned.add(assigned)
+        ordered_pairs.append((assigned, fp))
+    for fp in unnumbered:
+        while next_auto_num in used_nums or next_auto_num in seen_assigned:
+            next_auto_num += 1
+        seen_assigned.add(next_auto_num)
+        ordered_pairs.append((next_auto_num, fp))
+        next_auto_num += 1
 
     chapters = []
     total_chars = 0
     non_compliant = 0
 
-    for i, fp in enumerate(ordered, 1):
-        # 章号优先用文件名里的真实值；取不到才退回循环序号。
-        real_no = engine_adapter.chapter_number_from_path(fp)
-        num = real_no if real_no is not None else i
+    for num, fp in ordered_pairs:
         try:
             # 走 text_access 而不是 Path.read_text：国内稿子大量是 GBK，
             # 只按 UTF-8 解会让整章被静默跳过，导出的书凭空少一章。
@@ -578,10 +599,23 @@ def export_book_for_platform(platform_id: str, book_dir: str) -> dict[str, Any]:
             _log.warning(f"导出跳过无法读取的章节 {fp.name}: {exc.message}")
             continue
 
-        # 提取标题（第一行）
-        lines = content.strip().split('\n', 1)
-        title = lines[0].strip() if lines else f"第{i}章"
-        body = lines[1].strip() if len(lines) > 1 else content
+        # 提取标题：剥除 Markdown 标题前缀，并判定首行是否确为标题，防止无标题稿丢失第一段正文
+        stripped_content = content.strip()
+        lines = stripped_content.split("\n", 1)
+        raw_first = lines[0].strip() if lines else ""
+        clean_first = re.sub(r"^#{1,6}\s*", "", raw_first).strip()
+        looks_like_title = (
+            bool(clean_first)
+            and len(clean_first) <= 60
+            and "。" not in clean_first
+            and "，" not in clean_first
+        )
+        if looks_like_title:
+            title = clean_first
+            body = lines[1].strip() if len(lines) > 1 else ""
+        else:
+            title = f"第{num}章" if "{num}" not in p["chapter_format"] else ""
+            body = stripped_content
 
         # 检查合规性
         compliance = check_chapter_compliance(platform_id, body, title)

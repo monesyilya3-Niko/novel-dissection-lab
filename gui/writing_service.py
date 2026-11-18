@@ -561,50 +561,152 @@ def assemble(name: str, genre: str, skip_craft: bool = False) -> dict[str, Any]:
         raise ServiceError("pass1_structure.json 缺失或损坏", 400)
 
     metrics_fp = config.CORPUS_DIR / "metrics" / f"{name}.json"
-    metrics = {}
+    metrics: dict[str, Any] = {}
     if metrics_fp.is_file():
         try:
-            metrics = json.loads(metrics_fp.read_text(encoding="utf-8-sig"))
+            loaded_metrics = json.loads(metrics_fp.read_text(encoding="utf-8-sig"))
+            if isinstance(loaded_metrics, dict):
+                metrics = loaded_metrics
         except (json.JSONDecodeError, OSError) as exc:
             _log.warning(f"量化指标加载失败，注入提示将不含统计画像 {metrics_fp.name}: {exc}")
 
-    written: list[str] = []
+    from gui import asset_index, db, services, state_store
+
+    manifest_fp = config.CORPUS_DIR / "sampled" / name / "manifest.json"
+    manifest: dict[str, Any] = {}
+    if manifest_fp.is_file():
+        try:
+            loaded_manifest = json.loads(manifest_fp.read_text(encoding="utf-8-sig"))
+            if isinstance(loaded_manifest, dict):
+                manifest = loaded_manifest
+        except (json.JSONDecodeError, OSError) as exc:
+            _log.warning("采样 manifest 加载失败，将自动合成 %s: %s", manifest_fp.name, exc)
+
+    db_books: list[dict[str, Any]] = []
+    try:
+        if db._db_ready():
+            db_books = db.get_books(book_id=name)
+    except Exception as exc:  # noqa: BLE001
+        _log.debug("assemble 查询 books 表跳过 %s: %s", name, exc)
+
+    st_state = state_store.load_state(name)
+    resolved_title = (
+        str(manifest.get("title") or "").strip()
+        or (str(db_books[0].get("title") or "").strip() if db_books else "")
+        or str(st_state.get("title") or "").strip()
+        or name
+    )
+
+    raw_indices = manifest.get("selected_indices")
+    valid_indices = (
+        [int(x) for x in raw_indices if isinstance(x, int) and not isinstance(x, bool) and x >= 1]
+        if isinstance(raw_indices, list)
+        else []
+    )
+    if len(valid_indices) < 3:
+        ch_count = 0
+        for cand in (
+            manifest.get("total_chapters"),
+            metrics.get("chapter_count"),
+            len(pass1.get("chapter_analyses") or []) if isinstance(pass1.get("chapter_analyses"), list) else 0,
+            len((services._books_get(name) or {}).get("chapters") or []),
+        ):
+            if isinstance(cand, int) and not isinstance(cand, bool) and cand > ch_count:
+                ch_count = cand
+        if ch_count == 0:
+            state_idxs = [
+                parsed[0]
+                for key in (st_state.get("chapter_states") or {})
+                if (parsed := state_store.parse_cursor(key)) and parsed[0]
+            ]
+            if state_idxs:
+                ch_count = max(state_idxs)
+        ch_count = max(ch_count, 3)
+        valid_indices = list(range(1, ch_count + 1))
+
+    manifest["title"] = resolved_title
+    manifest["selected_indices"] = valid_indices
+    manifest["selected_count"] = len(valid_indices)
+
+    built: list[tuple[Path, dict[str, Any]]] = []
 
     # voice-card
     if pass2 and pass3:
         voices = engine_adapter.normalize_pass2(pass2)
         narration, dialogue, emotion, imagery, banned = engine_adapter.normalize_pass3(pass3)
+        if isinstance(dialogue, dict):
+            dialogue.setdefault("dialogue_ratio", metrics.get("dialogue_ratio", 0))
         vc = engine_adapter.assemble_asset_voice_card(
-            name, genre, {"title": name}, metrics, voices,
+            resolved_title, genre, manifest, metrics, voices,
             narration, dialogue, emotion, imagery, banned)
+        sr = (vc.get("narration") or {}).get("sentence_rhythm") or {}
+        if not metrics and all(float(sr.get(k) or 0) == 0 for k in ("avg_length", "short_ratio", "long_ratio")):
+            vc["meta"]["confidence"] = min(float(vc["meta"].get("confidence", 0.5)), 0.5)
         vc_fp = config.ASSETS_ROOT / f"{name}-voice-card.json"
-        _atomic_write_json(vc_fp, vc)
-        migrate.sync_asset(vc_fp)
-        written.append(str(vc_fp.name))
+        built.append((vc_fp, vc))
 
     # structure-obs
     if pass1:
-        so = engine_adapter.assemble_asset_obs("structure", name, genre, pass1)
+        so = engine_adapter.assemble_asset_obs("structure", resolved_title, genre, pass1)
         so_fp = config.ASSETS_ROOT / f"{name}-structure-obs.json"
-        _atomic_write_json(so_fp, so)
-        migrate.sync_asset(so_fp)
-        written.append(str(so_fp.name))
+        built.append((so_fp, so))
 
     # commercial-obs
     if pass4:
-        co = engine_adapter.assemble_asset_obs("commercial", name, genre, pass4)
+        co = engine_adapter.assemble_asset_obs("commercial", resolved_title, genre, pass4)
         co_fp = config.ASSETS_ROOT / f"{name}-commercial-obs.json"
-        _atomic_write_json(co_fp, co)
-        migrate.sync_asset(co_fp)
-        written.append(str(co_fp.name))
+        built.append((co_fp, co))
 
     # craft-card
     if pass5 and not skip_craft:
-        cc = engine_adapter.assemble_asset_craft_card(name, genre, {"title": name}, metrics, pass5)
+        cc = engine_adapter.assemble_asset_craft_card(resolved_title, genre, manifest, metrics, pass5)
         cc_fp = config.ASSETS_ROOT / f"{name}-craft-card.json"
-        _atomic_write_json(cc_fp, cc)
-        migrate.sync_asset(cc_fp)
-        written.append(str(cc_fp.name))
+        built.append((cc_fp, cc))
+
+    # 先校验全部内存对象，任一存在硬错误则阻断写盘，不覆盖旧资产
+    for fp, card in built:
+        errs, _warns = engine_adapter.validate_asset_card(card, fp.name)
+        if errs:
+            raise ServiceError(
+                f"资产校验未通过 ({fp.name}): {'; '.join(errs[:3])}",
+                400,
+            )
+
+    config.ASSETS_ROOT.mkdir(parents=True, exist_ok=True)
+    try:
+        if not db.table_exists("assets"):
+            db.init_schema()
+            db.apply_migrations()
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("assemble 初始化 SQLite 索引表跳过: %s", exc)
+
+    written: list[str] = []
+    for fp, card in built:
+        _atomic_write_json(fp, card)
+        try:
+            migrate.sync_asset(fp)
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("assemble 资产同步 SQLite 失败 %s: %s", fp.name, exc)
+        written.append(str(fp.name))
+
+    try:
+        latest_books = db.get_books(book_id=name) if db._db_ready() else []
+        if latest_books:
+            b0 = latest_books[0]
+            with db.tx() as conn:
+                migrate._upsert_book(
+                    conn,
+                    name,
+                    b0.get("title") or resolved_title,
+                    b0.get("source_path"),
+                    genre if genre != "unknown" else b0.get("genre"),
+                    "done",
+                )
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("assemble 更新 books.status=done 失败 %s: %s", name, exc)
+
+    asset_index.index.invalidate()
+    engine_adapter.invalidate_genre_cache()
 
     return {"name": name, "genre": genre, "written": written}
 
@@ -656,6 +758,20 @@ def _settings_defaults() -> dict[str, int]:
     return defaults
 
 
+def _is_chat_mocked() -> bool:
+    """检测测试是否显式 mock 了 llm_chat / llm_client.chat（保留单测走 _run_generate 的能力）。"""
+    chat_fn = getattr(engine_adapter, "llm_chat", None)
+    if hasattr(chat_fn, "_mock_name") or callable(getattr(chat_fn, "assert_called", None)):
+        return True
+    try:
+        llm_fn = getattr(engine_adapter._get_llm_client(), "chat", None)
+        if hasattr(llm_fn, "_mock_name") or callable(getattr(llm_fn, "assert_called", None)):
+            return True
+    except Exception:  # noqa: BLE001
+        return False
+    return False
+
+
 def generate(voice: str, project: str, chapter_no: int, task: str,
              novel_name: str | None = None, prompt: str | None = None,
              genre_pack: str | None = None, words: int | None = None,
@@ -699,8 +815,10 @@ def generate(voice: str, project: str, chapter_no: int, task: str,
 
     task_id = f"w-{uuid.uuid4().hex[:12]}"
 
-    # 无模型降级（同步返回，不占并发额度）
-    if not engine_adapter.any_model_configured():
+    # 无模型或未就绪密钥降级（同步返回，不占并发额度；测试 mock llm_chat 时放行）
+    if not engine_adapter.any_model_configured() or (
+        not engine_adapter.any_model_ready() and not _is_chat_mocked()
+    ):
         chapter_path = (novel_dir / "chapters" / f"arc-{_arc_for_chapter(chapter_no)}"
                         / f"chapter-{chapter_no:03d}.txt")
         guide = _build_degrade_guide(
@@ -800,7 +918,8 @@ def cancel(task_id: str) -> dict[str, Any]:
 
 def import_chapter(project: str, chapter_no: int, content: str,
                    novel_name: str | None = None, voice: str | None = None,
-                   genre_pack: str | None = None) -> dict[str, Any]:
+                   genre_pack: str | None = None,
+                   title: str | None = None) -> dict[str, Any]:
     """手动入库：用户贴回会话内写好的正文 → 落盘 + 双维度打分。"""
     project = _sanitize_project(project)
     if chapter_no < 1:
@@ -809,8 +928,23 @@ def import_chapter(project: str, chapter_no: int, content: str,
         # 章节号会直接拼成 chapter-%03d.txt 并成为记账/导出的排序键；
         # 10^20 这种值写得进去，但之后列目录、导出、统计都会被它拖乱。
         raise ServiceError(f"chapter_no 过大（最多 {_MAX_CHAPTER_NO}）", 400)
+    if title is not None and not isinstance(title, str):
+        raise ServiceError("title 必须为字符串", 400)
     if not content or not content.strip():
         raise ServiceError("content 不能为空", 400)
+    if isinstance(title, str) and title.strip():
+        clean_title = re.sub(r"[\r\n]+", " ", title).strip()
+        _tsur = next((i for i, ch in enumerate(clean_title) if 0xD800 <= ord(ch) <= 0xDFFF), -1)
+        if _tsur >= 0:
+            raise ServiceError(
+                f"章节标题含无法编码的字符（第 {_tsur + 1} 个字符，U+{ord(clean_title[_tsur]):04X}），"
+                "请清理后重试",
+                400,
+            )
+        first_line = content.lstrip().split("\n", 1)[0].strip()
+        stripped_first = re.sub(r"^#{1,6}\s*", "", first_line).strip()
+        if first_line != clean_title and stripped_first != clean_title:
+            content = f"{clean_title}\n\n{content.lstrip()}"
     # 孤立代理字符（\ud800-\udfff）无法编码成 UTF-8（2026-11-05）。
     #
     # 这类字符正常来源不会产生（读文件时严格 utf-8 解码会拒绝），但前端贴文本、

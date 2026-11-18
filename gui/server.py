@@ -554,6 +554,11 @@ class _Handler(BaseHTTPRequestHandler):
         book_id = query.get("book_id")
         task_id = query.get("task_id")
         task_type = query.get("task_type")
+        if hasattr(self, "connection") and hasattr(self.connection, "settimeout"):
+            try:
+                self.connection.settimeout(30.0)
+            except OSError as exc:
+                _log.debug("SSE socket settimeout 失败: %s", exc)
         q: queue.Queue = broker.subscribe()
         try:
             self.wfile.write(f"data: {json.dumps({'status': 'connected', 'book_id': book_id, 'task_id': task_id}, ensure_ascii=False)}\n\n".encode("utf-8", errors="replace"))
@@ -572,12 +577,15 @@ class _Handler(BaseHTTPRequestHandler):
                     continue
                 if not task_id and not book_id and task_type and event.get("task_type") != task_type:
                     continue
+                payload_event = dict(event)
+                payload_event.setdefault("book_id", book_id)
+                payload_event.setdefault("task_id", task_id)
                 # encode 必须容错（2026-11-07）：event 里可能带用户数据（书标题、
                 # 错误文案）。孤立代理字符无法编码成 UTF-8，而这里在 while 循环内，
                 # 一次 UnicodeEncodeError 会被外层 OSError 捕获并静默断开 SSE——
                 # 前端表现为「进度突然不动了」，且没有任何错误提示。
                 self.wfile.write(
-                    f"data: {json.dumps(event, ensure_ascii=False)}\n\n".encode(
+                    f"data: {json.dumps(payload_event, ensure_ascii=False)}\n\n".encode(
                         "utf-8", errors="replace"))
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):
@@ -654,11 +662,11 @@ def main(argv: list[str] | None = None) -> int:
     if str(_root) not in sys.path:
         sys.path.insert(0, str(_root))
 
-    setup_logging()
     parser = argparse.ArgumentParser(description="novel-lab GUI 常驻服务")
     parser.add_argument("--port", type=int, default=None, help="指定端口（默认 8000，占用自动 +1）")
     parser.add_argument("--no-browser", action="store_true", help="启动后不自动弹浏览器")
     args = parser.parse_args(argv)
+    setup_logging()
 
     server = GuiServer(preferred_port=args.port)
     try:
@@ -982,6 +990,7 @@ class GuiServer:
             raise
 
     def _start_inner(self) -> tuple[str, int]:
+        config.migrate_legacy_state()
 
         # 初始化持久化层 + 迁移（幂等），保证 analysis_tasks 表就绪。
         try:

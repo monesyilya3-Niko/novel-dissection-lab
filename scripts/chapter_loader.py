@@ -49,7 +49,9 @@ __all__ = [
     "ChapterLoadError",
     "EXCLUDED_DIR_NAMES",
     "discover_chapter_files",
+    "is_chapter_filename",
     "load_chapter_texts",
+    "read_text_file",
 ]
 
 # 备份/构建产物目录名（比较时 casefold）：这些目录里的 .txt 一律不参与加载
@@ -152,8 +154,83 @@ def _display_path(path: Path, source: Path) -> str:
 #:
 #: 现在的顺序：显式章号标记 → 纯数字 → 数字+分隔符。取不到就算"没有章号"
 #: （番外/序章/设定笔记走这条），而不是硬编一个错号。
+_CN_DIGITS = {
+    "零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3,
+    "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9,
+}
+_CN_UNITS = {"十": 10, "百": 100, "千": 1000}
+
+
+def _parse_cn_section(sec: str) -> int | None:
+    """解析万以内的中文数词片段（支持纯数位串如「一零八」与带权位串如「两百五十六」）。"""
+    if not sec:
+        return None
+    if all(ch in _CN_DIGITS for ch in sec):
+        val = 0
+        for ch in sec:
+            val = val * 10 + _CN_DIGITS[ch]
+        return val
+    total = 0
+    cur: int | None = None
+    prev_unit = 10000
+    for ch in sec:
+        if ch in _CN_DIGITS:
+            d = _CN_DIGITS[ch]
+            if d == 0:
+                cur = 0
+            else:
+                if cur not in (None, 0):
+                    return None
+                cur = d
+        elif ch in _CN_UNITS:
+            unit = _CN_UNITS[ch]
+            if unit >= prev_unit:
+                return None
+            if unit == 10 and cur in (None, 0):
+                mult = 1
+            elif cur in (None, 0):
+                return None
+            else:
+                mult = cur
+            total += mult * unit
+            prev_unit = unit
+            cur = None
+        else:
+            return None
+    if cur is not None:
+        total += cur
+    return total
+
+
+def _parse_cn_int(s: str) -> int | None:
+    """将阿拉伯数字或中文数词（零〇一二两三四五六七八九十百千万）解析为非负整数。"""
+    if not isinstance(s, str):
+        return None
+    token = s.strip()
+    if not token:
+        return None
+    if token.isascii() and token.isdigit():
+        return int(token)
+    if any(ch not in _CN_DIGITS and ch not in _CN_UNITS and ch != "万" for ch in token):
+        return None
+    if token.count("万") > 1:
+        return None
+    if "万" in token:
+        high_s, low_s = token.split("万", 1)
+        high = 1 if high_s == "" else _parse_cn_section(high_s)
+        if high is None:
+            return None
+        low = 0 if low_s == "" else _parse_cn_section(low_s)
+        if low is None:
+            return None
+        return high * 10000 + low
+    return _parse_cn_section(token)
+
+
+_AUX_STEM_RE = re.compile(r"番外|楔子|序章|设定|大纲|前言|后记")
+
 _CHAPTER_NO_PATTERNS = (
-    re.compile(r"第\s*(\d+)\s*[章回节]"),          # 第1章 / 第 12 回
+    re.compile(r"第\s*([0-9零〇一二两三四五六七八九十百千万]+)\s*[章回节]"),  # 第1章 / 第一百零一章 / 第 12 回
     re.compile(r"chapter[-_ ]?(\d+)", re.I),      # chapter-001 / Chapter 1
     re.compile(r"^ch[-_ ]?(\d+)", re.I),          # ch1 / ch-001
     re.compile(r"^(\d+)$"),                        # 001 / 12
@@ -163,21 +240,21 @@ _CHAPTER_NO_PATTERNS = (
 )
 
 
-
 def _chapter_number(path: Path):
     """从文件名（不含扩展名）提取章号；取不到返回 None。
 
     按 ``_CHAPTER_NO_PATTERNS`` 的优先级逐个尝试——``第10章`` 必须解析成 10，
-    而 ``番外1`` 不该被当成第 1 章。
+    而 ``番外1`` / ``01_番外`` 不该被当成第 1 章。
     """
     stem = path.stem
-    for pat in _CHAPTER_NO_PATTERNS:
+    for idx, pat in enumerate(_CHAPTER_NO_PATTERNS):
+        if idx == 4 and _AUX_STEM_RE.search(stem):
+            continue
         m = pat.search(stem)
         if m:
-            try:
-                return int(m.group(1))
-            except (ValueError, IndexError):
-                continue
+            num = _parse_cn_int(m.group(1))
+            if num is not None:
+                return num
     # 所有模式都没命中 → 无章号（番外 / 设定笔记 / 日期前缀文件都走这里）。
     # 不猜：硬编一个数字会和真正的第 N 章撞号（原实现让 番外1 与 第1章 冲突，
     # 抛 ChapterLoadError 使整本质检失败）。

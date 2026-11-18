@@ -50,12 +50,18 @@ const OUTLINE_STATUS_COLOR: Record<string, 'default' | 'primary' | 'success'> = 
   done: 'success',
 }
 
+function getProjectId(p: WritingProject): string {
+  return p.id || p.name
+}
+
 export default function WritingExtras() {
   const { t } = useI18n()
   const [tab, setTab] = useState(0)
   const [projects, setProjects] = useState<WritingProject[] | null>(null)
   const [project, setProject] = useState('')
   const [error, setError] = useState('')
+
+  const writableProjects = (projects ?? []).filter((p) => !p.readOnly)
 
   const projectsReqIdRef = useRef(0)
   const loadProjects = useCallback(() => {
@@ -65,8 +71,13 @@ export default function WritingExtras() {
       .then((ps) => {
         if (cur !== projectsReqIdRef.current) return
         setProjects(ps)
-        if (ps.length > 0 && !ps.some((p) => p.name === project)) {
-          setProject(ps[0].name)
+        const writable = ps.filter((p) => !p.readOnly)
+        if (writable.length > 0) {
+          if (!writable.some((p) => getProjectId(p) === project)) {
+            setProject(getProjectId(writable[0]))
+          }
+        } else {
+          setProject('')
         }
       })
       .catch((e) => {
@@ -91,11 +102,14 @@ export default function WritingExtras() {
           sx={{ minWidth: 220 }}
           size="small"
         >
-          {(projects ?? []).map((p) => (
-            <MenuItem key={p.id} value={p.name}>
-              {p.name}
-            </MenuItem>
-          ))}
+          {writableProjects.map((p) => {
+            const pid = getProjectId(p)
+            return (
+              <MenuItem key={pid} value={pid}>
+                {p.name}
+              </MenuItem>
+            )
+          })}
         </TextField>
         <Typography variant="body2" color="text.secondary">
           {t('extras_project_desc')}
@@ -150,6 +164,7 @@ function OutlinePanel({ project }: { project: string }) {
   const [selectedHook, setSelectedHook] = useState<HookItem | null>(null)
   const [isReordering, setIsReordering] = useState(false)
   const [isApplyingTemplate, setIsApplyingTemplate] = useState(false)
+  const [saving, setSaving] = useState(false)
   const reqIdRef = useRef(0)
 
   const kindLabel = (k: string) => (k === 'volume' ? t('extras_outline_volume') : t('extras_outline_chapter'))
@@ -267,11 +282,13 @@ function OutlinePanel({ project }: { project: string }) {
   }
 
   const doSave = async () => {
+    if (saving) return
     if (!title.trim()) {
       setError(t('extras_err_title_required', '标题不能为空'))
       return
     }
     setError('')
+    setSaving(true)
     try {
       if (editing) {
         await writingApi.updateOutline(editing.id, { kind, title: title.trim(), summary, status })
@@ -282,6 +299,8 @@ function OutlinePanel({ project }: { project: string }) {
       load()
     } catch (e) {
       setError(t('extras_err_save_failed', '保存失败: {msg}', { msg: friendlyError(e) }))
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -445,7 +464,7 @@ function OutlinePanel({ project }: { project: string }) {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>{t('action_cancel')}</Button>
-          <Button variant="contained" onClick={doSave}>{t('action_save')}</Button>
+          <Button variant="contained" onClick={doSave} disabled={saving}>{t('action_save')}</Button>
         </DialogActions>
       </Dialog>
 
@@ -563,6 +582,7 @@ function CharacterPanel({ project }: { project: string }) {
   const [camp, setCamp] = useState('主角阵营')
   const [relationTarget, setRelationTarget] = useState('')
   const [relationType, setRelationType] = useState('同盟')
+  const [saving, setSaving] = useState(false)
   const reqIdRef = useRef(0)
 
   const load = useCallback(() => {
@@ -625,11 +645,13 @@ function CharacterPanel({ project }: { project: string }) {
   }
 
   const doSave = async () => {
+    if (saving) return
     if (!name.trim()) {
       setError(t('extras_err_name_required', '姓名不能为空'))
       return
     }
     setError('')
+    setSaving(true)
     const extraData = {
       camp,
       relationTarget: relationTarget.trim(),
@@ -656,6 +678,8 @@ function CharacterPanel({ project }: { project: string }) {
       load()
     } catch (e) {
       setError(t('extras_err_save_failed', '保存失败: {msg}', { msg: friendlyError(e) }))
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -804,7 +828,7 @@ function CharacterPanel({ project }: { project: string }) {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>{t('action_cancel')}</Button>
-          <Button variant="contained" onClick={doSave}>{t('action_save')}</Button>
+          <Button variant="contained" onClick={doSave} disabled={saving}>{t('action_save')}</Button>
         </DialogActions>
       </Dialog>
     </Box>
@@ -824,6 +848,7 @@ function NotePanel({ project }: { project: string }) {
   const [editing, setEditing] = useState<NoteItem | null>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const [saving, setSaving] = useState(false)
   const reqIdRef = useRef(0)
 
   const load = useCallback(() => {
@@ -860,11 +885,13 @@ function NotePanel({ project }: { project: string }) {
   }
 
   const doSave = async () => {
+    if (saving) return
     if (!title.trim() && !content.trim()) {
       setError(t('extras_err_title_content_empty', '标题与内容不能同时为空'))
       return
     }
     setError('')
+    setSaving(true)
     try {
       if (editing) {
         await writingApi.updateNote(editing.id, { title, content })
@@ -875,6 +902,8 @@ function NotePanel({ project }: { project: string }) {
       load()
     } catch (e) {
       setError(t('extras_err_save_failed', '保存失败: {msg}', { msg: friendlyError(e) }))
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -975,7 +1004,7 @@ function NotePanel({ project }: { project: string }) {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>{t('action_cancel')}</Button>
-          <Button variant="contained" onClick={doSave}>{t('action_save')}</Button>
+          <Button variant="contained" onClick={doSave} disabled={saving}>{t('action_save')}</Button>
         </DialogActions>
       </Dialog>
     </Box>
@@ -1320,7 +1349,7 @@ function DashboardPanel({ project }: { project: string }) {
                 )}
                 <Box sx={{ position: 'relative' }}>
                   {(tensionLoading || goldenThreeLoading || retentionLoading) && (
-                    <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(255,255,255,0.55)', zIndex: 1, borderRadius: 1 }}>
+                    <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: isDark ? 'rgba(20, 20, 23, 0.65)' : 'rgba(255, 255, 255, 0.55)', zIndex: 1, borderRadius: 1 }}>
                       <CircularProgress size={36} />
                     </Box>
                   )}
@@ -1421,7 +1450,7 @@ function DashboardPanel({ project }: { project: string }) {
                   </Box>
                   <Box sx={{ position: 'relative' }}>
                     {retentionLoading && (
-                      <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(255,255,255,0.55)', zIndex: 1, borderRadius: 1 }}>
+                      <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: isDark ? 'rgba(20, 20, 23, 0.65)' : 'rgba(255, 255, 255, 0.55)', zIndex: 1, borderRadius: 1 }}>
                         <CircularProgress size={36} />
                       </Box>
                     )}

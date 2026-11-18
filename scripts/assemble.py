@@ -22,8 +22,10 @@ voice-card / structure-obs / commercial-obs / craft-card 四类资产，写入 a
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
+import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -67,11 +69,24 @@ DK = {
 
 
 def load_json(path: Path) -> dict:
-    """读取 JSON 文件，编码容错（utf-8 优先，回退 utf-8-sig）。"""
+    """读取 JSON 文件（utf-8-sig 同时兼容标准 UTF-8 与带 BOM 的 UTF-8）。"""
+    return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def _atomic_write_json(path: Path, data: object) -> None:
+    """原子写入 JSON 文件（同目录临时文件 + os.replace）。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(data, ensure_ascii=False, indent=2)
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=str(path.parent), suffix=".tmp", delete=False
+    ) as fh:
+        tmp_path = Path(fh.name)
+        fh.write(payload)
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return json.loads(path.read_text(encoding="utf-8-sig"))
+        os.replace(tmp_path, path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 def _confidence(n_chapters: int) -> float:
@@ -210,18 +225,26 @@ def assemble_voice_card(name: str, genre: str, manifest: dict, metrics: dict,
     }
 
 
+def _parse_chapter_no(title: str) -> int | None:
+    """从章节标题提取章号（支持前置卷名与中文数词，如「卷一 第101章」「第一百零一章」）。"""
+    m = re.search(r"第\s*([0-9零〇一二两三四五六七八九十百千万]+)\s*[章回节]", str(title or ""))
+    if not m:
+        return None
+    return chapter_loader._parse_cn_int(m.group(1))
+
+
 def assemble_obs(kind: str, name: str, genre: str, pass_out: dict) -> dict:
     """结构/商业观测：单本数据，标注待聚合。"""
-    body = {k: v for k, v in pass_out.items() if not k.startswith("_")}
+    body = {k: v for k, v in (pass_out or {}).items() if not str(k).startswith("_")} if isinstance(pass_out, dict) else {}
     # 2026-09-01 修复：structure-obs 的 chapter_analyses 若用 title 表达章节（如
     # "第1章 晨光与侧影"）而缺 chapter 字段，从 title 提取章节号补上，
     # 消除 validate 的"缺少 'chapter'"警告（qingning 曾报 22 条）。
     if kind == "structure" and isinstance(body.get("chapter_analyses"), list):
         for c in body["chapter_analyses"]:
             if isinstance(c, dict) and "chapter" not in c and c.get("title"):
-                m = re.match(r"第\s*([0-9一二三四五六七八九十百千]+)\s*章", str(c["title"]))
-                if m:
-                    c["chapter"] = m.group(1)
+                ch_no = _parse_chapter_no(str(c["title"]))
+                if ch_no is not None:
+                    c["chapter"] = str(ch_no)
     # 2026-09-21 修复：commercial-obs 的 common_mistakes 不来自 pass4 输出，
     # 每次重新组装都会静默丢失（sangshi 与 暮冬念春 各踩一次，均靠人工补回）。
     # 此处按同一口径兜底补齐，非新造观察：
@@ -259,17 +282,58 @@ def assemble_obs(kind: str, name: str, genre: str, pass_out: dict) -> dict:
     }
 
 
+def _craft_str(v: object) -> str:
+    """将技法字段值安全转为字符串（兼容 int/float/list/dict，不抛 TypeError，不截断）。"""
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, list):
+        return "；".join(s for x in v if (s := _craft_str(x)))
+    if isinstance(v, dict):
+        return json.dumps(v, ensure_ascii=False)
+    return str(v)
+
+
+def _normalize_craft_tech(t: dict) -> dict:
+    """标准化单条技法字典，保留 deep_analysis 且不对文本字段做破坏性截断。"""
+    nm = _craft_str(t.get("name") or t.get("technique_name") or "")
+    if not nm:
+        ap = _craft_str(t.get("abstract_pattern") or t.get("skeleton") or "")
+        if ap:
+            nm = ap[:25].rstrip("，。、")
+    entry: dict = {
+        "name": nm,
+        "description": _craft_str(
+            t.get("description") or t.get("example_in_text") or t.get("abstract_pattern") or ""
+        ),
+        "effect": _craft_str(t.get("effect") or ""),
+        "skeleton": _craft_str(t.get("skeleton") or t.get("abstract_pattern") or ""),
+        "anti_pattern": _craft_str(
+            t.get("anti_pattern") or t.get("反例") or t.get("counter_example") or ""
+        ),
+    }
+    if isinstance(t.get("deep_analysis"), dict):
+        entry["deep_analysis"] = t["deep_analysis"]
+    return entry
+
+
 def assemble_craft_card(name: str, genre: str, manifest: dict, metrics: dict,
                         pass5: dict) -> dict:
     """组装 craft-card：兼容 4 种 pass5 输出格式（与 pipeline.py 逻辑一致）。"""
-    craft_analysis = {}
+    if not isinstance(pass5, dict):
+        pass5 = {}
+    craft_analysis: dict = {}
     craft_summary = {"top_3_strengths": [], "unique_techniques": [], "reusable_patterns": []}
     all_tech_names = []
 
     # 格式检测
     if "craft_analysis" in pass5:
-        craft_analysis = pass5["craft_analysis"]
-        craft_summary = pass5.get("craft_summary", craft_summary)
+        raw_ca = pass5.get("craft_analysis")
+        craft_analysis = dict(raw_ca) if isinstance(raw_ca, dict) else {}
+        raw_cs = pass5.get("craft_summary")
+        if isinstance(raw_cs, dict):
+            craft_summary = raw_cs
     elif any(d in pass5 for d in DIM_NAMES):
         craft_analysis = {}
         for d in DIM_NAMES:
@@ -278,37 +342,86 @@ def assemble_craft_card(name: str, genre: str, manifest: dict, metrics: dict,
                 craft_analysis[d] = val
     elif "chapter_analysis" in pass5:
         craft_analysis = {d: {"techniques": []} for d in DK}
-        for ch in pass5["chapter_analysis"]:
-            for tech in ch.get("techniques", []):
-                nt = tech.get("name") or tech.get("technique_name", "")
-                sk = tech.get("abstract_skeleton", "")
-                ef = tech.get("effect", "")
-                dc = tech.get("example_in_text") or tech.get("execution") or tech.get("method", "")
-                an = tech.get("counter_example") or tech.get("anti_example") or tech.get("counter_exa", "")
-                o = {"name": nt, "description": dc[:200], "effect": ef[:200],
-                     "skeleton": sk[:200], "anti_pattern": an[:200]}
-                ft = f"{nt} {sk} {ef}".lower()
-                placed = False
-                for d, kws in DK.items():
-                    if any(k in ft for k in kws):
-                        craft_analysis[d]["techniques"].append(o)
-                        placed = True
-                        break
-                if not placed:
-                    craft_analysis["tension_building"]["techniques"].append(o)
-                all_tech_names.append(nt)
+        ch_list = pass5.get("chapter_analysis")
+        if isinstance(ch_list, list):
+            for ch in ch_list:
+                if not isinstance(ch, dict):
+                    continue
+                tech_list = ch.get("techniques")
+                if not isinstance(tech_list, list):
+                    continue
+                for tech in tech_list:
+                    if not isinstance(tech, dict):
+                        continue
+                    nt = _craft_str(tech.get("name") or tech.get("technique_name") or "")
+                    sk = _craft_str(tech.get("abstract_skeleton") or tech.get("skeleton") or "")
+                    ef = _craft_str(tech.get("effect") or "")
+                    dc = _craft_str(
+                        tech.get("description")
+                        or tech.get("example_in_text")
+                        or tech.get("execution")
+                        or tech.get("method")
+                        or ""
+                    )
+                    an = _craft_str(
+                        tech.get("anti_pattern")
+                        or tech.get("counter_example")
+                        or tech.get("anti_example")
+                        or tech.get("counter_exa")
+                        or ""
+                    )
+                    o: dict = {
+                        "name": nt,
+                        "description": dc,
+                        "effect": ef,
+                        "skeleton": sk,
+                        "anti_pattern": an,
+                    }
+                    if isinstance(tech.get("deep_analysis"), dict):
+                        o["deep_analysis"] = tech["deep_analysis"]
+                    ft = f"{nt} {sk} {ef}".lower()
+                    placed = False
+                    for d, kws in DK.items():
+                        if any(k in ft for k in kws):
+                            craft_analysis[d]["techniques"].append(o)
+                            placed = True
+                            break
+                    if not placed:
+                        craft_analysis["tension_building"]["techniques"].append(o)
+                    if nt:
+                        all_tech_names.append(nt)
     elif "techniques" in pass5 and isinstance(pass5["techniques"], list):
         craft_analysis = {d: {"techniques": []} for d in DK}
         for tech in pass5["techniques"]:
             if not isinstance(tech, dict):
                 continue
-            nt = (tech.get("name") or tech.get("technique_name") or tech.get("scenario", ""))[:50]
-            sk = tech.get("abstract_skeleton", "")
-            ef = tech.get("effect", "")
-            dc = tech.get("method") or tech.get("execution") or tech.get("scenario", "")
-            an = tech.get("counter_example") or tech.get("anti_example", "")
-            o = {"name": nt, "description": dc[:200], "effect": ef[:200],
-                 "skeleton": sk[:200], "anti_pattern": an[:200]}
+            nt = _craft_str(
+                tech.get("name") or tech.get("technique_name") or tech.get("scenario") or ""
+            )[:50]
+            sk = _craft_str(tech.get("abstract_skeleton") or tech.get("skeleton") or "")
+            ef = _craft_str(tech.get("effect") or "")
+            dc = _craft_str(
+                tech.get("description")
+                or tech.get("method")
+                or tech.get("execution")
+                or tech.get("scenario")
+                or ""
+            )
+            an = _craft_str(
+                tech.get("anti_pattern")
+                or tech.get("counter_example")
+                or tech.get("anti_example")
+                or ""
+            )
+            o = {
+                "name": nt,
+                "description": dc,
+                "effect": ef,
+                "skeleton": sk,
+                "anti_pattern": an,
+            }
+            if isinstance(tech.get("deep_analysis"), dict):
+                o["deep_analysis"] = tech["deep_analysis"]
             ft = f"{nt} {sk} {ef} {dc}".lower()
             placed = False
             for d, kws in DK.items():
@@ -318,36 +431,41 @@ def assemble_craft_card(name: str, genre: str, manifest: dict, metrics: dict,
                     break
             if not placed:
                 craft_analysis["tension_building"]["techniques"].append(o)
-            all_tech_names.append(nt)
+            if nt:
+                all_tech_names.append(nt)
 
     if all_tech_names:
         craft_summary["top_3_strengths"] = all_tech_names[:3]
         craft_summary["unique_techniques"] = all_tech_names[3:5] if len(all_tech_names) > 3 else []
         craft_summary["reusable_patterns"] = all_tech_names[:3]
 
-    # 规范化：list→{techniques:[...]}，字段名标准化，从 abstract_pattern 生成名称
+    # 规范化：list→{techniques:[...]}，字段名标准化，保留 deep_analysis
     for dk in list(craft_analysis.keys()):
         v = craft_analysis[dk]
         if isinstance(v, list):
-            norm_list = []
-            for t in v:
-                if not isinstance(t, dict):
-                    continue
-                nm = t.get("name") or t.get("technique_name") or ""
-                if not nm:
-                    ap = t.get("abstract_pattern") or t.get("skeleton") or ""
-                    if ap:
-                        nm = ap[:25].rstrip("，。、")
-                norm_list.append({
-                    "name": nm,
-                    "description": t.get("description") or t.get("example_in_text") or t.get("abstract_pattern", ""),
-                    "effect": t.get("effect", ""),
-                    "skeleton": t.get("skeleton") or t.get("abstract_pattern", ""),
-                    "anti_pattern": t.get("anti_pattern") or t.get("反例") or t.get("counter_example", ""),
-                })
+            norm_list = [_normalize_craft_tech(t) for t in v if isinstance(t, dict)]
             craft_analysis[dk] = {"techniques": norm_list}
-        elif isinstance(v, dict) and "techniques" not in v:
-            craft_analysis[dk] = {"techniques": [v]}
+        elif isinstance(v, dict):
+            if "techniques" not in v:
+                craft_analysis[dk] = {"techniques": [_normalize_craft_tech(v)]}
+            else:
+                raw_techs = v.get("techniques")
+                if isinstance(raw_techs, list):
+                    norm_techs = []
+                    for t in raw_techs:
+                        if isinstance(t, dict):
+                            merged = dict(t)
+                            merged.update(_normalize_craft_tech(t))
+                            norm_techs.append(merged)
+                    v = dict(v)
+                    v["techniques"] = norm_techs
+                    craft_analysis[dk] = v
+                else:
+                    v = dict(v)
+                    v["techniques"] = []
+                    craft_analysis[dk] = v
+        else:
+            craft_analysis.pop(dk, None)
 
     return {
         "meta": {
@@ -392,6 +510,24 @@ def source_fingerprint(raw_dir: Path, kind: str) -> dict:
     return out
 
 
+def _find_corpus_book(name: str) -> Path | None:
+    """在 corpus/ 下查找对应原文文件（支持 .txt / _chosen.txt / .md / _chosen.md）。"""
+    corpus_dir = ROOT / "corpus"
+    candidates = [
+        corpus_dir / f"{name}.txt",
+        corpus_dir / f"{name}_chosen.txt",
+        corpus_dir / f"{name}.md",
+        corpus_dir / f"{name}_chosen.md",
+    ]
+    if name.endswith("_chosen"):
+        stem = name[: -len("_chosen")]
+        candidates.extend([corpus_dir / f"{stem}.txt", corpus_dir / f"{stem}.md"])
+    for p in candidates:
+        if p.is_file():
+            return p
+    return None
+
+
 def _read_pass(name: str, pass_file: str) -> dict:
     """读取 corpus/raw/<name>/<pass_file>，缺失时报错。"""
     p = RAW_DIR / name / pass_file
@@ -434,14 +570,14 @@ def main(argv: list[str] | None = None) -> int:
     dialogue["dialogue_ratio"] = metrics.get("dialogue_ratio", 0)
     voice = assemble_voice_card(name, args.genre, manifest, metrics,
                                 voices, narration, dialogue, emotion, imagery, banned)
-    # 2026-09-01 集成：组装后自动清洗原文引用（若原文 TXT 存在），
-    # 避免 pass2 归一化重新带入原文台词导致 compliance REJECT。
-    book_path = ROOT / "corpus" / f"{name}.txt"
-    if book_path.exists():
-        voice, cleaned = _clean_verbatim(
-            voice, chapter_loader.read_text_file(book_path))
+    # 2026-09-01 集成：组装后自动清洗原文引用（若原文语料存在），
+    # 避免 pass2/pass5 归一化重新带入原文台词导致 compliance REJECT。
+    book_path = _find_corpus_book(name)
+    corpus_text = chapter_loader.read_text_file(book_path) if book_path else None
+    if corpus_text is not None and book_path is not None:
+        voice, cleaned = _clean_verbatim(voice, corpus_text)
         if cleaned:
-            print(f"  ⚠ 已清洗 {cleaned} 处原文引用（corpus/{name}.txt）")
+            print(f"  ⚠ 已清洗 {cleaned} 处原文引用（corpus/{book_path.name}）")
     # 2026-09-21 总工重构：四类资产**先组装到内存**，校验全通过后才落盘。
     # 此前是「组装一个写一个」，校验在写盘之后——一旦校验失败，磁盘上的旧资产
     # 已被覆盖，只能靠 git / 备份找回。数据安全优先于流程简洁。
@@ -465,8 +601,12 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print("[4/4] 组装 craft-card:")
         pass5 = _read_pass(name, "pass5_craft.json")
-        built.append(("craft-card", ASSETS_DIR / f"{name}-craft-card.json",
-                      assemble_craft_card(name, args.genre, manifest, metrics, pass5)))
+        craft_card = assemble_craft_card(name, args.genre, manifest, metrics, pass5)
+        if corpus_text is not None and book_path is not None:
+            craft_card, cleaned_cc = _clean_verbatim(craft_card, corpus_text)
+            if cleaned_cc:
+                print(f"  ⚠ 已清洗 {cleaned_cc} 处原文引用（corpus/{book_path.name}）")
+        built.append(("craft-card", ASSETS_DIR / f"{name}-craft-card.json", craft_card))
 
     # 4.5 注入来源指纹（2026-09-21）：让资产能自证「来自哪一版 pass 产出」
     raw_dir = RAW_DIR / name
@@ -506,7 +646,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print("\n落盘:")
     for _kind, path, data in built:
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write_json(path, data)
         print(f"  ✓ {path.name}")
 
     print("\n组装完成：四类资产全部通过 schema 校验并已落盘。")

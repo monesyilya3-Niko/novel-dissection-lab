@@ -110,5 +110,41 @@ class TestRealGuiStateLeakGuard(unittest.TestCase):
         )
 
 
+class TestRealUserDataDirLeakGuard(unittest.TestCase):
+    """真实平台用户数据目录（如 %LOCALAPPDATA%/暮冬念春）零泄漏守卫。
+
+    注意：用户可能同时在前台运行桌面端（占用 8000 端口并持有 index.db / -wal），
+    因此不将 index.db-wal / logs 等活跃运行文件判为泄漏，专门守护 config/（密钥与
+    模型配置）、assets/、state_json/ 不被测试新增或覆写。
+    """
+
+    def test_real_user_config_untouched(self):
+        current = _isolation.snapshot_real_user_data_dir()
+        baseline = _isolation.SESSION_START_USER_DATA_SNAPSHOT
+        self.assertEqual(
+            current["config_files"],
+            baseline["config_files"],
+            "检测到测试新建或篡改了真实用户数据目录 config/ 下的配置文件"
+            f"（可能漏设 XUAN_DATA_DIR）：会话前={list(baseline['config_files'])} "
+            f"现在={list(current['config_files'])}",
+        )
+
+    def test_no_new_assets_or_state_json_in_real_user_data_dir(self):
+        current = _isolation.snapshot_real_user_data_dir()
+        baseline = _isolation.SESSION_START_USER_DATA_SNAPSHOT
+        leaked_assets = sorted(current["assets_files"] - baseline["assets_files"])
+        self.assertEqual(
+            leaked_assets,
+            [],
+            f"检测到测试往真实用户数据目录 assets/ 写入文件: {leaked_assets}",
+        )
+        leaked_states = sorted(current["state_json_files"] - baseline["state_json_files"])
+        self.assertEqual(
+            leaked_states,
+            [],
+            f"检测到测试往真实用户数据目录 state_json/ 写入状态: {leaked_states}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

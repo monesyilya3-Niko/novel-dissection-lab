@@ -50,12 +50,11 @@ function JourneyStepIcon(props: JourneyStepIconProps) {
   const { active, completed, icon } = props
   const idx = typeof icon === 'number' ? icon : 1
   const Icon = STEP_ICONS[idx - 1] ?? STEP_ICONS[0]
-  const bg = completed ? ink.success : active ? ink.accent : ink.hairline
-  const fg = completed || active ? '#fff' : ink.textSecondary
   return (
     <Box sx={{
       width: 36, height: 36, borderRadius: '50%',
-      background: bg, color: fg,
+      bgcolor: (theme) => completed ? ink.success : active ? ink.accent : (theme.palette.mode === 'dark' ? ink.nightLine : ink.hairline),
+      color: (theme) => (completed || active) ? '#fff' : theme.palette.text.secondary,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       border: active ? `2px solid ${ink.accent}` : 'none',
       boxShadow: (completed || active) ? '0 2px 8px rgba(16,16,20,0.12)' : 'none',

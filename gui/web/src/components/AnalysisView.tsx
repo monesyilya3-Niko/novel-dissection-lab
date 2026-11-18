@@ -22,6 +22,8 @@ export default function AnalysisView() {
   const { selectedChapter } = useApp()
   const [subTab, setSubTab] = useState<SubTab>('import')
   const [lastSelectedChapter, setLastSelectedChapter] = useState<number | null>(selectedChapter ?? null)
+  const [offlineTriggerNonce, setOfflineTriggerNonce] = useState<number>(0)
+  const [selectedGenre, setSelectedGenre] = useState<string>('')
 
   // 左侧点击章节时自动打开原文阅读器（渲染期比对，避免在 effect 内同步 setState）
   if ((selectedChapter ?? null) !== lastSelectedChapter) {
@@ -88,12 +90,26 @@ export default function AnalysisView() {
           <Box sx={{ flex: 1 }} />
           <ContextHelpButton guideKey="analysis" title={t('analysis_help_title')} />
           {/* 一键分析：直接在当前工作台内触发，完成后切到结果页（由 SSE done 自动刷新） */}
-          <AnalysisControlBar onGoResult={() => setSubTab('result')} onGoProgress={() => setSubTab('progress')} />
+          <AnalysisControlBar
+            onGoResult={() => setSubTab('result')}
+            onGenreChange={setSelectedGenre}
+            onGoProgress={(g) => {
+              if (g) setSelectedGenre(g)
+              setSubTab('progress')
+              setOfflineTriggerNonce((n) => n + 1)
+            }}
+          />
         </Box>
         <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
           {subTab === 'import' && <ImportPanel />}
           {subTab === 'reader' && <ReaderPanel />}
-          {subTab === 'progress' && <ProgressPanel />}
+          {subTab === 'progress' && (
+            <ProgressPanel
+              offlineTriggerNonce={offlineTriggerNonce}
+              genre={selectedGenre}
+              onGoResult={() => setSubTab('result')}
+            />
+          )}
           {subTab === 'detail' && <ResultPanel />}
           {subTab === 'result' && <AnalysisResultView />}
         </Box>

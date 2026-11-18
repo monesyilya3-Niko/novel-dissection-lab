@@ -10,6 +10,7 @@
 """
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -22,6 +23,8 @@ MIN_REPORT_CHARS = 10000
 
 def _technique_block(t: dict, idx: int) -> str:
     """单个技法 → Markdown 段落。兼容中文/英文字段名。"""
+    if not isinstance(t, dict):
+        return f"**{idx}. {t}**"
     lines = []
     name = t.get("name") or t.get("technique_name") or f"技法{idx}"
     lines.append(f"**{idx}. {name}**")
@@ -37,7 +40,9 @@ def _technique_block(t: dict, idx: int) -> str:
     if anti:
         lines.append(f"- **反例**（该作者不会这么写）：{anti}")
     # === 渲染 deep_analysis 7 段（铁律二：深度字段是万字报告的主要来源）===
-    da = t.get("deep_analysis") or {}
+    da = t.get("deep_analysis")
+    if not isinstance(da, dict):
+        da = {}
     for field, label in [
         ("reader_psychology", "读者心理机制"),
         ("execution_steps", "执行步骤"),
@@ -55,13 +60,16 @@ def _technique_block(t: dict, idx: int) -> str:
 
 def _dimension_section(dim_key: str, dim_data, dim_label: str) -> str:
     """单个技法维度 → Markdown 章节。兼容 dict 和 list 两种格式。"""
-    if not dim_data:
+    if not dim_data or not isinstance(dim_data, (dict, list)):
         return ""
     # 兼容：dim_data 可能是 list（直接技法数组）或 dict（{techniques: [...]}）
     if isinstance(dim_data, list):
-        techniques = dim_data
+        techniques = [t for t in dim_data if isinstance(t, dict)]
+        if not techniques:
+            return ""
     else:
-        techniques = dim_data.get("techniques", [])
+        raw_techs = dim_data.get("techniques")
+        techniques = [t for t in raw_techs if isinstance(t, dict)] if isinstance(raw_techs, list) else []
     lines = [f"### {dim_label}\n"]
     if techniques:
         for i, t in enumerate(techniques, 1):
@@ -84,35 +92,56 @@ def _dimension_section(dim_key: str, dim_data, dim_label: str) -> str:
     ]:
         val = dim_data.get(key)
         if val is not None:
-            if isinstance(val, float):
+            if (
+                isinstance(val, float)
+                and not isinstance(val, bool)
+                and math.isfinite(val)
+                and (0.0 <= val <= 1.0 or "ratio" in key or "rate" in key)
+            ):
                 lines.append(f"- **{label}**：{val:.0%}")
             else:
                 lines.append(f"- **{label}**：{val}")
+    if len(lines) == 1:
+        return ""
     return "\n".join(lines)
+
+
+def _is_finite_num(v: object) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
 
 
 def render_craft_report(craft: dict) -> str:
     """craft-card JSON → 完整 Markdown 报告。"""
-    meta = craft.get("meta", {})
-    analysis = craft.get("craft_analysis", {})
-    summary = craft.get("craft_summary", {})
+    if not isinstance(craft, dict):
+        craft = {}
+    meta = craft.get("meta") if isinstance(craft.get("meta"), dict) else {}
+    analysis = craft.get("craft_analysis") if isinstance(craft.get("craft_analysis"), dict) else {}
+    summary = craft.get("craft_summary") if isinstance(craft.get("craft_summary"), dict) else {}
 
-    title = meta.get("source_title", "未知作品")
-    author = meta.get("author", "未知")
-    genre = meta.get("genre", "")
-    platform = meta.get("platform", "")
-    confidence = meta.get("confidence", 0)
-    chapters = meta.get("sample_chapters", [])
-    words = meta.get("total_sample_words", 0)
+    title = meta.get("source_title") or "未知作品"
+    author = meta.get("author") or "未知"
+    genre = meta.get("genre") or ""
+    platform = meta.get("platform") or ""
+    raw_conf = meta.get("confidence", 0)
+    conf_val = float(raw_conf) if _is_finite_num(raw_conf) else 0.0
+    raw_chapters = meta.get("sample_chapters")
+    if isinstance(raw_chapters, list):
+        chapter_count = len(raw_chapters)
+    elif isinstance(raw_chapters, int) and not isinstance(raw_chapters, bool) and raw_chapters >= 0:
+        chapter_count = raw_chapters
+    else:
+        chapter_count = 0
+    raw_words = meta.get("total_sample_words", 0)
+    words = int(raw_words) if _is_finite_num(raw_words) else 0
 
     lines = [
         f"# 《{title}》写作技法深度拆解报告",
         "",
         f"> **作者**：{author}",
         f"> **题材**：{genre} · **平台**：{platform}",
-        f"> **分析样本**：{len(chapters)} 章（{words:,} 字）",
-        f"> **置信度**：{confidence:.0%}",
-        f"> **生成时间**：{meta.get('extracted_at', '未知')}",
+        f"> **分析样本**：{chapter_count} 章（{words:,} 字）",
+        f"> **置信度**：{conf_val:.0%}",
+        f"> **生成时间**：{meta.get('extracted_at') or '未知'}",
         "",
         "---",
         "",
@@ -121,21 +150,24 @@ def render_craft_report(craft: dict) -> str:
     ]
 
     # 总览
-    if summary.get("top_3_strengths"):
+    top3 = summary.get("top_3_strengths")
+    if isinstance(top3, list) and top3:
         lines.append("### 最强技法 TOP 3")
-        for i, s in enumerate(summary["top_3_strengths"], 1):
+        for i, s in enumerate(top3, 1):
             lines.append(f"{i}. {s}")
         lines.append("")
 
-    if summary.get("unique_techniques"):
+    uniq = summary.get("unique_techniques")
+    if isinstance(uniq, list) and uniq:
         lines.append("### 该作者独有技法")
-        for t in summary["unique_techniques"]:
+        for t in uniq:
             lines.append(f"- {t}")
         lines.append("")
 
-    if summary.get("reusable_patterns"):
+    reusable = summary.get("reusable_patterns")
+    if isinstance(reusable, list) and reusable:
         lines.append("### 最值得学习复用的模式")
-        for p in summary["reusable_patterns"]:
+        for p in reusable:
             lines.append(f"- {p}")
         lines.append("")
 
@@ -188,13 +220,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"✗ 文件不存在: {craft_path}", file=sys.stderr)
         return 1
 
-    craft = json.loads(craft_path.read_text(encoding="utf-8"))
+    craft = json.loads(craft_path.read_text(encoding="utf-8-sig"))
     report = render_craft_report(craft)
 
     if args.out:
         out_path = Path(args.out)
     else:
-        title = craft.get("meta", {}).get("source_title", "unknown")
+        meta_obj = craft.get("meta") if isinstance(craft, dict) and isinstance(craft.get("meta"), dict) else {}
+        title = meta_obj.get("source_title") or "unknown"
         out_path = REPORTS_DIR / f"{title}-笔法分析.md"
 
     out_path.parent.mkdir(parents=True, exist_ok=True)

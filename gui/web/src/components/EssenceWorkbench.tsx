@@ -115,6 +115,10 @@ function getCategoryInfo(category: string, t: (k: string, fb?: string) => string
   return { label: t(item.key, item.defaultLabel), color: item.color }
 }
 
+function getProjectId(p: WritingProject): string {
+  return p.id || p.name
+}
+
 export default function EssenceWorkbench() {
   const { t } = useI18n()
   const [tab, setTab] = useState(0)
@@ -137,7 +141,7 @@ export default function EssenceWorkbench() {
           </Tabs>
         </Box>
 
-        {tab === 0 && <MacroExtractSection onAssetSaved={() => setTab(1)} />}
+        {tab === 0 && <MacroExtractSection onGoAssets={() => setTab(1)} />}
         {tab === 1 && <EssenceAssetsSection />}
         {tab === 2 && <EssenceChainsSection />}
         {tab === 3 && <EssenceBooksSection onToast={setGlobalToast} />}
@@ -158,7 +162,7 @@ export default function EssenceWorkbench() {
 // 1. 离线精读与宏观解构提炼
 // ---------------------------------------------------------------------------
 
-function MacroExtractSection({ onAssetSaved }: { onAssetSaved: () => void }) {
+function MacroExtractSection({ onGoAssets }: { onGoAssets: () => void }) {
   const { t } = useI18n()
   const [title, setTitle] = useState('')
   const [platform, setPlatform] = useState('fanqie')
@@ -167,9 +171,13 @@ function MacroExtractSection({ onAssetSaved }: { onAssetSaved: () => void }) {
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<EssenceMacroAnalysisResult | null>(null)
+  const [savedIndices, setSavedIndices] = useState<Record<number, boolean>>({})
+  const [savingIndices, setSavingIndices] = useState<Record<number, boolean>>({})
+  const [savedNotice, setSavedNotice] = useState('')
   const [toast, setToast] = useState('')
 
   const handleAnalyze = async () => {
+    if (analyzing) return
     if (!title.trim()) {
       setError('请输入书籍名称')
       return
@@ -188,6 +196,9 @@ function MacroExtractSection({ onAssetSaved }: { onAssetSaved: () => void }) {
         genre,
       })
       setResult(res)
+      setSavedIndices({})
+      setSavingIndices({})
+      setSavedNotice('')
       setToast(t('essence_macro_toast_done'))
     } catch (e) {
       setError(friendlyError(e))
@@ -196,8 +207,12 @@ function MacroExtractSection({ onAssetSaved }: { onAssetSaved: () => void }) {
     }
   }
 
-  const handleSaveSuggestedAsset = async (item: { category: string; title: string; summary: string; content: string }) => {
-    if (!result) return
+  const handleSaveSuggestedAsset = async (
+    item: { category: string; title: string; summary: string; content: string },
+    idx: number,
+  ) => {
+    if (!result || savedIndices[idx] || savingIndices[idx]) return
+    setSavingIndices((prev) => ({ ...prev, [idx]: true }))
     try {
       await essenceApi.createAsset({
         book_id: result.bookId,
@@ -210,10 +225,14 @@ function MacroExtractSection({ onAssetSaved }: { onAssetSaved: () => void }) {
         rating: 5,
         tags: `${result.title},${item.category}`,
       })
-      setToast(`${t('essence_macro_toast_saved')}${item.title}`)
-      onAssetSaved()
+      const msg = `${t('essence_macro_toast_saved')}${item.title}`
+      setSavedIndices((prev) => ({ ...prev, [idx]: true }))
+      setSavedNotice(msg)
+      setToast(msg)
     } catch (e) {
       setError(friendlyError(e))
+    } finally {
+      setSavingIndices((prev) => ({ ...prev, [idx]: false }))
     }
   }
 
@@ -391,9 +410,25 @@ function MacroExtractSection({ onAssetSaved }: { onAssetSaved: () => void }) {
               <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold' }}>
                 {t('essence_macro_h3_suggested')}
               </Typography>
+              {savedNotice && (
+                <Alert
+                  severity="success"
+                  sx={{ mb: 1.5 }}
+                  onClose={() => setSavedNotice('')}
+                  action={
+                    <Button color="inherit" size="small" onClick={onGoAssets}>
+                      {t('essence_tab_assets')}
+                    </Button>
+                  }
+                >
+                  {savedNotice}
+                </Alert>
+              )}
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 {result.suggestedAssets.map((asset, idx) => {
                   const catInfo = getCategoryInfo(asset.category, t)
+                  const isSaved = Boolean(savedIndices[idx])
+                  const isSaving = Boolean(savingIndices[idx])
                   return (
                     <Card key={idx} variant="outlined" sx={{ p: 1.5 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -409,11 +444,13 @@ function MacroExtractSection({ onAssetSaved }: { onAssetSaved: () => void }) {
                         </Box>
                         <Button
                           size="small"
-                          variant="outlined"
-                          startIcon={<BookmarkAddIcon />}
-                          onClick={() => handleSaveSuggestedAsset(asset)}
+                          variant={isSaved ? 'contained' : 'outlined'}
+                          color={isSaved ? 'success' : 'primary'}
+                          startIcon={isSaved ? <CheckCircleOutlineIcon /> : <BookmarkAddIcon />}
+                          disabled={isSaved || isSaving}
+                          onClick={() => handleSaveSuggestedAsset(asset, idx)}
                         >
-                          {t('essence_macro_btn_save_asset')}
+                          {isSaved ? t('essence_macro_btn_saved_asset', '✓ 已入库') : t('essence_macro_btn_save_asset')}
                         </Button>
                       </Box>
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -454,7 +491,10 @@ function EssenceAssetsSection() {
   const [projects, setProjects] = useState<WritingProject[]>([])
   const [adoptProject, setAdoptProject] = useState('')
   const [adoptTarget, setAdoptTarget] = useState('outline')
+  const [adopting, setAdopting] = useState(false)
   const [toast, setToast] = useState('')
+
+  const writableProjects = projects.filter((p) => !p.readOnly)
 
   const loadAssets = async () => {
     setLoading(true)
@@ -475,9 +515,13 @@ function EssenceAssetsSection() {
   const loadProjects = async () => {
     try {
       const ps = await writingApi.projects()
-      setProjects(ps || [])
-      if (ps && ps.length > 0 && !adoptProject) {
-        setAdoptProject(ps[0].name)
+      const list = ps || []
+      setProjects(list)
+      const writable = list.filter((p) => !p.readOnly)
+      if (writable.length > 0) {
+        setAdoptProject((prev) => (prev && writable.some((p) => getProjectId(p) === prev) ? prev : getProjectId(writable[0])))
+      } else {
+        setAdoptProject('')
       }
     } catch {
       // 容错处理
@@ -502,7 +546,8 @@ function EssenceAssetsSection() {
   }
 
   const handleAdopt = async () => {
-    if (!adoptDialog || !adoptProject) return
+    if (!adoptDialog || !adoptProject || adopting) return
+    setAdopting(true)
     try {
       await essenceApi.adoptAsset({
         asset_id: adoptDialog.id,
@@ -513,6 +558,8 @@ function EssenceAssetsSection() {
       setAdoptDialog(null)
     } catch (e) {
       setError(friendlyError(e))
+    } finally {
+      setAdopting(false)
     }
   }
 
@@ -676,9 +723,10 @@ function EssenceAssetsSection() {
             onChange={(e) => setAdoptProject(e.target.value)}
             fullWidth
           >
-            {projects.map((p) => (
-              <MenuItem key={p.name} value={p.name}>{p.name}</MenuItem>
-            ))}
+            {writableProjects.map((p) => {
+              const pid = getProjectId(p)
+              return <MenuItem key={pid} value={pid}>{p.name}</MenuItem>
+            })}
           </TextField>
           <TextField
             select
@@ -695,7 +743,7 @@ function EssenceAssetsSection() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAdoptDialog(null)}>{t('essence_assets_adopt_btn_cancel')}</Button>
-          <Button variant="contained" color="primary" onClick={handleAdopt}>{t('essence_assets_adopt_btn_confirm')}</Button>
+          <Button variant="contained" color="primary" onClick={handleAdopt} disabled={adopting || !adoptProject}>{t('essence_assets_adopt_btn_confirm')}</Button>
         </DialogActions>
       </Dialog>
 
@@ -716,9 +764,9 @@ function EssenceAssetsSection() {
 function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
   const { t } = useI18n()
   const [books, setBooks] = useState<EssenceBook[]>([])
-  const [projects, setProjects] = useState<string[]>([])
+  const [projects, setProjects] = useState<WritingProject[]>([])
   const [adoptBookDialog, setAdoptBookDialog] = useState<EssenceBook | null>(null)
-  const [adoptProject, setAdoptProject] = useState('default')
+  const [adoptProject, setAdoptProject] = useState('')
   const [adopting, setAdopting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -739,10 +787,9 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
       setBooks(res.books || [])
       setStats(st)
       const validProjects = (projs || []).filter((p: WritingProject) => !p.readOnly && p.name !== 'default' && p.id !== 'default')
-      const projNames = validProjects.map((p: WritingProject) => p.name)
-      setProjects(projNames)
-      if (projNames.length > 0) {
-        setAdoptProject(projNames[0])
+      setProjects(validProjects)
+      if (validProjects.length > 0) {
+        setAdoptProject(getProjectId(validProjects[0]))
       } else {
         setAdoptProject('')
       }
@@ -792,7 +839,7 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
   }
 
   const handleExecuteAdoptBook = async () => {
-    if (!adoptBookDialog || !adoptProject) return
+    if (!adoptBookDialog || !adoptProject || adopting) return
     setAdopting(true)
     try {
       const res = await essenceApi.adoptBook(adoptBookDialog.bookId, adoptProject)
@@ -952,9 +999,10 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
               onChange={(e) => setAdoptProject(e.target.value)}
               fullWidth
             >
-              {projects.map((p) => (
-                <MenuItem key={p} value={p}>{p}</MenuItem>
-              ))}
+              {projects.map((p) => {
+                const pid = getProjectId(p)
+                return <MenuItem key={pid} value={pid}>{p.name}</MenuItem>
+              })}
             </TextField>
           )}
         </DialogContent>
@@ -1039,6 +1087,7 @@ function EssenceChainsSection() {
   }, [selectedBook])
 
   const handleCreate = async () => {
+    if (saving) return
     if (!formTitle.trim()) {
       setError('请输入暗线伏笔名称')
       return

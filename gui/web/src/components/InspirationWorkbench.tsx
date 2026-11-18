@@ -14,6 +14,7 @@ import Tooltip from '@mui/material/Tooltip'
 import Snackbar from '@mui/material/Snackbar'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
+import { alpha } from '@mui/material/styles'
 import {
   toolsApi,
   friendlyError,
@@ -506,7 +507,7 @@ function ShuangdianLibrarySection() {
                 </Typography>
                 <Typography variant="caption">{s.mockery}</Typography>
                 <Typography variant="caption">{s.silence}</Typography>
-                <Typography variant="caption" fontWeight={600} color="error.dark">{s.crush}</Typography>
+                <Typography variant="caption" fontWeight={600} color="error.main">{s.crush}</Typography>
                 <Typography variant="caption" color="text.secondary">{s.spectators}</Typography>
               </Box>
 
@@ -606,7 +607,7 @@ function WorldLibrarySection() {
               </Typography>
               <Box sx={{ bgcolor: 'action.hover', p: 1, borderRadius: 1, display: 'flex', flexDirection: 'column', gap: 0.5, maxHeight: 180, overflowY: 'auto' }}>
                 {w.tierLadder?.map((tItem, idx) => (
-                  <Box key={idx} sx={{ borderBottom: idx < w.tierLadder.length - 1 ? '1px dashed rgba(0,0,0,0.1)' : 'none', pb: 0.5 }}>
+                  <Box key={idx} sx={{ borderBottom: idx < w.tierLadder.length - 1 ? '1px dashed' : 'none', borderColor: 'divider', pb: 0.5 }}>
                     <Typography variant="caption" fontWeight={700} color="text.primary">
                       {tItem.tier}
                     </Typography>
@@ -635,7 +636,7 @@ function WorldLibrarySection() {
                 <Typography variant="caption" color="text.secondary">
                   <strong>{t('inspiration_wd_currency')}</strong> {w.currencyAndResources}
                 </Typography>
-                <Typography variant="caption" color="error.dark">
+                <Typography variant="caption" color="error.main">
                   <strong>{t('inspiration_wd_collapsewarning')}</strong> {w.powerCollapseWarning}
                 </Typography>
               </Box>
@@ -724,8 +725,8 @@ function DialogueLibrarySection() {
                 <Chip size="small" label={d.category} color="secondary" />
               </Box>
 
-              <Box sx={{ bgcolor: 'error.50', borderLeft: 3, borderColor: 'error.main', p: 1, borderRadius: '0 4px 4px 0' }}>
-                <Typography variant="caption" color="error.dark" fontWeight={700} display="block">
+              <Box sx={{ bgcolor: (theme) => alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.14 : 0.06), borderLeft: 3, borderColor: 'error.main', p: 1, borderRadius: '0 4px 4px 0' }}>
+                <Typography variant="caption" color="error.main" fontWeight={700} display="block">
                   {t('inspiration_dlg_ai_bad')}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
@@ -733,8 +734,8 @@ function DialogueLibrarySection() {
                 </Typography>
               </Box>
 
-              <Box sx={{ bgcolor: 'success.50', borderLeft: 3, borderColor: 'success.main', p: 1, borderRadius: '0 4px 4px 0' }}>
-                <Typography variant="caption" color="success.dark" fontWeight={700} display="block">
+              <Box sx={{ bgcolor: (theme) => alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.14 : 0.06), borderLeft: 3, borderColor: 'success.main', p: 1, borderRadius: '0 4px 4px 0' }}>
+                <Typography variant="caption" color="success.main" fontWeight={700} display="block">
                   {t('inspiration_dlg_human_good')}
                 </Typography>
                 <Typography variant="body2" fontWeight={700} color="text.primary">
@@ -941,8 +942,8 @@ function EmotionLibrarySection() {
                 <Chip size="small" label={e.category} color="secondary" />
               </Box>
 
-              <Box sx={{ bgcolor: 'error.50', borderLeft: 3, borderColor: 'error.main', p: 1, borderRadius: '0 4px 4px 0' }}>
-                <Typography variant="caption" color="error.dark" fontWeight={700} display="block">
+              <Box sx={{ bgcolor: (theme) => alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.14 : 0.06), borderLeft: 3, borderColor: 'error.main', p: 1, borderRadius: '0 4px 4px 0' }}>
+                <Typography variant="caption" color="error.main" fontWeight={700} display="block">
                   {t('inspiration_dlg_ai_bad')}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
@@ -950,8 +951,8 @@ function EmotionLibrarySection() {
                 </Typography>
               </Box>
 
-              <Box sx={{ bgcolor: 'success.50', borderLeft: 3, borderColor: 'success.main', p: 1, borderRadius: '0 4px 4px 0' }}>
-                <Typography variant="caption" color="success.dark" fontWeight={700} display="block">
+              <Box sx={{ bgcolor: (theme) => alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.14 : 0.06), borderLeft: 3, borderColor: 'success.main', p: 1, borderRadius: '0 4px 4px 0' }}>
+                <Typography variant="caption" color="success.main" fontWeight={700} display="block">
                   {t('inspiration_emt_human_good')}
                 </Typography>
                 <Typography variant="body2" fontWeight={500} color="text.primary">

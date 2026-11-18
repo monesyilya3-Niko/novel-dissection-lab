@@ -421,6 +421,22 @@ def create_chain(
         raise ServiceError("book_id 必须为非空字符串", 400)
     if not clue_name or not isinstance(clue_name, str):
         raise ServiceError("clue_name 必须为非空字符串", 400)
+    for _field, _val in (
+        ("hook_text", hook_text),
+        ("payoff_text", payoff_text),
+        ("status", status),
+        ("analysis", analysis),
+    ):
+        if not isinstance(_val, str):
+            raise ServiceError(f"{_field} 必须为字符串", 400)
+    for _ifield, _ival in (
+        ("hook_chapter", hook_chapter),
+        ("payoff_chapter", payoff_chapter),
+    ):
+        if isinstance(_ival, bool) or not isinstance(_ival, int):
+            raise ServiceError(f"{_ifield} 必须为整数", 400)
+    if reveal_chapter is not None and (isinstance(reveal_chapter, bool) or not isinstance(reveal_chapter, int)):
+        raise ServiceError("reveal_chapter 必须为整数", 400)
     # 父行存在性（D8）：与 create_asset 同源问题，不校验会产出孤儿暗线。
     _require_book_exists(book_id)
 
@@ -508,6 +524,9 @@ def extract_macro_essence(
     platform: str = "general",
 ) -> dict[str, Any]:
     """提取整本书的离线宏观数据：全书文风指标、章节节奏心电图、高频角色候选。"""
+    for _field, _val in (("text", text), ("title", title), ("genre", genre), ("platform", platform)):
+        if not isinstance(_val, str):
+            raise ServiceError(f"{_field} 必须为字符串", 400)
     total_chars = len(text)
     chapters = split_chapters_simple(text)
     # 过滤可能存在的卷标空章，确保真实章节有正文内容
@@ -826,11 +845,12 @@ def adopt_book_to_project(book_id: str, project: str) -> dict[str, Any]:
         raise ServiceError(f"书籍 {book_id} 暂无可转入的资产", 404)
 
     results: list[dict[str, Any]] = []
-    for a in assets:
-        cat = a.get("category", "")
-        target_kind = "outline" if cat == "outline" else ("character" if cat in ("character", "persona") else "note")
-        res = adopt_asset_to_project(a["id"], project, target_kind=target_kind)
-        results.append(res)
+    with db.tx():
+        for a in assets:
+            cat = a.get("category", "")
+            target_kind = "outline" if cat == "outline" else ("character" if cat in ("character", "persona") else "note")
+            res = adopt_asset_to_project(a["id"], project, target_kind=target_kind)
+            results.append(res)
 
     return {
         "adopted": True,
@@ -1051,7 +1071,31 @@ def check_constitution_compliance(
     characters_forbidden: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     """小说宪法/正典合规性审查（支持自定义世界观红线与角色声线禁语）。"""
-    if not text or not isinstance(text, str):
+    if text is not None and not isinstance(text, str):
+        raise ServiceError("text 必须为字符串", 400)
+    if rules is not None:
+        if not isinstance(rules, list):
+            raise ServiceError("rules 必须为规则对象数组", 400)
+        for idx, r in enumerate(rules):
+            if not isinstance(r, dict):
+                raise ServiceError(f"rules[{idx}] 必须为对象", 400)
+            for _skey in ("id", "name", "severity"):
+                if _skey in r and r[_skey] is not None and not isinstance(r[_skey], str):
+                    raise ServiceError(f"rules[{idx}].{_skey} 必须为字符串", 400)
+            terms = r.get("terms", [])
+            if not isinstance(terms, list) or not all(isinstance(t, str) for t in terms):
+                raise ServiceError(f"rules[{idx}].terms 必须为字符串数组", 400)
+            penalty = r.get("penalty", 10)
+            if isinstance(penalty, bool) or not isinstance(penalty, (int, float)):
+                raise ServiceError(f"rules[{idx}].penalty 必须为数值", 400)
+    if characters_forbidden is not None:
+        if not isinstance(characters_forbidden, dict):
+            raise ServiceError("characters_forbidden 必须为对象映射", 400)
+        for cname, phrases in characters_forbidden.items():
+            if not isinstance(cname, str) or not isinstance(phrases, list) or not all(isinstance(p, str) for p in phrases):
+                raise ServiceError("characters_forbidden 必须为 {角色名: [禁语字符串, ...]}", 400)
+
+    if not text:
         return {
             "compliance_score": 100,
             "is_compliant": True,

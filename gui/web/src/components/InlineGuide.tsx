@@ -12,7 +12,6 @@ import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import { ink } from '../ink'
 import { useI18n } from '../state/I18nContext'
 
 interface InlineGuideProps {
@@ -63,14 +62,15 @@ export default function InlineGuide({
     <Box
       sx={{
         mb: 2,
-        border: `1px solid ${ink.hairline}`,
+        border: '1px solid',
+        borderColor: 'divider',
         borderRadius: 2,
-        backgroundColor: ink.bg,
+        bgcolor: 'action.hover',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1 }}>
-        <InfoOutlinedIcon sx={{ fontSize: 18, color: ink.accent, flexShrink: 0 }} />
-        <Typography variant="body2" sx={{ flex: 1, color: ink.textSecondary }}>
+        <InfoOutlinedIcon sx={{ fontSize: 18, color: 'primary.main', flexShrink: 0 }} />
+        <Typography variant="body2" sx={{ flex: 1, color: 'text.secondary' }}>
           {resolvedWhat}
         </Typography>
         {hasDetail && (
@@ -81,7 +81,7 @@ export default function InlineGuide({
             sx={{
               transform: open ? 'rotate(180deg)' : 'none',
               transition: 'transform 0.2s',
-              color: ink.textTertiary,
+              color: 'text.disabled',
             }}
           >
             <ExpandMoreIcon fontSize="small" />
@@ -90,22 +90,22 @@ export default function InlineGuide({
       </Box>
       {hasDetail && (
         <Collapse in={open}>
-          <Box sx={{ px: 1.5, pb: 1.5, pt: 0.5, borderTop: `1px dashed ${ink.hairline}` }}>
+          <Box sx={{ px: 1.5, pb: 1.5, pt: 0.5, borderTop: '1px dashed', borderColor: 'divider' }}>
             {resolvedSteps && resolvedSteps.length > 0 && (
               <Box component="ol" sx={{ m: 0, pl: 2.5, mb: resolvedTips || resolvedExample ? 1 : 0 }}>
                 {resolvedSteps.map((s, i) => (
-                  <Typography component="li" variant="body2" key={i} sx={{ color: ink.textSecondary, mb: 0.5 }}>
+                  <Typography component="li" variant="body2" key={i} sx={{ color: 'text.secondary', mb: 0.5 }}>
                     {s}
                   </Typography>
                 ))}
               </Box>
             )}
             {resolvedExample && (
-              <Box sx={{ mt: 1, p: 1.2, borderRadius: 1.5, backgroundColor: ink.surface, border: `1px solid ${ink.hairline}` }}>
-                <Typography variant="caption" sx={{ color: ink.textTertiary, display: 'block', mb: 0.5 }}>
+              <Box sx={{ mt: 1, p: 1.2, borderRadius: 1.5, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block', mb: 0.5 }}>
                   {t('inline_guide_example', '示例')}
                 </Typography>
-                <Typography variant="body2" sx={{ color: ink.text, whiteSpace: 'pre-wrap' }}>
+                <Typography variant="body2" sx={{ color: 'text.primary', whiteSpace: 'pre-wrap' }}>
                   {resolvedExample}
                 </Typography>
               </Box>
@@ -113,7 +113,7 @@ export default function InlineGuide({
             {resolvedTips && resolvedTips.length > 0 && (
               <Box sx={{ mt: 1 }}>
                 {resolvedTips.map((ti, i) => (
-                  <Typography variant="caption" key={i} sx={{ display: 'block', color: ink.textTertiary, mb: 0.4 }}>
+                  <Typography variant="caption" key={i} sx={{ display: 'block', color: 'text.disabled', mb: 0.4 }}>
                     ※ {ti}
                   </Typography>
                 ))}

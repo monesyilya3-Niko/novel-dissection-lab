@@ -38,6 +38,7 @@ import { useApp } from '../state/AppContext'
 import { useThemeMode } from '../state/ThemeModeContext'
 import { useUiModeOptional } from '../state/UiModeContext'
 import { useI18n } from '../state/I18nContext'
+import { requestSystemTab } from './SystemWorkbench'
 import type { WorkbenchKey } from '../layout/WorkbenchNav'
 import type { AssetKind } from '../types'
 
@@ -304,7 +305,10 @@ export default function CommandPalette() {
       icon: <TuneIcon fontSize="small" />,
       group: gSystem,
       keywords: 'model 模型 配置 config api key llm openai anthropic provider',
-      run: () => setWorkbench('system'),
+      run: () => {
+        requestSystemTab(2)
+        setWorkbench('system')
+      },
     })
     list.push({
       id: 'system-toggle-uimode',
@@ -559,12 +563,28 @@ export default function CommandPalette() {
 /** 命令面板触发按钮（放在 AppBar 上） */
 export function CommandPaletteTrigger() {
   const { t } = useI18n()
+  const isMac =
+    typeof navigator !== 'undefined'
+    && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || '')
+  const shortcutLabel = isMac ? '⌘K' : 'Ctrl+K'
   const openPalette = () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }))
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'k', metaKey: isMac, ctrlKey: !isMac, bubbles: true }),
+    )
   }
   return (
     <Box
+      role="button"
+      tabIndex={0}
+      aria-label={t('cmd_search_btn', '搜索…')}
+      data-testid="command-palette-trigger"
       onClick={openPalette}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          openPalette()
+        }
+      }}
       sx={{
         display: { xs: 'none', sm: 'flex' },
         alignItems: 'center',
@@ -580,6 +600,11 @@ export function CommandPaletteTrigger() {
         '&:hover': {
           borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.55)' : 'rgba(17,24,39,0.45)',
           bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(17,24,39,0.05)',
+        },
+        '&:focus-visible': {
+          outline: '2px solid',
+          outlineColor: 'primary.main',
+          outlineOffset: 1,
         },
       }}
     >
@@ -598,7 +623,7 @@ export function CommandPaletteTrigger() {
           fontSize: 10,
         }}
       >
-        ⌘K
+        {shortcutLabel}
       </Typography>
     </Box>
   )

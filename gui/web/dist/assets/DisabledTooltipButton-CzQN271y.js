@@ -1,1 +1,0 @@
-import{j as r,J as e}from"./vendor-BZU4NXLy.js";function p({disabled:i,disabledReason:t,children:o,placement:s="top"}){return i&&t?r.jsx(e,{title:t,arrow:!0,placement:s,children:r.jsx("span",{style:{display:"inline-flex"},children:o})}):o}export{p as D};

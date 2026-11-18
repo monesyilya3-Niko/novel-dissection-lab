@@ -4,6 +4,45 @@
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-11-18（企业级全维深度硬化与无模型接管工作台闭环）
+
+本版聚焦第二轮全栈深度审计揭示的核心引擎、前端交互与后端持久化缺陷，新增 **3 个 REST API 端点**（137 → 140），新增 **42 项全栈深度回归测试**（2681 → 2723）。
+
+### Added — Web-AI 离线接管工作台与极速拆书报告生成
+
+- **全流程 Web-AI 接管工作台（`ProgressPanel.tsx`）**：在无外部 API Key 或欠费环境下，拆书流水线提供可视化接管面板：
+  - 步骤一：Pass 选择器（Pass 1 结构大纲 ~ Pass 5 笔法深度），实时展示各 Pass 的入库标记；
+  - 步骤二：一键复制结构化 Prompt 与对应切片（`GET /api/analyze/takeover/<book_id>?pass_id=passN`），支持系统剪贴板与弹窗预览兜底；
+  - 步骤三：粘贴任意网页版大模型（ChatGPT / Claude / DeepSeek 等）生成的 JSON 结果并一键校验保存（`POST /api/analyze/takeover/<book_id>`）；
+  - 步骤四：一键触发离线 4D 资产全量组装与万字长篇拆书双报告生成（`POST /api/book/<book_id>/reports`），自动刷新概览与拆书成果。
+
+### Fixed — 核心引擎与算法深度硬化
+
+- **中文大写章节号完整支持**：`scripts/chapter_loader.py` 与 `scripts/assemble.py` 引入 `_parse_cn_int` 算法，支持 `零〇一二两三四五六七八九十百千万` 等汉字数词解析与连字符章号；自动排除番外/楔子/序章/设定/大纲等非正文章节；导出 `is_chapter_filename` 与 `read_text_file`。
+- **笔法卡深度解构数据保护**：`scripts/assemble.py` 修复组装时丢失 `deep_analysis` 7 维深度分析对象的缺陷，移除 200 字符硬截断；全面接入 `clean_verbatim` 原文引用脱敏。
+- **人物角色枚举归一化**：`scripts/normalize.py` 增加 `男主`/`男主角` → `主角`、`女主角` → `女主`、`男配`/`女配` → `配角` 的归一化映射，消除 Pass 2 角色卡校验因枚举漂移导致的校验失败。
+- **原文引用清洗与英文缩写误伤修复**：`scripts/clean_verbatim.py` 与 `scripts/compliance.py` 修复英文缩写与所有格（如 `don't`, `can't`）被当作单引号错误截断的隐患；修复 12 字符滑窗边界与长引用清理。
+- **单句段与 POV 人称一致性算法修正**：`scripts/consistency.py` 严格限定单句段判定条件（长度 <= 25 且标点 <= 1 且非标题）；第一人称检测自动剥离对话内容，防止人物台词中的“我”导致第三人称作品误报为第一人称；CJK 首两字兜底安全防护。
+- **长文本连续性追踪事务安全**：`scripts/state_tracker.py` 修复伏笔与时间线 upsert 时覆写导致其他元数据丢失的缺陷；剔除冗余 action 标记；增加类型防御与原子写盘。
+- **单章质检算法精细化**：`scripts/chapter_check.py` 限制对白占比连续衰减上限；章末钩子支持可选配对引号与中英文标点去重；增加 `「『` 直角引号开篇支持；`[他她]` 人称代词旁白与模板句式对称匹配；打分低于 50% 自动记录 issues。
+- **密钥安全存储原子写与备份**：`scripts/secret_store.py` 消除读取阶段静默创建目录行为；增加损坏密文 `.corrupt.bak` 自动备份机制与原子写替换。
+
+### Fixed — Web 前端体验与竞态防线
+
+- **章节编辑器空行爆炸根除（2^N `\n`）**：`ChapterEditor.tsx` 为 `editor.getText()` 明确指定 `{ blockSeparator: '\n' }` 并以 `emitUpdate: false` 阻止二次循环更新，消除每次保存/切换编辑器空行翻倍的严重缺陷。
+- **写作台草稿覆盖与无损切换**：`WritingWorkbench.tsx` 消除跨章节切换时旧章节内容残留自动保存覆盖新章节的竞态；增加 `serverContentRef` 追踪与离开页面确认提示；只读项目安全过滤与保存防重点击。
+- **高级资产编辑防覆盖防线**：`AdvancedWorkbench.tsx` 分离下拉选中项与已加载资产，增加未保存退出确认与 `Ctrl+S` / `Cmd+S` 快捷键。
+- **SSE 状态连通与超时治理**：`api/client.ts` 对瞬时失败任务正常分发连接事件，防止无限 loading；`AppContext.tsx` 过滤跨书籍串扰事件与任务范围事件。
+- **UI 对比度与双语补齐**：全面修复暗色模式下 `TropePanel`、`HelpWorkbench`、`InlineGuide`、`InspirationWorkbench` 的文本对比度；补齐 17 处中英双语词条。
+
+### Fixed — 后端隔离、事务与数据持久化
+
+- **测试隔离与配置防污染**：`tests/_isolation.py` 统一接管并重置 `XUAN_DATA_DIR`；消除 `gui/config.py` 导入时直接触发目录迁移的副作用；日志服务动态跟随临时目录。
+- **报告数据双源聚合持久化**：`gui/migrate.py` 实现 `sync_report()` 同步 SQLite `reports` 表，`list_reports()` 智能聚合磁盘与数据库双真相源；`services._run_analysis` 支持通过状态驱动直接落盘报告。
+- **章节标题持久化**：`gui/writing_service.py` 与 `gui/writing_extra.py` 补齐 `title` 字段落盘与读取。
+- **SQLite 事务死锁防范与连接池清理**：`gui/db.py` 开启 `BEGIN IMMEDIATE` 并支持保存点嵌套；跨线程连接池上限防护，自动回收死亡线程连接。
+- **输入校验与去 AI 味算法优化**：修复 `name_generator`、大纲/人物卡/便签 CRUD、精华分析等 6 处可能产生 500 的脏输入漏洞，优雅返回 400；去 AI 味服务优化长文本扫描光标与误报模式。
+
 ## [1.2.1] - 2026-11-17（跨平台干净环境契约对齐）
 
 ### Fixed

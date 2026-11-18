@@ -514,21 +514,10 @@ class TestLoadAndSaveModels(unittest.TestCase):
 
     def test_no_models_file_anywhere_yields_empty(self):
         """用户目录与仓库都没有配置文件 → 空骨架。"""
-        import shutil
-        backup = self.cfg_file
-        # 临时把仓库模板也挪走
-        repo_cfg = llm_client.MODELS_FILE
-        hidden = repo_cfg.with_suffix(".json.testbak")
-        moved = False
-        if repo_cfg.exists():
-            shutil.move(str(repo_cfg), str(hidden))
-            moved = True
-        try:
+        missing_repo_cfg = Path(self.temp_dir.name) / "no_such_repo_models.json"
+        with mock.patch.object(llm_client, "MODELS_FILE", missing_repo_cfg):
             cfg = llm_client.load_models()
-            self.assertEqual(cfg["models"], {}, "两处都无配置时应返回空骨架")
-        finally:
-            if moved:
-                shutil.move(str(hidden), str(repo_cfg))
+        self.assertEqual(cfg["models"], {}, "两处都无配置时应返回空骨架")
 
     def test_load_models_corrupt_json(self):
         self.cfg_file.write_text("{bad json...", encoding="utf-8")

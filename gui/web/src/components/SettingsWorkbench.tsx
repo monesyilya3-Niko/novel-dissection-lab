@@ -1,7 +1,7 @@
 // 设置工作台：阈值 / 写作 / 端口配置管理。
 // P2-F12：数值字段即时校验（与后端 update_settings 规则对齐），非法时禁用保存；
 // 保存成功后调用 refreshThresholds()，让 QC/写作面板即时用上新阈值。
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Box from '@mui/material/Box'
 import ContextHelpButton from './ContextHelpButton'
 import Typography from '@mui/material/Typography'
@@ -129,8 +129,8 @@ export default function SettingsWorkbench() {
   ) as Record<FieldName, string>
   const hasError = FIELD_NAMES.some((n) => fieldErrors[n] !== '')
 
-  const saveSettings = async () => {
-    if (hasError) return
+  const saveSettings = useCallback(async () => {
+    if (hasError || saving || loading) return
     setSaving(true)
     setMessage('')
     setError('')
@@ -155,7 +155,18 @@ export default function SettingsWorkbench() {
     } finally {
       setSaving(false)
     }
-  }
+  }, [hasError, saving, loading, fields, t, refreshThresholds])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        void saveSettings()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [saveSettings])
 
   const resetSettings = async () => {
     // P2-F11/F13：重置二次确认

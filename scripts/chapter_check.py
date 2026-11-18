@@ -88,12 +88,12 @@ BODY_WORDS = ["心跳", "指尖", "耳根", "脊背", "手心", "喉结", "呼�
 # 钩子关键词（章末 300 字内出现 = 有钩子）
 # 2026-09-21：追加英文章末钩模式（多语料）；中文词表保持不变，仅增加可命中项。
 HOOK_KEYWORDS = [
-    r"[。！？]\s*$",  # 以中文句末标点结束（弱钩子）
-    r"[.!?]\s*$",  # 英文章末句号/问号/叹号（弱钩子）
+    r"[。！？][”\"」』’']?\s*$",  # 以中文句末标点结束（兼容闭合引号）
+    r"[.!?][”\"」』’']?\s*$",  # 英文章末句号/问号/叹号（兼容闭合引号，不与英文问号重复计分）
     r"[…]{1,3}|\.\.\.",  # 省略号（悬念）
     r"忽然|突然|猛然|骤然",  # 突发事件
     r"\b(Suddenly|Abruptly|Without warning)\b",  # EN 突发
-    r"门.*开了|电话.*响|手机.*响|有人.*敲",  # 中断/引入
+    r"门[^。！？!?\n]{0,12}开了|电话[^。！？!?\n]{0,12}响|手机[^。！？!?\n]{0,12}响|有人[^。！？!?\n]{0,12}敲",  # 中断/引入
     r"她不知道|他不知道|谁也没想到",  # 悬念
     r"\bdidn'?t know\b|\bhad no idea\b|\bnever expected\b",  # EN 悬念
     r"转身|回头|推门|拉开|站起",  # 动作钩子
@@ -103,8 +103,7 @@ HOOK_KEYWORDS = [
     r"可是|可那|但是|却只|却还|却在",  # 转折留白
     r"\bBut\b|\bHowever\b|\bYet\b",  # EN 转折
     r"如果|难道|究竟能|是否还",  # 设问/不确定
-    r"\?$",  # 英文设问收尾
-    r"\bif only\b|\bwhat if\b|\bcould it be\b",
+    r"(?i:\bif only\b|\bwhat if\b|\bcould it be\b)",
 ]
 
 # 评分阈值默认值（题材包未配置 quality_thresholds 时的回退线）
@@ -162,13 +161,13 @@ def _fmt_score(v: float) -> str:
 
 # AI 味模板句式
 AI_TICS = [
-    (r"她不知道，[^。]{5,30}(会|将|要)[^。]{3,20}", "作者预告旁白"),
+    (r"[她他]不知道，[^。]{5,30}(会|将|要)[^。]{3,20}", "作者预告旁白"),
     (r"那个画面浮现在脑海[:：]", "记忆闪回模板"),
     (r"像一道小小的伤口", "伤口比喻模板"),
     (r"镀了一层很薄的金色", "金色轮廓模板"),
     (r"不需要说很多话[。]", "沉默模板"),
     (r"在就够了[。]", "存在模板"),
-    (r"她深吸一口气，[^。]{5,15}不知道", "深呼吸+不知道模板"),
+    (r"[她他]深吸一口气，[^。]{5,15}不知道", "深呼吸+不知道模板"),
 ]
 
 
@@ -241,10 +240,11 @@ def check_dialogue_ratio(text: str, band=None) -> tuple:
     外侧锚点按带宽相对推导，默认带时与旧档位端点一致。
     """
     dialogue_chars = dialogue_char_count(text)
-    total = sum(1 for ch in text if '\u4e00' <= ch <= '\u9fff')
-    if total == 0:
+    cjk_total = sum(1 for ch in text if '\u4e00' <= ch <= '\u9fff')
+    denom = cjk_total if cjk_total > 0 else len(re.sub(r"\s+", "", text))
+    if denom == 0:
         return 0, "无文本"
-    ratio = dialogue_chars / total
+    ratio = min(dialogue_chars / denom, 1.0)
 
     lo, hi = band if band is not None else DEFAULT_DIALOGUE_BAND
     lo, hi = float(lo), float(hi)
@@ -305,7 +305,7 @@ def check_hook(text: str) -> tuple:
             notes.append(pat[:12])
 
     last_line = [l.strip() for l in text.split('\n') if l.strip()][-1] if text.strip() else ""
-    closed = bool(last_line and re.search(r'[。！？…"\u201d]$', last_line))
+    closed = bool(last_line and re.search(r'[。！？.!?…"\u201d」』\u2019\']$', last_line))
     short_close = bool(closed and len(last_line) <= 15)
     truncated = bool(last_line and len(last_line) > 4 and not closed)
     if closed:
@@ -337,6 +337,8 @@ def check_hook(text: str) -> tuple:
 
     score = min(_score1(score), 12.0)
     state = f"closed={int(closed)} short={int(short_close)} trunc={int(truncated)}"
+    if truncated:
+        return score, f"钩子 {score}/12: hits={hits}, {state}（截断风险）"
     return score, f"钩子 {score}/12: hits={hits}, {state}"
 
 
@@ -372,7 +374,11 @@ def check_opening(text: str) -> tuple:
     ):
         score += 2
         notes.append("冲突引入")
-    if re.search(r'["\u201c\u2018\u2019].{2,20}["\u201c\u201d\u2018\u2019]', dial_window):
+    if re.search(
+        r'(?:["\u201c\u2018「『][^"\u201d\u2019」』\n]{1,80}["\u201d\u2019」』]'
+        r"|(?<![A-Za-z])'[^'\n]{1,80}'(?![A-Za-z]))",
+        dial_window,
+    ):
         score += 2
         notes.append("对话开场")
     if re.search(
@@ -576,7 +582,7 @@ def check_rang_character(text: str) -> tuple:
 def check_emotion_tags(text: str) -> tuple:
     """12. 情绪标签词滥用（7 分）— 区分对话/旁白；次数连续计分"""
     narrator_tags = ['她感到', '他感到', '她觉得', '他觉得', '她意识到', '他意识到',
-                     '她忽然感到', '他忽然感到', '她不禁感到', '她内心']
+                     '她忽然感到', '他忽然感到', '她不禁感到', '他不禁感到', '她内心', '他内心']
     tag_count = sum(text.count(w) for w in narrator_tags)
 
     if tag_count == 0:
@@ -691,10 +697,13 @@ def chapter_check(text: str, genre_pack: dict = None) -> dict:
     total = _score1(min(sum(float(s) for s, _ in checks), float(TOTAL_MAX_SCORE)))
     details = [d for _, d in checks]
     issues = []
-    for _, d in checks:
-        if "偏短" in d and "严重" not in d:
-            continue
-        if "严重" in d or "不足" in d or "截断" in d:
+    for dim, (s, d) in zip(DIMENSION_ORDER, checks, strict=True):
+        cap = DIMENSION_WEIGHTS[dim]
+        low_score = float(s) <= cap * 0.5
+        severe_text = ("严重" in d or "不足" in d or "截断" in d) and not (
+            "偏短" in d and "严重" not in d
+        )
+        if low_score or severe_text:
             issues.append(d)
 
     # 判定（阈值来自 resolve_thresholds：题材包 quality_thresholds 可覆盖默认 75/60）
@@ -730,7 +739,7 @@ def main(argv: list[str] | None = None) -> int:
     text = chapter_loader.read_text_file(ch_path)
     gp = None
     if args.genre_pack:
-        gp = json.loads(Path(args.genre_pack).read_text(encoding="utf-8"))
+        gp = json.loads(Path(args.genre_pack).read_text(encoding="utf-8-sig"))
 
     result = chapter_check(text, gp)
 

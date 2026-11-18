@@ -220,7 +220,7 @@ def load_models() -> dict:
     if not path.exists():
         return {"version": 1, "models": {}, "roles": {}, "routes": dict(DEFAULT_ROUTES)}
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:
             cfg = json.load(f)
         if not isinstance(cfg, dict):
             raise ValueError("models.json 顶层不是对象")

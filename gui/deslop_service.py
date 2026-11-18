@@ -26,7 +26,7 @@ HOLLOW_RHETORIC_PATTERNS = [
     (r"像一道小小的伤口", "伤口比喻模板", "典型 AI 伤感套路，建议具象化为实际的不甘或迟疑。"),
     (r"镀上了一层(?:淡淡的|很薄的)?(?:金|银|月)?光", "镀金镀光模板", "过于程式化的光影描写，可换成更日常的场景反光或略去。"),
     (r"不知为何[，,]?心底(?:忽然|猛然)?涌起一股", "无由情绪涌起", "情绪必须有前置视听刺激触发，勿凭空涌起。"),
-    (r"眼底(?:闪过|掠过)(?:一丝|一抹)?(?:复杂的|冰冷的|凌厉的)?(?:神色|光芒|暗芒)?", "眼底复杂神色套路", "网文严重泛滥的套路眼部特写，改为动作、呼吸或微表情描写。"),
+    (r"眼底(?:闪过|掠过)(?:一丝|一抹)?(?:复杂的|冰冷的|凌厉的)?(?:神色|光芒|暗芒|情绪)", "眼底复杂神色套路", "网文严重泛滥的套路眼部特写，改为动作、呼吸或微表情描写。"),
     (r"宛如(?:一[只头尊])?断了线的风筝", "断线风筝俗套", "换为实打实的重物坠落受击体感（如后背撞裂青砖、喉头腥甜）。"),
     (r"(?:不可置否|毋庸置疑|显而易见地?)", "说明文论调侵蚀", "小说叙事切忌议论文说教词汇，通过现场事实让读者自行得出结论。"),
 ]
@@ -54,7 +54,7 @@ CLICHE_PATTERNS = [
     (r"倒吸了一口(?:凉气|冷气)", "倒吸凉气俗套", "换为屏息、身形后仰或喉咙发紧等更生动的体感。"),
     (r"瞳孔(?:猛然|剧烈)?收缩", "瞳孔收缩俗套", "避免高频使用此模板，可用眼底暗沉、视线锁定等代替。"),
     (r"嘴角(?:微微)?勾起(?:一抹|一丝)?(?:玩味|戏谑|冰冷|嘲讽|残忍|淡淡)?的(?:笑意|弧度|冷笑)", "嘴角弧度模板", "极度泛滥的脸谱化微表情模板，建议替换为具体的眼神、视线转移或短促台词。"),
-    (r"(?:眼中|眼底|眼眸|眸中)(?:闪过|掠过|浮现)(?:了)?(?:一丝|一抹|一缕)?", "眼中闪过套路", "直接写出他当场说的话、做出的决定或具体动作，不要替读者标注情绪。"),
+    (r"(?:眼中|眼底|眼眸|眸中)(?:闪过|掠过|浮现)(?:了)?(?:一丝|一抹|一缕)", "眼中闪过套路", "直接写出他当场说的话、做出的决定或具体动作，不要替读者标注情绪。"),
 ]
 
 # 5. 否定铺垫后接肯定翻转（2026-10-11 新增，对标业界★★★★★级 AI 句式）
@@ -75,7 +75,7 @@ NEGATION_FLIP_PATTERNS = [
 # 依据：同上参考源列为 ★★★★ 毒级"。AI 极爱用「动作，带着某种情绪/气质」
 # 补一个抽象状语收尾，这是"告诉而非展示"的典型。
 DANGLING_ZHE_PATTERNS = [
-    (r"[，,](?:带着|带着着)(?:一丝|一抹|几分|些许|某种|一种)?[^。！？；\n]{1,12}(?:的)?(?:笑意|嘲讽|无奈|决然|坚毅|温柔|冷意|杀意|情绪|意味)", "带着…万能状语", "删掉这个状语留主句，或换成具体动作——'带着'后面挂抽象名词是 AI 的标志性写法。"),
+    (r"[，,]带着(?:一丝|一抹|几分|些许|某种|一种)?[^。！？；，,\n]{1,12}(?:的)?(?:笑意|嘲讽|无奈|决然|坚毅|温柔|冷意|杀意|情绪|意味)", "带着…万能状语", "删掉这个状语留主句，或换成具体动作——'带着'后面挂抽象名词是 AI 的标志性写法。"),
     (r"声音不大[，,](?:却|但)?(?:带着|透着)", "声音不大却带着套路", "直接写声音的实际特征（沙哑、发紧、压得很低）或干脆只写台词。"),
 ]
 
@@ -123,7 +123,10 @@ DENSITY_RULES = [
     {
         "type": "negation_pair",
         "label": "「没有…也没有…」配对否定",
-        "pattern": re.compile(r"(?:没有|没|不)[^，。！？；,!?\n]{1,10}[，,；]\s*[^，。！？；,!?\n]{0,6}?也(?:没有|没|不)"),
+        "pattern": re.compile(
+            r"(?:没有|没|不(?!过|少|但|仅|禁|妨|管|论))[^，。！？；,!?\n]{1,10}[，,；]\s*"
+            r"[^，。！？；,!?\n]{0,6}?也(?:没有|没|不(?!过|少|但|仅|禁|妨|管|论))"
+        ),
         "min_hits": 3,
         "per_kilo": 4.0,
         "weight": 7,
@@ -459,12 +462,15 @@ def _analyze_deslop_en(text: str, en_words: list[str]) -> dict[str, Any]:
 
     # 3. 英文连续相同主语/代词起手检测（Monotonous Sentence Starters）
     lead_words: list[tuple[str, str, int]] = []
+    _en_cursor = 0
     for s in raw_sents:
+        off = _locate(text, s, _en_cursor)
+        _en_cursor = off + len(s)
         wm = _EN_WORD_RE.search(s)
         if wm:
-            lead_words.append((wm.group(0).lower(), s, _locate(text, s, 0)))
+            lead_words.append((wm.group(0).lower(), s, off))
         else:
-            lead_words.append(("", s, 0))
+            lead_words.append(("", s, off))
 
     k = 0
     n_leads = len(lead_words)
@@ -519,6 +525,7 @@ def _analyze_deslop_en(text: str, en_words: list[str]) -> dict[str, Any]:
     if any(it["type"] == "parallelism" for it in issues):
         suggestions.append("丰富句式开头与长短句节奏，避免连续多句以同一代词机械铺叙。")
 
+    issues_sorted = sorted(issues, key=lambda it: (-it.get("weight", 0), it.get("index", 0)))
     return {
         "ai_score": ai_score,
         "verdict": verdict,
@@ -530,7 +537,7 @@ def _analyze_deslop_en(text: str, en_words: list[str]) -> dict[str, Any]:
             "rang_density": 0.0,
             "adverb_density": round(adverb_density, 1),
         },
-        "issues": issues[:30],
+        "issues": issues_sorted[:30],
         "suggestions": suggestions,
     }
 
@@ -547,8 +554,10 @@ def analyze_deslop(text: str, lang: str = "auto") -> dict[str, Any]:
     en_words = _EN_WORD_RE.findall(text)
     en_count = len(en_words)
 
-    # 英文分支判定：显式指定 en，或 auto 模式下无中文且有英文词汇
-    if normalized_lang == "en" or (normalized_lang == "auto" and cn_count == 0 and en_count > 0):
+    # 英文分支判定：显式指定 en，或 auto 模式下英文主导（防极少量中文名字/标点误把英文章节导入中文分支）
+    if normalized_lang == "en" or (
+        normalized_lang == "auto" and en_count > 0 and (cn_count == 0 or en_count > cn_count * 2)
+    ):
         return _analyze_deslop_en(text, en_words)
 
     if cn_count == 0:
@@ -632,12 +641,14 @@ def analyze_deslop(text: str, lang: str = "auto") -> dict[str, Any]:
     # 切句：除句末标点外，分号串联的并列分句也要切开——排比句常写成
     # "他看见风雪；他看见长剑；他看见破碎的梦。"，不切分号就整段是一句。
     clauses: list[tuple[str, int]] = []
+    _cn_cursor = 0
     for s in raw_sents:
         parts = _CLAUSE_SPLIT_RE.split(s)
+        base = _locate(text, s, _cn_cursor)
         if len(parts) == 1:
-            clauses.append((s, _locate(text, s, clauses[-1][1] if clauses else 0)))
+            clauses.append((s, base))
+            _cn_cursor = base + len(s)
             continue
-        base = _locate(text, s, clauses[-1][1] if clauses else 0)
         cursor = base
         for p in parts:
             p_st = p.strip()
@@ -646,6 +657,7 @@ def analyze_deslop(text: str, lang: str = "auto") -> dict[str, Any]:
             off = _locate(text, p_st, cursor)
             clauses.append((p_st, off))
             cursor = off + len(p_st)
+        _cn_cursor = max(base + len(s), cursor)
 
     i = 0
     n_clause = len(clauses)
@@ -728,6 +740,7 @@ def analyze_deslop(text: str, lang: str = "auto") -> dict[str, Any]:
     if any(it["type"] == "cliche" for it in issues):
         general_suggestions.append("清理'就在这时'、'突然'等俗套连接词，突兀感靠叙述节奏自发带出。")
 
+    issues_sorted = sorted(issues, key=lambda it: (-it.get("weight", 0), it.get("index", 0)))
     return {
         "ai_score": ai_score,
         "verdict": verdict,
@@ -738,6 +751,6 @@ def analyze_deslop(text: str, lang: str = "auto") -> dict[str, Any]:
             "issues_count": len(issues),
             "rang_density": round(rang_density, 1),
         },
-        "issues": issues[:30],  # 最多返回前 30 项
+        "issues": issues_sorted[:30],  # 按毒级权重降序 + 位置升序返回前 30 项
         "suggestions": general_suggestions,
     }

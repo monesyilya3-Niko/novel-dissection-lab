@@ -384,7 +384,7 @@ function QcPanel() {
     try {
       const r = await qualityApi.qc({ target })
       setTaskState(r)
-      if (r.status === 'running' && r.taskId) {
+      if ((r.status === 'running' || r.status === 'pending') && r.taskId) {
         const unsub = subscribeTaskEvents(r.taskId, async () => {
           try {
             const s = await qualityApi.taskState(r.taskId)

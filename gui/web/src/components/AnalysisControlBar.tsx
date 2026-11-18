@@ -36,11 +36,13 @@ const STATUS_COLOR: Record<TaskStatus, 'default' | 'primary' | 'success' | 'erro
 export interface AnalysisControlBarProps {
   /** 一键分析完成后回调（切到结果页）。 */
   onGoResult: () => void
-  /** 切到进度/离线接管页回调（可选）。 */
-  onGoProgress?: () => void
+  /** 切到进度/离线接管页回调（可选，传入选定题材触发离线量化与接管面板）。 */
+  onGoProgress?: (genre?: string) => void
+  /** 同步当前选定题材给父级工作台。 */
+  onGenreChange?: (genre: string) => void
 }
 
-export default function AnalysisControlBar({ onGoResult, onGoProgress }: AnalysisControlBarProps) {
+export default function AnalysisControlBar({ onGoResult, onGoProgress, onGenreChange }: AnalysisControlBarProps) {
   const { t } = useI18n()
   const { book, overview, status, batchStates, runFullAnalysis, pauseAnalysis, resumeAnalysis, retryFailed } = useApp()
   const [genres, setGenres] = useState<string[]>([])
@@ -59,7 +61,9 @@ export default function AnalysisControlBar({ onGoResult, onGoProgress }: Analysi
   // 只依赖 bookId 会让"同一本书改名后重新推断"失效，也是 react-hooks 报
   // missing dependency 的原因。提取成稳定字符串避免以整个 book 对象作依赖
   // （对象引用每次刷新都变，会导致疯狂重跑）。
-  const bookId = book?.bookId
+  const bookId = book?.bookId || ((book as unknown as Record<string, unknown> | undefined)?.id as string | undefined)
+  const onGenreChangeRef = useRef(onGenreChange)
+  onGenreChangeRef.current = onGenreChange
   const bookTitleForInfer =
     ((book as unknown as Record<string, unknown> | undefined)?.title as string)
     || ((book as unknown as Record<string, unknown> | undefined)?.name as string)
@@ -81,6 +85,7 @@ export default function AnalysisControlBar({ onGoResult, onGoProgress }: Analysi
             autoInferredForRef.current = bookId
             setGenre(inferred)
             setInferredFromFilename(inferred)
+            onGenreChangeRef.current?.(inferred)
           }
         }
       })
@@ -129,6 +134,20 @@ export default function AnalysisControlBar({ onGoResult, onGoProgress }: Analysi
     }
   }
 
+  const runControlAction = async (fn: () => Promise<void>) => {
+    if (busy) return
+    setBusy(true)
+    setErrorKey(null)
+    setRawError(null)
+    try {
+      await fn()
+    } catch (e) {
+      setRawError(friendlyError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const errorMessage = errorKey ? t(errorKey) : rawError
 
   return (
@@ -154,7 +173,11 @@ export default function AnalysisControlBar({ onGoResult, onGoProgress }: Analysi
               labelId="genre-select-label"
               value={genre}
               label={t('analysis_genre_label')}
-              onChange={(e) => { setGenre(e.target.value); setInferredFromFilename(null) }}
+              onChange={(e) => {
+                setGenre(e.target.value)
+                setInferredFromFilename(null)
+                onGenreChange?.(e.target.value)
+              }}
               sx={{ fontSize: 13 }}
             >
               {genres.map((g) => (
@@ -184,17 +207,35 @@ export default function AnalysisControlBar({ onGoResult, onGoProgress }: Analysi
             </Button>
           </DisabledTooltipButton>
           {isRunning && typeof pauseAnalysis === 'function' && (
-            <Button size="small" variant="outlined" color="warning" onClick={() => void pauseAnalysis()}>
+            <Button
+              size="small"
+              variant="outlined"
+              color="warning"
+              disabled={busy}
+              onClick={() => void runControlAction(() => pauseAnalysis())}
+            >
               {t('analysis_btn_pause', '暂停')}
             </Button>
           )}
           {isPaused && typeof resumeAnalysis === 'function' && (
-            <Button size="small" variant="outlined" color="primary" onClick={() => void resumeAnalysis()}>
+            <Button
+              size="small"
+              variant="outlined"
+              color="primary"
+              disabled={busy}
+              onClick={() => void runControlAction(() => resumeAnalysis(genre || undefined))}
+            >
               {t('analysis_btn_resume', '继续')}
             </Button>
           )}
           {!isRunning && hasFailed && typeof retryFailed === 'function' && (
-            <Button size="small" variant="outlined" color="error" onClick={() => void retryFailed()}>
+            <Button
+              size="small"
+              variant="outlined"
+              color="error"
+              disabled={busy}
+              onClick={() => void runControlAction(() => retryFailed())}
+            >
               {t('analysis_btn_retry_failed', '重试失败批')}
             </Button>
           )}
@@ -202,10 +243,8 @@ export default function AnalysisControlBar({ onGoResult, onGoProgress }: Analysi
             <Button
               size="small"
               variant="outlined"
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent('novellab:run-offline-analysis', { detail: { genre: genre || 'unknown' } }))
-                onGoProgress()
-              }}
+              disabled={busy}
+              onClick={() => onGoProgress(genre || 'unknown')}
             >
               {t('analysis_btn_offline', '离线量化拆解 & 接管包')}
             </Button>

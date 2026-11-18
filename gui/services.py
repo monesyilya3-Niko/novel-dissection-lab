@@ -11,6 +11,7 @@ import re
 import threading
 import time
 from collections import OrderedDict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,16 @@ _log = get_logger("services")
 
 # 每个 pass 分析的 kind 名（串行顺序）。
 PASS_ORDER = ("pass1_structure", "pass2_character", "pass3_style", "pass4_commercial")
+
+# 离线 Web-AI 拆书接管支持的全部五遍扫描 Pass。
+TAKEOVER_PASSES: tuple[tuple[str, str], ...] = (
+    ("pass1_structure", "Pass 1 · 结构与钩子"),
+    ("pass2_character", "Pass 2 · 角色声线与对话"),
+    ("pass3_style", "Pass 3 · 叙述视角与文风"),
+    ("pass4_commercial", "Pass 4 · 爽点与商业节奏"),
+    ("pass5_craft", "Pass 5 · 十维笔法深度拆解"),
+)
+_TAKEOVER_PASS_MAP: dict[str, str] = dict(TAKEOVER_PASSES)
 
 #: 主循环最多重扫几轮。retry_failed 把失败批改回 pending 后需要再走一遍，
 #: 但有上限——否则「一直失败 → 一直 pending → 无限重扫」会把线程卡死。
@@ -514,10 +525,16 @@ def _chapters_meta(book_id: str, book: dict[str, Any]) -> list[dict[str, Any]]:
 # 分析执行（串行：章→批→pass）
 # ---------------------------------------------------------------------------
 
-def start_analysis(book_id: str, genre: str, model_id: str | None = None,
-                   batch_size: int | None = None) -> dict[str, Any]:
+def start_analysis(
+    book_id: str,
+    genre: str,
+    model_id: str | None = None,
+    batch_size: int | None = None,
+    *,
+    generate_reports: bool | None = None,
+) -> dict[str, Any]:
     """开始/重启分析。串行跑，后台线程执行，SSE 推送进度。"""
-    book = _get_book_or_raise(book_id)
+    _get_book_or_raise(book_id)
     if not engine_adapter.any_model_configured():
         raise ServiceError("未配置外部模型，请先运行 model_config.py 配置（PRD Q7：首版 GUI 仅支持已配置模型）", 400)
 
@@ -546,6 +563,8 @@ def start_analysis(book_id: str, genre: str, model_id: str | None = None,
             state["model_id"] = model_id
             state["batch_size"] = bs
             state["status"] = "running"
+            if generate_reports is not None:
+                state["generate_reports"] = bool(generate_reports)
             state.pop("report_error", None)
 
         # 启动后台线程（在锁内完成登记与启动，保证并发安全）
@@ -731,26 +750,28 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
             })
             return
 
-        # 全部完成（或部分批次成功）
+        # 全部完成（或部分批次成功）：先完成整书资产卡组装与可选报告生成，再置 status="done"，
+        # 确保轮询 /api/status 或收到 SSE done 时磁盘与 SQLite 上的卡片及报告已 100% 就绪。
+        pre_done_state = state_store.load_state(book_id)
+        try:
+            _assemble_after_analysis(book_id, genre, chapters, pre_done_state)
+        except Exception as exc:  # noqa: BLE001 - 组装失败不改变"分析已完成"的事实
+            _log.warning("分析后组装资产失败（批级产物仍完整）: %s", exc)
+        if pre_done_state.get("generate_reports"):
+            try:
+                _generate_reports(
+                    book_id,
+                    {"title": pre_done_state.get("title") or book.get("title") or book_id},
+                )
+            except Exception as exc:  # noqa: BLE001
+                with state_store.update_state(book_id) as st_err:
+                    st_err["report_error"] = str(exc)[:500]
+
         with state_store.update_state(book_id) as state:
             state["status"] = "done"
             if failed_total == 0:
                 state.pop("last_error", None)
-        # 同步 books 表状态（2026-11-05 修）。
-        #
-        # /api/books 的 status 取自 SQLite books.status，而分析完成原先只改
-        # 状态文件——全库没有任何代码把 books.status 推进到 done（唯一写入点
-        # 是导入时的 "idle"）。实测：db.get_books(status='done') 恒为 0 条，
-        # 而状态文件里有 7 本 done。用户看到拆完的书仍标「待拆」。
         _sync_book_status(book_id, "done")
-        # 2026-11-04：分析结束后组装整书资产卡。
-        # 此前只落了批级 pass 文件就置 done，而 get_book_results /
-        # _generate_reports_inner 读的是 {book_id}-voice-card.json 这类整书卡——
-        # 没有任何代码生成它们，于是结果页资产全空、报告 0 字、铁律二必然判失败。
-        try:
-            _assemble_after_analysis(book_id, genre, chapters, state)
-        except Exception as exc:  # noqa: BLE001 - 组装失败不改变"分析已完成"的事实
-            _log.warning("分析后组装资产失败（批级产物仍完整）: %s", exc)
         _publish(book_id, 0, 0, "done", done, total_batches, ctx)
     except Exception as exc:  # noqa: BLE001
         _log.exception("拆书任务未捕获异常 book_id=%s", book_id)
@@ -1086,6 +1107,329 @@ def offline_analyze_book(book_id: str, genre: str = "unknown") -> dict[str, Any]
     return res
 
 
+_TAKEOVER_HEADER = (
+    "请严格按以下要求分析小说采样切片，最终仅输出一个合法的 JSON 对象"
+    "（可使用 ```json 代码块包裹，切勿省略结构字段，严禁连续摘抄原文超过 11 字）。"
+)
+
+
+def _validate_safe_book_id(book_id: Any) -> str:
+    """校验 book_id 安全性（拒绝非字符串、空值与任何路径穿越字符）。"""
+    if not isinstance(book_id, str):
+        raise ServiceError("book_id 必须为字符串", 400)
+    bid = book_id.strip()
+    if not bid or any(ch in bid for ch in ("/", "\\", "..", ":", "\x00", "\n", "\r")):
+        raise ServiceError(f"非法 book_id: {book_id!r}", 400)
+    probe = (config.CORPUS_DIR / "raw" / bid).resolve()
+    if not probe.is_relative_to(config.CORPUS_DIR.resolve()):
+        raise ServiceError(f"非法 book_id: {book_id!r}", 400)
+    return bid
+
+
+def _load_takeover_prompt_markdown(pass_name: str) -> str:
+    """读取 prompts/<pass_name>.md 原文（优先 PROMPTS_DIR 定制覆盖，回退仓库 prompts/）。"""
+    candidates = [
+        config.PROMPTS_DIR / f"{pass_name}.md",
+        config.PROMPTS_DIR.parent / f"{pass_name}.md",
+        config.ROOT_DIR / "prompts" / f"{pass_name}.md",
+    ]
+    for fp in candidates:
+        if fp.is_file():
+            try:
+                return fp.read_text(encoding="utf-8-sig").strip()
+            except OSError as exc:
+                _log.warning("读取 prompt 模板失败 %s: %s", fp, exc)
+    sys_prompt, usr_prompt = engine_adapter.load_prompt(pass_name)
+    return f"## SYSTEM\n{sys_prompt}\n\n## USER\n{usr_prompt}"
+
+
+def _compact_metrics_json(metrics: dict[str, Any]) -> str:
+    """提炼紧凑版全书量化指标 JSON，防止大体积统计明细撑爆 Web-AI 上下文。"""
+    if not isinstance(metrics, dict) or not metrics:
+        return "{}"
+    keep_keys = (
+        "total_chars",
+        "total_words_est",
+        "chapter_count",
+        "sentence_count",
+        "avg_sentence_len",
+        "short_ratio",
+        "long_ratio",
+        "paragraph_count",
+        "dialogue_ratio",
+        "char_ttr",
+        "exclaim_ratio",
+        "sensory",
+    )
+    compact: dict[str, Any] = {k: metrics[k] for k in keep_keys if k in metrics}
+    if isinstance(metrics.get("top_bigrams"), list):
+        compact["top_bigrams"] = metrics["top_bigrams"][:10]
+    return json.dumps(compact, ensure_ascii=False)
+
+
+def get_takeover_bundle(book_id: str, pass_name: str | None = None) -> dict[str, Any]:
+    """获取离线 Web-AI 拆书接管状态总览，或生成指定 Pass 的完整一键复制 Prompt 包。"""
+    bid = _validate_safe_book_id(book_id)
+    sampled_fp = config.CORPUS_DIR / "sampled" / bid / "slices.json"
+    raw_dir = config.CORPUS_DIR / "raw" / bid
+
+    if not pass_name:
+        passes_info: list[dict[str, Any]] = []
+        for p_key, p_label in TAKEOVER_PASSES:
+            rfp = raw_dir / f"{p_key}.json"
+            if rfp.is_file():
+                st = rfp.stat()
+                passes_info.append({
+                    "pass_name": p_key,
+                    "label": p_label,
+                    "saved": True,
+                    "size_bytes": st.st_size,
+                    "updated_at": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
+                })
+            else:
+                passes_info.append({
+                    "pass_name": p_key,
+                    "label": p_label,
+                    "saved": False,
+                    "size_bytes": 0,
+                    "updated_at": None,
+                })
+        assembled_cards = [
+            fname
+            for fname in (
+                f"{bid}-voice-card.json",
+                f"{bid}-structure-obs.json",
+                f"{bid}-commercial-obs.json",
+                f"{bid}-craft-card.json",
+            )
+            if (config.ASSETS_ROOT / fname).is_file()
+        ]
+        reports = [
+            f"report:{rname}"
+            for rname in (f"{bid}-拆书报告", f"{bid}-笔法分析")
+            if (config.REPORTS_DIR / f"{rname}.md").is_file()
+        ]
+        return {
+            "book_id": bid,
+            "sampled_ready": sampled_fp.is_file(),
+            "passes": passes_info,
+            "assembled_cards": assembled_cards,
+            "reports": reports,
+        }
+
+    if not isinstance(pass_name, str) or pass_name.strip() not in _TAKEOVER_PASS_MAP:
+        raise ServiceError(
+            f"未知 pass_name: {pass_name!r}，允许值为 {list(_TAKEOVER_PASS_MAP)}",
+            400,
+        )
+    p = pass_name.strip()
+
+    if not sampled_fp.is_file():
+        offline_analyze_book(bid)
+
+    try:
+        slices = json.loads(sampled_fp.read_text(encoding="utf-8-sig")) if sampled_fp.is_file() else {}
+    except (json.JSONDecodeError, OSError) as exc:
+        raise ServiceError(f"采样切片读取失败: {exc}", 500) from exc
+
+    metrics_fp = config.CORPUS_DIR / "metrics" / f"{bid}.json"
+    metrics: dict[str, Any] = {}
+    if metrics_fp.is_file():
+        try:
+            loaded_m = json.loads(metrics_fp.read_text(encoding="utf-8-sig"))
+            if isinstance(loaded_m, dict):
+                metrics = loaded_m
+        except (json.JSONDecodeError, OSError) as exc:
+            _log.warning("读取量化指标失败 %s: %s", metrics_fp.name, exc)
+
+    prompt_md = _load_takeover_prompt_markdown(p)
+    compact_metrics = _compact_metrics_json(metrics)
+    book_mem = _books_get(bid)
+    slice_text = engine_adapter.build_takeover_slice_text(
+        p,
+        slices if isinstance(slices, dict) else {},
+        metrics,
+        chapters=(book_mem or {}).get("chapters"),
+        max_chars=40000,
+    )
+    bundle = (
+        f"{_TAKEOVER_HEADER}\n\n"
+        f"# 分析规范与输出 Schema（{p}）\n\n{prompt_md}\n\n"
+        f"# 全书量化统计指标\n\n```json\n{compact_metrics}\n```\n\n"
+        f"# 小说采样切片内容\n\n{slice_text}\n"
+    )
+
+    raw_fp = raw_dir / f"{p}.json"
+    existing_text = ""
+    if raw_fp.is_file():
+        try:
+            existing_text = raw_fp.read_text(encoding="utf-8-sig")
+        except OSError as exc:
+            _log.warning("读取已存 pass JSON 失败 %s: %s", raw_fp, exc)
+
+    return {
+        "book_id": bid,
+        "pass_name": p,
+        "prompt_bundle": bundle,
+        "char_count": len(bundle),
+        "saved": raw_fp.is_file(),
+        "existing_json": existing_text,
+    }
+
+
+def save_takeover_pass(book_id: str, pass_name: Any, content: Any) -> dict[str, Any]:
+    """校验并原子保存用户在 Web-AI 生成的 Pass JSON 回复至 corpus/raw/<book_id>/<pass_name>.json。"""
+    bid = _validate_safe_book_id(book_id)
+    if not isinstance(pass_name, str) or pass_name.strip() not in _TAKEOVER_PASS_MAP:
+        raise ServiceError(
+            f"未知 pass_name: {pass_name!r}，允许值为 {list(_TAKEOVER_PASS_MAP)}",
+            400,
+        )
+    p = pass_name.strip()
+
+    parsed: dict[str, Any] | None = None
+    if isinstance(content, dict):
+        parsed = content
+    elif isinstance(content, str) and content.strip():
+        try:
+            extracted = engine_adapter.extract_json(content)
+            if isinstance(extracted, dict):
+                parsed = extracted
+        except (ValueError, TypeError) as exc:
+            raise ServiceError(
+                "无法从内容中解析出合法 JSON 对象，请粘贴完整的 AI JSON 回复",
+                400,
+            ) from exc
+    else:
+        raise ServiceError("content 必须为非空字符串或 JSON 对象", 400)
+
+    if not isinstance(parsed, dict) or not parsed:
+        raise ServiceError(
+            "无法从内容中解析出合法 JSON 对象，请粘贴完整的 AI JSON 回复（不允许空对象 {}）",
+            400,
+        )
+
+    raw_dir = config.CORPUS_DIR / "raw" / bid
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    raw_fp = raw_dir / f"{p}.json"
+    tmp_fp = raw_fp.with_name(f"{raw_fp.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    tmp_fp.write_text(json.dumps(parsed, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp_fp, raw_fp)
+
+    return {
+        "book_id": bid,
+        "pass_name": p,
+        "saved_path": str(raw_fp),
+        "keys": list(parsed.keys()),
+        "size_bytes": raw_fp.stat().st_size,
+    }
+
+
+def generate_book_reports(
+    book_id: str,
+    genre: str | None = None,
+    assemble: bool | None = None,
+) -> dict[str, Any]:
+    """纯离线组装四维资产并生成双份万字报告（无需配置任何外部 LLM 模型，不要求 _BOOKS 驻留内存）。"""
+    bid = _validate_safe_book_id(book_id)
+    if genre is not None and not isinstance(genre, str):
+        raise ServiceError("genre 必须为字符串", 400)
+    if assemble is not None and not isinstance(assemble, bool):
+        raise ServiceError("assemble 必须为布尔值", 400)
+
+    raw_dir = config.CORPUS_DIR / "raw" / bid
+    has_raw = raw_dir.is_dir() and any(raw_dir.glob("pass*.json"))
+    batch_dir = config.ASSETS_ROOT / bid
+    has_batches = batch_dir.is_dir() and any(batch_dir.glob("c*-b*-pass*.json"))
+
+    existing_voice = _load_assembled_card(bid, "voice")
+    existing_struct = _load_assembled_card(bid, "structure")
+    existing_comm = _load_assembled_card(bid, "commercial")
+    existing_craft = _load_assembled_card(bid, "craft")
+    has_cards = bool(existing_voice or existing_struct or existing_comm or existing_craft)
+
+    db_rows: list[dict[str, Any]] = []
+    try:
+        if db._db_ready():
+            db_rows = db.get_books(book_id=bid)
+    except Exception as exc:  # noqa: BLE001
+        _log.debug("generate_book_reports 查询 books 表跳过 %s: %s", bid, exc)
+
+    st_loaded = state_store.load_state(bid)
+    mem_book = _books_get(bid)
+    if not (has_raw or has_batches or has_cards or db_rows or st_loaded.get("title") or mem_book):
+        raise ServiceError(f"未找到书籍或拆书产物: {bid}", 404)
+
+    body_genre = (genre or "").strip()
+    if body_genre and len(body_genre) < 2:
+        raise ServiceError(f"genre 长度过短: {body_genre!r}", 400)
+    resolved_genre = (
+        body_genre
+        or (str(db_rows[0].get("genre") or "").strip() if db_rows else "")
+        or str(st_loaded.get("genre") or "").strip()
+        or str((existing_voice.get("meta") or {}).get("genre") or "").strip()
+        or str((existing_craft.get("meta") or {}).get("genre") or "").strip()
+        or str((existing_struct.get("meta") or {}).get("genre") or "").strip()
+        or "unknown"
+    )
+    if len(resolved_genre) < 2:
+        resolved_genre = "unknown"
+
+    should_assemble = assemble if assemble is not None else bool(has_raw or has_batches)
+    assembled_list: list[str] = []
+    if should_assemble:
+        if has_raw and (raw_dir / "pass1_structure.json").is_file():
+            from gui import writing_service
+
+            asm_res = writing_service.assemble(bid, resolved_genre)
+            assembled_list = list(asm_res.get("written") or [])
+        elif has_batches:
+            assembled_list = _assemble_after_analysis(
+                bid,
+                resolved_genre,
+                (mem_book or {}).get("chapters") or [],
+                st_loaded,
+            )
+
+    voice_now = _load_assembled_card(bid, "voice")
+    craft_now = _load_assembled_card(bid, "craft")
+    resolved_title = (
+        (voice_now.get("meta") or {}).get("source_title")
+        or (craft_now.get("meta") or {}).get("source_title")
+        or (db_rows[0].get("title") if db_rows else None)
+        or st_loaded.get("title")
+        or (mem_book or {}).get("title")
+        or bid
+    )
+
+    with state_store.update_state(bid) as st_clear:
+        st_clear.pop("report_error", None)
+
+    _generate_reports(bid, {"title": resolved_title})
+
+    st_after = state_store.load_state(bid)
+    err_str = str(st_after.get("report_error") or "")
+    generated_ids = [
+        f"report:{rname}"
+        for rname in (f"{bid}-拆书报告", f"{bid}-笔法分析")
+        if (config.REPORTS_DIR / f"{rname}.md").is_file()
+    ]
+    total_chars = 0
+    if generated_ids:
+        chk = engine_adapter.check_report_min_length(config.REPORTS_DIR, bid)
+        total_chars = int(chk.get("total", 0))
+    report_ok = bool(generated_ids) and not err_str
+
+    return {
+        "book_id": bid,
+        "assembled": assembled_list,
+        "reports": generated_ids,
+        "report_ok": report_ok,
+        "report_error": err_str,
+        "total_chars": total_chars,
+    }
+
+
 # ---------------------------------------------------------------------------
 # 阶段一：概览 / 资产 / 报告 / 拆书结果 / 一键分析
 # ---------------------------------------------------------------------------
@@ -1151,24 +1495,65 @@ def list_tropes() -> dict[str, Any]:
 
 
 def list_reports() -> list[dict[str, Any]]:
-    """报告清单（拆书报告 + 笔法分析），优先 SQLite，空则回退扫描。"""
+    """报告清单（拆书报告 + 笔法分析），合并 SQLite 记录与磁盘 reports/*.md，确保双端零漂移。"""
     rows = db.list_reports()
-    if rows:
-        out = []
-        for r in rows:
-            path = r.get("path", "")
-            stem = Path(path).stem if path else r.get("title", "")
+    out: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for r in rows:
+        path = r.get("path", "")
+        stem = Path(path).stem if path else r.get("title", "")
+        if not stem:
+            continue
+        rid = f"report:{stem}"
+        seen_ids.add(rid)
+        disk_fp = config.REPORTS_DIR / f"{stem}.md"
+        sz: int | None = None
+        if disk_fp.is_file():
+            try:
+                sz = disk_fp.stat().st_size
+            except OSError:
+                sz = None
+        out.append({
+            "id": rid,
+            "name": stem,
+            "kind": r.get("type", "book"),
+            "book_id": r.get("book_id", ""),
+            "size": sz,
+        })
+
+    if config.REPORTS_DIR.is_dir():
+        for fp in sorted(config.REPORTS_DIR.glob("*.md")):
+            if not fp.is_file():
+                continue
+            rid = f"report:{fp.stem}"
+            if rid in seen_ids:
+                continue
+            seen_ids.add(rid)
+            rtype = "book"
+            bid = fp.stem
+            if fp.name.endswith("-笔法分析.md"):
+                rtype = "craft"
+                bid = fp.name[: -len("-笔法分析.md")]
+            elif fp.name.endswith("-拆书报告.md"):
+                rtype = "book"
+                bid = fp.name[: -len("-拆书报告.md")]
+            try:
+                sz = fp.stat().st_size
+            except OSError:
+                sz = None
             out.append({
-                "id": f"report:{stem}",
-                "name": stem,
-                "kind": r.get("type", "book"),
-                "book_id": r.get("book_id", ""),
-                "size": None,
+                "id": rid,
+                "name": fp.stem,
+                "kind": rtype,
+                "book_id": bid,
+                "size": sz,
             })
+
+    if out:
         return out
+
     # 回退扫描（迁移前）。
     items = [it for it in asset_index.index.scan()["items"] if it["kind"] == "report"]
-    out = []
     for it in items:
         out.append({
             "id": it["id"],
@@ -1370,53 +1755,32 @@ def get_book_scores(book_id: str) -> list[dict[str, Any]]:
 def run_full_analysis(book_id: str, genre: str, model_id: str | None = None) -> dict[str, Any]:
     """一键「分析」：拆书 + 拆书报告 + 笔法报告串联。
 
-    拆书阶段复用现有 ``start_analysis``（后台线程 + SSE）；报告阶段在拆书线程
-    done 后由 ``_generate_reports`` 回调生成。返回 ``{task_id, cursor, status}``，
-    与 ``/api/analyze/start`` 一致，前端沿用既有 SSE 进度订阅。
+    在 ``state_store`` 中持久化 ``generate_reports=True``，由 ``_run_analysis`` 在
+    ``_assemble_after_analysis`` 完成后直接同步生成报告（既不启动 24 小时轮询线程钉死
+    百兆级 ``book`` 内存，也能在 ``pause/resume`` 或 ``retry_failed`` 后可靠续接报告生成）。
     """
-    book = _get_book_or_raise(book_id)
+    _get_book_or_raise(book_id)
     if not engine_adapter.any_model_configured():
         raise ServiceError("未配置外部模型，请先运行 model_config.py 配置", 400)
 
-    # 复用现有 start_analysis（内部起后台线程）。
-    result = start_analysis(book_id, genre, model_id)
-
-    # 报告生成采用「拆书 done 后回调」：轮询状态，done 后触发报告生成。
-    _schedule_report_generation(book_id, book)
-    return result
+    return start_analysis(book_id, genre, model_id, generate_reports=True)
 
 
-def _schedule_report_generation(book_id: str, book: dict[str, Any]) -> None:
-    """拆书线程完成后回调生成两份报告（拆书报告 + 笔法分析，尽力而为）。
+def _schedule_report_generation(book_id: str, book: dict[str, Any] | None = None) -> None:
+    """兼容包装：标记 ``generate_reports=True``，若任务已处于 done 则立即触发报告生成。
 
-    用独立守护线程轮询拆书状态，done 后调用 ``_generate_reports``。不阻塞
-    ``run_full_analysis`` 返回（前端已拿到 task_id 继续走 SSE）。
+    已废弃旧版 24 小时轮询守护线程，避免闭包长期持有完整 ``book`` 正文字典造成内存泄漏。
     """
-    def _watch() -> None:
-        deadline = time.time() + 24 * 3600  # 上限 24h，避免永久占用。
-        while time.time() < deadline:
-            st = state_store.load_state(book_id)
-            if st.get("status") in ("done", "error"):
-                if st.get("status") == "done":
-                    try:
-                        _generate_reports(book_id, book)
-                    except Exception as exc:  # noqa: BLE001
-                        with state_store.update_state(book_id) as st:
-                            st["report_error"] = str(exc)[:500]
-                return
-            time.sleep(1.0)
-        # 24h 未收敛（极少见：拆书线程僵死 / 一直被暂停）（2026-11-05）。
-        # 原来直接 return，既不写状态也不告知——这个后台线程就此消失，
-        # 用户永远等不到报告，也不知道为什么。
+    title_hint = str((book or {}).get("title") or book_id)
+    with state_store.update_state(book_id) as st:
+        st["generate_reports"] = True
+        is_done = st.get("status") == "done"
+    if is_done:
         try:
-            with state_store.update_state(book_id) as st:
-                st["report_error"] = (
-                    "报告生成等待超时（拆书在 24 小时内未完成，可能因长期暂停或线程僵死）。"
-                    "请检查任务状态后重试分析。")
+            _generate_reports(book_id, {"title": title_hint})
         except Exception as exc:  # noqa: BLE001
-            _log.warning("写入报告超时标记失败 %s: %s", book_id, exc)
-
-    threading.Thread(target=_watch, daemon=True, name=f"report-{book_id}").start()
+            with state_store.update_state(book_id) as st_err:
+                st_err["report_error"] = str(exc)[:500]
 
 
 def _generate_reports(book_id: str, book: dict[str, Any]) -> None:
@@ -1633,7 +1997,24 @@ def _generate_reports_inner(book_id: str, book: dict[str, Any]) -> None:
     commercial = _load_assembled_card(book_id, "commercial")
     craft = _load_assembled_card(book_id, "craft")
 
-    title = (voice.get("meta") or {}).get("source_title", book.get("title", book_id))
+    book_dict = book if isinstance(book, dict) else {}
+    db_title = None
+    try:
+        if db._db_ready():
+            db_rows = db.get_books(book_id=book_id)
+            if db_rows:
+                db_title = db_rows[0].get("title")
+    except Exception as exc:  # noqa: BLE001
+        _log.debug("读取报告书名回退跳过 %s: %s", book_id, exc)
+    state_title = state_store.load_state(book_id).get("title")
+    title = (
+        (voice.get("meta") or {}).get("source_title")
+        or (craft.get("meta") or {}).get("source_title")
+        or book_dict.get("title")
+        or db_title
+        or state_title
+        or book_id
+    )
     reports_dir = config.REPORTS_DIR
 
     # 1. 全部在内存里生成（不落盘）。
@@ -1675,11 +2056,26 @@ def _generate_reports_inner(book_id: str, book: dict[str, Any]) -> None:
         tmp.write_text(text, encoding="utf-8")
         os.replace(tmp, fp)
 
+    from gui import migrate as _migrate
+
     reports_dir.mkdir(parents=True, exist_ok=True)
     if book_md:
-        _atomic_write_text(reports_dir / f"{book_id}-拆书报告.md", book_md)
+        book_fp = reports_dir / f"{book_id}-拆书报告.md"
+        _atomic_write_text(book_fp, book_md)
+        try:
+            _migrate.sync_report(book_fp, book_id=book_id, report_type="book")
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("同步拆书报告至 SQLite 失败 %s: %s", book_fp.name, exc)
     if craft_md:
-        _atomic_write_text(reports_dir / f"{book_id}-笔法分析.md", craft_md)
+        craft_fp = reports_dir / f"{book_id}-笔法分析.md"
+        _atomic_write_text(craft_fp, craft_md)
+        try:
+            _migrate.sync_report(craft_fp, book_id=book_id, report_type="craft")
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("同步笔法分析报告至 SQLite 失败 %s: %s", craft_fp.name, exc)
+
+    with state_store.update_state(book_id) as state:
+        state.pop("report_error", None)
 
     # 刷新资产索引。
     asset_index.index.invalidate()

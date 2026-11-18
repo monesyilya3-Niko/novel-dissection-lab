@@ -1,5 +1,5 @@
 // 内容阅读器：TanStack Virtual 虚拟滚动渲染长文本。
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
@@ -14,6 +14,14 @@ export default function ReaderPanel() {
   const { t } = useI18n()
   const { currentChapter, selectedChapter, book, selectChapter } = useApp()
   const parentRef = useRef<HTMLDivElement>(null)
+  const chapterKey = currentChapter?.index ?? selectedChapter
+
+  // 切换章节时重置阅读器滚动条到顶部
+  useEffect(() => {
+    if (parentRef.current) {
+      parentRef.current.scrollTop = 0
+    }
+  }, [chapterKey])
 
   // 把正文按段落切分，作为虚拟列表的行（动态行高）。
   const paragraphs = useMemo(() => {

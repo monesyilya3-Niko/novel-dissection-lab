@@ -348,7 +348,7 @@ def _pass_field_contract(raw_dir: Path) -> str:
     lines = []
     for f in sorted(raw_dir.glob("pass*.json")):
         try:
-            d = json.loads(f.read_text(encoding="utf-8"))
+            d = json.loads(f.read_text(encoding="utf-8-sig"))
         except Exception:
             continue
         if isinstance(d, dict) and d:
@@ -495,6 +495,13 @@ def assemble_voice_card_v2(name: str, genre: str, manifest: dict,
             "abstraction_note": "四遍扫描产物，经 compliance.py 扫描，连续12字匹配原文已拒收",
         },
     }
+
+
+def assemble_craft_card(name: str, genre: str, manifest: dict, metrics: dict,
+                        pass5: dict) -> dict:
+    """组装 craft-card（委托 assemble.assemble_craft_card 单一来源，保留 deep_analysis）。"""
+    import assemble as _assemble_mod
+    return _assemble_mod.assemble_craft_card(name, genre, manifest, metrics, pass5)
 
 
 # --------------------------------------------------------------------------
@@ -673,106 +680,7 @@ def main(argv: list[str] | None = None) -> int:
         if not args.dry_run:
             (raw_dir / "pass5_craft.json").write_text(
                 json.dumps(pass5_result, ensure_ascii=False, indent=2), encoding="utf-8")
-            # 组装 craft-card：兼容 4 种 pass5 输出格式
-            DIM_NAMES = ["foreshadowing", "information_release", "pov_control",
-                         "scene_transition", "tension_building", "dialogue_craft",
-                         "rhythm_control", "sensory_craft", "narrative_engine", "emotional_algorithm"]
-            DK = {
-                "foreshadowing": ["伏笔","铺垫","埋伏","埋","回收","线索","暗示","预示","物件","象征"],
-                "information_release": ["信息","悬念","释放","揭示","隐瞒","秘密","反转","真相"],
-                "pov_control": ["视角","限知","全知","信息差","叙述者","内心独白","心理","旁白"],
-                "scene_transition": ["转场","切换","过渡","场景转换","淡出","时间","空间","地点"],
-                "tension_building": ["张力","紧张","高潮","压迫","加速","减速","对比","冲突","危机","威胁","困境"],
-                "dialogue_craft": ["对话","潜台词","沉默","打断","错位","回应","拒绝","语气","口吻","言外之意"],
-                "rhythm_control": ["节奏","快慢","段落","留白","停顿","递进","句式","短句","长句","单句成段","呼吸"],
-                "sensory_craft": ["感官","五感","视觉","听觉","触觉","嗅觉","细节","身体","反应","表情","动作","外貌"],
-                "narrative_engine": ["驱动","翻页","悬念","牵挂","承诺","兑现","命运","牵引","吸引","期待","好奇"],
-                "emotional_algorithm": ["情绪","升起","伪装","转移","释放","压抑","爆发","隐忍","伪装","隐藏","流泪","哽咽"],
-            }
-
-            craft_analysis = {}
-            craft_summary = {"top_3_strengths":[],"unique_techniques":[],"reusable_patterns":[]}
-            all_tech_names = []
-
-            # 格式检测
-            if "craft_analysis" in pass5_result:
-                craft_analysis = pass5_result["craft_analysis"]
-                craft_summary = pass5_result.get("craft_summary", craft_summary)
-            elif any(d in pass5_result for d in DIM_NAMES):
-                # 只取 pass5 实际输出了的维度（不创建空壳）
-                craft_analysis = {}
-                for d in DIM_NAMES:
-                    val = pass5_result.get(d)
-                    if val:
-                        craft_analysis[d] = val
-            elif "chapter_analysis" in pass5_result:
-                craft_analysis = {d:{"techniques":[]} for d in DK}
-                for ch in pass5_result["chapter_analysis"]:
-                    for tech in ch.get("techniques",[]):
-                        nt = tech.get("name") or tech.get("technique_name","")
-                        sk = tech.get("abstract_skeleton",""); ef = tech.get("effect","")
-                        dc = tech.get("example_in_text") or tech.get("execution") or tech.get("method","")
-                        an = tech.get("counter_example") or tech.get("anti_example") or tech.get("counter_exa","")
-                        o = {"name":nt,"description":dc[:200],"effect":ef[:200],"skeleton":sk[:200],"anti_pattern":an[:200]}
-                        ft = f"{nt} {sk} {ef}".lower(); placed=False
-                        for d,kws in DK.items():
-                            if any(k in ft for k in kws): craft_analysis[d]["techniques"].append(o); placed=True; break
-                        if not placed: craft_analysis["tension_building"]["techniques"].append(o)
-                        all_tech_names.append(nt)
-            elif "techniques" in pass5_result and isinstance(pass5_result["techniques"],list):
-                craft_analysis = {d:{"techniques":[]} for d in DK}
-                for tech in pass5_result["techniques"]:
-                    if not isinstance(tech,dict): continue
-                    nt = (tech.get("name") or tech.get("technique_name") or tech.get("scenario",""))[:50]
-                    sk = tech.get("abstract_skeleton",""); ef = tech.get("effect","")
-                    dc = tech.get("method") or tech.get("execution") or tech.get("scenario","")
-                    an = tech.get("counter_example") or tech.get("anti_example","")
-                    o = {"name":nt,"description":dc[:200],"effect":ef[:200],"skeleton":sk[:200],"anti_pattern":an[:200]}
-                    ft = f"{nt} {sk} {ef} {dc}".lower(); placed=False
-                    for d,kws in DK.items():
-                        if any(k in ft for k in kws): craft_analysis[d]["techniques"].append(o); placed=True; break
-                    if not placed: craft_analysis["tension_building"]["techniques"].append(o)
-                    all_tech_names.append(nt)
-
-            if all_tech_names:
-                craft_summary["top_3_strengths"] = all_tech_names[:3]
-                craft_summary["unique_techniques"] = all_tech_names[3:5] if len(all_tech_names)>3 else []
-                craft_summary["reusable_patterns"] = all_tech_names[:3]
-
-            # 规范化：list→{techniques:[...]}，字段名标准化，从abstract_pattern生成名称
-            for dk in list(craft_analysis.keys()):
-                v = craft_analysis[dk]
-                if isinstance(v,list):
-                    norm = []
-                    for t in v:
-                        if not isinstance(t,dict): continue
-                        nm = t.get("name") or t.get("technique_name") or ""
-                        if not nm:
-                            ap = t.get("abstract_pattern") or t.get("skeleton") or ""
-                            if ap: nm = ap[:25].rstrip("，。、")
-                        norm.append({"name":nm,"description":t.get("description") or t.get("example_in_text") or t.get("abstract_pattern",""),"effect":t.get("effect",""),"skeleton":t.get("skeleton") or t.get("abstract_pattern",""),"anti_pattern":t.get("anti_pattern") or t.get("反例") or t.get("counter_example","")})
-                    craft_analysis[dk] = {"techniques":norm}
-                elif isinstance(v,dict) and "techniques" not in v:
-                    craft_analysis[dk] = {"techniques":[v]}
-
-            n_chapters = manifest["selected_count"]
-            craft_card = {
-                "meta": {
-                    "source_title": name,
-                    "genre": args.genre,
-                    "extracted_at": __import__("datetime").date.today().isoformat(),
-                    "sample_chapters": manifest["selected_indices"],
-                    "total_sample_words": _sample_words(manifest, m),
-                    "confidence": 0.6 if n_chapters < 10 else min(0.9, 0.65 + n_chapters / 80),
-                    "pass5_version": "1.0",
-                },
-                "craft_analysis": craft_analysis,
-                "craft_summary": craft_summary,
-                "provenance": {
-                    "contains_verbatim": False,
-                    "abstraction_note": "Pass5 笔法分析产物，经 compliance.py 扫描",
-                },
-            }
+            craft_card = assemble_craft_card(name, args.genre, manifest, m, pass5_result)
             # 深度分析校验 + 补齐（deep_analyze 不生成内容，只校验结构）
             try:
                 import deep_analyze
@@ -868,10 +776,11 @@ def _run_distill_hook(genre: str) -> None:
     voice_cards = []
     for vc in sorted(ASSETS_DIR.glob("*-voice-card.json")):
         try:
-            meta = json.loads(vc.read_text(encoding="utf-8")).get("meta") or {}
+            loaded_vc = json.loads(vc.read_text(encoding="utf-8-sig"))
+            meta = (loaded_vc.get("meta") if isinstance(loaded_vc, dict) else None) or {}
         except (json.JSONDecodeError, OSError):
             continue
-        if meta.get("genre") == genre:
+        if isinstance(meta, dict) and meta.get("genre") == genre:
             voice_cards.append(vc)
     if len(voice_cards) < 3:
         print(f"\n[蒸馏 Hook] 同题材《{genre}》仅 {len(voice_cards)} 本（<3），暂不蒸馏。")
@@ -891,7 +800,7 @@ def _run_distill_hook(genre: str) -> None:
 
 def run_compliance(asset_path: Path, book_path: Path) -> int:
     """合规扫描封装：返回退出码（0 通过 / 1 拒绝 / 2 警告）。"""
-    asset = json.loads(asset_path.read_text(encoding="utf-8"))
+    asset = json.loads(asset_path.read_text(encoding="utf-8-sig"))
     book_text = chapter_loader.read_text_file(book_path)
     ngram = compliance_mod.build_ngram_index(book_text)
     errs, warns = compliance_mod.scan_asset(asset, ngram)

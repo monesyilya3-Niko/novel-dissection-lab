@@ -19,7 +19,6 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { tropeApi, friendlyError } from '../api/client'
 import type { Trope } from '../types'
-import { ink } from '../ink'
 import { useI18n } from '../state/I18nContext'
 
 const ALL_CATEGORY_KEY = '__all__'
@@ -130,7 +129,7 @@ onInsert(tropeToTaskText(selected))
 }
 
   return (
-    <Paper sx={{ p: 2, mb: 2, backgroundColor: ink.surface }}>
+    <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <Typography variant="subtitle1">{t('trope_title', '桥段库 · 找灵感')}</Typography>
         <Chip size="small" label={t('trope_count', '{n} 条', { n: totalCount })} />
@@ -198,7 +197,8 @@ onInsert(tropeToTaskText(selected))
                 maxWidth: '100%',
                 maxHeight: 320,
                 overflowY: 'auto',
-                border: `1px solid ${ink.hairline}`,
+                border: '1px solid',
+                borderColor: 'divider',
                 borderRadius: 1,
               }}
             >

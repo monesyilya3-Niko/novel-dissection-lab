@@ -16,7 +16,10 @@ from pathlib import Path
 from typing import Any
 
 from gui import engine_adapter, services
+from gui.logging_setup import get_logger
 from gui.services import ServiceError
+
+_log = get_logger("router")
 
 # ---------------------------------------------------------------------------
 # 响应工具
@@ -312,6 +315,38 @@ def _h_offline_analysis(_params: dict[str, Any], body: dict[str, Any]) -> dict[s
     return ok(services.offline_analyze_book(book_id, genre or "unknown"))
 
 
+def _h_analyze_takeover_get(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
+    from urllib.parse import unquote
+
+    book_id = unquote(str(params.get("book_id") or ""))
+    pass_name = params.get("pass_name")
+    if pass_name is not None and not isinstance(pass_name, str):
+        raise ServiceError("pass_name 必须为字符串", 400)
+    return ok(services.get_takeover_bundle(book_id, pass_name=pass_name or None))
+
+
+def _h_analyze_takeover_post(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from urllib.parse import unquote
+
+    b = body or {}
+    book_id = unquote(str(params.get("book_id") or ""))
+    return ok(services.save_takeover_pass(book_id, b.get("pass_name"), b.get("content")))
+
+
+def _h_book_reports_generate(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    from urllib.parse import unquote
+
+    b = body or {}
+    book_id = unquote(str(params.get("book_id") or ""))
+    genre = b.get("genre")
+    assemble = b.get("assemble")
+    if genre is not None and not isinstance(genre, str):
+        raise ServiceError("genre 必须为字符串", 400)
+    if assemble is not None and not isinstance(assemble, bool):
+        raise ServiceError("assemble 必须为布尔值", 400)
+    return ok(services.generate_book_reports(book_id, genre=genre, assemble=assemble))
+
+
 def _h_genres(_params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
     """P0-4：题材列表（前端下拉唯一来源，与后端校验同源）。"""
     from gui import engine_adapter
@@ -498,11 +533,14 @@ def _h_writing_import_chapter(_params: dict[str, Any], body: dict[str, Any]) -> 
     _genre_pack = b.get("genre_pack")
     if _genre_pack is not None and not isinstance(_genre_pack, str):
         raise ServiceError("genre_pack 必须为字符串", 400)
+    _title = b.get("title")
+    if _title is not None and not isinstance(_title, str):
+        raise ServiceError("title 必须为字符串", 400)
     return ok(writing_service.import_chapter(
         project=_project,
         chapter_no=_safe_chapter_no(b.get("chapter_no"), "chapter_no"),
         content=_content, novel_name=_novel_name,
-        voice=_voice, genre_pack=_genre_pack))
+        voice=_voice, genre_pack=_genre_pack, title=_title))
 
 
 def _h_writing_score(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
@@ -548,17 +586,35 @@ def _h_writing_outlines_list(params: dict[str, Any], _body: dict[str, Any]) -> d
 def _h_writing_outline_create(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
     b = body or {}
+    for _k in ("project", "kind", "title", "summary", "status"):
+        _v = b.get(_k)
+        if _v is not None and not isinstance(_v, str):
+            raise ServiceError(f"{_k} 必须为字符串", 400)
+    _raw_sort = b.get("sort_order")
+    if isinstance(_raw_sort, float):
+        raise ServiceError("sort_order 必须为整数", 400)
     return ok(writing_extra.create_outline(
         b.get("project") or "", kind=b.get("kind") or "chapter",
         title=b.get("title") or "", summary=b.get("summary") or "",
         status=b.get("status") or "planned",
-        sort_order=_safe_int(b.get("sort_order"), 0, "sort_order")))
+        sort_order=_safe_int(_raw_sort, 0, "sort_order")))
 
 
 def _h_writing_outline_update(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
     oid = _safe_int(params.get("oid"), 0, "oid")
-    return ok(writing_extra.update_outline(oid, **(body or {})))
+    b = body or {}
+    kw: dict[str, Any] = {}
+    for _k in ("kind", "title", "summary", "status"):
+        if _k in b and b[_k] is not None:
+            if not isinstance(b[_k], str):
+                raise ServiceError(f"{_k} 必须为字符串", 400)
+            kw[_k] = b[_k]
+    if "sort_order" in b and b["sort_order"] is not None:
+        if isinstance(b["sort_order"], float):
+            raise ServiceError("sort_order 必须为整数", 400)
+        kw["sort_order"] = _safe_int(b["sort_order"], 0, "sort_order")
+    return ok(writing_extra.update_outline(oid, **kw))
 
 
 def _h_writing_outline_delete(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
@@ -592,28 +648,34 @@ def _h_writing_characters_list(params: dict[str, Any], _body: dict[str, Any]) ->
 def _h_writing_character_create(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
     b = body or {}
-    _project = b.get("project") or ""
-    if _project is not None and not isinstance(_project, str):
-        raise ServiceError("project 必须为字符串", 400)
-    _name = b.get("name") or ""
-    if _name is not None and not isinstance(_name, str):
-        raise ServiceError("name 必须为字符串", 400)
-    _role = b.get("role") or ""
-    if _role is not None and not isinstance(_role, str):
-        raise ServiceError("role 必须为字符串", 400)
-    _desc = b.get("description") or ""
-    if _desc is not None and not isinstance(_desc, str):
-        raise ServiceError("description 必须为字符串", 400)
+    for _k in ("project", "name", "role", "description"):
+        _v = b.get(_k)
+        if _v is not None and not isinstance(_v, str):
+            raise ServiceError(f"{_k} 必须为字符串", 400)
+    _extra = b.get("extra")
+    if _extra is not None and not isinstance(_extra, dict):
+        raise ServiceError("extra 必须为对象", 400)
     return ok(writing_extra.create_character(
-        _project, _name,
-        role=_role, description=_desc,
-        extra=b.get("extra") if isinstance(b.get("extra"), dict) else None))
+        b.get("project") or "", b.get("name") or "",
+        role=b.get("role") or "", description=b.get("description") or "",
+        extra=_extra))
 
 
 def _h_writing_character_update(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
     cid = _safe_int(params.get("cid"), 0, "cid")
-    return ok(writing_extra.update_character(cid, **(body or {})))
+    b = body or {}
+    kw: dict[str, Any] = {}
+    for _k in ("name", "role", "description"):
+        if _k in b and b[_k] is not None:
+            if not isinstance(b[_k], str):
+                raise ServiceError(f"{_k} 必须为字符串", 400)
+            kw[_k] = b[_k]
+    if "extra" in b and b["extra"] is not None:
+        if not isinstance(b["extra"], dict):
+            raise ServiceError("extra 必须为对象", 400)
+        kw["extra"] = b["extra"]
+    return ok(writing_extra.update_character(cid, **kw))
 
 
 def _h_writing_character_delete(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
@@ -631,22 +693,28 @@ def _h_writing_notes_list(params: dict[str, Any], _body: dict[str, Any]) -> dict
 def _h_writing_note_create(_params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
     b = body or {}
-    _project = b.get("project") or ""
-    if _project is not None and not isinstance(_project, str):
-        raise ServiceError("project 必须为字符串", 400)
-    _title = b.get("title") or ""
-    if _title is not None and not isinstance(_title, str):
-        raise ServiceError("title 必须为字符串", 400)
-    _content = b.get("content") or ""
-    if _content is not None and not isinstance(_content, str):
-        raise ServiceError("content 必须为字符串", 400)
-    return ok(writing_extra.create_note(_project, title=_title, content=_content))
+    for _k in ("project", "title", "content"):
+        _v = b.get(_k)
+        if _v is not None and not isinstance(_v, str):
+            raise ServiceError(f"{_k} 必须为字符串", 400)
+    return ok(writing_extra.create_note(
+        b.get("project") or "",
+        title=b.get("title") or "",
+        content=b.get("content") or "",
+    ))
 
 
 def _h_writing_note_update(params: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     from gui import writing_extra
     nid = _safe_int(params.get("nid"), 0, "nid")
-    return ok(writing_extra.update_note(nid, **(body or {})))
+    b = body or {}
+    kw: dict[str, Any] = {}
+    for _k in ("title", "content"):
+        if _k in b and b[_k] is not None:
+            if not isinstance(b[_k], str):
+                raise ServiceError(f"{_k} 必须为字符串", 400)
+            kw[_k] = b[_k]
+    return ok(writing_extra.update_note(nid, **kw))
 
 
 def _h_writing_note_delete(params: dict[str, Any], _body: dict[str, Any]) -> dict[str, Any]:
@@ -1300,10 +1368,13 @@ def _h_essence_analyze_macro(_params: dict[str, Any], body: dict[str, Any]) -> d
         raise ServiceError("text 必须为非空字符串", 400)
     if not isinstance(title, str) or not title.strip():
         raise ServiceError("title 必须为非空字符串", 400)
-    genre = b.get("genre") or "general"
-    platform = b.get("platform") or "general"
+    for _k in ("genre", "platform", "book_id"):
+        if _k in b and b[_k] is not None and not isinstance(b[_k], str):
+            raise ServiceError(f"{_k} 必须为字符串", 400)
+    genre = (b.get("genre") or "").strip() or "general"
+    platform = (b.get("platform") or "").strip() or "general"
     res = essence_service.extract_macro_essence(text, title, genre=genre, platform=platform)
-    book_id = b.get("book_id") or f"essence_{int(time.time())}"
+    book_id = (b.get("book_id") or "").strip() or f"essence_{int(time.time())}"
     essence_service.create_or_update_book(
         book_id=book_id,
         title=title,
@@ -1326,8 +1397,8 @@ def _h_essence_analyze_macro(_params: dict[str, Any], body: dict[str, Any]) -> d
                     genre=genre,
                     platform=platform,
                 )
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                _log.warning("自动保存精华派生资产失败 book_id=%s: %s", book_id, exc)
     return ok({"book_id": book_id, **res})
 
 
@@ -1450,27 +1521,36 @@ def _h_essence_chain_create(_params: dict[str, Any], body: dict[str, Any]) -> di
     else:
         clue_full = clue
 
-    hook_ch = b.get("hook_chapter") or b.get("plant_chapter") or 1
-    payoff_ch = b.get("payoff_chapter") or b.get("climax_chapter") or 1
-    desc = b.get("description", "")
-    hook_txt = b.get("hook_text") or desc
-    analysis_txt = b.get("analysis") or desc
+    raw_book_id = b.get("book_id") if "book_id" in b else b.get("bookId")
+    if raw_book_id is not None and not isinstance(raw_book_id, str):
+        raise ServiceError("book_id 必须为字符串", 400)
+    for _sk in ("description", "hook_text", "payoff_text", "status", "analysis"):
+        if _sk in b and b[_sk] is not None and not isinstance(b[_sk], str):
+            raise ServiceError(f"{_sk} 必须为字符串", 400)
+
+    hook_ch = b.get("hook_chapter") if b.get("hook_chapter") is not None else b.get("plant_chapter")
+    payoff_ch = b.get("payoff_chapter") if b.get("payoff_chapter") is not None else b.get("climax_chapter")
+    reveal_ch = b.get("reveal_chapter") if b.get("reveal_chapter") is not None else b.get("revealChapter")
+    for _ik, _iv in (("hook_chapter", hook_ch), ("payoff_chapter", payoff_ch), ("reveal_chapter", reveal_ch)):
+        if isinstance(_iv, float):
+            raise ServiceError(f"{_ik} 必须为整数", 400)
+
+    desc = b.get("description") or ""
+    hook_txt = b.get("hook_text") if b.get("hook_text") is not None else desc
+    analysis_txt = b.get("analysis") if b.get("analysis") is not None else desc
 
     return ok(essence_service.create_chain(
-        book_id=b.get("book_id") or b.get("bookId") or "",
+        book_id=raw_book_id or "",
         clue_name=clue_full,
         hook_chapter=_safe_int(hook_ch, 1, "hook_chapter"),
         payoff_chapter=_safe_int(payoff_ch, 1, "payoff_chapter"),
-        hook_text=hook_txt,
-        payoff_text=b.get("payoff_text", ""),
-        status=b.get("status", "planted"),
-        analysis=analysis_txt,
+        hook_text=hook_txt or "",
+        payoff_text=b.get("payoff_text") or "",
+        status=b.get("status") or "planted",
+        analysis=analysis_txt or "",
         # 用户显式填写的显露章（2026-11-05）：此前 router 根本不读这个字段，
         # 前端有输入框却永远不生效。同时兼容 snake_case 与 camelCase。
-        reveal_chapter=_safe_int_or_none(
-            b.get("reveal_chapter") if b.get("reveal_chapter") is not None else b.get("revealChapter"),
-            "reveal_chapter",
-        ),
+        reveal_chapter=_safe_int_or_none(reveal_ch, "reveal_chapter"),
     ))
 
 
@@ -1503,7 +1583,11 @@ def _h_essence_constitution_check(_params: dict[str, Any], body: dict[str, Any])
         raise ServiceError("text 必须为字符串", 400)
     text = text or ""
     rules = b.get("rules")
-    characters_forbidden = b.get("characters_forbidden") or b.get("charactersForbidden")
+    characters_forbidden = (
+        b.get("characters_forbidden")
+        if "characters_forbidden" in b
+        else b.get("charactersForbidden")
+    )
     return ok(essence_service.check_constitution_compliance(
         text=text, rules=rules, characters_forbidden=characters_forbidden
     ))
@@ -1543,8 +1627,11 @@ ROUTES: list[tuple[str, re.Pattern, Callable[[dict, dict], dict]]] = [
     ("GET", re.compile(r"^/api/reports/(?P<id>[^/]+)$"), _h_get_report),
     ("GET", re.compile(r"^/api/book/(?P<book_id>[^/]+)/results$"), _h_book_results),
     ("GET", re.compile(r"^/api/book/(?P<book_id>[^/]+)/scores$"), _h_book_scores),
+    ("POST", re.compile(r"^/api/book/(?P<book_id>[^/]+)/reports$"), _h_book_reports_generate),
     ("POST", re.compile(r"^/api/analyze/full$"), _h_full_analysis),
     ("POST", re.compile(r"^/api/analyze/offline$"), _h_offline_analysis),
+    ("GET", re.compile(r"^/api/analyze/takeover/(?P<book_id>[^/]+)$"), _h_analyze_takeover_get),
+    ("POST", re.compile(r"^/api/analyze/takeover/(?P<book_id>[^/]+)$"), _h_analyze_takeover_post),
     # W15 阶段二：写作（M2）
     ("GET", re.compile(r"^/api/writing/projects$"), _h_writing_projects),
     ("POST", re.compile(r"^/api/writing/projects$"), _h_writing_project_create),

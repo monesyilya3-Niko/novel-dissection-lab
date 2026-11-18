@@ -40,6 +40,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import AddIcon from '@mui/icons-material/Add'
 import NavigateNextIcon from '@mui/icons-material/NavigateNext'
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
+import * as clientMod from '../api/client'
 import {
   writingApi,
   toolsApi,
@@ -60,7 +61,7 @@ import {
   type EssenceChain,
 } from '../api/client'
 import type { WritingProject, WritingTaskState, ScoreResult } from '../types'
-import { useApp } from '../state/AppContext'
+import { useApp, useAppOptional } from '../state/AppContext'
 import { useI18n } from '../state/I18nContext'
 import { useUiModeOptional } from '../state/UiModeContext'
 import StylePanel from './StylePanel'
@@ -87,6 +88,52 @@ const WRITING_STATUS_LABELS: Record<string, string> = {
   cancelled: '已取消',
 }
 const writingStatusLabel = (s: string | null | undefined) => (s ? WRITING_STATUS_LABELS[s] ?? s : s)
+
+function getProjectId(p: WritingProject): string {
+  return p.id || p.name
+}
+
+async function safeFetchGenres(): Promise<string[]> {
+  let fn: (() => Promise<string[]>) | undefined
+  try {
+    fn = ((clientMod as Record<string, unknown>).listGenres
+      ?? (clientMod as Record<string, unknown>).getGenres) as (() => Promise<string[]>) | undefined
+  } catch {
+    fn = undefined
+  }
+  if (typeof fn !== 'function') return []
+  try {
+    const res = await fn()
+    return Array.isArray(res) ? res : []
+  } catch {
+    return []
+  }
+}
+
+function deriveChapterTitle(
+  chapterNo: number,
+  serverTitle?: string,
+  text?: string,
+  savedList?: Array<{ chapterNo: number; title: string }>,
+  preferredTitle?: string,
+): string {
+  if (serverTitle && serverTitle.trim()) return serverTitle.trim()
+  if (preferredTitle && preferredTitle.trim()) return preferredTitle.trim()
+  const fromList = savedList?.find((c) => c.chapterNo === chapterNo)?.title
+  if (fromList && fromList.trim()) return fromList.trim()
+  if (text) {
+    const firstLine = text.split('\n').map((l) => l.trim()).find(Boolean) ?? ''
+    const cleaned = firstLine.replace(/^#+\s*/, '').trim()
+    if (
+      cleaned
+      && cleaned.length <= 40
+      && (/^第\s*[0-9一二三四五六七八九十百千万零〇]+\s*[章回节]/.test(cleaned) || /^Chapter\s+\d+/i.test(cleaned))
+    ) {
+      return cleaned
+    }
+  }
+  return `第${chapterNo}章`
+}
 
 /**
  * 题材包按「与声线卡同题材优先」排序。
@@ -302,7 +349,7 @@ export default function WritingWorkbench({
               {pipelineTab === 0 && <InjectPanel sel={sel} />}
               {pipelineTab === 1 && <GeneratePanel sel={sel} />}
               {pipelineTab === 2 && <ScorePanel />}
-              {pipelineTab === 3 && <AssemblePanel />}
+              {pipelineTab === 3 && <AssemblePanel sel={sel} />}
               {pipelineTab === 4 && <StylePanel />}
               {pipelineTab === 5 && (
                 <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={28} /></Box>}>
@@ -467,7 +514,16 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
       .projects()
       .then((ps) => {
         setProjects(ps)
-        if (selectId) setProject(selectId)
+        const writable = ps.filter((p) => !p.readOnly)
+        if (selectId) {
+          setProject(selectId)
+        } else {
+          setProject((prev) => (
+            prev && writable.some((p) => getProjectId(p) === prev)
+              ? prev
+              : (writable[0] ? getProjectId(writable[0]) : '')
+          ))
+        }
       })
       .catch((e) => setError(`加载项目失败: ${e}`))
   }, [])
@@ -490,7 +546,7 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
       const created = await writingApi.createProject(name)
       setNewProjOpen(false)
       setNewProjName('')
-      loadProjects(created.id) // 刷新列表并自动选中新建项目
+      loadProjects(created.id || created.name) // 刷新列表并自动选中新建项目
     } catch (e) {
       setError(`新建项目失败: ${friendlyError(e)}`)
     } finally {
@@ -509,7 +565,7 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
         genre_pack: genrePack || undefined,
       })
       setTaskState(r)
-      if (r.status === 'running' && r.taskId) {
+      if ((r.status === 'running' || r.status === 'pending') && r.taskId) {
         const unsub = subscribeTaskEvents(r.taskId, async () => {
           try {
             const s = await writingApi.taskState(r.taskId)
@@ -551,6 +607,17 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
     }
   }, [importContent, project, importing, voice, genrePack, chapterNo])
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        void doImport()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [doImport])
+
   const writableProjects = useMemo(() => projects.filter((p) => !p.readOnly), [projects])
 
   return (
@@ -572,7 +639,10 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
       )}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
         <TextField select label="项目" value={project} onChange={(e) => setProject(e.target.value)} sx={{ minWidth: 180 }} size="small">
-          {writableProjects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+          {writableProjects.map((p) => {
+            const pid = getProjectId(p)
+            return <MenuItem key={pid} value={pid}>{p.name}</MenuItem>
+          })}
         </TextField>
         <Button variant="outlined" size="small" onClick={() => { setNewProjName(''); setNewProjOpen(true) }} sx={{ alignSelf: 'center' }}>
           新建项目
@@ -642,7 +712,7 @@ function GeneratePanel({ sel }: { sel: WritingAssetSelection }) {
             状态：{writingStatusLabel(taskState.status)} | 第{taskState.chapterNo}章
             {taskState.attempt ? ` | 第${taskState.attempt}稿` : ''}
           </Typography>
-          {taskState.status === 'running' || taskState.status === 'rewriting' || taskState.status === 'scoring' ? (
+          {taskState.status === 'pending' || taskState.status === 'running' || taskState.status === 'rewriting' || taskState.status === 'scoring' ? (
             <>
               <LinearProgress sx={{ mt: 1 }} />
               {/* 2026-11-03：此前任务一旦开跑就只能干等（最多 N 轮 × LLM 超时） */}
@@ -831,9 +901,11 @@ function ScorePanel() {
 // 组装面板
 // ---------------------------------------------------------------------------
 
-function AssemblePanel() {
+function AssemblePanel({ sel }: { sel: WritingAssetSelection }) {
   const { t } = useI18n()
+  const appCtx = useAppOptional()
   const [candidates, setCandidates] = useState<{ name: string; passes: string[] }[]>([])
+  const [genres, setGenres] = useState<string[]>([])
   const [name, setName] = useState('')
   // P2-F14：默认题材改为空，必须显式选择，避免误用 campus-redemption。
   const [genre, setGenre] = useState('')
@@ -848,13 +920,16 @@ function AssemblePanel() {
         if (r.length > 0) setName((r[0] as { name: string }).name)
       })
       .catch((e) => setError(`加载候选失败: ${e}`))
+    void safeFetchGenres().then(setGenres)
   }, [])
 
   const doAssemble = async () => {
+    if (loading) return
     setLoading(true)
     try {
       const r = await writingApi.assemble({ name, genre })
       setResult(JSON.stringify(r, null, 2))
+      await Promise.allSettled([sel.refresh?.(), appCtx?.refreshOverview?.()])
     } catch (e) {
       setResult(friendlyError(e))
     } finally {
@@ -878,7 +953,21 @@ function AssemblePanel() {
         <TextField select label="书名" value={name} onChange={(e) => setName(e.target.value)} sx={{ minWidth: 200 }} size="small">
           {candidates.map((c) => <MenuItem key={c.name} value={c.name}>{c.name}（{c.passes.length} pass）</MenuItem>)}
         </TextField>
-        <TextField label="题材" value={genre} onChange={(e) => setGenre(e.target.value)} sx={{ minWidth: 180 }} size="small" />
+        {genres.length > 0 ? (
+          <TextField select label="题材" value={genre} onChange={(e) => setGenre(e.target.value)} sx={{ minWidth: 180 }} size="small">
+            {genres.map((g) => (
+              <MenuItem key={g} value={g}>{g}</MenuItem>
+            ))}
+            {genre && !genres.includes(genre) && (
+              <MenuItem value={genre}>{genre}</MenuItem>
+            )}
+            {!genres.includes('unknown') && (
+              <MenuItem value="unknown">unknown</MenuItem>
+            )}
+          </TextField>
+        ) : (
+          <TextField label="题材" value={genre} onChange={(e) => setGenre(e.target.value)} sx={{ minWidth: 180 }} size="small" />
+        )}
         <Button variant="contained" onClick={doAssemble} disabled={!name || !genre || loading}>
           {loading ? <CircularProgress size={20} /> : '组装入库'}
         </Button>
@@ -927,53 +1016,132 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   const [content, setContent] = useState<string>(
     '寒风呼啸，少年林凡握紧手中残破铁剑，凝视着眼前深不见底的万丈深渊。宗门考核长老的冷笑声犹在耳畔，但他胸膛内那颗沉寂已久的神秘石珠，正隐隐泛起滚烫的微光。'
   )
+  const [isDirty, setIsDirty] = useState<boolean>(false)
   const [saving, setSaving] = useState<boolean>(false)
   const [copyingPrompt, setCopyingPrompt] = useState<boolean>(false)
+  const [creatingStudioProj, setCreatingStudioProj] = useState<boolean>(false)
+  const [savingMeta, setSavingMeta] = useState<boolean>(false)
+  const [creatingOutline, setCreatingOutline] = useState<boolean>(false)
+  const [creatingChar, setCreatingChar] = useState<boolean>(false)
+  const [creatingNote, setCreatingNote] = useState<boolean>(false)
+  const [creatingChain, setCreatingChain] = useState<boolean>(false)
 
-  // 本地草稿自动暂存 Key（防丢稿机制）
+  // 本地草稿自动暂存 Key（仅在真实用户编辑时写入，杜绝跨章/跨项目污染与覆盖服务端真稿）
   const getDraftKey = (proj: string, ch: number) => `novel_draft_${proj}_ch${ch}`
   const loadedChapterKeyRef = useRef<string>('')
+  const serverContentRef = useRef<string>('')
+  const prevProjectRef = useRef<string>('')
+  const chapterNoRef = useRef<number>(chapterNo)
+  chapterNoRef.current = chapterNo
+  const savedChaptersRef = useRef(savedChapters)
+  savedChaptersRef.current = savedChapters
+  const pendingOutlineTitleRef = useRef<{ key: string; title: string } | null>(null)
 
-  // 切换项目或章号时：优先恢复未入库的本地草稿；若无草稿则自动拉取服务端已入库章节（修复刷新丢稿）
+  const persistDraftOnUserEdit = useCallback((proj: string, ch: number, nextText: string) => {
+    if (!proj) return
+    const draftKey = getDraftKey(proj, ch)
+    try {
+      if (nextText === serverContentRef.current) {
+        localStorage.removeItem(draftKey)
+        setIsDirty(false)
+      } else {
+        localStorage.setItem(draftKey, nextText)
+        setIsDirty(true)
+      }
+    } catch {
+      setIsDirty(nextText !== serverContentRef.current)
+    }
+  }, [])
+
+  // 未保存草稿离开页面拦截
+  useEffect(() => {
+    if (!isDirty) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [isDirty])
+
+  // 切换项目或章号时：优先恢复未入库的本地草稿；若无草稿则拉取服务端章节，404 时严格清空正文防串项
   useEffect(() => {
     if (!currentProject) return
     const key = `${currentProject}::${chapterNo}`
     loadedChapterKeyRef.current = key
-    let localDraft = ''
+    const switchedProject = Boolean(prevProjectRef.current && prevProjectRef.current !== currentProject)
+    prevProjectRef.current = currentProject
+
+    const pendingTitle =
+      pendingOutlineTitleRef.current?.key === key ? pendingOutlineTitleRef.current.title : undefined
+    if (pendingOutlineTitleRef.current?.key === key) {
+      pendingOutlineTitleRef.current = null
+    }
+
+    let rawDraft: string | null = null
     try {
-      localDraft = localStorage.getItem(getDraftKey(currentProject, chapterNo)) || ''
-    } catch { /* ignore */ }
-    if (localDraft) {
-      setContent(localDraft)
+      rawDraft = localStorage.getItem(getDraftKey(currentProject, chapterNo))
+    } catch {
+      rawDraft = null
+    }
+
+    const hasGetChapter = typeof writingApi.getChapter === 'function'
+    if (hasGetChapter || switchedProject || chapterNo > 1 || pendingTitle) {
+      setChapterTitle(deriveChapterTitle(chapterNo, undefined, undefined, savedChaptersRef.current, pendingTitle))
+    }
+
+    if (rawDraft !== null) {
+      serverContentRef.current = ''
+      setContent(rawDraft)
+      setIsDirty(true)
+      if (hasGetChapter) {
+        let cancelled = false
+        writingApi.getChapter(currentProject, chapterNo)
+          .then((res) => {
+            if (cancelled || loadedChapterKeyRef.current !== key) return
+            const srv = typeof res?.content === 'string' ? res.content : ''
+            serverContentRef.current = srv
+            setChapterTitle(deriveChapterTitle(chapterNo, res?.title, srv, savedChaptersRef.current, pendingTitle))
+            if (rawDraft === srv) {
+              try { localStorage.removeItem(getDraftKey(currentProject, chapterNo)) } catch { /* ignore */ }
+              setIsDirty(false)
+            }
+          })
+          .catch(() => {
+            if (cancelled || loadedChapterKeyRef.current !== key) return
+            serverContentRef.current = ''
+            setIsDirty(rawDraft !== '')
+          })
+        return () => { cancelled = true }
+      }
       return
     }
-    if (typeof writingApi.getChapter === 'function') {
+
+    serverContentRef.current = ''
+    setIsDirty(false)
+    if (hasGetChapter) {
+      setContent('')
       let cancelled = false
       writingApi.getChapter(currentProject, chapterNo)
         .then((res) => {
-          if (!cancelled && loadedChapterKeyRef.current === key && typeof res?.content === 'string') {
-            setContent(res.content)
-          }
+          if (cancelled || loadedChapterKeyRef.current !== key) return
+          const srv = typeof res?.content === 'string' ? res.content : ''
+          serverContentRef.current = srv
+          setContent(srv)
+          setIsDirty(false)
+          setChapterTitle(deriveChapterTitle(chapterNo, res?.title, srv, savedChaptersRef.current, pendingTitle))
         })
         .catch(() => {
-          // 服务端尚未落盘该章：第 1 章保留初始示例便于快速体验，其余新章置空
-          if (!cancelled && loadedChapterKeyRef.current === key && chapterNo > 1) {
-            setContent('')
-          }
+          if (cancelled || loadedChapterKeyRef.current !== key) return
+          serverContentRef.current = ''
+          setContent('')
+          setIsDirty(false)
         })
       return () => { cancelled = true }
+    } else if (switchedProject || chapterNo > 1) {
+      setContent('')
     }
   }, [currentProject, chapterNo])
-
-  // 监听内容变动，自动同步到本地草稿缓存
-  useEffect(() => {
-    if (!currentProject || !content) return
-    try {
-      localStorage.setItem(getDraftKey(currentProject, chapterNo), content)
-    } catch (_e) {
-      void _e
-    }
-  }, [content, currentProject, chapterNo])
 
   // 左右栏交互
   const [leftTab, setLeftTab] = useState<'outlines' | 'characters' | 'notes'>('outlines')
@@ -1076,13 +1244,24 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   const currentProjectRef = useRef(currentProject)
   currentProjectRef.current = currentProject
 
+  const writableProjects = useMemo(() => projects.filter((p) => !p.readOnly), [projects])
+  const currentProjectDisplayName = useMemo(
+    () => writableProjects.find((p) => getProjectId(p) === currentProject)?.name || currentProject,
+    [writableProjects, currentProject],
+  )
+
   const loadProjects = useCallback(async () => {
     try {
       const ps = await writingApi.projects()
       setProjects(ps)
+      const writable = ps.filter((p) => !p.readOnly)
       const cur = currentProjectRef.current
-      if (ps.length > 0 && !ps.some((p) => p.name === cur)) {
-        setCurrentProject(ps[0].name)
+      if (writable.length > 0) {
+        if (!writable.some((p) => getProjectId(p) === cur)) {
+          setCurrentProject(getProjectId(writable[0]))
+        }
+      } else {
+        setCurrentProject('')
       }
     } catch (e) {
       setError(`加载项目失败: ${friendlyError(e)}`)
@@ -1114,11 +1293,16 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       setCharacters(charRes || [])
       setNotes(noteRes || [])
       setStats(statsRes)
-      setSavedChapters((chapsRes?.chapters || []).map((c) => ({
+      const chaps = (chapsRes?.chapters || []).map((c) => ({
         chapterNo: c.chapterNo,
         title: c.title,
         wordCount: c.wordCount,
-      })))
+      }))
+      setSavedChapters(chaps)
+      const curChSummary = chaps.find((c) => c.chapterNo === chapterNoRef.current)
+      if (curChSummary?.title) {
+        setChapterTitle((prev) => (!prev || prev === `第${chapterNoRef.current}章` ? curChSummary.title : prev))
+      }
       // 只展示当前项目关联书籍的暗线（2026-11-05 修）。
       // 原来查不到就回退到「全库暗线」，于是 A 项目的「草蛇灰线」里会冒出
       // B 书的伏笔，按章号高亮时还会误命中，数据看起来像串了。
@@ -1157,21 +1341,26 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
 
   // 新建项目
   const handleCreateProject = async () => {
-    if (!newProjName.trim()) return
+    if (!newProjName.trim() || creatingStudioProj) return
+    setCreatingStudioProj(true)
     try {
       const p = await writingApi.createProject(newProjName.trim())
       setOpenNewProj(false)
       setNewProjName('')
       setToast(`小说工程《${p.name}》已创建`)
-      setCurrentProject(p.name)
-      loadProjects()
+      setCurrentProject(getProjectId(p))
+      await loadProjects()
     } catch (e) {
       setError(friendlyError(e))
+    } finally {
+      setCreatingStudioProj(false)
     }
   }
 
   // 保存企划 Meta
   const handleSaveMeta = async () => {
+    if (!currentProject || savingMeta) return
+    setSavingMeta(true)
     try {
       const updated = await writingApi.updateProjectMeta(currentProject, {
         platform: metaPlatform,
@@ -1184,6 +1373,8 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       setToast('作品企划定位已保存并持久化')
     } catch (e) {
       setError(friendlyError(e))
+    } finally {
+      setSavingMeta(false)
     }
   }
 
@@ -1228,31 +1419,30 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     }
   }
 
-  // 下一章快捷切换（带本地草稿记忆防误触）
+  // 下一章快捷切换（仅已脏改的章节由编辑回调持久化，不污染未修改章节草稿）
   const handleNextChapter = useCallback(() => {
-    if (content.trim()) {
-      try {
-        localStorage.setItem(getDraftKey(currentProject, chapterNo), content)
-      } catch (_e) {
-        void _e
-      }
-    }
     const next = chapterNo + 1
     setChapterNo(next)
-    setChapterTitle(`第${next}章`)
-    let savedDraft = ''
-    try {
-      savedDraft = localStorage.getItem(getDraftKey(currentProject, next)) || ''
-    } catch (_e) {
-      void _e
+    const existingMeta = savedChapters.find((c) => c.chapterNo === next)
+    setChapterTitle(existingMeta?.title || `第${next}章`)
+    let rawDraft: string | null = null
+    if (currentProject) {
+      try {
+        rawDraft = localStorage.getItem(getDraftKey(currentProject, next))
+      } catch {
+        rawDraft = null
+      }
     }
-    setContent(savedDraft)
-    setToast(`已准备好开启第 ${next} 章创作${savedDraft ? '（已自动恢复本章本地草稿）' : ''}`)
-  }, [content, currentProject, chapterNo])
+    if (typeof writingApi.getChapter !== 'function') {
+      setContent(rawDraft ?? '')
+    }
+    setToast(`已准备好开启第 ${next} 章创作${rawDraft ? '（已自动恢复本章本地草稿）' : ''}`)
+  }, [currentProject, chapterNo, savedChapters])
 
   // 快捷创建章节大纲
   const handleCreateOutline = async () => {
-    if (!newOutlineTitle.trim()) return
+    if (!newOutlineTitle.trim() || !currentProject || creatingOutline) return
+    setCreatingOutline(true)
     try {
       await writingApi.createOutline({
         project: currentProject,
@@ -1268,12 +1458,15 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       loadProjectData(currentProject)
     } catch (e) {
       setError(friendlyError(e))
+    } finally {
+      setCreatingOutline(false)
     }
   }
 
   // 快捷创建人物卡
   const handleCreateCharacter = async () => {
-    if (!newCharName.trim()) return
+    if (!newCharName.trim() || !currentProject || creatingChar) return
+    setCreatingChar(true)
     try {
       await writingApi.createCharacter({
         project: currentProject,
@@ -1288,12 +1481,15 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       loadProjectData(currentProject)
     } catch (e) {
       setError(friendlyError(e))
+    } finally {
+      setCreatingChar(false)
     }
   }
 
   // 快捷创建便签
   const handleCreateNote = async () => {
-    if (!newNoteTitle.trim()) return
+    if (!newNoteTitle.trim() || !currentProject || creatingNote) return
+    setCreatingNote(true)
     try {
       await writingApi.createNote({
         project: currentProject,
@@ -1307,6 +1503,8 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       loadProjectData(currentProject)
     } catch (e) {
       setError(friendlyError(e))
+    } finally {
+      setCreatingNote(false)
     }
   }
 
@@ -1325,12 +1523,13 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   }, [])
 
   const handleCreateChain = async () => {
-    if (!newChainTitle.trim()) return
+    if (!newChainTitle.trim() || creatingChain) return
     if (!chainBookId) {
       setError(t('studio_chain_need_book',
         '请先选择这条伏笔所属的精华库书籍（伏笔档案按书归档，不挂在写作项目下）'))
       return
     }
+    setCreatingChain(true)
     try {
       await essenceApi.createChain({
         book_id: chainBookId,
@@ -1348,11 +1547,18 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       loadProjectData(currentProject)
     } catch (e) {
       setError(friendlyError(e))
+    } finally {
+      setCreatingChain(false)
     }
   }
 
   // 章节保存入库
   const handleSaveChapter = useCallback(async () => {
+    if (saving) return
+    if (!currentProject) {
+      setError('请先新建可写的小说工程')
+      return
+    }
     if (!content.trim()) {
       setError('章节正文不能为空')
       return
@@ -1360,12 +1566,16 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     setSaving(true)
     setError('')
     try {
+      const trimmedTitle = chapterTitle.trim() || `第${chapterNo}章`
       const r = await writingApi.importChapter({
         project: currentProject,
         chapter_no: chapterNo,
-        title: chapterTitle.trim() || `第${chapterNo}章`,
+        title: trimmedTitle,
         content: content,
       })
+      serverContentRef.current = content
+      setIsDirty(false)
+      if (r.title) setChapterTitle(r.title)
       setToast(`第 ${chapterNo} 章已入库！共 ${r.charCount} 字（${r.overwrote ? '覆盖旧章' : '新增章节'}）`)
       try {
         localStorage.removeItem(getDraftKey(currentProject, chapterNo))
@@ -1379,14 +1589,14 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     } finally {
       setSaving(false)
     }
-  }, [content, currentProject, chapterNo, chapterTitle, loadProjectData])
+  }, [saving, content, currentProject, chapterNo, chapterTitle, loadProjectData])
 
   // 快捷键支持：Ctrl+S 保存入库，Alt+N 快速开启下一章
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
-        handleSaveChapter()
+        void handleSaveChapter()
       } else if (e.altKey && e.key.toLowerCase() === 'n') {
         e.preventDefault()
         handleNextChapter()
@@ -1394,8 +1604,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content, currentProject, chapterNo, chapterTitle])
+  }, [handleSaveChapter, handleNextChapter])
 
   // 一键全维排毒与去AI检测
   const handleRunFullCheck = useCallback(async () => {
@@ -1451,11 +1660,21 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     }
   }, [content, chapterTitle, chapterNo, meta?.platform])
 
+  // 编辑器用户改动回调（唯一草稿写盘入口）
+  const handleEditorChange = useCallback((nextText: string) => {
+    setContent(nextText)
+    persistDraftOnUserEdit(currentProjectRef.current, chapterNoRef.current, nextText)
+  }, [persistDraftOnUserEdit])
+
   // 精华资产/人设一键插入正文
   const insertTextToEditor = useCallback((textToInsert: string, label: string) => {
-    setContent((prev) => (prev ? `${prev}\n\n${textToInsert}` : textToInsert))
+    setContent((prev) => {
+      const next = prev ? `${prev}\n\n${textToInsert}` : textToInsert
+      persistDraftOnUserEdit(currentProjectRef.current, chapterNoRef.current, next)
+      return next
+    })
     setToast(`已成功将【${label}】插入当前正文`)
-  }, [])
+  }, [persistDraftOnUserEdit])
 
   const platformInfo = useMemo(() => PLATFORM_LABELS[meta?.platform || 'fanqie'] || PLATFORM_LABELS.general, [meta?.platform])
   const totalWords = useMemo(() => stats?.totalWords || 0, [stats?.totalWords])
@@ -1490,16 +1709,19 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             onChange={(e) => setCurrentProject(e.target.value)}
             sx={{ minWidth: 180 }}
           >
-            {projects.length === 0 && (
+            {writableProjects.length === 0 && (
               <MenuItem value="" disabled>
                 （暂无小说工程）
               </MenuItem>
             )}
-            {projects.map((p) => (
-              <MenuItem key={p.id} value={p.name}>
-                {p.name}
-              </MenuItem>
-            ))}
+            {writableProjects.map((p) => {
+              const pid = getProjectId(p)
+              return (
+                <MenuItem key={pid} value={pid}>
+                  {p.name}
+                </MenuItem>
+              )
+            })}
           </TextField>
 
           <Button
@@ -1649,28 +1871,27 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
                         '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
                       }}
                       onClick={() => {
-                        if (content.trim()) {
-                          try {
-                            localStorage.setItem(getDraftKey(currentProject, chapterNo), content)
-                          } catch (_e) {
-                            void _e
-                          }
-                        }
-                        setChapterTitle(ot.title)
                         let targetNo = chapterNo
                         const m = ot.title.match(/第\s*(\d+)\s*章/)
                         if (m) {
                           targetNo = Number(m[1])
+                          pendingOutlineTitleRef.current = {
+                            key: `${currentProject}::${targetNo}`,
+                            title: ot.title,
+                          }
                           setChapterNo(targetNo)
                         }
-                        let savedDraft = ''
-                        try {
-                          savedDraft = localStorage.getItem(getDraftKey(currentProject, targetNo)) || ''
-                        } catch (_e) {
-                          void _e
+                        setChapterTitle(ot.title)
+                        let savedDraft: string | null = null
+                        if (currentProject) {
+                          try {
+                            savedDraft = localStorage.getItem(getDraftKey(currentProject, targetNo))
+                          } catch {
+                            savedDraft = null
+                          }
                         }
-                        if (savedDraft) {
-                          setContent(savedDraft)
+                        if (savedDraft !== null) {
+                          if (targetNo === chapterNo) setContent(savedDraft)
                           setToast(`已选定大纲章节: ${ot.title}（已自动恢复本地草稿）`)
                         } else {
                           setToast(`已选定大纲章节: ${ot.title}`)
@@ -1898,7 +2119,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
           <Paper sx={{ flex: 1, minHeight: 480, p: 2, display: 'flex', flexDirection: 'column' }}>
             <ChapterEditor
               value={content}
-              onChange={setContent}
+              onChange={handleEditorChange}
               minHeight={420}
               placeholder="在此沉浸创作章节正文……随写随查左侧大纲设定，右侧智能副驾实时排雷并反哺精华资产。"
               targetChars={3000}
@@ -2430,7 +2651,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenMetaDialog(false)}>{t('action_cancel', '取消')}</Button>
-          <Button variant="contained" onClick={handleSaveMeta}>
+          <Button variant="contained" onClick={handleSaveMeta} disabled={savingMeta || !currentProject}>
             {t('studio_meta_save_btn', '保存企划')}
           </Button>
         </DialogActions>
@@ -2452,8 +2673,8 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenNewProj(false)}>{t('action_cancel', '取消')}</Button>
-          <Button variant="contained" onClick={handleCreateProject}>
-            {t('action_create', '创建')}
+          <Button variant="contained" onClick={handleCreateProject} disabled={creatingStudioProj || !newProjName.trim()}>
+            {creatingStudioProj ? t('action_creating', '创建中…') : t('action_create', '创建')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2464,7 +2685,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <Typography variant="body2" color="text.secondary">
             {t('studio_export_summary', '当前工程《{project}》已写 {chapters} 章，共 {words} 字。', {
-              project: currentProject,
+              project: currentProjectDisplayName,
               chapters: stats?.totalChapters || 0,
               words: (stats?.totalWords || 0).toLocaleString(),
             })}
@@ -2524,7 +2745,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenNewOutline(false)}>{t('action_cancel', '取消')}</Button>
-          <Button variant="contained" onClick={handleCreateOutline}>
+          <Button variant="contained" onClick={handleCreateOutline} disabled={creatingOutline || !newOutlineTitle.trim() || !currentProject}>
             {t('studio_outline_save_btn', '保存大纲')}
           </Button>
         </DialogActions>
@@ -2571,7 +2792,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenNewChar(false)}>{t('action_cancel', '取消')}</Button>
-          <Button variant="contained" onClick={handleCreateCharacter}>
+          <Button variant="contained" onClick={handleCreateCharacter} disabled={creatingChar || !newCharName.trim() || !currentProject}>
             {t('studio_char_save_btn', '保存人物')}
           </Button>
         </DialogActions>
@@ -2603,7 +2824,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenNewNote(false)}>{t('action_cancel', '取消')}</Button>
-          <Button variant="contained" onClick={handleCreateNote}>
+          <Button variant="contained" onClick={handleCreateNote} disabled={creatingNote || !newNoteTitle.trim() || !currentProject}>
             {t('studio_note_save_btn', '保存便签')}
           </Button>
         </DialogActions>
@@ -2692,7 +2913,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenNewChain(false)}>{t('action_cancel', '取消')}</Button>
-          <Button variant="contained" onClick={handleCreateChain}>
+          <Button variant="contained" onClick={handleCreateChain} disabled={creatingChain || !newChainTitle.trim()}>
             {t('studio_chain_start_btn', '启动暗线追踪')}
           </Button>
         </DialogActions>

@@ -20,6 +20,7 @@ import contextlib
 import hashlib
 import os
 import shutil
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -101,18 +102,34 @@ def discover_data_path_constants() -> dict[str, Path]:
 def isolate_paths(tmp_root: Path) -> Iterator[dict[str, Path]]:
     """把全部 ``DATA_PATH_CONSTANTS`` 重定向到 ``tmp_root/<常量名小写>``，退出还原并删除。
 
+    同时设置 ``XUAN_DATA_DIR = str(tmp_root)``，确保 ``scripts/llm_client.py`` 与
+    ``scripts/secret_store.py`` 等按环境变量解析用户数据目录的代码也完全隔离，不触碰
+    真实平台用户数据目录（如 ``%LOCALAPPDATA%\\暮冬念春``）。
+
     Yields:
         重定向前的原值映射（便于断言还原正确）。
     """
     tmp_root = Path(tmp_root)
     saved = {name: getattr(config, name) for name in DATA_PATH_CONSTANTS}
+    saved_xuan = os.environ.get("XUAN_DATA_DIR")
+    os.environ["XUAN_DATA_DIR"] = str(tmp_root)
     for name in DATA_PATH_CONSTANTS:
         setattr(config, name, tmp_root / name.lower())
+    _svc_mod = sys.modules.get("gui.services")
+    if _svc_mod is not None and hasattr(_svc_mod, "invalidate_library_cache"):
+        _svc_mod.invalidate_library_cache()
     try:
         yield saved
     finally:
+        if saved_xuan is None:
+            os.environ.pop("XUAN_DATA_DIR", None)
+        else:
+            os.environ["XUAN_DATA_DIR"] = saved_xuan
         for name, value in saved.items():
             setattr(config, name, value)
+        _svc_mod = sys.modules.get("gui.services")
+        if _svc_mod is not None and hasattr(_svc_mod, "invalidate_library_cache"):
+            _svc_mod.invalidate_library_cache()
         # ⚠️ 只在**当前线程**释放自己登记的连接，绝不跨线程 close（2026-11-05 第三次修正）。
         #
         # 历史（三次试错，记录以免再绕）：
@@ -236,5 +253,66 @@ def snapshot_real_gui_state() -> dict[str, Any]:
 
 # 测试会话开始时的真实目录快照（本模块在 discover 阶段被首个测试模块 import，
 # 早于任何测试执行），供末位泄漏守卫比对。
+def real_user_data_dir() -> Path:
+    """计算真实平台用户数据目录（忽略 ``XUAN_DATA_DIR`` 环境变量覆盖）。"""
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+        return Path(base) / "暮冬念春"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "暮冬念春"
+    return Path.home() / ".local" / "share" / "暮冬念春"
+
+
+REAL_USER_DATA_DIR = real_user_data_dir()
+
+
+def snapshot_real_user_data_dir() -> dict[str, Any]:
+    """真实平台用户数据目录快照（排除运行中桌面端可能写入的 index.db/-wal/-shm/logs）。
+
+    重点守护：
+    - ``config/`` 下所有文件集合及其 ``(sha256, mtime_ns)``（防测试篡改密钥与模型配置）；
+    - ``assets/`` 下文件集合（防未隔离服务启动往真实用户目录写资产）；
+    - ``state_json/`` 下状态文件集合（防未隔离任务状态落入真实用户目录）。
+    """
+    root = REAL_USER_DATA_DIR
+    if not root.is_dir():
+        return {
+            "exists": False,
+            "config_files": {},
+            "assets_files": frozenset(),
+            "state_json_files": frozenset(),
+        }
+    cfg_dir = root / "config"
+    config_files: dict[str, tuple[str, int]] = {}
+    if cfg_dir.is_dir():
+        for p in sorted(cfg_dir.iterdir()):
+            if p.is_file():
+                try:
+                    st = p.stat()
+                    digest = hashlib.sha256(p.read_bytes()).hexdigest()
+                    config_files[p.name] = (digest, st.st_mtime_ns)
+                except OSError:
+                    continue
+    assets_dir = root / "assets"
+    assets_files = (
+        frozenset(p.name for p in assets_dir.iterdir() if p.is_file())
+        if assets_dir.is_dir()
+        else frozenset()
+    )
+    state_json_dir = root / "state_json"
+    state_json_files = (
+        frozenset(p.name for p in state_json_dir.glob("gui_state_*.json"))
+        if state_json_dir.is_dir()
+        else frozenset()
+    )
+    return {
+        "exists": True,
+        "config_files": config_files,
+        "assets_files": assets_files,
+        "state_json_files": state_json_files,
+    }
+
+
 SESSION_START_STATE_JSON_SNAPSHOT = snapshot_real_state_json_dir()
 SESSION_START_GUI_STATE_SNAPSHOT = snapshot_real_gui_state()
+SESSION_START_USER_DATA_SNAPSHOT = snapshot_real_user_data_dir()

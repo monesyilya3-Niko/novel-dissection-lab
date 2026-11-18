@@ -947,6 +947,63 @@ def sync_asset(fp: Path) -> bool:
     return True
 
 
+def sync_report(
+    fp: Path,
+    book_id: str | None = None,
+    report_type: str | None = None,
+) -> bool:
+    """单份报告重索引：报告落盘 reports/*.md 后调用，幂等 upsert 进 SQLite。
+
+    若 SQLite ``reports`` 表尚未初始化，先自动执行 ``init_schema()`` + ``apply_migrations()``，
+    确保 ``db.list_reports()``、``asset_index``、``/api/overview``、``/api/stats``、``/api/reports``
+    即刻可见最新报告。
+    """
+    from gui import asset_index as _asset_index
+    from gui import db as _db
+
+    fp = Path(fp)
+    if not fp.is_file():
+        return False
+
+    rtype = report_type or ""
+    bid = book_id or ""
+    if not rtype or not bid:
+        inferred_type = "book"
+        inferred_bid = fp.stem
+        for suffix, rk in _REPORT_SUFFIX:
+            if fp.name.endswith(suffix):
+                inferred_type = rk
+                inferred_bid = fp.name[: -len(suffix)]
+                break
+        if not rtype:
+            rtype = inferred_type
+        if not bid:
+            bid = inferred_bid
+    if not bid:
+        return False
+
+    if not _db.table_exists("reports"):
+        _db.init_schema()
+        _db.apply_migrations()
+
+    report_key = f"{bid}:{rtype}"
+    rel = _rel_path(fp)
+    title = fp.stem
+    char_count = _report_char_count(fp)
+
+    with _db.tx() as conn:
+        existing = conn.execute(
+            "SELECT report_key FROM reports WHERE path = ?",
+            (rel,),
+        ).fetchone()
+        if existing is not None and existing[0] != report_key:
+            conn.execute("DELETE FROM reports WHERE path = ?", (rel,))
+        _upsert_report(conn, report_key, rtype, bid, rel, title, char_count)
+
+    _asset_index.index.invalidate()
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="novel-lab GUI 数据迁移 CLI")
     parser.add_argument("--check", action="store_true", help="只读对账，不写库")
@@ -959,6 +1016,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sync-builtins", action="store_true",
                         help="增量同步随包内置资产到用户数据目录（只补缺失，永不覆盖）")
     args = parser.parse_args(argv)
+    if not args.check and not args.dry_run:
+        config.migrate_legacy_state()
 
     if args.sync_builtins:
         from gui import builtin_sync

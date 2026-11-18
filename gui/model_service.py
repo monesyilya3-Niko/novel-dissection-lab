@@ -79,6 +79,15 @@ def _validate_timeout(value):
     return value
 
 
+def _validate_optional_api_key(value: Any) -> str:
+    """校验可选 api_key：None 视为空串；非字符串抛 400（必须在写 models.json 之前拦截）。"""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ServiceError("api_key 必须为字符串", 400)
+    return value.strip()
+
+
 def list_models() -> dict[str, Any]:
     """列出已配置模型（脱敏展示）。"""
     cfg = engine_adapter.models_load()
@@ -147,6 +156,18 @@ def add_model(body: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(model_name, str) or not model_name.strip():
         raise ServiceError("model_name 不能为空", 400)
     model_name = model_name.strip()
+    api_key = _validate_optional_api_key(body.get("api_key"))
+
+    raw_label = body.get("label", mid)
+    if raw_label is not None and not isinstance(raw_label, str):
+        raise ServiceError("label 必须为字符串", 400)
+    raw_roles = body.get("roles", [])
+    if raw_roles is not None and (
+        not isinstance(raw_roles, list) or not all(isinstance(r, str) for r in raw_roles)
+    ):
+        raise ServiceError("roles 必须为字符串数组", 400)
+    if "extra_headers" in body and body["extra_headers"] is not None and not isinstance(body["extra_headers"], dict):
+        raise ServiceError("extra_headers 必须为 JSON 对象", 400)
 
     cfg = engine_adapter.models_load()
 
@@ -154,11 +175,11 @@ def add_model(body: dict[str, Any]) -> dict[str, Any]:
         raise ServiceError(f"模型已存在: {mid}", 409)
 
     model_entry: dict[str, Any] = {
-        "label": body.get("label", mid),
+        "label": (raw_label or mid).strip(),
         "protocol": protocol,
         "base_url": base_url,
         "model_name": model_name,
-        "roles": body.get("roles", []),
+        "roles": list(raw_roles or []),
         "json_mode": bool(body.get("json_mode", False)),
         "timeout": _validate_timeout(body.get("timeout", 180)),
     }
@@ -174,7 +195,6 @@ def add_model(body: dict[str, Any]) -> dict[str, Any]:
     engine_adapter.models_save(cfg)
 
     # 如果提供了 API key，同时保存到 secrets
-    api_key = body.get("api_key", "").strip()
     if api_key:
         secrets = engine_adapter.secrets_load()
         secrets[mid] = api_key
@@ -189,6 +209,8 @@ def update_model(model_id: str, body: dict[str, Any]) -> dict[str, Any]:
     if not body or not isinstance(body, dict):
         raise ServiceError("请求体必须为 JSON 对象", 400)
 
+    api_key = _validate_optional_api_key(body.get("api_key"))
+
     cfg = engine_adapter.models_load()
 
     if mid not in cfg.get("models", {}):
@@ -198,18 +220,23 @@ def update_model(model_id: str, body: dict[str, Any]) -> dict[str, Any]:
 
     # 可更新字段
     if "label" in body:
-        m["label"] = str(body["label"]).strip()
+        if not isinstance(body["label"], str):
+            raise ServiceError("label 必须为字符串", 400)
+        m["label"] = body["label"].strip()
     if "protocol" in body:
         m["protocol"] = _validate_protocol(body["protocol"])
     if "base_url" in body:
         m["base_url"] = _validate_base_url(body["base_url"])
     if "model_name" in body:
-        name = str(body["model_name"]).strip()
-        if not name:
+        if not isinstance(body["model_name"], str) or not body["model_name"].strip():
             raise ServiceError("model_name 不能为空", 400)
-        m["model_name"] = name
+        m["model_name"] = body["model_name"].strip()
     if "roles" in body:
-        m["roles"] = body["roles"] if isinstance(body["roles"], list) else []
+        if body["roles"] is not None and (
+            not isinstance(body["roles"], list) or not all(isinstance(r, str) for r in body["roles"])
+        ):
+            raise ServiceError("roles 必须为字符串数组", 400)
+        m["roles"] = list(body["roles"] or [])
     if "json_mode" in body:
         m["json_mode"] = bool(body["json_mode"])
     if "timeout" in body:
@@ -221,7 +248,9 @@ def update_model(model_id: str, body: dict[str, Any]) -> dict[str, Any]:
             else:
                 m.pop(opt, None)
     if "extra_headers" in body:
-        if body["extra_headers"] and isinstance(body["extra_headers"], dict):
+        if body["extra_headers"] is not None and not isinstance(body["extra_headers"], dict):
+            raise ServiceError("extra_headers 必须为 JSON 对象", 400)
+        if body["extra_headers"]:
             m["extra_headers"] = body["extra_headers"]
         else:
             m.pop("extra_headers", None)
@@ -229,7 +258,6 @@ def update_model(model_id: str, body: dict[str, Any]) -> dict[str, Any]:
     engine_adapter.models_save(cfg)
 
     # 更新 API key
-    api_key = body.get("api_key", "").strip()
     if api_key:
         secrets = engine_adapter.secrets_load()
         secrets[mid] = api_key
@@ -265,8 +293,8 @@ def delete_model(model_id: str) -> dict[str, Any]:
 def set_api_key(model_id: str, api_key: str) -> dict[str, Any]:
     """设置/更新 API Key。"""
     mid = _validate_model_id(model_id)
-    if not api_key or not api_key.strip():
-        raise ServiceError("api_key 不能为空", 400)
+    if not isinstance(api_key, str) or not api_key.strip():
+        raise ServiceError("api_key 必须为非空字符串", 400)
 
     cfg = engine_adapter.models_load()
     if mid not in cfg.get("models", {}):

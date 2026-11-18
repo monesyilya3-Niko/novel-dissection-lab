@@ -17,6 +17,7 @@
 """
 from __future__ import annotations
 
+import itertools
 import json
 import sqlite3
 import threading
@@ -127,9 +128,9 @@ def get_conn() -> sqlite3.Connection:
     tid = threading.get_ident()
     me = threading.current_thread()
     with _conns_lock:
-        # B3：清理死线程的残留连接（每 50 次调用检查一次，避免每次枚举开销）。
+        # B3：清理死线程的残留连接（每 50 次调用或连接池超过 8 条时检查）。
         _get_conn_calls[0] += 1
-        if _get_conn_calls[0] % 50 == 0:
+        if _get_conn_calls[0] % 50 == 0 or len(_conns) > 8:
             _prune_dead_threads_locked()
         conn = _conns.get(tid)
         # 本线程这条连接：路径不符 / owner 不是本线程 → 关掉重建（只动自己这条）。
@@ -217,16 +218,34 @@ def _drop_current_thread_conn() -> None:
             pass
 
 
+_sp_counter = itertools.count(1)
+
+
 @contextmanager
 def tx() -> Iterator[sqlite3.Connection]:
-    """事务上下文：正常提交，异常回滚并重新抛出。写路径统一走这里。"""
+    """事务上下文：顶层使用 ``BEGIN IMMEDIATE`` 抢写锁，嵌套使用 ``SAVEPOINT`` 局部回滚。"""
     conn = get_conn()
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
+    if conn.in_transaction:
+        sp_name = f"sp_{next(_sp_counter)}"
+        conn.execute(f"SAVEPOINT {sp_name}")
+        try:
+            yield conn
+            conn.execute(f"RELEASE SAVEPOINT {sp_name}")
+        except Exception:
+            try:
+                conn.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
+                conn.execute(f"RELEASE SAVEPOINT {sp_name}")
+            except sqlite3.Error:
+                pass
+            raise
+    else:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
 
 def init_schema() -> None:

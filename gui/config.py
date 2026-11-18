@@ -110,12 +110,15 @@ def _migrate_legacy_state(target: Path) -> None:
         (ROOT_DIR / "prompts" / "generated", target / "prompts" / "generated"),
         (ROOT_DIR / "gui" / "state", target / "state_json"),
     ]
-    # xuan -> 暮冬念春：仅当旧目录存在、目标不存在时迁移（避免覆盖新数据）
-    _xuan_rename = False
-    if _old_xuan_dir and _old_xuan_dir.is_dir() and _old_xuan_dir != target:
-        if not target.exists():
-            migrations.append((_old_xuan_dir, target))
-            _xuan_rename = True
+    # xuan -> 暮冬念春：仅当未指定 XUAN_DATA_DIR、旧目录存在、目标不存在时迁移
+    if (
+        not os.environ.get("XUAN_DATA_DIR")
+        and _old_xuan_dir
+        and _old_xuan_dir.is_dir()
+        and _old_xuan_dir != target
+        and not target.exists()
+    ):
+        migrations.append((_old_xuan_dir, target))
     for legacy, dest in migrations:
         if not legacy.is_dir():
             continue
@@ -125,11 +128,27 @@ def _migrate_legacy_state(target: Path) -> None:
             pass  # 迁移失败不阻断启动，下次再试
 
 
+def migrate_legacy_state(target: Path | None = None) -> None:
+    """显式执行旧版运行时数据迁移（幂等合并，永不删除已有文件）。
+
+    不在 ``import gui.config`` 时无条件执行，避免 CLI ``--help`` 或单测导入期产生
+    磁盘写入副作用；由 ``GuiServer._start_inner()`` 与 ``gui.migrate.main()`` 调用。
+    """
+    if target is not None:
+        _migrate_legacy_state(Path(target))
+        return
+    # 若测试通过 monkeypatch 重定向了 STATE_ROOT 或设置了 XUAN_DATA_DIR，不自动搬运真实旧目录
+    if os.environ.get("XUAN_DATA_DIR"):
+        return
+    if STATE_ROOT != _USER_DATA_DIR:
+        return
+    _migrate_legacy_state(_USER_DATA_DIR)
+
+
 # 运行时状态目录：只放**运行时产物**（SQLite 库 / WAL / SHM、单实例锁、备份）。
 # 桌面端：%LOCALAPPDATA%\暮冬念春（Win）/ ~/Library/Application Support/暮冬念春（macOS）
-#        / ~/.local/share/暮冬念春（Linux）；旧版 ROOT_DIR/gui_state 及旧版 xuan 目录自动迁移。
+#        / ~/.local/share/暮冬念春（Linux）；旧版 ROOT_DIR/gui_state 及旧版 xuan 目录在启动期迁移。
 _USER_DATA_DIR = _user_data_dir()
-_migrate_legacy_state(_USER_DATA_DIR)
 STATE_ROOT = _USER_DATA_DIR
 
 # 状态/资产落盘目录（用户数据目录，桌面端可写）。

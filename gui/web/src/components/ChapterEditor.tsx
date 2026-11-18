@@ -127,17 +127,17 @@ export default function ChapterEditor({
       },
     },
     onUpdate: ({ editor }) => {
-      onChange(editor.getText())
+      onChange(editor.getText({ blockSeparator: '\n' }))
     },
   })
 
-  // 外部 value 变化时同步回编辑器（清空或载入新文本都同步；getText 对比防循环）。
+  // 外部 value 变化时同步回编辑器（清空或载入新文本都同步；getText 对比防循环，emitUpdate: false 防反向触发 onUpdate）。
   useEffect(() => {
-    if (editor && editor.getText() !== value) {
+    if (editor && editor.getText({ blockSeparator: '\n' }) !== value) {
       if (value === '') {
-        editor.commands.clearContent()
+        editor.commands.clearContent(false)
       } else {
-        editor.commands.setContent(textToHtml(value))
+        editor.commands.setContent(textToHtml(value), { emitUpdate: false })
       }
     }
   }, [value, editor])
@@ -151,7 +151,7 @@ export default function ChapterEditor({
   }, [value])
 
   const handleQuickPoisonCheck = async () => {
-    const text = editor?.getText() || value
+    const text = editor?.getText({ blockSeparator: '\n' }) || value
     if (!text.trim()) {
       setPoisonError(t('editor_empty_text', '正文为空，请先编写章节内容'))
       setPoisonResult(null)
@@ -178,7 +178,7 @@ export default function ChapterEditor({
   }
 
   const handleQuickDeslopCheck = async () => {
-    const text = editor?.getText() || value
+    const text = editor?.getText({ blockSeparator: '\n' }) || value
     if (!text.trim()) {
       setDeslopError(t('editor_empty_text', '正文为空，请先编写章节内容'))
       setDeslopResult(null)
@@ -205,7 +205,7 @@ export default function ChapterEditor({
   }
 
   const handleQuickConstitutionCheck = async () => {
-    const text = editor?.getText() || value
+    const text = editor?.getText({ blockSeparator: '\n' }) || value
     if (!text.trim()) {
       setConstitutionError(t('editor_empty_text', '正文为空，请先编写章节内容'))
       setConstitutionResult(null)
@@ -268,7 +268,8 @@ export default function ChapterEditor({
           gap: 1,
           px: 1.5,
           py: 0.75,
-          borderTop: `1px solid ${ink.hairline}`,
+          borderTop: '1px solid',
+          borderColor: 'divider',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -280,7 +281,7 @@ export default function ChapterEditor({
               disabled={poisonLoading}
               sx={{
                 fontSize: '0.78rem',
-                color: ink.textSecondary,
+                color: 'text.secondary',
                 p: 0,
                 minWidth: 'auto',
                 '&:hover': { color: ink.accent },
@@ -297,7 +298,7 @@ export default function ChapterEditor({
               disabled={deslopLoading}
               sx={{
                 fontSize: '0.78rem',
-                color: ink.textSecondary,
+                color: 'text.secondary',
                 p: 0,
                 minWidth: 'auto',
                 '&:hover': { color: ink.accent },
@@ -314,7 +315,7 @@ export default function ChapterEditor({
               disabled={constitutionLoading}
               sx={{
                 fontSize: '0.78rem',
-                color: ink.textSecondary,
+                color: 'text.secondary',
                 p: 0,
                 minWidth: 'auto',
                 '&:hover': { color: ink.accent },
@@ -327,13 +328,13 @@ export default function ChapterEditor({
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {targetChars != null && (
-            <Typography variant="caption" sx={{ color: targetMet ? ink.success : ink.textTertiary }}>
+            <Typography variant="caption" sx={{ color: targetMet ? 'success.main' : 'text.disabled' }}>
               {targetMet
                 ? `${t('editor_target_met', '已达目标')} ${targetChars} ${t('editor_word_unit', '字')}`
                 : `${t('editor_target_prefix', '目标')} ${targetChars} ${t('editor_word_unit', '字')}`}
             </Typography>
           )}
-          <Typography variant="caption" sx={{ color: ink.textTertiary }}>
+          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
             {chars} {t('editor_word_unit', '字')}
           </Typography>
         </Box>

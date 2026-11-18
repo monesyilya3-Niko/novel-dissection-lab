@@ -54,7 +54,7 @@ _ILLEGAL_XML_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
 
 
 def _escape_xml(text: str) -> str:
-    """过滤 XML 1.0 非法字符与孤立代理字符，并转义实体字符 (&, <, >)。"""
+    """过滤 XML 1.0 非法字符与孤立代理字符，并转义实体字符 (&, <, >, ", ')。"""
     if not text:
         return ""
     cleaned = _ILLEGAL_XML_CHARS_RE.sub("", text)
@@ -62,7 +62,7 @@ def _escape_xml(text: str) -> str:
     # 编码检查，产出的字符串到序列化阶段才炸（surrogates not allowed），
     # 那时已无从定位是哪一章（2026-11-05）。
     cleaned = re.sub(r"[\ud800-\udfff]", "", cleaned)
-    return xml.sax.saxutils.escape(cleaned)
+    return xml.sax.saxutils.escape(cleaned, {'"': "&quot;", "'": "&apos;"})
 
 
 _OUTLINE_KINDS = frozenset({"volume", "chapter"})
@@ -984,6 +984,15 @@ def list_outlines(project: str) -> list[dict[str, Any]]:
     return [db.row_to_dict(r) for r in rows]
 
 
+def _strict_int(val: Any, field: str) -> int:
+    if isinstance(val, (bool, float)):
+        raise ServiceError(f"{field} 必须为整数", 400)
+    try:
+        return int(val)
+    except (ValueError, TypeError) as exc:
+        raise ServiceError(f"{field} 必须为整数", 400) from exc
+
+
 def create_outline(project: str, kind: str = "chapter", title: str = "",
                    summary: str = "", status: str = "planned",
                    sort_order: int = 0) -> dict[str, Any]:
@@ -993,6 +1002,11 @@ def create_outline(project: str, kind: str = "chapter", title: str = "",
         raise ServiceError("kind 必须为字符串", 400)
     if status is not None and not isinstance(status, str):
         raise ServiceError("status 必须为字符串", 400)
+    if not isinstance(title, str):
+        raise ServiceError("title 必须为字符串", 400)
+    if summary is not None and not isinstance(summary, str):
+        raise ServiceError("summary 必须为字符串", 400)
+    clean_sort = _strict_int(sort_order, "sort_order") if sort_order is not None else 0
     if kind not in _OUTLINE_KINDS:
         raise ServiceError(f"非法 kind: {kind}", 400)
     if status not in _OUTLINE_STATUSES:
@@ -1006,7 +1020,7 @@ def create_outline(project: str, kind: str = "chapter", title: str = "",
             " (project, kind, title, summary, status, sort_order, created_at, updated_at)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (project, kind, title.strip(), summary or "", status,
-             int(sort_order), now, now),
+             clean_sort, now, now),
         )
         new_id = cur.lastrowid
         row = conn.execute(
@@ -1024,12 +1038,23 @@ def update_outline(outline_id: int, **fields: Any) -> dict[str, Any]:
     for k, v in fields.items():
         if k not in allowed or v is None:
             continue
-        if k == "kind" and v not in _OUTLINE_KINDS:
-            raise ServiceError(f"非法 kind: {v}", 400)
-        if k == "status" and v not in _OUTLINE_STATUSES:
-            raise ServiceError(f"非法 status: {v}", 400)
-        if k == "title" and not str(v).strip():
-            raise ServiceError("大纲标题不能为空", 400)
+        if k == "kind":
+            if not isinstance(v, str) or v not in _OUTLINE_KINDS:
+                raise ServiceError(f"非法 kind: {v}", 400)
+        elif k == "status":
+            if not isinstance(v, str) or v not in _OUTLINE_STATUSES:
+                raise ServiceError(f"非法 status: {v}", 400)
+        elif k == "title":
+            if not isinstance(v, str):
+                raise ServiceError("title 必须为字符串", 400)
+            if not v.strip():
+                raise ServiceError("大纲标题不能为空", 400)
+            v = v.strip()
+        elif k == "summary":
+            if not isinstance(v, str):
+                raise ServiceError("summary 必须为字符串", 400)
+        elif k == "sort_order":
+            v = _strict_int(v, "sort_order")
         sets.append(f"{k} = ?")
         vals.append(v)
     if not sets:
@@ -1105,6 +1130,14 @@ def create_character(project: str, name: str, role: str = "",
                      description: str = "",
                      extra: dict[str, Any] | None = None) -> dict[str, Any]:
     project = _require_project(project)
+    if not isinstance(name, str):
+        raise ServiceError("name 必须为字符串", 400)
+    if role is not None and not isinstance(role, str):
+        raise ServiceError("role 必须为字符串", 400)
+    if description is not None and not isinstance(description, str):
+        raise ServiceError("description 必须为字符串", 400)
+    if extra is not None and not isinstance(extra, dict):
+        raise ServiceError("extra 必须为对象", 400)
     if not name or not name.strip():
         raise ServiceError("人物姓名不能为空", 400)
     now = _now_iso()
@@ -1131,9 +1164,18 @@ def update_character(char_id: int, **fields: Any) -> dict[str, Any]:
     for k, v in fields.items():
         if k not in allowed or v is None:
             continue
-        if k == "name" and not str(v).strip():
-            raise ServiceError("人物姓名不能为空", 400)
-        if k == "extra" and isinstance(v, dict):
+        if k == "name":
+            if not isinstance(v, str):
+                raise ServiceError("name 必须为字符串", 400)
+            if not v.strip():
+                raise ServiceError("人物姓名不能为空", 400)
+            v = v.strip()
+        elif k in ("role", "description"):
+            if not isinstance(v, str):
+                raise ServiceError(f"{k} 必须为字符串", 400)
+        elif k == "extra":
+            if not isinstance(v, dict):
+                raise ServiceError("extra 必须为对象", 400)
             v = json.dumps(v, ensure_ascii=False)
         sets.append(f"{k} = ?")
         vals.append(v)
@@ -1182,6 +1224,10 @@ def list_notes(project: str) -> list[dict[str, Any]]:
 
 def create_note(project: str, title: str = "", content: str = "") -> dict[str, Any]:
     project = _require_project(project)
+    if title is not None and not isinstance(title, str):
+        raise ServiceError("title 必须为字符串", 400)
+    if content is not None and not isinstance(content, str):
+        raise ServiceError("content 必须为字符串", 400)
     if not (title or "").strip() and not (content or "").strip():
         raise ServiceError("便签标题与内容不能同时为空", 400)
     now = _now_iso()
@@ -1206,6 +1252,8 @@ def update_note(note_id: int, **fields: Any) -> dict[str, Any]:
     for k, v in fields.items():
         if k not in allowed or v is None:
             continue
+        if not isinstance(v, str):
+            raise ServiceError(f"{k} 必须为字符串", 400)
         sets.append(f"{k} = ?")
         vals.append(v)
     if not sets:
@@ -1411,9 +1459,18 @@ def get_chapter_words(project: str, chapter_no: int) -> int | None:
         if no == chapter_no:
             try:
                 return count_words(_read_chapter(fp))
-            except OSError:
+            except (OSError, ServiceError):
                 return 0
     return None
+
+
+def _extract_chapter_title(text: str, no: int) -> str:
+    """从章节正文首行提取展示标题（剥除 Markdown # 前缀，排除纯叙述长句）。"""
+    first_line = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
+    clean_first = re.sub(r"^#{1,6}\s*", "", first_line).strip()
+    if clean_first and len(clean_first) <= 60 and "。" not in clean_first and "，" not in clean_first:
+        return clean_first[:40]
+    return f"第{no}章"
 
 
 def list_project_chapters(project: str) -> list[dict[str, Any]]:
@@ -1424,8 +1481,7 @@ def list_project_chapters(project: str) -> list[dict[str, Any]]:
         try:
             text = _read_chapter(fp)
             st = fp.stat()
-            first_line = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
-            title = first_line[:40] if (first_line and len(first_line) <= 40) else f"第{no}章"
+            title = _extract_chapter_title(text, no)
             out.append({
                 "chapter_no": no,
                 "filename": fp.name,
@@ -1451,6 +1507,7 @@ def get_project_chapter(project: str, chapter_no: int) -> dict[str, Any]:
                 "project": clean_proj,
                 "chapter_no": no,
                 "filename": fp.name,
+                "title": _extract_chapter_title(content, no),
                 "content": content,
                 "word_count": count_words(content),
                 "char_count": len(content),
@@ -1614,6 +1671,10 @@ def export_project_docx(project: str) -> dict[str, Any]:
     if not files:
         raise ServiceError(f"项目尚无章节可导出: {project}", 404)
 
+    _kept, _skipped = _read_chapters_for_export(files)
+    if not _kept:
+        raise ServiceError(f"项目章节全部读取失败，无可导出内容: {project}", 400)
+
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("[Content_Types].xml", (
@@ -1638,10 +1699,9 @@ def export_project_docx(project: str) -> dict[str, Any]:
         ]
 
         total_words = 0
-        _kept, _skipped = _read_chapters_for_export(files)
         for no, content in _kept:
             total_words += count_words(content)
-            first_line = content.split("\n", 1)[0].strip()
+            first_line = re.sub(r"^#{1,6}\s*", "", content.split("\n", 1)[0].strip()).strip()
             looks_like_title = bool(first_line) and len(first_line) <= 60 and "。" not in first_line and "，" not in first_line
             if looks_like_title:
                 ch_title = first_line
@@ -1690,6 +1750,22 @@ def export_project_epub(project: str) -> dict[str, Any]:
     files = _iter_chapter_files(project)
     if not files:
         raise ServiceError(f"项目尚无章节可导出: {project}", 404)
+
+    _kept, _skipped = _read_chapters_for_export(files)
+    if not _kept:
+        raise ServiceError(f"项目章节全部读取失败，无可导出内容: {project}", 400)
+
+    proj_meta_row = get_project_meta(project)
+    meta_dict = proj_meta_row.get("meta") if isinstance(proj_meta_row.get("meta"), dict) else {}
+    creator_raw = re.sub(r"[\r\n]+", " ", str(meta_dict.get("author") or "")).strip()
+    creator_name = creator_raw or "暮冬念春 / Exoscribe"
+    sample_text = "\n".join(c for _, c in _kept[:3])
+    is_en = (
+        proj_meta_row.get("platform") in ("royalroad", "amazon_kdp", "webnovel")
+        or count_words_i18n(sample_text, mode="auto")["primary_language"] == "en"
+    )
+    lang_code = "en" if is_en else "zh-CN"
+    toc_label = "Table of Contents" if is_en else "目录"
 
     buf = io.BytesIO()
     book_uuid = str(uuid.uuid4())
@@ -1747,17 +1823,16 @@ def export_project_epub(project: str) -> dict[str, Any]:
         spine_items = []
         toc_items = []
         total_words = 0
-        _kept, _skipped = _read_chapters_for_export(files)
 
         for no, content in _kept:
-            total_words += count_words(content)
-            first_line = content.split("\n", 1)[0].strip()
+            total_words += count_words_i18n(content, mode="auto")["total"] if is_en else count_words(content)
+            first_line = re.sub(r"^#{1,6}\s*", "", content.split("\n", 1)[0].strip()).strip()
             looks_like_title = bool(first_line) and len(first_line) <= 60 and "。" not in first_line and "，" not in first_line
             if looks_like_title:
                 ch_title = first_line
                 ch_body = content.split("\n", 1)[1].strip() if "\n" in content else ""
             else:
-                ch_title = f"第{no}章"
+                ch_title = f"Chapter {no}" if is_en else f"第{no}章"
                 ch_body = content
 
             ch_id = f"chapter_{no:03d}"
@@ -1774,7 +1849,7 @@ def export_project_epub(project: str) -> dict[str, Any]:
             chapter_xhtml = (
                 '<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<!DOCTYPE html>\n'
-                '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="zh-CN">\n'
+                f'<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="{lang_code}">\n'
                 '<head>\n'
                 '  <meta charset="utf-8"/>\n'
                 f'  <title>{_escape_xml(ch_title)}</title>\n'
@@ -1797,15 +1872,15 @@ def export_project_epub(project: str) -> dict[str, Any]:
         toc_xhtml = (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             '<!DOCTYPE html>\n'
-            '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="zh-CN">\n'
+            f'<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="{lang_code}">\n'
             '<head>\n'
             '  <meta charset="utf-8"/>\n'
-            '  <title>目录</title>\n'
+            f'  <title>{toc_label}</title>\n'
             '  <link rel="stylesheet" type="text/css" href="style.css"/>\n'
             '</head>\n'
             '<body>\n'
             '  <nav epub:type="toc" id="toc">\n'
-            f'    <h1>{_escape_xml(project)} - 目录</h1>\n'
+            f'    <h1>{_escape_xml(project)} - {toc_label}</h1>\n'
             '    <ol>\n'
             f'{toc_list_html}\n'
             '    </ol>\n'
@@ -1824,8 +1899,8 @@ def export_project_epub(project: str) -> dict[str, Any]:
             '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n'
             f'    <dc:identifier id="pub-id">urn:uuid:{book_uuid}</dc:identifier>\n'
             f'    <dc:title>{_escape_xml(project)}</dc:title>\n'
-            '    <dc:language>zh-CN</dc:language>\n'
-            '    <dc:creator>暮冬念春 / Exoscribe</dc:creator>\n'
+            f'    <dc:language>{lang_code}</dc:language>\n'
+            f'    <dc:creator>{_escape_xml(creator_name)}</dc:creator>\n'
             f'    <meta property="dcterms:modified">{now_iso}</meta>\n'
             '  </metadata>\n'
             '  <manifest>\n'
@@ -1865,6 +1940,10 @@ def export_project_shunn(
     仍为空时才用占位符，并在返回值里给出 author_missing 标记供 UI 提示。
     """
     project = _require_project(project)
+    if author_name is not None and not isinstance(author_name, str):
+        raise ServiceError("author_name 必须为字符串", 400)
+    if contact_info is not None and not isinstance(contact_info, str):
+        raise ServiceError("contact_info 必须为字符串", 400)
     if author_name is None or contact_info is None:
         meta = (get_project_meta(project).get("meta") or {})
         if not isinstance(meta, dict):
@@ -1873,6 +1952,8 @@ def export_project_shunn(
             author_name = str(meta.get("author") or "").strip()
         if contact_info is None:
             contact_info = str(meta.get("contact") or "").strip()
+    author_name = re.sub(r"[\r\n]+", " ", author_name or "").strip()
+    contact_info = re.sub(r"[\r\n]+", " ", contact_info or "").strip()
     author_missing = not author_name
     if not author_name:
         author_name = "Author Name"
@@ -1886,10 +1967,12 @@ def export_project_shunn(
     total_words = 0
     chapter_contents: list[tuple[str, str]] = []
     _kept, _skipped = _read_chapters_for_export(files)
+    if not _kept:
+        raise ServiceError(f"项目章节全部读取失败，无可导出内容: {project}", 400)
 
     for no, content in _kept:
-        total_words += count_words(content)
-        first_line = content.split("\n", 1)[0].strip()
+        total_words += count_words_i18n(content, mode="auto")["total"]
+        first_line = re.sub(r"^#{1,6}\s*", "", content.split("\n", 1)[0].strip()).strip()
         looks_like_title = bool(first_line) and len(first_line) <= 60 and "。" not in first_line and "，" not in first_line
         if looks_like_title:
             ch_title = first_line
@@ -1920,7 +2003,7 @@ def export_project_shunn(
         for para in ch_body.split("\n"):
             p = para.strip()
             if p:
-                lines.append(f"    {p}\n\n")  # 5-space indentation, double spaced
+                lines.append(f"     {p}\n\n")  # 5-space indentation, double spaced
 
     full_text = "".join(lines)
     filename = f"{project}-Shunn文稿-{date.today().isoformat()}.txt"
@@ -1936,9 +2019,21 @@ def export_project_shunn(
     }
 
 
+_SUPPORTED_EXPORT_FORMATS = frozenset({
+    "txt", "text", "md", "markdown", "docx", "word", "epub", "ebook", "shunn", "manuscript",
+})
+
+
 def export_project(project: str, fmt: str = "txt") -> dict[str, Any]:
     """统一多格式导出入口：txt / md / docx / epub / shunn。"""
-    fmt_clean = (fmt or "txt").lower().strip()
+    if fmt is not None and not isinstance(fmt, str):
+        raise ServiceError("format 必须为字符串", 400)
+    fmt_clean = (fmt or "txt").lower().strip() or "txt"
+    if fmt_clean not in _SUPPORTED_EXPORT_FORMATS:
+        raise ServiceError(
+            f"不支持的导出格式: {fmt!r}（仅支持 txt / md / docx / epub / shunn）",
+            400,
+        )
     if fmt_clean in ("docx", "word"):
         return export_project_docx(project)
     elif fmt_clean in ("md", "markdown"):

@@ -20,7 +20,7 @@
   - [4.6 质量检查与合规体检](#46-质量检查与合规体检)
   - [4.7 平台投稿规则自检](#47-平台投稿规则自检)
   - [4.8 管理员系统、限流与审计日志](#48-管理员系统限流与审计日志)
-- [5. 全量 REST API 端点清单（97 端点速查）](#5-全量-rest-api-端点清单97-端点速查)
+- [5. 全量 REST API 端点清单（140 端点速查）](#5-全量-rest-api-端点清单140-端点速查)
 - [6. Python SDK 客户端封装范例（纯标准库，Agent 即拷即用）](#6-python-sdk-客户端封装范例纯标准库agent-即拷即用)
 - [7. Agent 调用注意事项与铁律](#7-agent-调用注意事项与铁律)
 
@@ -308,7 +308,7 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 
 ---
 
-## 5. 全量 REST API 端点清单（137 端点速查）
+## 5. 全量 REST API 端点清单（140 端点速查）
 
 > 端点总数以 `len(gui.router.ROUTES)` 实测为准，`tests/test_doc_metrics.py` 守着本行数字。
 
@@ -331,8 +331,11 @@ curl -s "$B/api/admin/audit" -b "nl_admin_session=<sid>"
 | | `GET` | `/api/tropes` | 桥段库查询 |
 | | `GET` | `/api/book/{book_id}/results` | 拆书明细结果 |
 | | `GET` | `/api/book/{book_id}/scores` | 拆书打分分布 |
+| | `POST` | `/api/book/{book_id}/reports` | **纯离线组装四维资产并生成双份万字拆书与笔法报告** |
 | | `POST` | `/api/analyze/full` | 全量深度分析流程 |
 | | `POST` | `/api/analyze/offline` | **无外部 LLM 离线量化拆解与 AI 接管任务包生成** |
+| | `GET` | `/api/analyze/takeover/{book_id}` | **离线 Web-AI 五遍拆书接管总览与单 Pass 一键复制 Prompt 包生成** |
+| | `POST` | `/api/analyze/takeover/{book_id}` | **校验并原子保存 Web-AI 返回的 Pass JSON 拆书结果** |
 | **资产中心** | `GET` | `/api/asset` | 单个资产卡片查询 |
 | | `GET` | `/api/assets` | 资产库分页与分类列表 |
 | | `GET` | `/api/assets/{kind}/{id}` | 资产详情获取 |

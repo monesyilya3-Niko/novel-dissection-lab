@@ -13,11 +13,29 @@ import Paper from '@mui/material/Paper'
 import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
 import Chip from '@mui/material/Chip'
+import * as clientMod from '../api/client'
 import { advancedApi, assetApi } from '../api/client'
 import PlatformPanel from './PlatformPanel'
 import { kindLabel } from '../assetKindLabels'
 import { friendlyError } from '../api/client'
 import { useI18n, Locale } from '../state/I18nContext'
+
+async function safeFetchGenres(): Promise<string[]> {
+  let fn: (() => Promise<string[]>) | undefined
+  try {
+    fn = ((clientMod as Record<string, unknown>).listGenres
+      ?? (clientMod as Record<string, unknown>).getGenres) as (() => Promise<string[]>) | undefined
+  } catch {
+    fn = undefined
+  }
+  if (typeof fn !== 'function') return []
+  try {
+    const list = await fn()
+    return Array.isArray(list) ? list : []
+  } catch {
+    return []
+  }
+}
 
 function getLocalizedKind(kind: string, locale: Locale, t: (k: string, fb?: string) => string): string {
   if (locale === 'zh-CN') return kindLabel(kind)
@@ -64,10 +82,15 @@ const DIM_LABELS: Record<string, Record<Locale, string>> = {
 function DistillPanel() {
   const { t, locale } = useI18n()
   const [genre, setGenre] = useState('campus-redemption')
+  const [genres, setGenres] = useState<string[]>([])
   const [status, setStatus] = useState<Record<string, unknown> | null>(null)
   const [result, setResult] = useState<Record<string, unknown> | null>(null)
   const [rawOpen, setRawOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    void safeFetchGenres().then(setGenres)
+  }, [])
 
   const loadStatus = useCallback(async () => {
     try {
@@ -79,6 +102,7 @@ function DistillPanel() {
   useEffect(() => { loadStatus() }, [loadStatus])
 
   const doDistill = async () => {
+    if (loading) return
     setLoading(true)
     setResult(null)
     try {
@@ -100,13 +124,31 @@ function DistillPanel() {
     <Box>
       <Typography variant="h6" gutterBottom>{t('distill_title')}</Typography>
       <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-        <TextField
-          label={t('distill_genre_label')}
-          value={genre}
-          onChange={(e) => setGenre(e.target.value)}
-          sx={{ minWidth: 200 }}
-          size="small"
-        />
+        {genres.length > 0 ? (
+          <TextField
+            select
+            label={t('distill_genre_label')}
+            value={genre}
+            onChange={(e) => setGenre(e.target.value)}
+            sx={{ minWidth: 200 }}
+            size="small"
+          >
+            {genres.map((g) => (
+              <MenuItem key={g} value={g}>{g}</MenuItem>
+            ))}
+            {genre && !genres.includes(genre) && (
+              <MenuItem value={genre}>{genre}</MenuItem>
+            )}
+          </TextField>
+        ) : (
+          <TextField
+            label={t('distill_genre_label')}
+            value={genre}
+            onChange={(e) => setGenre(e.target.value)}
+            sx={{ minWidth: 200 }}
+            size="small"
+          />
+        )}
         <Button variant="contained" onClick={doDistill} disabled={loading || !status?.canDistill}>
           {loading ? <CircularProgress size={20} /> : t('distill_btn_execute')}
         </Button>
@@ -235,6 +277,8 @@ function AssetEditPanel() {
   const { t, locale } = useI18n()
   const [assets, setAssets] = useState<{ id: string; name: string; kind: string }[]>([])
   const [selected, setSelected] = useState('')
+  // 已载入编辑器的资产标识（独立于下拉框 selected，彻底阻断加载 A 后切下拉到 B 再点保存导致的跨资产覆盖事故）
+  const [loadedAssetKey, setLoadedAssetKey] = useState('')
   const [content, setContent] = useState('')
   const [savedContent, setSavedContent] = useState('')
   const [message, setMessage] = useState('')
@@ -250,12 +294,23 @@ function AssetEditPanel() {
       .catch((e) => setError(friendlyError(e)))
   }, [])
 
-  const selectedAsset = assets.find((a) => `${a.kind}:${a.id}` === selected)
+  const activeAssetKey = loadedAssetKey || selected
+  const selectedAsset = assets.find((a) => `${a.kind}:${a.id}` === activeAssetKey)
   // 题材文风卡索引（prose_card_index）只是题材→卡片文件的寻址表，不是可编辑卡片：
   // 不进可编辑下拉，避免手改索引内容破坏寻址（查看请走「资产库」）。
   const editableAssets = assets.filter((a) => a.kind !== 'prose_card_index')
   const hasProseCardIndex = assets.some((a) => a.kind === 'prose_card_index')
   const dirty = content !== savedContent
+
+  useEffect(() => {
+    if (!dirty) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [dirty])
 
   // 活体 JSON 校验：输入即反馈，保存前就知道合不合法
   const validation = (() => {
@@ -272,13 +327,18 @@ function AssetEditPanel() {
   })()
 
   const loadAsset = async () => {
-    if (!selected) return
+    if (!selected || loading) return
+    if (dirty && !window.confirm(t('asset_edit_confirm_discard', '当前资产有未保存的修改，确定放弃修改并切换/重新加载吗？'))) {
+      return
+    }
+    const targetKey = selected
     setLoading(true)
     try {
-      const [kind, ...rest] = selected.split(':')
+      const [kind, ...rest] = targetKey.split(':')
       const id = rest.join(':')
       const data = await assetApi.detail(kind, id)
       const text = JSON.stringify((data as Record<string, unknown>)?.content ?? data, null, 2)
+      setLoadedAssetKey(targetKey)
       setContent(text)
       setSavedContent(text)
       setMessage('')
@@ -290,12 +350,12 @@ function AssetEditPanel() {
   }
 
   const saveAsset = async () => {
-    if (!selected || !content || !validation.ok) return
+    if (!loadedAssetKey || !content || !validation.ok || !dirty || loading) return
     setLoading(true)
     setMessage('')
     try {
       const parsed = JSON.parse(content)
-      const [kind, ...rest] = selected.split(':')
+      const [kind, ...rest] = loadedAssetKey.split(':')
       const id = rest.join(':')
       await assetApi.update(kind, id, parsed)
       setSavedContent(content)
@@ -333,10 +393,17 @@ function AssetEditPanel() {
         <Button variant="outlined" onClick={loadAsset} disabled={!selected || loading}>
           {t('asset_edit_btn_load')}
         </Button>
-        <Button variant="contained" onClick={saveAsset} disabled={!content || loading || !validation.ok || !dirty}>
+        <Button variant="contained" onClick={saveAsset} disabled={!loadedAssetKey || !content || loading || !validation.ok || !dirty}>
           {loading ? <CircularProgress size={20} /> : t('asset_edit_btn_save')}
         </Button>
       </Box>
+      {loadedAssetKey && selected && selected !== loadedAssetKey && (
+        <Alert severity="info" sx={{ mb: 1 }}>
+          {locale === 'en-US'
+            ? `Currently editing "${loadedAssetKey}". Click Load to switch to "${selected}".`
+            : `当前编辑器仍为已加载资产「${loadedAssetKey}」，点击「加载」才会切换到「${selected}」。`}
+        </Alert>
+      )}
       {hasProseCardIndex && (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
           {t('asset_edit_readonly_hint')}
@@ -370,6 +437,12 @@ function AssetEditPanel() {
         fullWidth
         value={content}
         onChange={(e) => setContent(e.target.value)}
+        onKeyDown={(e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+            e.preventDefault()
+            void saveAsset()
+          }
+        }}
         size="small"
         InputProps={{ style: { fontFamily: 'monospace', fontSize: 12 } }}
       />

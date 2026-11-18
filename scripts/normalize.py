@@ -160,20 +160,45 @@ PASS2_KEYS = {
 }
 
 
-def _role_for(name: str, spec: dict, position: int = 99) -> str:
-    """判断角色身份：优先 spec 声明 → 名字关键词 → 位置兜底（第一个=主角，第二个=女主）。"""
+_VALID_ROLES = {"主角", "女主", "反派", "导师", "配角", "工具人"}
+
+_ROLE_KEYWORD_MAP = (
+    (("女主角", "女主"), "女主"),
+    (("男主角", "男主", "第一主角", "主人公", "主角"), "主角"),
+    (("反派BOSS", "反派boss", "大反派", "反派"), "反派"),
+    (("导师", "师父", "引路人"), "导师"),
+    (("工具人",), "工具人"),
+    (("女配角", "男配角", "女配", "男配", "次要角色", "配角"), "配角"),
+)
+
+
+def _match_role_text(text: str) -> str | None:
+    if not text:
+        return None
+    if text in _VALID_ROLES:
+        return text
+    for kws, target in _ROLE_KEYWORD_MAP:
+        if any(kw in text for kw in kws):
+            return target
+    return None
+
+
+def _role_for(name: str, spec: dict, position: int = 99, explicit_role: object = "") -> str:
+    """判断角色身份：显式声明 → spec 声明 → 名字关键词 → 位置兜底，恒返回合法 ROLE_ENUM 成员。"""
     spec_dict = spec if isinstance(spec, dict) else {}
-    declared = as_str(spec_dict.get("角色") or spec_dict.get("role") or "")
-    if declared:
-        for r in ("主角", "女主", "男主", "反派", "导师", "配角"):
-            if r in declared:
-                return r
-    if any(k in name for k in ("女主", "女主角", "女主一", "女主二号")):
-        return "女主"
-    if any(k in name for k in ("男主", "男主角")):
-        return "主角"
-    if any(k in name for k in ("反派", "恶毒", "女配", "男配")):
-        return "反派" if "反派" in name else "配角"
+    for cand in (
+        as_str(explicit_role),
+        as_str(spec_dict.get("身份") or spec_dict.get("role") or spec_dict.get("角色") or ""),
+    ):
+        matched = _match_role_text(cand)
+        if matched:
+            return matched
+    name_str = str(name or "")
+    matched_name = _match_role_text(name_str)
+    if matched_name:
+        return matched_name
+    if "恶毒" in name_str:
+        return "配角"
     # 位置兜底：仅第一个角色安全（Pass2 通常把最重要角色排最前，多为男主）。
     # 不自动判女主——Pass2 顺序不可靠（可能女二排第二），宁可保守判配角待人工校验。
     if position == 0:
@@ -265,7 +290,10 @@ def normalize_pass2(pass2: dict) -> list:
                 continue
             voices.append({
                 "name": name,
-                "role": item.get("role") or item.get("身份") or _role_for(name, spec, position=len(voices)),
+                "role": _role_for(
+                    name, spec, position=len(voices),
+                    explicit_role=item.get("role") or item.get("身份"),
+                ),
                 "speech_signature": _extract_signature(spec),
                 "arc": item.get("arc", {}) or _extract_arc(spec),
             })
@@ -274,7 +302,10 @@ def normalize_pass2(pass2: dict) -> list:
         spec = {k: v for k, v in raw.items() if k not in ("name", "_meta")}
         voices.append({
             "name": raw["name"],
-            "role": _role_for(raw["name"], spec, position=0),
+            "role": _role_for(
+                raw["name"], spec, position=0,
+                explicit_role=raw.get("role") or raw.get("身份"),
+            ),
             "speech_signature": _extract_signature(spec),
             "arc": _extract_arc(spec),
         })
@@ -300,12 +331,15 @@ def normalize_pass2(pass2: dict) -> list:
                 continue
             voices.append({
                 "name": name,
-                "role": item.get("role") or _role_for(name, spec, position=len(voices)),
+                "role": _role_for(
+                    name, spec, position=len(voices),
+                    explicit_role=item.get("role") or item.get("身份"),
+                ),
                 "speech_signature": _extract_signature(spec),
                 "arc": item.get("arc", {}) or _extract_arc(spec),
             })
     # 排序：主角/女主靠前
-    order = {"主角": 0, "女主": 1, "男主": 1}
+    order = {"主角": 0, "女主": 1}
     voices.sort(key=lambda v: order.get(v.get("role"), 9))
     return voices
 
@@ -912,8 +946,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("pass3", help="pass3 原始输出 JSON")
     args = ap.parse_args(argv)
 
-    p2 = json.loads(Path(args.pass2).read_text(encoding="utf-8"))
-    p3 = json.loads(Path(args.pass3).read_text(encoding="utf-8"))
+    p2 = json.loads(Path(args.pass2).read_text(encoding="utf-8-sig"))
+    p3 = json.loads(Path(args.pass3).read_text(encoding="utf-8-sig"))
     voices = normalize_pass2(p2)
     narration, dialogue, emotion, imagery, banned = normalize_pass3(p3)
     print(json.dumps({

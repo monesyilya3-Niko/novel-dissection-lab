@@ -9,7 +9,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: process.env.VITE_API_TARGET ?? 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
     },
@@ -24,7 +24,7 @@ export default defineConfig({
         // writing 主体与 writing-extras（图表+重度面板）分离避免 monolithic 600KB+。
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('echarts')) return 'echarts'
+            if (id.includes('echarts') || id.includes('zrender')) return 'echarts'
             if (id.includes('@tiptap') || id.includes('prosemirror')) return 'tiptap'
             if (id.includes('react-markdown') || id.includes('remark-')) return 'markdown'
             if (id.includes('@tanstack')) return 'virtual'

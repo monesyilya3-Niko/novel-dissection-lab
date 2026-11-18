@@ -63,7 +63,7 @@ interface AppState {
   startAnalysis: (genre: string) => Promise<void>
   runFullAnalysis: (genre: string) => Promise<void>
   pauseAnalysis: () => Promise<void>
-  resumeAnalysis: () => Promise<void>
+  resumeAnalysis: (genre?: string) => Promise<void>
   retryFailed: () => Promise<void>
 }
 
@@ -107,8 +107,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setOverview(ov)
   }, [])
 
-  // 竞态守卫：只让最后一次请求的响应写入全局 bookResults
+  // 竞态守卫：只让最后一次请求的响应写入全局 bookResults / currentChapter
   const bookResultsSeq = useRef(0)
+  const selectChapterSeq = useRef(0)
   const loadBookResults = useCallback(async (bookId: string) => {
     const seq = ++bookResultsSeq.current
     const r = await api.getBookResults(bookId)
@@ -128,8 +129,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // 订阅 SSE 进度。
   useEffect(() => {
     const close = api.subscribeEvents(bookIdRef.current, (e) => {
+      // 忽略按 task_id 派发的写作/质检任务事件，避免异构进度污染拆书状态
+      if (e.taskId || e.taskType) return
+      // 忽略非当前书目的拆书事件，防止跨书污染
+      if (e.bookId && e.bookId !== bookIdRef.current) return
       setLastEvent(e)
-      if (e.status === 'success' || e.status === 'failed' || e.status === 'running') {
+      if ((e.status === 'success' || e.status === 'failed' || e.status === 'running') && e.cursor) {
         const key = e.cursor
         setBatchStates((prev) => ({ ...prev, [key]: { status: e.status } }))
       }
@@ -166,6 +171,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const applyImportedBook = useCallback(async (b: Book) => {
     setBook(b)
     bookIdRef.current = b.bookId
+    bookResultsSeq.current += 1
+    selectChapterSeq.current += 1
+    setBookResults(null)
     setSelectedChapter(null)
     setCurrentChapter(null)
     // 初始化批次状态
@@ -211,13 +219,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // 竞态守卫（与 loadBookResults 同模式）：A→B 快速切换时，A 的迟到响应
   // 不得覆盖 B。只让最后一次 selectChapter 的响应写入 currentChapter。
-  const selectChapterSeq = useRef(0)
   const selectChapter = useCallback(async (idx: number) => {
-    if (!bookIdRef.current) return
+    if (!bookIdRef.current || !Number.isInteger(idx) || idx < 1) return
     const seq = ++selectChapterSeq.current
     setSelectedChapter(idx)
-    const ch = await api.getChapter(bookIdRef.current, idx)
-    if (seq === selectChapterSeq.current) setCurrentChapter(ch)
+    try {
+      const ch = await api.getChapter(bookIdRef.current, idx)
+      if (seq === selectChapterSeq.current) setCurrentChapter(ch)
+    } catch (e) {
+      if (seq === selectChapterSeq.current) {
+        setCurrentChapter(null)
+        setInitError(friendlyError(e))
+      }
+    }
   }, [])
 
   const startAnalysis = useCallback(async (genre: string) => {
@@ -238,9 +252,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await refreshStatus()
   }, [refreshStatus])
 
-  const resumeAnalysis = useCallback(async () => {
+  const resumeAnalysis = useCallback(async (genre?: string) => {
     if (!bookIdRef.current) return
-    await api.resumeAnalysis(bookIdRef.current)
+    if (genre) {
+      await api.resumeAnalysis(bookIdRef.current, genre)
+    } else {
+      await api.resumeAnalysis(bookIdRef.current)
+    }
     await refreshStatus()
   }, [refreshStatus])
 
@@ -276,8 +294,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // 初始加载：恢复会话 + 加载概览（P1-F8：错误写入 initError，不再静默吞掉）。
-  /* eslint-disable react-hooks/set-state-in-effect -- 本 effect 内所有 setState
-     均在异步回调（.then/.catch）中触发，非 effect 同步体；这是标准的数据加载模式。 */
+  /* eslint-disable react-hooks/set-state-in-effect -- 挂载初始化请求内部均在异步回调中更新状态 */
   useEffect(() => {
     let cancelled = false
     const fail = (e: unknown) => {

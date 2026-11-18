@@ -18,6 +18,7 @@ novel-lab CLI 统一入口 — 一条命令覆盖全部工作流
   novel 状态                                   # 项目概览
 """
 import argparse
+import contextlib
 import json
 import os
 import shutil
@@ -27,6 +28,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent  # novel-lab/ 本身
+_DEFAULT_ROOT = ROOT
 SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))  # 使 scripts/ 下的模块可直接 import
 PY = sys.executable
@@ -215,6 +217,31 @@ def cmd_reset_admin_password() -> int:
     return 0
 
 
+@contextlib.contextmanager
+def _status_llm_scope():
+    """当测试把 novel.ROOT 重定向到临时沙箱且未显式设置 XUAN_DATA_DIR 时，同步隔离 llm_client。"""
+    import llm_client
+
+    if (
+        ROOT != _DEFAULT_ROOT
+        and not os.environ.get("XUAN_DATA_DIR")
+        and getattr(llm_client.resolve_models_file, "__module__", "") == llm_client.__name__
+    ):
+        old_cfg = llm_client.CONFIG_DIR
+        old_models = llm_client.MODELS_FILE
+        llm_client.CONFIG_DIR = ROOT / "config"
+        llm_client.MODELS_FILE = ROOT / "config" / "models.json"
+        os.environ["XUAN_DATA_DIR"] = str(ROOT)
+        try:
+            yield llm_client
+        finally:
+            llm_client.CONFIG_DIR = old_cfg
+            llm_client.MODELS_FILE = old_models
+            os.environ.pop("XUAN_DATA_DIR", None)
+    else:
+        yield llm_client
+
+
 def cmd_status():
     """项目概览：资产/章节/报告状态。
 
@@ -232,12 +259,26 @@ def cmd_status():
     print(f"\n[资产] {len(assets)} 本已拆:")
     for a in assets:
         try:
-            vc = json.loads(a.read_text(encoding="utf-8"))
+            vc = json.loads(a.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, OSError):
             print(f"  - {a.name}: （损坏，跳过）")
             damaged.append(a.name)
             continue
-        meta = vc.get("meta", {})
+        if (
+            not isinstance(vc, dict)
+            or not isinstance(vc.get("meta"), dict)
+            or ("dialogue" in vc and not isinstance(vc.get("dialogue"), dict))
+        ):
+            print(f"  - {a.name}: （损坏，跳过）")
+            damaged.append(a.name)
+            continue
+        dlg = vc.get("dialogue") or {}
+        c_voices = dlg.get("character_voices", [])
+        if not isinstance(c_voices, list):
+            print(f"  - {a.name}: （损坏，跳过）")
+            damaged.append(a.name)
+            continue
+        meta = vc["meta"]
         conf = meta.get("confidence", 0)
         try:
             conf_str = f"{float(conf):.0%}"
@@ -245,7 +286,7 @@ def cmd_status():
             conf_str = "?"
         print(f"  - {a.name.replace('-voice-card.json','')}: "
               f"{meta.get('genre','?')} | 置信 {conf_str} | "
-              f"角色 {len(vc.get('dialogue',{}).get('character_voices',[]))} 个")
+              f"角色 {len(c_voices)} 个")
     packs = sorted((ROOT / "assets").glob("*-genre-pack.json"))
     if packs:
         print(f"\n[题材包] {len(packs)} 份: {[p.name for p in packs]}")
@@ -256,8 +297,12 @@ def cmd_status():
         print("\n[创作项目]")
         for s in novels:
             try:
-                state = json.loads(s.read_text(encoding="utf-8"))
+                state = json.loads(s.read_text(encoding="utf-8-sig"))
             except (json.JSONDecodeError, OSError):
+                print(f"  - {s.parent.name}: （损坏，跳过）")
+                damaged.append(str(s))
+                continue
+            if not isinstance(state, dict):
                 print(f"  - {s.parent.name}: （损坏，跳过）")
                 damaged.append(str(s))
                 continue
@@ -266,17 +311,24 @@ def cmd_status():
     reports = sorted((ROOT / "reports").glob("*.md"))
     if reports:
         print(f"\n[拆书报告] {len(reports)} 份: {[r.name for r in reports]}")
-    models_path = ROOT / "config" / "models.json"
-    if models_path.exists():
-        try:
-            models = json.loads(models_path.read_text(encoding="utf-8"))
-            print(f"\n[模型] {list(models.get('models', {}).keys())}")
-        except (json.JSONDecodeError, OSError):
-            print("\n[模型] 配置文件损坏")
-            damaged.append(str(models_path))
-    else:
-        print("\n[模型] 未配置外部模型 —— LLM 层由 WorkBuddy 内置智能承担"
-              "（pass1-5 分析与写作改写由 AI 直接读文本完成，无 API 依赖）")
+    with _status_llm_scope() as llm_mod:
+        models_path = llm_mod.resolve_models_file()
+        if models_path.exists():
+            try:
+                models = json.loads(models_path.read_text(encoding="utf-8-sig"))
+                if not isinstance(models, dict) or not isinstance(models.get("models", {}), dict):
+                    raise ValueError("models.json 结构非法")
+                model_ids = list((models.get("models") or {}).keys())
+                if llm_mod.any_model_ready():
+                    print(f"\n[模型] {model_ids}")
+                else:
+                    print(f"\n[模型] {model_ids}（未就绪/缺有效凭据 —— LLM 层由 WorkBuddy 内置智能承担）")
+            except (json.JSONDecodeError, OSError, ValueError):
+                print("\n[模型] 配置文件损坏")
+                damaged.append(str(models_path))
+        else:
+            print("\n[模型] 未配置外部模型 —— LLM 层由 WorkBuddy 内置智能承担"
+                  "（pass1-5 分析与写作改写由 AI 直接读文本完成，无 API 依赖）")
     print("\n提示: 'novel 拆书 --help' 查看各子命令详细用法")
     if damaged:
         print(f"\n✗ 状态检查发现 {len(damaged)} 处损坏文件（上述已标注），"
@@ -306,6 +358,8 @@ def main():
     p0.add_argument("--genre", required=True)
     p0.add_argument("--model-id")
     p0.add_argument("--dry-run", action="store_true")
+    p0.add_argument("--from-assets", action="store_true",
+                    help="跳过 LLM 拆书扫描，直接从已有资产卡生成并原子发布双报告")
 
     p1 = sub.add_parser("拆书", help="拆书：TXT → 资产")
     p1.add_argument("book")
@@ -433,17 +487,50 @@ def main():
 
     if args.cmd == "分析":
         # 一键：拆书 → 拆书报告 → 笔法报告 → 自动质检（Hook）
-        src = resolve_book_src(args.book)
-        name = src.stem
-        book_arg = str(src)
-        # 1. 跑 pipeline（含 Pass5）
-        rc1 = run_script("pipeline.py", [book_arg, "--genre", args.genre] +
-                         (["--model-id", args.model_id] if args.model_id else []) +
-                         (["--dry-run"] if args.dry_run else []))
-        if rc1 != 0:
-            return rc1
-        if args.dry_run:
-            return 0
+        if args.from_assets:
+            cand_path = Path(args.book)
+            if cand_path.exists():
+                src = cand_path
+                name = src.stem
+            elif (ROOT / "assets" / f"{args.book}-voice-card.json").exists() or (
+                ROOT / "assets" / f"{args.book}-craft-card.json"
+            ).exists():
+                name = Path(args.book).stem
+                src = ROOT / "corpus" / f"{name}.txt"
+            elif (ROOT / "assets" / f"{args.book}_chosen-voice-card.json").exists() or (
+                ROOT / "assets" / f"{args.book}_chosen-craft-card.json"
+            ).exists():
+                name = f"{args.book}_chosen"
+                src = ROOT / "corpus" / f"{name}.txt"
+            else:
+                src = resolve_book_src(args.book)
+                name = src.stem
+            vc_check = ROOT / "assets" / f"{name}-voice-card.json"
+            cc_check = ROOT / "assets" / f"{name}-craft-card.json"
+            if not vc_check.exists() and not cc_check.exists():
+                print(f"✗ 未找到已有资产卡: {vc_check}")
+                return 1
+            if args.dry_run:
+                return 0
+            print(f"[--from-assets] 跳过 LLM 拆书扫描，直接从已有资产卡（{name}）生成报告")
+        else:
+            src = resolve_book_src(args.book)
+            name = src.stem
+            book_arg = str(src)
+            vc_existing = ROOT / "assets" / f"{name}-voice-card.json"
+            # 1. 跑 pipeline（含 Pass5）
+            rc1 = run_script("pipeline.py", [book_arg, "--genre", args.genre] +
+                             (["--model-id", args.model_id] if args.model_id else []) +
+                             (["--dry-run"] if args.dry_run else []))
+            if rc1 != 0:
+                if vc_existing.exists():
+                    print(
+                        f"\n💡 检测到本地已有资产卡 {vc_existing.name}，可跳过 LLM 扫描直接生成报告：\n"
+                        f"   python novel.py 分析 {name} --genre {args.genre} --from-assets"
+                    )
+                return rc1
+            if args.dry_run:
+                return 0
         # 2/3. 生成报告 → 先写 staging 临时目录（校验先于副作用：reports/ 不见次品）
         # P0-2 修复：原来先直写 reports/ 再做万字校验，校验失败次品已落盘。
         # P1-B4 修复：原来丢弃 run_script 返回码，脚本失败时旧报告冒充本轮成果。
@@ -599,7 +686,7 @@ def main():
         gp = None
         if args.genre_pack:
             try:
-                gp = _json.loads(Path(args.genre_pack).read_text(encoding="utf-8"))
+                gp = _json.loads(Path(args.genre_pack).read_text(encoding="utf-8-sig"))
             except (json.JSONDecodeError, OSError) as exc:
                 sys.exit(f"读取题材包失败: {exc}")
         qc = chapter_check.chapter_check(text, gp)
@@ -610,7 +697,7 @@ def main():
         if args.voice:
             import consistency
             try:
-                vc_data = _json.loads(Path(args.voice).read_text(encoding="utf-8"))
+                vc_data = _json.loads(Path(args.voice).read_text(encoding="utf-8-sig"))
             except (json.JSONDecodeError, OSError) as exc:
                 sys.exit(f"读取 voice-card 失败: {exc}")
             vc_score, vc_details, _ = consistency.score_text(vc_data, text, label=ch_path.name)

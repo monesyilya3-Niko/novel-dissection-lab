@@ -12,6 +12,7 @@ Schema 校验脚本 — 纯标准库，零依赖
 """
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -69,6 +70,20 @@ else:
 #: 向后兼容：历史调用方（含 test_genre_isolation）按集合使用 KNOWN_GENRES
 KNOWN_GENRES = set(CORE_GENRES | PROSE_GENRES)
 
+
+def _current_core_genres() -> frozenset:
+    """动态查询当前完整链题材集（避免导入期冻结导致测试沙箱或新增资产无法立即生效）。"""
+    if _core_genres is not None:
+        return _core_genres()
+    return CORE_GENRES
+
+
+def _current_known_genres() -> set:
+    """动态查询当前已知题材全集（完整链 ∪ prose 卡）。"""
+    if _core_genres is not None and _prose_genres is not None:
+        return set(_core_genres() | _prose_genres())
+    return set(KNOWN_GENRES)
+
 # 蒸馏维度枚举：distilled 资产的 meta.dimension 与 rules[].dimension 都必须 ∈ 此集合。
 DISTILLED_DIMENSIONS = ("voice-card", "craft-card", "structure-obs", "commercial-obs")
 # distilled 规则的必填键（缺一即硬错误）。
@@ -96,7 +111,7 @@ def warn(msg, path=""):
 
 
 def is_num(v):
-    return isinstance(v, (int, float)) and not isinstance(v, bool)
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
 
 
 def check_enum(v, allowed, path):
@@ -215,7 +230,7 @@ def validate_voice_card(d):
                     err("应为数字", f"narration.paragraph.{f}")
             # 同上：paragraph 整块为空说明段落统计没跑。与句长同理，降为 warn
             # （内置资产里确实是空的，且语料已不在）；仅在硬错误级别才拦的是"造假"。
-            if not para and d.get("meta", {}).get("quantitative_gap") is None:
+            if not para and (d.get("meta") or {}).get("quantitative_gap") is None:
                 warn(
                     "narration.paragraph 为空——段落长度与单句段占比未统计",
                     "narration.paragraph",
@@ -306,9 +321,13 @@ def validate_voice_card(d):
                     warn(f"比喻领域 '{domain[:15]}...' 过长（{len(domain)}字），应为简短标签（≤6字）", f"imagery.high_freq_metaphor_domains[{i}]")
         sp = img.get("sensory_preference")
         if isinstance(sp, dict) and sp:
-            total = sum(v for v in sp.values() if isinstance(v, (int, float)))
-            if abs(total - 1.0) > 0.15:
-                warn(f"sensory_preference 各项和={total:.2f}，应接近1.0", "imagery.sensory_preference")
+            bad_sp = [k for k, v in sp.items() if not is_num(v)]
+            for k in bad_sp:
+                err(f"应为有限数字，实际 {sp[k]!r}", f"imagery.sensory_preference.{k}")
+            if not bad_sp:
+                total = sum(v for v in sp.values() if is_num(v))
+                if abs(total - 1.0) > 0.15:
+                    warn(f"sensory_preference 各项和={total:.2f}，应接近1.0", "imagery.sensory_preference")
         elif sp == {} or sp is None:
             warn("sensory_preference 为空——五感偏好是文风指纹的重要维度", "imagery")
         sd = img.get("signature_devices")
@@ -467,9 +486,10 @@ def validate_trope_library(d):
                 check_strength(s, p + ".effectiveness.payoff_strength")
         # === 新增：genre_scope 校验（铁律一）===
         gs = t.get("genre_scope")
+        known_genres = _current_known_genres()
         if gs is None:
             err("缺少 genre_scope 字段", p + ".genre_scope")   # 硬错误：题材作用域必须标注
-        elif gs not in ("universal", *KNOWN_GENRES):
+        elif gs not in ("universal", *known_genres):
             err(f"genre_scope='{gs}' 非法，须 ∈ {{'universal', *sorted(KNOWN_GENRES)}}", p + ".genre_scope")
 
 
@@ -493,12 +513,13 @@ def validate_craft_card(d):
         check_probability(meta.get("confidence"), "meta.confidence")
         # === 新增：genre 枚举校验（铁律一）===
         genre = meta.get("genre", "")
+        core_genres = _current_core_genres()
         if not genre:
             err("meta.genre 为空，题材未标注", "meta.genre")   # 硬错误
-        elif genre not in CORE_GENRES:
+        elif genre not in core_genres:
             # 文案关键词「不在已知题材白名单」被 test_genre_isolation 按子串匹配，
             # 改动会导致那条既有测试静默空转——如需改文案必须同步那条测试。
-            warn(f"meta.genre='{genre}' 不在已知题材白名单 {sorted(CORE_GENRES)}，"
+            warn(f"meta.genre='{genre}' 不在已知题材白名单 {sorted(core_genres)}，"
                  f"请确认题材包是否已登记", "meta.genre")        # 警告（不阻断拆书，但阻断聚合）
 
     analysis = d.get("craft_analysis")
@@ -506,10 +527,21 @@ def validate_craft_card(d):
         required_dims = ["foreshadowing", "information_release", "pov_control",
                          "scene_transition", "tension_building", "dialogue_craft",
                          "rhythm_control", "sensory_craft", "narrative_engine", "emotional_algorithm"]
-        # 检查维度覆盖（至少 3/8 维有内容）
-        covered_dims = sum(1 for dim in required_dims if dim in analysis and isinstance(analysis[dim], dict) and analysis[dim].get("techniques"))
+        for dim, dim_val in analysis.items():
+            if isinstance(dim_val, dict) and "techniques" in dim_val:
+                if not isinstance(dim_val.get("techniques"), list):
+                    err(f"techniques 应为数组，实际 {type(dim_val.get('techniques')).__name__}",
+                        f"craft_analysis.{dim}.techniques")
+        # 检查维度覆盖（至少 3/10 维有内容）
+        covered_dims = sum(
+            1 for dim in required_dims
+            if dim in analysis
+            and isinstance(analysis[dim], dict)
+            and isinstance(analysis[dim].get("techniques"), list)
+            and len(analysis[dim]["techniques"]) > 0
+        )
         if covered_dims < 3:
-            warn(f"仅 {covered_dims}/8 维有技法——建议重跑 Pass5 提升覆盖度", "craft_analysis")
+            warn(f"仅 {covered_dims}/{len(required_dims)} 维有技法——建议重跑 Pass5 提升覆盖度", "craft_analysis")
 
     summary = d.get("craft_summary")
     if check_obj(summary, "craft_summary"):
@@ -896,6 +928,8 @@ def auto_kind(d: dict, filename: str | None = None) -> str:
     ``filename`` 可选——旧的单参数调用继续有效；CLI 会传入 ``path.name``，
     因为索引文件的判定依赖文件名线索（内容只有 cards 键，不足以自证）。
     """
+    if not isinstance(d, dict):
+        return "voice-card"
     meta = d.get("meta")
     if not isinstance(meta, dict):
         meta = {}
@@ -937,7 +971,7 @@ def main(argv: list[str] | None = None) -> int:
 
     path = Path(args.asset)
     try:
-        d = json.loads(path.read_text(encoding="utf-8"))
+        d = json.loads(path.read_text(encoding="utf-8-sig"))
     except Exception as e:
         print(f"JSON 解析失败: {e}")
         return 1
@@ -947,8 +981,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # 阶段② · 题材隔离校验：断言 meta.id 与文件名一致（防串味，共享知识约定 9）。
     # 仅对 genre-prose-card 生效；文件名约定 assets/genre-prose-card-<id>.json。
-    if kind == "genre-prose-card":
-        meta = d.get("meta") or {}
+    if kind == "genre-prose-card" and isinstance(d, dict):
+        meta = d.get("meta") if isinstance(d.get("meta"), dict) else {}
         card_id = meta.get("id", "")
         expected_stem = f"genre-prose-card-{card_id}"
         if card_id and path.stem != expected_stem:

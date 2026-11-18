@@ -47,6 +47,9 @@ export interface TaskState {
 }
 
 export interface ProgressEvent {
+  bookId?: string | null
+  taskId?: string | null
+  taskType?: string | null
   cursor: string
   chapterIndex: number
   batchIndex: number
@@ -145,6 +148,48 @@ export interface OfflineAnalysisResult {
   guideMarkdown: string
 }
 
+export interface TakeoverPassSummary {
+  passName: string
+  label: string
+  saved: boolean
+  sizeBytes: number
+  updatedAt: string | number | null
+}
+
+export interface TakeoverStatus {
+  bookId: string
+  sampledReady: boolean
+  passes: TakeoverPassSummary[]
+  assembledCards: string[]
+  reports: string[]
+}
+
+export interface TakeoverPassDetail {
+  bookId: string
+  passName: string
+  promptBundle: string
+  charCount: number
+  saved: boolean
+  existingJson: string | Record<string, unknown> | null
+}
+
+export interface SaveTakeoverPassResult {
+  bookId: string
+  passName: string
+  savedPath: string
+  keys: string[]
+  sizeBytes: number
+}
+
+export interface GenerateBookReportsResult {
+  bookId: string
+  assembled: string[]
+  reports: string[]
+  reportOk: boolean
+  reportError?: string
+  totalChars: number
+}
+
 export interface SavedChapterSummary {
   chapterNo: number
   filename: string
@@ -158,6 +203,7 @@ export interface SavedChapterDetail {
   project: string
   chapterNo: number
   filename: string
+  title?: string
   content: string
   wordCount: number
   charCount: number
@@ -277,6 +323,7 @@ export interface ScoreResult {
 export interface ImportChapterResult {
   chapterPath: string
   chapterNo: number
+  title?: string
   charCount: number
   overwrote: boolean
   consistencyScore?: number

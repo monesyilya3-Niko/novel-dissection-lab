@@ -1,5 +1,5 @@
 // 管理员系统工作台：登录门禁 / 仪表盘 / 书库管理 / 资产管理 / 操作日志 / 安全设置。
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Box from '@mui/material/Box'
 import ContextHelpButton from './ContextHelpButton'
 import Tabs from '@mui/material/Tabs'
@@ -42,6 +42,7 @@ import {
 import { ink, fadeUp } from '../ink'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import { useI18n } from '../state/I18nContext'
+import { useAppOptional } from '../state/AppContext'
 
 function fmtSize(bytes: number): string {
   if (!bytes) return '0 B'
@@ -62,6 +63,8 @@ function fmtUptime(seconds: number, t?: (k: string, fb?: string) => string): str
 }
 
 export default function AdminWorkbench() {
+  const appCtx = useAppOptional()
+  const refreshAdmin = appCtx?.refreshAdmin
   const [me, setMe] = useState<{ username: string } | null>(null)
   const [checking, setChecking] = useState(true)
   const [forceChangePw, setForceChangePw] = useState(false)
@@ -83,14 +86,15 @@ export default function AdminWorkbench() {
 
   useEffect(() => { checkMe() }, [checkMe])
 
-  // 会话失效（401）自动回登录页
+  // 会话失效（401）自动回登录页并同步全局导航可见性
   useEffect(() => {
     onAdminUnauthorized(() => {
       setMe(null)
       setForceChangePw(false)
+      void refreshAdmin?.()
     })
     return () => onAdminUnauthorized(null)
-  }, [])
+  }, [refreshAdmin])
 
   if (checking) {
     return (
@@ -100,8 +104,28 @@ export default function AdminWorkbench() {
     )
   }
 
-  if (!me) return <LoginForm onDone={(mustChange) => { checkMe(); if (mustChange) setForceChangePw(true) }} />
-  return <AdminPanels username={me.username} onLogout={() => setMe(null)} forceChangePw={forceChangePw} clearForceChangePw={() => setForceChangePw(false)} />
+  if (!me) {
+    return (
+      <LoginForm
+        onDone={(mustChange) => {
+          void checkMe()
+          void refreshAdmin?.()
+          if (mustChange) setForceChangePw(true)
+        }}
+      />
+    )
+  }
+  return (
+    <AdminPanels
+      username={me.username}
+      onLogout={() => {
+        setMe(null)
+        void refreshAdmin?.()
+      }}
+      forceChangePw={forceChangePw}
+      clearForceChangePw={() => setForceChangePw(false)}
+    />
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -789,6 +813,13 @@ function SecurityPanel({ onLogout, onPasswordChanged }: {
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
   const [busy, setBusy] = useState(false)
+  const logoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current)
+    }
+  }, [])
 
   const submit = async () => {
     setError('')
@@ -801,7 +832,8 @@ function SecurityPanel({ onLogout, onPasswordChanged }: {
       setOk(t('admin_sec_success', '密码已修改，历史会话已吊销，请重新登录。'))
       setOldPw(''); setNewPw(''); setNewPw2('')
       onPasswordChanged?.()
-      setTimeout(onLogout, 1500)
+      if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current)
+      logoutTimerRef.current = setTimeout(onLogout, 1500)
     } catch (e) {
       if (e instanceof ApiError && e.code === 401) {
         // 会话被吊销属于正常流程

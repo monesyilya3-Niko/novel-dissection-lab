@@ -425,6 +425,8 @@ export async function getGenres(): Promise<string[]> {
   return data.genres ?? []
 }
 
+export const listGenres = getGenres
+
 export async function getStatus(bookId?: string): Promise<StatusInfo> {
   const q = bookId ? `?book_id=${encodeURIComponent(bookId)}` : ''
   const data = await request<Record<string, unknown>>('GET', `/status${q}`)
@@ -564,6 +566,55 @@ export async function runOfflineAnalysis(
   })
 }
 
+export async function getTakeoverStatus(
+  bookId: string,
+): Promise<import('../types').TakeoverStatus> {
+  return request<import('../types').TakeoverStatus>(
+    'GET',
+    `/analyze/takeover/${encodeURIComponent(bookId)}`,
+  )
+}
+
+export async function getTakeoverPass(
+  bookId: string,
+  passName: string,
+): Promise<import('../types').TakeoverPassDetail> {
+  const raw = await getRaw<Record<string, unknown>>(
+    `/analyze/takeover/${encodeURIComponent(bookId)}?pass_name=${encodeURIComponent(passName)}`,
+  )
+  return {
+    bookId: String(raw.book_id ?? raw.bookId ?? bookId),
+    passName: String(raw.pass_name ?? raw.passName ?? passName),
+    promptBundle: String(raw.prompt_bundle ?? raw.promptBundle ?? ''),
+    charCount: Number(raw.char_count ?? raw.charCount ?? 0),
+    saved: Boolean(raw.saved),
+    existingJson: (raw.existing_json ?? raw.existingJson ?? null) as string | Record<string, unknown> | null,
+  }
+}
+
+export async function saveTakeoverPass(
+  bookId: string,
+  passName: string,
+  content: string,
+): Promise<import('../types').SaveTakeoverPassResult> {
+  return request<import('../types').SaveTakeoverPassResult>(
+    'POST',
+    `/analyze/takeover/${encodeURIComponent(bookId)}`,
+    { pass_name: passName, content },
+  )
+}
+
+export async function generateBookReports(
+  bookId: string,
+  opts?: { genre?: string; assemble?: boolean },
+): Promise<import('../types').GenerateBookReportsResult> {
+  return request<import('../types').GenerateBookReportsResult>(
+    'POST',
+    `/book/${encodeURIComponent(bookId)}/reports`,
+    { genre: opts?.genre ?? 'unknown', assemble: opts?.assemble ?? true },
+  )
+}
+
 // ---------------------------------------------------------------------------
 // SSE
 // ---------------------------------------------------------------------------
@@ -581,7 +632,10 @@ export function subscribeEvents(bookId: string | null, onEvent: (e: ProgressEven
       const data = JSON.parse(msg.data) as Record<string, unknown>
       if (data.status === 'connected' || !('status' in data)) return
       onEvent({
-        cursor: data.cursor as string,
+        bookId: (data.book_id ?? data.bookId ?? undefined) as string | undefined,
+        taskId: (data.task_id ?? data.taskId ?? undefined) as string | undefined,
+        taskType: (data.task_type ?? data.taskType ?? undefined) as string | undefined,
+        cursor: (data.cursor ?? '') as string,
         chapterIndex: data.chapter_index as number,
         batchIndex: data.batch_index as number,
         status: data.status as ProgressEvent['status'],
@@ -950,7 +1004,6 @@ export function subscribeTaskEvents(taskId: string, onEvent: (e: Record<string, 
   es.onmessage = (msg) => {
     try {
       const data = JSON.parse(msg.data) as Record<string, unknown>
-      if (data.status === 'connected') return
       onEvent(data)
     } catch (e) {
       console.warn('[sse] 无法解析的任务事件', e)

@@ -386,5 +386,65 @@ describe('EssenceWorkbench', () => {
       removeStorage('novellab.locale')
     }
   })
+
+  it('沉淀单张建议资产卡后保持当前页签挂载，不销毁其余未保存卡片，且反哺过滤只读项目', async () => {
+    mockProjects.mockResolvedValue([
+      { id: 'default', name: 'default（CLI 只读）', readOnly: true },
+      { id: 'proj-real', name: '苍穹道果', readOnly: false },
+    ])
+    mockCreateAsset.mockResolvedValue({ id: 501 })
+    mockAnalyzeMacro.mockResolvedValue({
+      bookId: 'essence_multi_1',
+      title: '多维神作',
+      genre: 'xianxia',
+      platform: 'qidian',
+      totalChapters: 2,
+      totalChars: 6000,
+      avgChapterLen: 3000,
+      dialogueRatio: 0.3,
+      rhythmClimaxInterval: 3,
+      aiSlopScore: 1.0,
+      openingThreeChapters: [],
+      highFrequencySpeechPatterns: [],
+      suggestedAssets: [
+        { category: 'outline', title: '建议卡片一：总纲', summary: '总纲摘要', content: '总纲内容' },
+        { category: 'hook', title: '建议卡片二：开篇钩子', summary: '钩子摘要', content: '钩子内容' },
+      ],
+    })
+
+    render(<EssenceWorkbench />)
+
+    fireEvent.change(screen.getByLabelText('精图书籍/样本名称'), { target: { value: '多维神作' } })
+    fireEvent.change(screen.getByLabelText('输入精读正文（支持多章连粘，自动识别章节序号）'), {
+      target: { value: '第1章 破局\n少年睁眼。' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '开始深度精读与宏观解构' }))
+
+    expect(await screen.findByText('建议卡片一：总纲')).toBeInTheDocument()
+    expect(screen.getByText('建议卡片二：开篇钩子')).toBeInTheDocument()
+
+    // 点击第一张卡片的「沉淀入库」
+    const saveBtns = screen.getAllByRole('button', { name: '沉淀入库' })
+    expect(saveBtns).toHaveLength(2)
+    fireEvent.click(saveBtns[0])
+
+    await waitFor(() => {
+      expect(mockCreateAsset).toHaveBeenCalledTimes(1)
+    })
+
+    // 第一张卡变为已入库，第二张卡仍然保留在 DOM 中可继续沉淀（不会跳走销毁！）
+    expect(await screen.findByRole('button', { name: '✓ 已入库' })).toBeDisabled()
+    expect(screen.getByText('建议卡片二：开篇钩子')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: '沉淀入库' })).toHaveLength(1)
+
+    // 切到资产库验证反哺默认绑定可写项目 id ('proj-real')，不选只读 default
+    mockAdoptAsset.mockResolvedValue({ adopted: true, targetKind: 'outline', recordId: 202 })
+    fireEvent.click(screen.getByRole('tab', { name: '五维精华资产库' }))
+    fireEvent.click(await screen.findByRole('button', { name: '一键反哺创作' }))
+    fireEvent.click(await screen.findByRole('button', { name: '确认反哺' }))
+    await waitFor(() => {
+      expect(mockAdoptAsset).toHaveBeenCalledWith(expect.objectContaining({ project: 'proj-real' }))
+    })
+  })
 })
 

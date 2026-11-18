@@ -43,7 +43,7 @@ test.describe('GUI 冒烟', () => {
     for (let i = 0; i < 3; i++) {
       const mode = await page.evaluate(() => window.localStorage.getItem('novellab.theme-mode'))
       if (mode === 'dark') break
-      const btn = page.locator('header button').last()
+      const btn = page.getByTestId('theme-mode-toggle')
       await btn.click()
       await page.waitForTimeout(300)
     }

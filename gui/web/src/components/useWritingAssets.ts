@@ -45,6 +45,8 @@ export interface WritingAssetSelection {
    * voice 题材已知、且某已选资产题材已知、两者不一致 → 后端会 400。
    * 任一侧题材未知时不警告（后端同样不阻断，避免误伤历史资产）。 */
   mismatches: GenreMismatch[]
+  /** 重新拉取资产列表（如组装入库后即时刷新下拉选项）。 */
+  refresh: () => Promise<void>
 }
 
 // 「题材不一致」警告里对资产种类的称呼。kind → i18n key，渲染方按当前语言取值；
@@ -71,29 +73,31 @@ export function useWritingAssets(): WritingAssetSelection {
   const [distilled, setDistilled] = useState('')
   const [proseCard, setProseCard] = useState('')
 
-  useEffect(() => {
-    assetApi.list({ limit: 500 })
-      .then((j) => {
-        const items = ((j as Record<string, unknown>).items ?? []) as AssetOption[]
-        setAssets(items)
-        // 默认选择策略（2026-09-29）：只有 voice 默认首张；genre_pack / craft /
-        // distilled / prose_card 默认空——旧写作页 genre_pack 默认为空，自动携带
-        // 首张会凭空制造题材不一致。只有用户明确选择后才在两页签间共享。
-        if (!voice) {
-          const firstVoice = items.find((a) => a.kind === 'voice')?.id ?? ''
-          setVoice(firstVoice)
-        }
-      })
-      .catch(() => setAssets([]))
+  const refresh = useCallback(async () => {
+    try {
+      const j = await assetApi.list({ limit: 500 })
+      const items = ((j as Record<string, unknown>).items ?? []) as AssetOption[]
+      setAssets(items)
+      // 默认选择策略（2026-09-29）：只有 voice 默认首张；genre_pack / craft /
+      // distilled / prose_card 默认空——旧写作页 genre_pack 默认为空，自动携带
+      // 首张会凭空制造题材不一致。只有用户明确选择后才在两页签间共享。
+      setVoice((prev) => prev || (items.find((a) => a.kind === 'voice')?.id ?? ''))
+    } catch {
+      setAssets([])
+    }
     // 蒸馏卡按 kind 单独拉取：混在首页列表里会在资产总数超限被分页截断时静默选不到。
-    assetApi.list({ kind: 'distilled', limit: 50 })
-      .then((j) => {
-        const items = ((j as Record<string, unknown>).items ?? []) as AssetOption[]
-        setDistilledAssets(items)
-      })
-      .catch(() => setDistilledAssets([]))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    try {
+      const j = await assetApi.list({ kind: 'distilled', limit: 50 })
+      const items = ((j as Record<string, unknown>).items ?? []) as AssetOption[]
+      setDistilledAssets(items)
+    } catch {
+      setDistilledAssets([])
+    }
   }, [])
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
 
   const byKind = useCallback((k: string) => assets.filter((a) => a.kind === k), [assets])
 
@@ -134,7 +138,7 @@ export function useWritingAssets(): WritingAssetSelection {
     craft, setCraft,
     distilled, setDistilled,
     proseCard, setProseCard,
-    byKind, genreOf, voiceGenre, mismatches,
+    byKind, genreOf, voiceGenre, mismatches, refresh,
   }
 }
 

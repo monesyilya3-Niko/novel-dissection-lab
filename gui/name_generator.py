@@ -11,6 +11,10 @@ from __future__ import annotations
 import random
 from typing import Any
 
+from gui.services import ServiceError
+
+ALLOWED_GENDERS = ("male", "female", "neutral", "all")
+
 # ---------------------------------------------------------------------------
 # 姓氏库
 # ---------------------------------------------------------------------------
@@ -138,6 +142,14 @@ ARTIFACT_TYPES = ["神剑", "龙枪", "战戟", "古鼎", "宝钟", "玄塔", "�
 
 def generate_character_names(style: str = "xianxia", gender: str = "all", count: int = 10) -> list[str]:
     """生成角色名列表。"""
+    if not isinstance(gender, str):
+        raise ServiceError("gender 必须为字符串", 400)
+    gender = gender.strip().lower() or "all"
+    if gender not in ALLOWED_GENDERS:
+        raise ServiceError(
+            f"非法 gender: {gender!r}，允许值为 {', '.join(ALLOWED_GENDERS)}",
+            400,
+        )
     style_key = style if style in CHARACTER_VOCAB else "xianxia"
     pool: list[str] = []
     
@@ -439,6 +451,18 @@ def generate_title_names(style: str = "xianxia", count: int = 10) -> list[str]:
 
 def generate(kind: str = "character", style: str = "xianxia", gender: str = "all", count: int = 10) -> dict[str, Any]:
     """起名工坊对外统一接口。"""
+    if not isinstance(kind, str):
+        raise ServiceError("kind 必须为字符串", 400)
+    if not isinstance(style, str):
+        raise ServiceError("style 必须为字符串", 400)
+    if not isinstance(gender, str):
+        raise ServiceError("gender 必须为字符串", 400)
+    gender = gender.strip().lower() or "all"
+    if gender not in ALLOWED_GENDERS:
+        raise ServiceError(
+            f"非法 gender: {gender!r}，允许值为 {', '.join(ALLOWED_GENDERS)}",
+            400,
+        )
     kind = kind.lower().strip()
     if kind == "character":
         names = generate_character_names(style=style, gender=gender, count=count)

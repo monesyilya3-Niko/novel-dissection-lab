@@ -1,5 +1,5 @@
 // 双栏对比审校视图（Side-by-Side Review & Diff View）
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
@@ -29,6 +29,13 @@ export default function DiffReviewView({
   const { isDark } = useThemeMode()
   const { t } = useI18n()
   const [copied, setCopied] = useState(false)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    }
+  }, [])
 
   const origParas = originalText.split('\n').filter((p) => p.trim())
   const polishParas = polishedText.split('\n').filter((p) => p.trim())
@@ -39,7 +46,8 @@ export default function DiffReviewView({
       navigator.clipboard.writeText(polishedText).catch(() => {})
     }
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000)
   }
 
   return (

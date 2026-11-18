@@ -69,7 +69,7 @@ function ModeToggle() {
         : t('toggle_theme_dark', '切换为跟随系统')
   return (
     <Tooltip title={label}>
-      <IconButton color="inherit" size="small" onClick={() => setMode(next)} aria-label={label}>
+      <IconButton color="inherit" size="small" onClick={() => setMode(next)} aria-label={label} data-testid="theme-mode-toggle">
         {mode === 'light' ? (
           <LightModeIcon fontSize="small" />
         ) : mode === 'dark' ? (
@@ -163,7 +163,7 @@ function AppShell() {
     return () => window.removeEventListener(REPLAY_EVENT, h)
   }, [])
 
-  // 键盘快捷键：Alt+1..9 切换工作台（输入框聚焦时不劫持）
+  // 键盘快捷键：Alt+1..9 切换工作台（输入框聚焦时不劫持；非管理员或简洁模式下拦截 Alt+9 进入 admin）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey) return
@@ -171,12 +171,14 @@ function AppShell() {
       if (!Number.isInteger(n) || n < 1 || n > WORKBENCH_ORDER.length) return
       const target = e.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      const targetWb = WORKBENCH_ORDER[n - 1]
+      if (targetWb === 'admin' && (!isAdmin || uiMode === 'simple')) return
       e.preventDefault()
-      setWorkbench(WORKBENCH_ORDER[n - 1])
+      setWorkbench(targetWb)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [setWorkbench])
+  }, [setWorkbench, isAdmin, uiMode])
 
 
   const nav = (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
@@ -108,6 +108,13 @@ export default function PlatformPanel() {
   const [formatting, setFormatting] = useState(false)
   const [copied, setCopied] = useState(false)
   const [litrpgError, setLitrpgError] = useState('')
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     platformApi.list()
@@ -214,7 +221,8 @@ export default function PlatformPanel() {
       navigator.clipboard.writeText(text).catch(() => {})
     }
     setCopied(true)
-    setTimeout(() => setCopied(false), 2500)
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2500)
   }
 
   const currentPlatform = platforms.find((p) => p.id === selected)

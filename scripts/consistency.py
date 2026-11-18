@@ -4,6 +4,7 @@ M2.3 风格一致性自检 — 生成章 vs voice-card 逐维打分
 """
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -25,6 +26,13 @@ DIRECT_EMOTION = ["很愤怒", "很生气", "感到难过", "非常开心", "很
 
 # 视角标记
 POV_MARKERS = ["他", "她", "她和他", "他心里", "她心里"]
+
+_DIALOGUE_STRIP_RE = re.compile(r"“[^”\n]*”|‘[^’\n]*’|「[^」\n]*」|『[^』\n]*』|\"[^\"\n]*\"")
+_SENT_END_RE = re.compile(r"[。！？!?]|……|\.{3}")
+_HEADING_RE = re.compile(
+    r"^\s*(?:第\s*[0-9零〇一二两三四五六七八九十百千万]+\s*[章回节卷]|chapter\s+\d+|#+\s)",
+    re.I,
+)
 
 def extract_keywords(desc: str, max_kws: int = 8) -> list:
     """从声线卡描述中提取可匹配的关键词。
@@ -70,10 +78,19 @@ def _vt_to_str(item) -> str:
 
 def check_voices(text, voices):
     """角色声线执行度"""
+    if not isinstance(voices, list):
+        voices = []
     present = []
     for v in voices:
-        name = v.get("name", "")
-        if name and (name in text or (len(name) >= 2 and name[:2] in text)):
+        if not isinstance(v, dict):
+            continue
+        name = str(v.get("name") or "")
+        cjk_prefix = (
+            len(name) >= 2
+            and all("\u4e00" <= c <= "\u9fff" for c in name[:2])
+            and name[:2] in text
+        )
+        if name and (name in text or cjk_prefix):
             present.append(v)
     if not present:
         return 0.0, ["  本章无角色出场，无法检查声线"]
@@ -81,10 +98,13 @@ def check_voices(text, voices):
     total = 0
     details = []
     for v in present:
-        ss = v.get("speech_signature") or {}
+        ss = v.get("speech_signature")
+        if not isinstance(ss, dict):
+            ss = {}
         name = v.get("name", "?")
         kws = []
-        for t in ss.get("verbal_tics", []):
+        vt_list = ss.get("verbal_tics")
+        for t in (vt_list if isinstance(vt_list, list) else []):
             kws.extend(extract_keywords(_vt_to_str(t)))
         for field in ("refusal_pattern", "anger_pattern"):
             val = ss.get(field)
@@ -158,11 +178,13 @@ def check_narration(text, narration):
     if "第一人称" in pov:
         pov_markers = ["我", "我们"]
         pov_label = "第一人称"
+        pov_text = _DIALOGUE_STRIP_RE.sub("", text)
     else:
         # 资产缺失或声明第三人称 → 检查第三人称标记
         pov_markers = POV_MARKERS
         pov_label = pov or "第三人称"
-    hit_pov = sum(1 for m in pov_markers if m in text)
+        pov_text = text
+    hit_pov = sum(1 for m in pov_markers if m in pov_text)
     if hit_pov > 0:
         score += 5
         details.append(f"  视角{pov_label} ✓(+5)")
@@ -183,8 +205,15 @@ def check_narration(text, narration):
     else:
         details.append(f"  短句爆发 {max_streak} 连续(+0)")
     single_sentence_paragraphs = 0
-    for line in lines:
-        if len(line) <= 20 and not any(p in line for p in ['。', '！', '？', '……']):
+    body_lines = [ln for ln in text.splitlines() if not _HEADING_RE.match(ln.strip())]
+    body_text = "\n".join(body_lines).strip()
+    paras = (
+        [p.strip() for p in re.split(r"\n\s*\n", body_text) if p.strip()]
+        if re.search(r"\n\s*\n", body_text)
+        else [ln.strip() for ln in body_lines if ln.strip()]
+    )
+    for para in paras:
+        if 0 < len(para) <= 25 and len(_SENT_END_RE.findall(para)) <= 1:
             single_sentence_paragraphs += 1
     if single_sentence_paragraphs >= 5:
         score += 5
@@ -246,14 +275,26 @@ def check_imagery(text, imagery):
     src = f"，含资产领域 {asset_hits} 个" if asset_domains else ""
     return score, [f"  意象领域命中 {len(hit_domains)} 个{src} → {score}/10"]
 
+def _extract_voice_card_parts(voice_card):
+    vc = voice_card if isinstance(voice_card, dict) else {}
+    dlg = vc.get("dialogue")
+    dlg = dlg if isinstance(dlg, dict) else {}
+    voices = dlg.get("character_voices")
+    voices = voices if isinstance(voices, list) else []
+    emotion = vc.get("emotion_handling")
+    emotion = emotion if isinstance(emotion, dict) else {}
+    narration = vc.get("narration")
+    narration = narration if isinstance(narration, dict) else {}
+    banned = vc.get("banned_words")
+    banned = banned if isinstance(banned, list) else []
+    imagery = vc.get("imagery")
+    imagery = imagery if isinstance(imagery, dict) else {}
+    return voices, emotion, narration, banned, imagery
+
+
 def score_text(voice_card: dict, text: str, label: str = ""):
     """供 novel.py 调用的接口：返回 (score, details, raw)"""
-    # 提取voice-card中的各个维度
-    voices = voice_card.get("dialogue", {}).get("character_voices", [])
-    emotion = voice_card.get("emotion_handling", {})
-    narration = voice_card.get("narration", {})
-    banned = voice_card.get("banned_words", [])
-    imagery = voice_card.get("imagery", {})
+    voices, emotion, narration, banned, imagery = _extract_voice_card_parts(voice_card)
 
     # 各维度打分
     voice_score, voice_details = check_voices(text, voices)
@@ -294,13 +335,9 @@ def score_text(voice_card: dict, text: str, label: str = ""):
 
 def consistency_check(voice_card_path: str, chapter_path: str, quiet: bool = False):
     """主函数：一致性打分。"""
-    voice_card = json.loads(Path(voice_card_path).read_text(encoding="utf-8"))
+    voice_card = json.loads(Path(voice_card_path).read_text(encoding="utf-8-sig"))
     chapter_text = chapter_loader.read_text_file(Path(chapter_path))
-    voices = voice_card.get("dialogue", {}).get("character_voices", [])
-    emotion = voice_card.get("emotion_handling", {})
-    narration = voice_card.get("narration", {})
-    banned = voice_card.get("banned_words", [])
-    imagery = voice_card.get("imagery", {})
+    voices, emotion, narration, banned, imagery = _extract_voice_card_parts(voice_card)
     voice_score, voice_details = check_voices(chapter_text, voices)
     emotion_score, emotion_details = check_emotion(chapter_text, emotion)
     narration_score, narration_details = check_narration(chapter_text, narration)

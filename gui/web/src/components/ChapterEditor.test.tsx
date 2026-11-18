@@ -7,6 +7,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import ChapterEditor from './ChapterEditor'
+import { toolsApi } from '../api/client'
 import { I18nProvider } from '../state/I18nContext'
 import { writeStorage, removeStorage } from '../safeStorage'
 
@@ -86,6 +87,29 @@ describe('ChapterEditor', () => {
     await screen.findByText('甲段落')
     // 三个 <p>：甲 / 空 / 丙，join 后还原原文
     expect(editorParagraphs(container)).toBe('甲段落\n\n丙段落')
+  })
+
+  it('多段带空行外部灌入不会触发 onChange 空行翻倍（防 2^N \\n 爆炸）且排查读取单 \\n 分隔', async () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<ChapterEditor value="初始段落" onChange={onChange} />)
+    await screen.findByText('初始段落')
+    onChange.mockClear()
+
+    // 外部受控更新多段落文本：emitUpdate: false 不得反向触发 onUpdate/onChange，更不得产生 \n\n\n\n
+    rerender(<ChapterEditor value={'第一段\n\n第二段'} onChange={onChange} />)
+    await screen.findByText('第一段')
+    expect(onChange).not.toHaveBeenCalled()
+    for (const call of onChange.mock.calls) {
+      expect(call[0]).not.toContain('\n\n\n\n')
+    }
+
+    // 毒点排查读取 editor.getText({ blockSeparator: '\n' })，保持精确单空行 '第一段\n\n第二段'
+    vi.mocked(toolsApi.checkPoison).mockClear()
+    const btn = await screen.findByText('🛡️ 毒点避雷排查')
+    fireEvent.click(btn)
+    await waitFor(() => {
+      expect(toolsApi.checkPoison).toHaveBeenCalledWith('第一段\n\n第二段')
+    })
   })
 
   it('多段换行保真', async () => {

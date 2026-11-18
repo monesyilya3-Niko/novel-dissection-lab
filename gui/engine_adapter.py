@@ -351,6 +351,86 @@ def load_prompt(kind: str) -> tuple[str, str]:
     return _get_pipeline().load_prompt(kind)
 
 
+def build_takeover_slice_text(
+    pass_name: str,
+    slices: dict[str, Any],
+    metrics: dict[str, Any],
+    chapters: list[Any] | None = None,
+    max_chars: int = 40000,
+) -> str:
+    """组装 Web-AI 离线接管用的采样切片文本（控制上下文体积上限 ≤ max_chars）。"""
+    parts: list[str] = []
+    if pass_name == "pass2_character":
+        dialogues = (slices.get("pass2_character") or {}).get("dialogues") or []
+        for d in dialogues:
+            if not isinstance(d, dict):
+                continue
+            parts.append(
+                f"[第{d.get('chapter', '?')}章 {d.get('title', '')}] "
+                f"前:{d.get('before', '')} | 对话:{d.get('line', '')} | 后:{d.get('after', '')}"
+            )
+        joined = "\n".join(parts)
+    elif pass_name in ("pass1_structure", "pass3_style", "pass4_commercial"):
+        ch_list = (slices.get(pass_name) or {}).get("chapters") or []
+        for i, c in enumerate(ch_list, start=1):
+            if not isinstance(c, dict):
+                continue
+            idx = c.get("index", i)
+            title = c.get("title", "")
+            reason = f"（{c['reason']}）" if c.get("reason") and pass_name == "pass1_structure" else ""
+            body = str(c.get("text") or "")
+            if pass_name == "pass1_structure" and c.get("tail500"):
+                parts.append(f"## 第{idx}章 {title}{reason}\n{body}\n【章末500字】\n{c['tail500']}")
+            else:
+                parts.append(f"## 第{idx}章 {title}\n{body}")
+        joined = "\n\n".join(parts)
+    elif pass_name == "pass5_craft":
+        # 提取最多 6 章代表性切片：前 3 章 + 中段 2 章 + 末 1 章
+        src_chs: list[dict[str, Any]] = list(
+            (slices.get("pass1_structure") or {}).get("chapters") or []
+        )
+        if not src_chs:
+            src_chs = list((slices.get("pass3_style") or {}).get("chapters") or [])
+        if not src_chs and chapters:
+            for i, item in enumerate(chapters, start=1):
+                if isinstance(item, (tuple, list)) and len(item) >= 2:
+                    src_chs.append({"index": i, "title": str(item[0] or f"第{i}章"), "text": str(item[1] or "")})
+                elif isinstance(item, dict):
+                    src_chs.append({
+                        "index": item.get("index", i),
+                        "title": str(item.get("title") or f"第{i}章"),
+                        "text": str(item.get("text") or ""),
+                    })
+        n = len(src_chs)
+        if n <= 6:
+            picked = src_chs
+        else:
+            mid = n // 2
+            raw_idxs = [0, 1, 2, max(3, mid - 1), max(3, mid), n - 1]
+            seen_pos: set[int] = set()
+            picked = []
+            for pos in raw_idxs:
+                if 0 <= pos < n and pos not in seen_pos:
+                    seen_pos.add(pos)
+                    picked.append(src_chs[pos])
+        per_ch_budget = max(2000, (max_chars - 512) // max(len(picked), 1))
+        for i, c in enumerate(picked, start=1):
+            idx = c.get("index", i)
+            title = c.get("title", "")
+            body = str(c.get("text") or "")
+            if len(body) > per_ch_budget:
+                half = per_ch_budget // 2
+                body = body[:half] + "\n…[章节中段省略]…\n" + body[-half:]
+            parts.append(f"## 第{idx}章 {title}\n{body}")
+        joined = "\n\n".join(parts)
+    else:
+        raise ValueError(f"未知 Pass: {pass_name}")
+
+    if len(joined) > max_chars:
+        joined = joined[:max_chars] + "\n…[已截断至上下文安全上限]"
+    return joined
+
+
 def any_model_configured() -> bool:
     """是否有外部模型配置（复用 llm_client.any_model_configured）。"""
     return _get_llm_client().any_model_configured()
@@ -711,8 +791,24 @@ def ensure_novel_structure(novel_dir: str, name: str = "新书") -> Path:
 
 
 def save_chapter(novel_dir: str, chapter_no: int, content: str) -> Path:
-    """落盘章节（write.save_chapter）。"""
-    return _get_write().save_chapter(Path(novel_dir), chapter_no, content)
+    """落盘章节（write.save_chapter；覆盖前自动兼容 GBK 或损坏旧稿，防 read_text('utf-8') 崩溃）。"""
+    nd = Path(novel_dir)
+    arc = (chapter_no - 1) // 30 + 1
+    ch_file = nd / "chapters" / f"arc-{arc}" / f"chapter-{chapter_no:03d}.txt"
+    if ch_file.is_file():
+        try:
+            ch_file.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            try:
+                decoded_old = read_chapter_text(ch_file)
+                ch_file.write_text(decoded_old, encoding="utf-8")
+            except (UnicodeError, OSError):
+                bak_corrupt = ch_file.with_name(f"{ch_file.name}.corrupt.bak")
+                try:
+                    ch_file.replace(bak_corrupt)
+                except OSError:
+                    pass
+    return _get_write().save_chapter(nd, chapter_no, content)
 
 
 # --- 打分 / 检查（consistency.py / chapter_check.py）---
@@ -976,9 +1072,9 @@ def adapter_self_check() -> bool:
         # 单批切片
         slices = build_single_batch_slices("pass1_structure", 1, "第1章", "正文", m)
         assert "pass1_structure" in slices
-        # W10：阈值解析（纯算法，不调 LLM）
+        # W10：阈值解析（纯算法，不调 LLM；兼容用户自定义 settings.json 阈值）
         pass_line, warn_line = resolve_thresholds(None)
-        assert pass_line == 75 and warn_line == 60, f"resolve_thresholds 异常: {pass_line}/{warn_line}"
+        assert 0 < warn_line < pass_line <= 100, f"resolve_thresholds 异常: {pass_line}/{warn_line}"
         # W10：章节检查（纯算法）
         qc_result = chapter_check("这是一段测试正文，用来验证章节检查函数可调用。" * 20)
         assert "score" in qc_result and "verdict" in qc_result, "chapter_check 返回结构异常"

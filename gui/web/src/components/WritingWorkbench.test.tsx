@@ -1,6 +1,7 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import WritingWorkbench from './WritingWorkbench'
+import { writingApi } from '../api/client'
 import { I18nProvider } from '../state/I18nContext'
 import { UiModeProvider } from '../state/UiModeContext'
 import { writeStorage, removeStorage } from '../safeStorage'
@@ -85,12 +86,15 @@ vi.mock('./useWritingAssets', () => ({
     setProseCard: vi.fn(),
     mismatches: [],
     voiceGenre: '',
+    refresh: vi.fn().mockResolvedValue(undefined),
   }),
 }))
 
 describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
+    delete (writingApi as Record<string, unknown>).getChapter
     mockProjects.mockResolvedValue([
       { id: 'p1', name: '万界仙途', readOnly: false, platform: 'fanqie', genre: 'xianxia', targetWords: 1000000 },
     ])
@@ -318,7 +322,7 @@ describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
 
     fireEvent.click(screen.getByText('保存企划'))
     await waitFor(() => {
-      expect(mockUpdateProjectMeta).toHaveBeenCalledWith('万界仙途', expect.objectContaining({
+      expect(mockUpdateProjectMeta).toHaveBeenCalledWith('p1', expect.objectContaining({
         platform: expect.any(String),
         genre: expect.any(String),
       }))
@@ -342,7 +346,7 @@ describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
 
     fireEvent.click(screen.getByText('立即下载'))
     await waitFor(() => {
-      expect(mockExport).toHaveBeenCalledWith('万界仙途', 'docx')
+      expect(mockExport).toHaveBeenCalledWith('p1', 'docx')
       expect(screen.getByText(/全书已成功导出为 万界仙途-全书导出.docx/)).toBeInTheDocument()
     })
   })
@@ -424,5 +428,77 @@ describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
     } finally {
       removeStorage('novellab.locale')
     }
+  })
+
+  it('过滤只读 default 项目并始终使用项目 id 而非显示名发起请求', async () => {
+    mockProjects.mockResolvedValue([
+      { id: 'default', name: 'default（CLI 只读）', readOnly: true },
+      { id: 'proj-beta', name: '剑道独尊', readOnly: false, platform: 'qidian', genre: 'xianxia', targetWords: 800000 },
+    ])
+
+    render(<WritingWorkbench />)
+    await waitFor(() => {
+      expect(mockGetProjectMeta).toHaveBeenCalledWith('proj-beta')
+    })
+    expect(mockGetProjectMeta).not.toHaveBeenCalledWith('default')
+    expect(mockGetProjectMeta).not.toHaveBeenCalledWith('default（CLI 只读）')
+    expect(mockGetProjectMeta).not.toHaveBeenCalledWith('剑道独尊')
+  })
+
+  it('草稿 localStorage 安全：切换章号与切换空项目不会跨章污染或泄漏旧正文', async () => {
+    const mockGetChapter = vi.fn((proj: string, ch: number) => {
+      if (proj === 'proj-a' && ch === 1) {
+        return Promise.resolve({ project: 'proj-a', chapterNo: 1, title: '第1章 破境', content: '甲项目第一章服务端真稿', wordCount: 11 })
+      }
+      return Promise.reject(new Error('404 Not Found'))
+    })
+    ;(writingApi as Record<string, unknown>).getChapter = mockGetChapter
+
+    mockProjects.mockResolvedValue([
+      { id: 'proj-a', name: '甲作品', readOnly: false },
+      { id: 'proj-b', name: '乙作品', readOnly: false },
+    ])
+
+    render(<WritingWorkbench />)
+    await waitFor(() => {
+      expect(mockGetChapter).toHaveBeenCalledWith('proj-a', 1)
+      expect(screen.getByDisplayValue('第1章 破境')).toBeInTheDocument()
+    })
+
+    // 未做用户编辑时不应写入 localStorage 草稿
+    expect(localStorage.getItem('novel_draft_proj-a_ch1')).toBeNull()
+
+    // 点击「下一章」切到第 2 章（404）：第 2 章草稿不得被第 1 章正文覆盖！
+    fireEvent.click(screen.getByText('下一章'))
+    await waitFor(() => {
+      expect(mockGetChapter).toHaveBeenCalledWith('proj-a', 2)
+    })
+    expect(localStorage.getItem('novel_draft_proj-a_ch2')).toBeNull()
+  })
+
+  it('保存章节同步传递 title 字段并在请求飞行中拦截连点', async () => {
+    let resolveSave!: (v: unknown) => void
+    mockImportChapter.mockImplementation(
+      () => new Promise((resolve) => { resolveSave = resolve }),
+    )
+
+    render(<WritingWorkbench />)
+    await waitFor(() => expect(screen.getByText('番茄小说')).toBeInTheDocument())
+    const saveBtn = screen.getByText('保存并入库')
+
+    fireEvent.click(saveBtn)
+    fireEvent.click(saveBtn)
+
+    expect(mockImportChapter).toHaveBeenCalledTimes(1)
+    expect(mockImportChapter).toHaveBeenCalledWith(expect.objectContaining({
+      project: 'p1',
+      chapter_no: 1,
+      title: '第1章 惊变',
+    }))
+
+    resolveSave({ project: 'p1', chapterNo: 1, title: '第1章 惊变', charCount: 80, overwrote: false })
+    await waitFor(() => {
+      expect(screen.getByText(/第 1 章已入库/)).toBeInTheDocument()
+    })
   })
 })

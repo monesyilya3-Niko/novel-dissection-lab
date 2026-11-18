@@ -37,7 +37,7 @@ QUOTE_PAIRS = [('「', '」'), ('『', '』'), ('“', '”'), ('‘', '’'), (
 
 def load_json(path: Path) -> dict:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8-sig"))
     except Exception as e:
         print(f"JSON 解析失败: {e}")
         sys.exit(1)
@@ -70,10 +70,13 @@ def walk_strings(node, path="", out=None):
 
 
 def find_quoted_fragments(s: str) -> list:
-    """提取字符串里所有中文引号包裹的片段（用于 >20 字警告）。"""
+    """提取字符串里所有成对引号包裹的片段（用于 >20 字警告，避开英文缩写撇号）。"""
     frags = []
     for op, cl in QUOTE_PAIRS:
-        pat = re.escape(op) + r'([^' + re.escape(cl) + r']+)' + re.escape(cl)
+        if op == "'":
+            pat = r"(?<![A-Za-z])'([^'\n]+)'(?![A-Za-z])"
+        else:
+            pat = re.escape(op) + r"([^" + re.escape(cl) + r"\n]+)" + re.escape(cl)
         frags.extend(m.group(1) for m in re.finditer(pat, s))
     return frags
 
@@ -103,15 +106,15 @@ def scan_asset(asset: dict, ngram: set) -> tuple:
     errors, warns = [], []
     # 检查特殊字段（用 walk_all_values 以捕获布尔值 contains_verbatim）
     for path, val in walk_all_values(asset):
-        if path.endswith(".abstraction_level") and val == "verbal":
+        if (path == "abstraction_level" or path.endswith(".abstraction_level")) and val == "verbal":
             errors.append(f"abstraction_level='verbal' → REJECT（版权红线） @ {path}")
-        if path.endswith(".contains_verbatim") and val is True:
+        if (path == "contains_verbatim" or path.endswith(".contains_verbatim")) and val is True:
             errors.append(f"contains_verbatim=true → REJECT（版权红线） @ {path}")
 
     # 逐字段做 12 字连续匹配 + 引号内片段检查
     for path, val in walk_strings(asset):
         # 章节标题是书目元数据（功能性标识），不构成受版权保护的表达 → 豁免
-        if path.endswith(".title"):
+        if path == "title" or path.endswith(".title"):
             continue
         if len(val) < WINDOW:
             continue

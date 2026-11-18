@@ -14,8 +14,10 @@ Pass2/3 模型输出常把「例如」示例写成原文引用（如 '例如：'
 """
 import argparse
 import json
+import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -23,33 +25,67 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import chapter_loader
 import compliance as comp
 
+# 成对引号匹配器：严格要求首尾同型配对，英文单引号要求非字母边界以避开 don't / can't 等缩写
+_PAIRED_QUOTES = (
+    ("「", "」", re.compile(r"「([^」\n]+)」")),
+    ("『", "』", re.compile(r"『([^』\n]+)』")),
+    ("“", "”", re.compile(r"“([^”\n]+)”")),
+    ("‘", "’", re.compile(r"‘([^’\n]+)’")),
+    ('"', '"', re.compile(r'"([^"\n]+)"')),
+    ("'", "'", re.compile(r"(?<![A-Za-z])'([^'\n]+)'(?![A-Za-z])")),
+)
+
+_EXAMPLE_QUOTE_PATTERNS = tuple(
+    re.compile(
+        r"(例如|比如|如)\s*[：:]\s*"
+        + (
+            r"(?<![A-Za-z])'([^'\n]{9,})'(?![A-Za-z])"
+            if op == "'"
+            else re.escape(op) + r"([^" + re.escape(cl) + r"\n]{9,})" + re.escape(cl)
+        )
+    )
+    for op, cl, _ in _PAIRED_QUOTES
+)
+
+_EMPTY_QUOTE_PATTERNS = tuple(
+    re.compile(
+        r"(?<![A-Za-z])'\s*'(?![A-Za-z])"
+        if op == "'"
+        else re.escape(op) + r"\s*" + re.escape(cl)
+    )
+    for op, cl, _ in _PAIRED_QUOTES
+)
+
 
 def clean_string(s: str, ngram: set, path: str) -> tuple:
     """清洗单个字符串，返回 (清洗后, 是否改动)。"""
     orig = s
-    # 引号字符集：中文引号 + 英文引号（2026-09-01 补齐英文单/双引号，
-    # sangshi 的 pass2 用英文单引号 ' 夹带原文，此前漏检导致 compliance REJECT）
-    OPEN = "「『“‘'\""
-    CLOSE = "」』”’'\""
     # 1. 删除「例如/比如/如」后引号内 >8 字的片段（模型常把原文当示例）
-    s = re.sub(r'(例如|比如|如)\s*[：:]\s*[' + OPEN + r']([^' + CLOSE + r']{9,})[' + CLOSE + r']', r'\1', s)
-    # 2. 删除引号内 >12 字且与原文匹配的片段（保留短的、非原文的引号短语）
+    for pat in _EXAMPLE_QUOTE_PATTERNS:
+        s = pat.sub(r"\1", s)
+
+    # 2. 删除引号内 ≥12 字且滑窗命中原文的片段（无 40 字长度上限，O(N) 不回溯）
     def drop_quoted(m):
-        frag = m.group(2)
-        frag_c = re.sub(r'\s+', '', frag)
-        if len(frag_c) > 12 and frag_c[:12] in ngram:
-            # 2026-09-01 修复：整组删除（含前后引号），避免残留孤立引号
-            # 与相邻片段形成错误配对（sangshi 曾因此产生 26 字误报）。
+        frag = m.group(1)
+        frag_c = re.sub(r"\s+", "", frag)
+        w = comp.WINDOW
+        if len(frag_c) >= w and ngram and any(
+            frag_c[i:i + w] in ngram for i in range(len(frag_c) - w + 1)
+        ):
             return ""
         return m.group(0)
-    s = re.sub(r'([' + OPEN + r'])([^' + CLOSE + r']{1,40})([' + CLOSE + r'])', drop_quoted, s)
-    # 3. 清理清洗后可能残留的孤立引号（连续两个引号中间无内容，或句读旁的单引号）
-    s = re.sub(r'[' + OPEN + r'][' + CLOSE + r']{2,}', lambda m: m.group(0)[0], s)
-    s = re.sub(r'[、，,]\s*[' + OPEN + r']\s*[' + CLOSE + r']\s*[、，,]', '、', s)
-    s = re.sub(r'[、，,]\s*[' + OPEN + r']\s*[' + CLOSE + r']', '', s)
+
+    for _op, _cl, qpat in _PAIRED_QUOTES:
+        s = qpat.sub(drop_quoted, s)
+
+    # 3. 清理清洗后可能残留的空引号对
+    for epat in _EMPTY_QUOTE_PATTERNS:
+        s = re.sub(r"[、，,]\s*" + epat.pattern + r"\s*[、，,]", "、", s)
+        s = re.sub(r"[、，,]\s*" + epat.pattern, "", s)
+
     # 4. 清理删除片段后产生的标点冗余（如"、。"、"、、"、"，，"）
-    s = re.sub(r'[、，,]\s*[。；;]', '。', s)
-    s = re.sub(r'[、，,]{2,}', '、', s)
+    s = re.sub(r"[、，,]\s*[。；;]", "。", s)
+    s = re.sub(r"[、，,]{2,}", "、", s)
     return s, s != orig
 
 
@@ -61,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     asset_path = Path(args.asset)
-    asset = json.loads(asset_path.read_text(encoding="utf-8"))
+    asset = json.loads(asset_path.read_text(encoding="utf-8-sig"))
     book = chapter_loader.read_text_file(Path(args.book))
     ngram = comp.build_ngram_index(book)
 
@@ -110,7 +146,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.apply and write_points:
         for parent, key, _old, new in write_points:
             parent[key] = new
-        asset_path.write_text(json.dumps(asset, ensure_ascii=False, indent=2), encoding="utf-8")
+        payload = json.dumps(asset, ensure_ascii=False, indent=2)
+        asset_path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=str(asset_path.parent), suffix=".tmp", delete=False
+        ) as fh:
+            tmp_path = Path(fh.name)
+            fh.write(payload)
+        try:
+            os.replace(tmp_path, asset_path)
+        except Exception:
+            tmp_path.unlink(missing_ok=True)
+            raise
         print(f"\n✓ 已清洗 {len(write_points)} 处并保存")
 
     # 复扫
