@@ -26,6 +26,8 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@emotion/styled"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "jsdom"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
