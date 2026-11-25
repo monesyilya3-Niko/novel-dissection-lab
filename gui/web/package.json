@@ -29,7 +29,7 @@
     "@tiptap/starter-kit": "^3.34.0",
     "echarts": "^6.1.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "^19.3.1",
     "react-markdown": "^9.0.0",
     "remark-gfm": "^4.0.0"
   },
@@ -40,7 +40,7 @@
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.10",
     "@types/react": "^18.3.11",
-    "@types/react-dom": "^18.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.6.2",
     "eslint": "^9.39.5",
