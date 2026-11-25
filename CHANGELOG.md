@@ -2,9 +2,11 @@
 
 本文件记录面向用户的显著变更。版本发布由 `.github/workflows/release.yml` 驱动：推送 `v*` tag 即从 Conventional Commits 自动生成发布说明。
 
-## [Unreleased]
+## [1.3.1] - 2026-11-25（真实模型链路修复）
 
-### Fixed — 真实模型链路（2026-11-25，Anthropic 协议网关实测）
+本版的核心是**用真实模型网关做端到端实测**，修掉四个「自动化测试全绿、真实链路却不可用」的缺陷。1.3.0 的整修内容随本版一并发布（此前未发版）。
+
+### Fixed — 真实模型链路（2026-11-25 实测）
 - **推理模型经 Anthropic 协议整体不可用**：网关返回 `[thinking, text]` 双块时，`_call_anthropic` 要求每个块都有 `text` 键，一律抛「响应格式异常」。实测 `deepseek-4.1-flash` / `glm-5.3-flash` 两个模型全部不可调用。现在只取 `text` 块、跳过 `thinking`/`redacted_thinking`/`tool_use`；全是思考块时报「返回空正文」并给出思考字符数，而不是含糊的格式错误。
 - **拆书资产永远无法入库**：`assemble.py` 的 CLI 路径组装后会用 `_clean_verbatim` 清洗模型照抄的原文台词，但 `pipeline.py` 这条路径从没调用它。模型把原文对白当「声线证据」抄进 `refusal_pattern`/`anger_pattern`，`compliance` 判「连续 12 字匹配原文」REJECT，关键资产被整批阻塞。实测 6 章示例书 voice-card 5 处硬错误 → 清洗后 0。现在 voice-card / structure-obs / commercial-obs / craft-card 四类资产在合规扫描前统一清洗。
 - **Markdown 合集被切成 1 章**：用户用 Markdown 整理的整本合集，章节标题写作 `# 第134章 油热那一声`，`sampler` 的章节正则从行首要求直接是「第」，一本 137 章的书整本只切出 1 章，拆书、采样、报告全部失真。现在放行 Markdown 标题标记（`#`~`######`）；目录里的 `· 第001章…` 索引行仍不当作正文标题。实测该合集 137 章全部正确切出。
@@ -36,7 +38,8 @@
 ### Verification
 - 后端：2766 项通过，7 skipped；`ruff check .` 通过。
 - 前端：441 项通过（73 套件）；ESLint、TypeScript 与 Vite 生产构建通过。
-- 真实链路：网关 `deepseek-4.1-flash` / `glm-5.3-flash` 经项目自带 `_call_anthropic` 与 `model_test` 实测连通；6 章示例书 `pipeline.py` 端到端跑通 pass1–5。
+- 真实链路：网关 `deepseek-4.1-flash` / `glm-5.3-flash` 经项目自带 `_call_anthropic` 与 `model_test` 实测连通；137 章 Markdown 合集实测正确切分为 137 章；pass5 实测 19 条技法 `deep_analysis` 全齐（修复前 28/28 全缺）。
+- 6 章示例书 `pipeline.py` 端到端跑通 pass1–5，四类资产清洗后 0 硬错误并成功入库。
 - 浏览器：含写作项目夹具的隔离服务 Playwright 22 项通过、3 项空库跳过；无写作夹具的标准副本 17 项通过、8 项按前置条件跳过；空库 onboarding 3 项全部通过；写作取消竞态及管理后台/精华工坊巡检通过。
 
 ## [1.3.0] - 2026-11-23（企业级可用性整修：去伪数据、补缺口、修崩溃）
