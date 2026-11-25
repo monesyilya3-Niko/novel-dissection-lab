@@ -1,6 +1,6 @@
 // M1 高级分析 + M4 资产写入工作台：蒸馏 / 聚合 / 批量状态 / 资产编辑。
 // 全量接入 I18nProvider，支持中英文双语国际化。
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Box from '@mui/material/Box'
 import ContextHelpButton from './ContextHelpButton'
 import Tabs from '@mui/material/Tabs'
@@ -50,7 +50,14 @@ export default function AdvancedWorkbench() {
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: 1, borderColor: 'divider', pr: 1 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ flex: 1, px: 2 }}>
+        <Tabs
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          sx={{ flex: 1, minWidth: 0, px: 2 }}
+        >
           <Tab label={t('advanced_tab_distill')} />
           <Tab label={t('advanced_tab_batch')} />
           <Tab label={t('advanced_tab_edit')} />
@@ -59,10 +66,13 @@ export default function AdvancedWorkbench() {
         <ContextHelpButton guideKey="advanced" />
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: 2 }}>
-        {tab === 0 && <DistillPanel />}
-        {tab === 1 && <BatchStatusPanel />}
-        {tab === 2 && <AssetEditPanel />}
-        {tab === 3 && <PlatformPanel />}
+        {/* 2026-11-23：四个面板保持挂载、仅切换可见性。
+            旧实现用 `tab===N && <Panel/>`，切一次页签就卸载编辑器，
+            未保存的 JSON 修改静默丢失（用户看不出发生过什么）。 */}
+        <Box sx={{ display: tab === 0 ? 'block' : 'none' }}><DistillPanel /></Box>
+        <Box sx={{ display: tab === 1 ? 'block' : 'none' }}><BatchStatusPanel active={tab === 1} /></Box>
+        <Box sx={{ display: tab === 2 ? 'block' : 'none' }}><AssetEditPanel /></Box>
+        <Box sx={{ display: tab === 3 ? 'block' : 'none' }}><PlatformPanel /></Box>
       </Box>
     </Box>
   )
@@ -227,24 +237,46 @@ const PASS_SHORT: Record<string, Record<Locale, string>> = {
   pass5_aggregate: { 'zh-CN': 'P5 聚合', 'en-US': 'P5 Aggregate' },
 }
 
-function BatchStatusPanel() {
+function BatchStatusPanel({ active }: { active: boolean }) {
   const { t, locale } = useI18n()
   const [status, setStatus] = useState<Record<string, unknown> | null>(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const loadSeq = useRef(0)
+
+  const load = useCallback(async () => {
+    const seq = ++loadSeq.current
+    setLoading(true)
+    try {
+      const data = await advancedApi.batchStatus()
+      if (seq === loadSeq.current) {
+        setStatus(data as Record<string, unknown>)
+        setError('')
+      }
+    } catch (e) {
+      if (seq === loadSeq.current) setError(friendlyError(e))
+    } finally {
+      if (seq === loadSeq.current) setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    advancedApi.batchStatus()
-      .then((data) => setStatus(data as Record<string, unknown>))
-      .catch((e) => setError(friendlyError(e)))
-  }, [])
+    if (active) void load()
+  }, [active, load])
 
   const books = (status?.books ?? []) as Record<string, unknown>[]
 
-  if (error) return <Alert severity="error">{error}</Alert>
+  if (error && !status) return <Alert severity="error">{error}</Alert>
 
   return (
     <Box>
-      <Typography variant="h6" gutterBottom>{t('batch_status_title')}</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Typography variant="h6">{t('batch_status_title')}</Typography>
+        <Button variant="outlined" size="small" onClick={() => void load()} disabled={loading}>
+          {t('batch_status_refresh')}
+        </Button>
+      </Box>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {books.length === 0 && (
         <Typography variant="body2" color="text.secondary">{t('batch_status_empty')}</Typography>
       )}
@@ -286,7 +318,9 @@ function AssetEditPanel() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    assetApi.list({ limit: 100 })
+    // 2026-11-23：limit 100 会静默漏掉约 1/3 资产（干净仓库 138 张）；
+    // 报告/语料是虚拟行，编辑保存必然 404，必须从可编辑下拉中剔除。
+    assetApi.list({ limit: 500 })
       .then((j) => {
         const items = ((j as Record<string, unknown>).items ?? []) as { id: string; name: string; kind: string }[]
         setAssets(items)
@@ -298,9 +332,19 @@ function AssetEditPanel() {
   const selectedAsset = assets.find((a) => `${a.kind}:${a.id}` === activeAssetKey)
   // 题材文风卡索引（prose_card_index）只是题材→卡片文件的寻址表，不是可编辑卡片：
   // 不进可编辑下拉，避免手改索引内容破坏寻址（查看请走「资产库」）。
-  const editableAssets = assets.filter((a) => a.kind !== 'prose_card_index')
+  // report/book 是虚拟资产行，没有可写 JSON，旧实现选中后保存必 404。
+  const NON_EDITABLE_KINDS = new Set(['prose_card_index', 'report', 'book'])
+  const editableAssets = assets.filter((a) => !NON_EDITABLE_KINDS.has(a.kind))
   const hasProseCardIndex = assets.some((a) => a.kind === 'prose_card_index')
   const dirty = content !== savedContent
+
+  // 2026-11-23：切页签/工作台会卸载本面板；未保存的 JSON 曾静默丢失。
+  // 用 sessionStorage 按资产 key 暂存，重新选中同一资产时恢复。
+  const DRAFT_PREFIX = 'novellab.assetDraft.'
+  useEffect(() => {
+    if (!dirty || !loadedAssetKey) return
+    try { sessionStorage.setItem(DRAFT_PREFIX + loadedAssetKey, content) } catch { /* ignore */ }
+  }, [content, dirty, loadedAssetKey])
 
   useEffect(() => {
     if (!dirty) return
@@ -338,10 +382,14 @@ function AssetEditPanel() {
       const id = rest.join(':')
       const data = await assetApi.detail(kind, id)
       const text = JSON.stringify((data as Record<string, unknown>)?.content ?? data, null, 2)
+      let restored = ''
+      try { restored = sessionStorage.getItem(DRAFT_PREFIX + targetKey) || '' } catch { /* ignore */ }
       setLoadedAssetKey(targetKey)
-      setContent(text)
+      setContent(restored || text)
       setSavedContent(text)
-      setMessage('')
+      setMessage(restored
+        ? t('asset_edit_draft_restored', '已恢复上次未保存的草稿；保存后才会写入磁盘。')
+        : '')
     } catch (e) {
       setMessage(friendlyError(e))
     } finally {
@@ -359,6 +407,7 @@ function AssetEditPanel() {
       const id = rest.join(':')
       await assetApi.update(kind, id, parsed)
       setSavedContent(content)
+      try { sessionStorage.removeItem(DRAFT_PREFIX + loadedAssetKey) } catch { /* ignore */ }
       setMessage(t('asset_edit_save_success'))
     } catch (e) {
       setMessage(friendlyError(e))

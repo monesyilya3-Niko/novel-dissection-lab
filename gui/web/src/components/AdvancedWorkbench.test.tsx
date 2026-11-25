@@ -15,8 +15,36 @@ vi.mock('../api/client', () => ({
     detail: vi.fn(),
     update: vi.fn(),
   },
+  // 2026-11-23：四个面板改为常驻挂载后，平台适配面板也会在首次渲染时初始化。
+  platformApi: {
+    list: vi.fn().mockResolvedValue([]),
+    check: vi.fn(),
+    diagnose: vi.fn(),
+    export: vi.fn(),
+    parseStatBox: vi.fn(),
+    formatRoyalRoad: vi.fn(),
+  },
   friendlyError: vi.fn((e) => String(e)),
 }))
+
+describe('AdvancedWorkbench 响应式页签', () => {
+  beforeEach(() => {
+    vi.mocked(advancedApi.distillStatus).mockResolvedValue({
+      canDistill: true, books: [], distilledAssets: [],
+    })
+    vi.mocked(assetApi.list).mockResolvedValue({ items: [] })
+  })
+
+  it('主工作台页签在窄屏可横向滚动', async () => {
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <AdvancedWorkbench />
+      </I18nProvider>,
+    )
+    expect(screen.getByRole('tablist').parentElement).toHaveClass('MuiTabs-scrollableX')
+    await screen.findByText('可蒸馏')
+  })
+})
 
 describe('AdvancedWorkbench 高级功能工坊双语支持', () => {
   beforeEach(() => {
@@ -117,6 +145,29 @@ describe('AdvancedWorkbench 高级功能工坊双语支持', () => {
     expect(screen.getByRole('button', { name: 'Load' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
     expect(screen.getByLabelText('Asset JSON Content')).toBeInTheDocument()
+  })
+
+  it('批量状态在切换回页签和手动刷新时获取最新数据', async () => {
+    vi.mocked(advancedApi.batchStatus)
+      .mockReset()
+      .mockResolvedValueOnce({ books: [{ name: 'Book-old', passCount: 1, hasAssets: false, passes: {} }] })
+      .mockResolvedValueOnce({ books: [{ name: 'Book-new', passCount: 5, hasAssets: true, passes: {} }] })
+      .mockResolvedValueOnce({ books: [{ name: 'Book-latest', passCount: 5, hasAssets: true, passes: {} }] })
+
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <AdvancedWorkbench />
+      </I18nProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: '批量状态' }))
+    expect(await screen.findByText('Book-old')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: '蒸馏' }))
+    fireEvent.click(screen.getByRole('tab', { name: '批量状态' }))
+    expect(await screen.findByText('Book-new')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }))
+    expect(await screen.findByText('Book-latest')).toBeInTheDocument()
+    expect(advancedApi.batchStatus).toHaveBeenCalledTimes(3)
   })
 
   it('AssetEditPanel 防跨资产误写守卫、未保存加载确认与 Ctrl+S 快捷保存', async () => {

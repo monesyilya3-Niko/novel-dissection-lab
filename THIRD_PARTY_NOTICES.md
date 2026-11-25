@@ -62,9 +62,11 @@
 
 ### 2.2 题材包二次泛化清单（genre-pack，由 2.1 的题材文风卡转述综合）
 
-以下 6 个通用题材包由仓库内 genre-prose-card 泛化综合而成，写法为转述综合、非复制原文；
+仓库内**所有** `meta.scope = "genre-generalized"` 的 `assets/*-genre-pack.json`（2026-11-23 实测共 45 个）
+均由对应 `assets/genre-prose-card-genre-*.json` 泛化综合而成，写法为转述综合、非复制原文；
 衍生链归因：上游 zenstory-ai/oh-story-claudecode（MIT，Copyright (c) 2025-2026 oh-story-claudecode），
-许可证副本见 `LICENSES/oh-story-claudecode/LICENSE`。scope 均为 genre-generalized，非单书蒸馏。
+许可证副本见 `LICENSES/oh-story-claudecode/LICENSE`。下表列出其中 6 个代表性条目；
+其余派生包的来源可由文件名一一对应（`<genre>-genre-pack.json` ↔ `genre-prose-card-genre-<genre>.json`）。
 
 | 资产文件 | meta.id | 题材 | 来源 prose-card | 生成时间 |
 | --- | --- | --- | --- | --- |

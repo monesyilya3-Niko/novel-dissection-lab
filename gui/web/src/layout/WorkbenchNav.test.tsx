@@ -17,11 +17,9 @@ describe('WorkbenchNav 左侧导航栏组件', () => {
     expect(simple[1].items.map((i) => i.key)).toEqual(['assets', 'advanced'])
     expect(simple[1].collapsible).toBe(true)
     expect(simple[1].defaultOpen).toBe(false)
-    expect(simple[2].items.map((i) => i.key)).toEqual(['system', 'settings'])
+    expect(simple[2].items.map((i) => i.key)).toEqual(['system', 'settings', 'admin'])
     expect(simple[2].subtle).toBe(true)
     expect(simple[3].items.map((i) => i.key)).toEqual(['help'])
-    // admin 不可见时绝不出现
-    expect(simple.flatMap((g) => g.items).map((i) => i.key).includes('admin')).toBe(false)
 
     // simple + isAdmin：manage 含 admin
     const simpleAdmin = buildNavGroups(t, 'simple', true)
@@ -33,7 +31,8 @@ describe('WorkbenchNav 左侧导航栏组件', () => {
     expect(advanced[1].collapsible).toBe(true)
     expect(advanced[2].items.map((i) => i.key)).toEqual(['system', 'settings', 'admin'])
     const advNoAdmin = buildNavGroups(t, 'advanced', false)
-    expect(advNoAdmin[2].items.map((i) => i.key)).toEqual(['system', 'settings'])
+    // 2026-11-23：admin 入口不再按登录态隐藏——首次部署的用户需要能找到登录表单。
+    expect(advNoAdmin[2].items.map((i) => i.key)).toEqual(['system', 'settings', 'admin'])
   })
 
   it('渲染默认 (advanced) 下全部可见项及分组标题', () => {
@@ -46,7 +45,7 @@ describe('WorkbenchNav 左侧导航栏组件', () => {
     expect(screen.getByText('管理')).toBeInTheDocument()
     expect(screen.getByText('帮助')).toBeInTheDocument()
 
-    // 默认 non-admin：9 个工作台（admin 隐藏），data-testid 可用于 e2e
+    // 默认 non-admin：10 个工作台全部可见（admin 是登录入口，权限由后端兜底）
     expect(screen.getByTestId('nav-home')).toBeInTheDocument()
     expect(screen.getByTestId('nav-analysis')).toBeInTheDocument()
     expect(screen.getByTestId('nav-writing')).toBeInTheDocument()
@@ -56,7 +55,7 @@ describe('WorkbenchNav 左侧导航栏组件', () => {
     expect(screen.getByTestId('nav-system')).toBeInTheDocument()
     expect(screen.getByTestId('nav-settings')).toBeInTheDocument()
     expect(screen.getByTestId('nav-help')).toBeInTheDocument()
-    expect(screen.queryByTestId('nav-admin')).toBeNull()
+    expect(screen.getByTestId('nav-admin')).toBeInTheDocument()
 
     // 版本号展示
     // 只校验格式，不绑定具体版本 —— 版本号由 test_version_consistency.py 守（2026-11-01）

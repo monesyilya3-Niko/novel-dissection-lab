@@ -220,6 +220,44 @@ class TestChatOneWiresTheCheck(unittest.TestCase):
         self.assertEqual(calls, ["check", "handler"],
                          "check_context_budget 必须在 handler 之前调用")
 
+    def test_chat_one_caps_output_to_available_context(self):
+        captured = {}
+
+        def fake_handler(model, api_key, system, user, max_tokens, temperature):
+            captured["max_tokens"] = max_tokens
+            return {"text": "ok", "prompt_tokens": 1, "completion_tokens": 1}
+
+        model = {"protocol": "openai", "model_name": "m",
+                 "base_url": "http://x", "api_key_env": "K",
+                 "context_window": 32768}
+        with mock.patch.dict(llm_client.PROTOCOL_HANDLERS, {"openai": fake_handler}), \
+             mock.patch.object(llm_client, "resolve_api_key", return_value="k"):
+            llm_client._chat_one("m1", model, "拆书输入", "系统要求", 32768, 0.3, 0, None, False)
+
+        self.assertGreater(captured["max_tokens"], 0)
+        self.assertLess(captured["max_tokens"], 32768)
+        prompt_tokens = llm_client.estimate_tokens("拆书输入") + llm_client.estimate_tokens("系统要求")
+        self.assertLessEqual(
+            prompt_tokens + captured["max_tokens"] + llm_client._RESPONSE_HEADROOM_TOKENS,
+            32768,
+        )
+
+    def test_chat_one_keeps_output_budget_when_it_fits(self):
+        captured = {}
+
+        def fake_handler(model, api_key, system, user, max_tokens, temperature):
+            captured["max_tokens"] = max_tokens
+            return {"text": "ok", "prompt_tokens": 1, "completion_tokens": 1}
+
+        model = {"protocol": "openai", "model_name": "m",
+                 "base_url": "http://x", "api_key_env": "K",
+                 "context_window": 128000}
+        with mock.patch.dict(llm_client.PROTOCOL_HANDLERS, {"openai": fake_handler}), \
+             mock.patch.object(llm_client, "resolve_api_key", return_value="k"):
+            llm_client._chat_one("m1", model, "u", "s", 8192, 0.3, 0, None, False)
+
+        self.assertEqual(captured["max_tokens"], 8192)
+
     def test_chat_one_propagates_budget_error(self):
         """超预算的异常必须冒泡出去，不能被 _chat_one 吞掉。"""
         def fake_handler(*a, **k):

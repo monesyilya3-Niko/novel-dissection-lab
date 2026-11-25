@@ -12,6 +12,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -65,6 +66,29 @@ export function UiModeProvider({
       setModeState(defaultMode)
     }
   }
+
+  // 2026-11-23：后端 settings.json 一直有 ui.mode 备份，但此前只写不读，
+  // 清缓存/换设备后显式偏好丢失。本地无存储时从后端恢复一次。
+  useEffect(() => {
+    if (readStored() !== null) return
+    // 单测/局部渲染可能 mock 掉 client 而未提供 systemApi；缺失时静默跳过。
+    // Vitest 的 mock 代理在“取不存在的命名导出”时会抛错，这里必须 try 包住。
+    let loadSettings: (() => Promise<unknown>) | undefined
+    try {
+      loadSettings = systemApi?.settings
+    } catch {
+      return
+    }
+    if (typeof loadSettings !== 'function') return
+    let cancelled = false
+    loadSettings()
+      .then((s) => {
+        const m = (s as { ui?: { mode?: unknown } })?.ui?.mode
+        if (!cancelled && isValidMode(m)) setModeState(m)
+      })
+      .catch(() => { /* offline is fine */ })
+    return () => { cancelled = true }
+  }, [])
 
   const setMode = useCallback((m: UIMode) => {
     if (!isValidMode(m)) return

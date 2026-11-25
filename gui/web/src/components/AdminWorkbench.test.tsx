@@ -243,6 +243,19 @@ describe('AdminWorkbench 管理工作台双语国际化与运维功能测试', (
     expect(screen.getByText(/Password stored with PBKDF2-HMAC-SHA256/)).toBeInTheDocument()
   })
 
+  it('资产管理类型筛选下拉框具有可访问名称', async () => {
+    vi.mocked(adminApi.me).mockResolvedValue({ loggedIn: true, username: 'admin', mustChangePassword: false })
+
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <AdminWorkbench />
+      </I18nProvider>
+    )
+
+    fireEvent.click(await screen.findByRole('tab', { name: '资产管理' }))
+    expect(await screen.findByRole('combobox', { name: '类型' })).toBeInTheDocument()
+  })
+
   it('强制改密状态下显示警告条并锁定其他标签页', async () => {
     vi.mocked(adminApi.me).mockResolvedValue({ loggedIn: true, username: 'admin', mustChangePassword: true })
 

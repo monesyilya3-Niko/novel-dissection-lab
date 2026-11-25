@@ -66,7 +66,7 @@ novel-lab 脚本（纯标准库，零改动）
    - 调 `engine_adapter.render_craft_report(craft)` → 写 `reports/{book_id}-笔法分析.md`。
    - 校验合计字数 ≥ 10000（铁律二），结果通过 SSE 事件 `report_ready` 推送 + `/api/overview` 反映。
 
-> 说明：`craft-card` 需要 pass5（笔法）结果；现有拆书主链路 PASS_ORDER 只含 pass1-4。阶段一「分析」的报告生成采用**尽力而为**：若 craft-card 资产缺失则笔法报告留空并在结果里提示（不阻断拆书交付）。pass5 深度笔法纳入阶段三 M1 高级能力。
+> 说明：`craft-card` 需要 pass5（笔法）结果。2026-11-23 起 GUI 主链路 PASS_ORDER 已含 pass5_craft，与 CLI 一致生成笔法卡与笔法分析报告；若某批 pass5 失败，报告仍按尽力而为留空提示，不阻断拆书交付。
 
 ---
 

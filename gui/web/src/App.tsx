@@ -134,8 +134,10 @@ function UiModeShell() {
   const { overview } = useApp()
   const defaultMode = useMemo(() => {
     if (!overview) return undefined
-    // 新手空库默认简洁模式，有内容的老用户默认完整模式（尊重存储偏好，切换由 UiModeContext 接管）
-    return (overview.totalBooks === 0 && overview.totalAssets < 5 ? 'simple' : 'advanced') as 'simple' | 'advanced'
+    // 2026-11-23：内置资产随包同步（138 张），旧判据 `totalAssets < 5` 永远不成立，
+    // 新手实际一直被丢进进阶模式。真正的新手判据是「没有导入过任何书」。
+    const noImported = (overview.totalImportedBooks ?? 0) === 0
+    return (overview.totalBooks === 0 && noImported ? 'simple' : 'advanced') as 'simple' | 'advanced'
   }, [overview])
   return (
     <UiModeProvider defaultMode={defaultMode}>
@@ -172,7 +174,7 @@ function AppShell() {
       const target = e.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
       const targetWb = WORKBENCH_ORDER[n - 1]
-      if (targetWb === 'admin' && (!isAdmin || uiMode === 'simple')) return
+      // 管理员入口始终可达：未登录时打开的是登录表单，由后端鉴权兜底。
       e.preventDefault()
       setWorkbench(targetWb)
     }
@@ -195,7 +197,10 @@ function AppShell() {
 
   // 首次自动弹出：仅空库 + 未引导过。
   // 主动重播：用户点了「重看引导」，即使已有数据也必须弹出（否则点击看起来毫无反应）。
-  const isEmptyLibrary = !!overview && overview.totalBooks === 0 && overview.totalAssets === 0
+  // 2026-11-23：不能用 totalAssets===0——内置资产随包同步，全新安装也有 138 张，
+  // 导致首启引导永远不弹。用「没有导入过任何真实书籍」作为新手判据。
+  const isEmptyLibrary = !!overview && overview.totalBooks === 0
+    && (overview.totalImportedBooks ?? 0) === 0
   const showWizard = !onboarded && (replayRequested || isEmptyLibrary)
 
   return (
@@ -204,7 +209,7 @@ function AppShell() {
         <OnboardingWizard
           onDone={() => { setOnboarded(true); setReplayRequested(false) }}
           onNavigate={setWorkbench}
-          modelConfigured={!!overview?.modelConfigured}
+          modelConfigured={!!overview?.modelConfigured && overview?.modelReady !== false}
         />
       )}
       <AppBar position="static" elevation={0} sx={{
@@ -272,7 +277,10 @@ function AppShell() {
         )}
         <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <ErrorBoundary>
+            {/* key=workbench：某个工作台崩溃后，切到别的工作台必须重置错误边界。
+                2026-11-23 实测：错误边界不重置会把后续所有页面都锁死在同一张
+                「组件加载失败」上，看起来像"按钮全按不了"。 */}
+            <ErrorBoundary key={workbench}>
               <Suspense fallback={<LoadingFallback />}>
                 <WorkbenchTransition key={workbench}>
                 {workbench === 'home' && <HomeDashboard />}

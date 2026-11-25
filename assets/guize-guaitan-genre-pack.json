@@ -12,27 +12,8 @@
     "target_platform": "长篇通用",
     "scope": "genre-generalized",
     "confidence": 0.6,
-    "note": "通用题材包：规则怪谈/惊悚游戏/高智商推演通关",
-    "source_books": [
-      {
-        "title": "规则怪谈标杆代表作一",
-        "platform": "番茄",
-        "performance": "千万级爆款",
-        "voice_card_ref": "guize-guaitan_ref1"
-      },
-      {
-        "title": "规则怪谈热门畅销作二",
-        "platform": "番茄",
-        "performance": "高追读榜首",
-        "voice_card_ref": "guize-guaitan_ref2"
-      },
-      {
-        "title": "规则怪谈经典完结作三",
-        "platform": "番茄",
-        "performance": "高评分必读",
-        "voice_card_ref": "guize-guaitan_ref3"
-      }
-    ]
+    "note": "通用题材包：规则怪谈/惊悚游戏/高智商推演通关；暂无合规语料样本，规则由编辑手工整理，非具体作品实测",
+    "source_books": []
   },
   "commercial": {
     "opening_analysis": {

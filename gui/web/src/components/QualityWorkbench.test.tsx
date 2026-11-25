@@ -15,7 +15,7 @@ import QualityWorkbench from './QualityWorkbench'
 import { I18nProvider } from '../state/I18nContext'
 import { writeStorage, removeStorage } from '../safeStorage'
 
-const { bookMock } = vi.hoisted(() => ({ bookMock: vi.fn() }))
+const { bookMock, qcMock } = vi.hoisted(() => ({ bookMock: vi.fn(), qcMock: vi.fn() }))
 
 vi.mock('../api/client', () => ({
   friendlyError: (e: unknown) => String(e),
@@ -24,7 +24,7 @@ vi.mock('../api/client', () => ({
   qualityApi: {
     check: vi.fn(),
     book: (...args: unknown[]) => bookMock(...args),
-    qc: vi.fn(),
+    qc: (...args: unknown[]) => qcMock(...args),
     taskState: vi.fn(),
     reports: vi.fn().mockResolvedValue([]),
   },
@@ -57,6 +57,13 @@ async function runBookQuality(expectedCountText: string) {
   fireEvent.click(screen.getByRole('button', { name: '质检' }))
   await screen.findByText(expectedCountText)
 }
+
+describe('QualityWorkbench 响应式页签', () => {
+  it('主工作台页签在窄屏可横向滚动', () => {
+    render(<QualityWorkbench />)
+    expect(screen.getByRole('tablist').parentElement).toHaveClass('MuiTabs-scrollableX')
+  })
+})
 
 describe('BookQualityPanel 截断提示', () => {
   beforeEach(() => {
@@ -255,6 +262,29 @@ describe('BookQualityPanel 截断提示', () => {
   })
 })
 
+describe('QcPanel 服务端截断契约', () => {
+  beforeEach(() => {
+    qcMock.mockReset()
+  })
+
+  it('真实总数 51、响应 50 条时，标题和提示都使用后端元数据', async () => {
+    qcMock.mockResolvedValue({
+      taskId: 'q-1', status: 'done', phase: 'done', target: 'chapters',
+      verdict: 'WARN', totalScore: 80, layers: [], issues: makeIssues(50),
+      totalIssues: 51, issuesTruncated: true, issuesLimit: 50,
+      meta: {}, reportJson: 'reports/qc/q-1.json', reportMd: 'reports/qc/q-1.md', error: null,
+    })
+    render(<QualityWorkbench />)
+    fireEvent.click(screen.getByRole('tab', { name: 'QC 综合' }))
+    fireEvent.change(screen.getByLabelText('章节目录路径'), { target: { value: 'chapters' } })
+    fireEvent.click(screen.getByRole('button', { name: '开始 QC' }))
+
+    expect(await screen.findByText('问题详情（51）')).toBeInTheDocument()
+    expect(screen.getAllByText(ISSUE_ROW)).toHaveLength(50)
+    expect(screen.getByText('仅显示前 50 条（共 51 条），完整内容请查看已保存的 QC 报告。')).toBeInTheDocument()
+  })
+})
+
 describe('QualityWorkbench i18n 双语支持', () => {
   beforeEach(() => {
     bookMock.mockReset()
@@ -288,7 +318,7 @@ describe('QualityWorkbench i18n 双语支持', () => {
 
       // Tab 0: Chapter Check
       expect(screen.getByRole('heading', { name: 'Single Chapter Quality Check' })).toBeInTheDocument()
-      expect(screen.getByLabelText('Chapter Path (or Paste Draft)')).toBeInTheDocument()
+      expect(screen.getByLabelText('Chapter Path (Optional)')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Check' })).toBeInTheDocument()
 
       // Tab 1: Full Book Inspection

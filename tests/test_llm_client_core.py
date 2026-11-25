@@ -254,6 +254,42 @@ class TestCallAnthropic(unittest.TestCase):
         self.assertEqual(headers["X-Anthropic-Beta"], "output-128k-2025-02-19")
 
     @mock.patch.object(llm_client, "_post_json")
+    def test_call_anthropic_thinking_blocks_are_skipped(self, mock_post):
+        """推理模型经 Anthropic 协议返回 [thinking, text] 时必须取到正文。
+
+        2026-11-25 实测缺陷：deepseek-4.1-flash / glm-5.3-flash 走
+        Anthropic Messages 协议时固定返回 [thinking, text] 两段，旧实现
+        要求每个 block 都有 text 键，一律抛「响应格式异常」，模型整体不可用。
+        """
+        mock_post.return_value = {
+            "content": [
+                {"type": "thinking", "thinking": "用户只是打招呼，回两个字即可。", "signature": ""},
+                {"type": "text", "text": "收到"},
+            ],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 35, "output_tokens": 17},
+        }
+        model = {"base_url": "https://gw.example.com/v1", "model_name": "deepseek-4.1-flash"}
+        res = llm_client._call_anthropic(model, "key", "", "ping", 512, 0.7)
+        self.assertEqual(res["text"], "收到")
+        self.assertEqual(res["completion_tokens"], 17)
+
+    @mock.patch.object(llm_client, "_post_json")
+    def test_call_anthropic_only_thinking_reports_empty_body(self, mock_post):
+        """只有 thinking 块、没有 text 块时，报「空正文」而不是「格式异常」。"""
+        mock_post.return_value = {
+            "content": [{"type": "thinking", "thinking": "想了很多", "signature": ""}],
+            "stop_reason": "max_tokens",
+            "usage": {"input_tokens": 10, "output_tokens": 512},
+        }
+        model = {"base_url": "https://gw.example.com/v1", "model_name": "deepseek-4.1-flash"}
+        with self.assertRaises(llm_client.LLMError) as ctx:
+            llm_client._call_anthropic(model, "key", "", "ping", 512, 0.7)
+        msg = str(ctx.exception)
+        self.assertIn("返回空正文", msg)
+        self.assertIn("思考内容", msg)
+
+    @mock.patch.object(llm_client, "_post_json")
     def test_call_anthropic_malformed_responses(self, mock_post):
         model = {"base_url": "https://api.anthropic.com/v1", "model_name": "claude"}
         bad_responses = [
@@ -474,6 +510,50 @@ class TestResolveModel(unittest.TestCase):
         self.cfg["roles"] = {}
         mid, m = llm_client.resolve_model(task="unmapped_task")
         self.assertEqual(mid, "cheap_model")
+
+
+class TestKeylessLocalModels(unittest.TestCase):
+    def test_chat_one_allows_loopback_without_key(self):
+        for base_url in ("http://127.0.0.1:55143/v1", "http://localhost:8000/v1", "http://[::1]:8000/v1"):
+            with self.subTest(base_url=base_url):
+                handler = mock.Mock(return_value={"text": "本地响应"})
+                model = {"protocol": "openai", "base_url": base_url, "model_name": "local-mock"}
+                with mock.patch.dict(llm_client.PROTOCOL_HANDLERS, {"openai": handler}), \
+                     mock.patch.object(llm_client, "resolve_api_key", return_value=""):
+                    result = llm_client._chat_one("local", model, "用户", "系统", 32, 0.3, 0, False, False)
+                self.assertEqual(result["text"], "本地响应")
+                self.assertEqual(handler.call_args.args[1], "")
+
+    def test_chat_one_rejects_non_loopback_or_explicit_key_requirement(self):
+        cases = [
+            {"base_url": "https://api.example.com/v1"},
+            {"base_url": "http://localhost.example.com/v1"},
+            {"base_url": "http://127.0.0.1:8000/v1", "api_key_env": "LOCAL_API_KEY"},
+        ]
+        for model in cases:
+            with self.subTest(model=model):
+                handler = mock.Mock()
+                model = {"protocol": "openai", "model_name": "remote", **model}
+                with mock.patch.dict(llm_client.PROTOCOL_HANDLERS, {"openai": handler}), \
+                     mock.patch.object(llm_client, "resolve_api_key", return_value=""):
+                    with self.assertRaisesRegex(llm_client.LLMError, "缺少 API Key"):
+                        llm_client._chat_one("remote", model, "用户", "系统", 32, 0.3, 0, False, False)
+                handler.assert_not_called()
+
+    def test_any_model_ready_uses_exact_loopback_host(self):
+        for base_url, expected in (
+            ("http://127.0.0.1:55143/v1", True),
+            ("http://localhost:8000/v1", True),
+            ("http://[::1]:8000/v1", True),
+            ("http://localhost.example.com/v1", False),
+            ("https://api.example.com/v1", False),
+        ):
+            with self.subTest(base_url=base_url):
+                cfg = {"models": {"m": {"base_url": base_url}}, "roles": {}, "routes": {}}
+                with mock.patch.object(llm_client, "load_models", return_value=cfg), \
+                     mock.patch.object(llm_client, "_is_unconfigured_repo_template", return_value=False), \
+                     mock.patch.object(llm_client, "resolve_api_key", return_value=""):
+                    self.assertEqual(llm_client.any_model_ready(), expected)
 
 
 class TestLoadAndSaveModels(unittest.TestCase):

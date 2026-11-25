@@ -359,6 +359,7 @@ def set_batch_state(
     batch_index: int,
     status: str,
     asset: str | None = None,
+    passes: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """记录某批的状态并推进 cursor（原地修改，调用方负责 save_state）。
 
@@ -366,11 +367,14 @@ def set_batch_state(
     也推进（失败批由 retry-failed 单独处理，不阻塞串行流）。
     """
     key = batch_id(chapter_index, batch_index)
-    state.setdefault("chapter_states", {})[key] = {
+    record = {
         "status": status,
         "asset": asset,
         "ts": int(time.time()),
     }
+    if passes is not None:
+        record["passes"] = dict(passes)
+    state.setdefault("chapter_states", {})[key] = record
     if asset:
         state.setdefault("asset_index", {}).setdefault(f"c{chapter_index}", [])
         if key not in state["asset_index"][f"c{chapter_index}"]:

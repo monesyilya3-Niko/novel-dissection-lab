@@ -66,6 +66,36 @@ class TestPipelineHelpers(unittest.TestCase):
                     pipeline_mod.load_prompt("pass1_structure")
                 self.assertIn("缺少 SYSTEM/USER 区块", str(cm.exception))
 
+    def test_pass5_missing_deep_analysis_is_incomplete(self):
+        """pass5 每条技法都缺 deep_analysis 七段时必须判不完整并重试（2026-11-25）。
+
+        实测事故：提示词从未要求 deep_analysis，模型永远不产出，
+        于是每次拆书都是「深度分析缺段 28/28」、笔法报告深度段全空。
+        """
+        out = {
+            "craft_analysis": {"foreshadowing": {"techniques": [{"name": "a", "description": "d"}]}},
+            "craft_summary": {"top_3_strengths": ["x"]},
+        }
+        reason = pipeline_mod._pass_output_incomplete("pass5_craft", out)
+        self.assertIsNotNone(reason)
+        self.assertIn("deep_analysis", reason)
+
+    def test_pass5_with_deep_analysis_passes(self):
+        out = {
+            "craft_analysis": {"foreshadowing": {"techniques": [
+                {"name": "a", "deep_analysis": {"reader_psychology": "读者为何买账"}}]}},
+            "craft_summary": {"top_3_strengths": ["x"]},
+        }
+        self.assertIsNone(pipeline_mod._pass_output_incomplete("pass5_craft", out))
+
+    def test_pass5_prompt_declares_deep_analysis_fields(self):
+        """提示词必须声明 deep_analysis 七字段，否则模型不会产出。"""
+        _sys, usr = pipeline_mod.load_prompt("pass5_craft")
+        for field in ("deep_analysis", "reader_psychology", "execution_steps",
+                      "applicable_scene", "usage_boundary", "intensity_control",
+                      "combo_patterns", "migration_checklist"):
+            self.assertIn(field, usr, f"pass5 提示词缺少 {field}")
+
     def test_sample_words(self):
         # 1. 显式 sample_words 优先
         manifest = {"sample_words": 15000}
@@ -177,7 +207,17 @@ class TestPipelineRunPass(unittest.TestCase):
 
     def test_run_pass_successful_chat(self):
         mock_res = {
-            "text": json.dumps({"arcs": [{"title": "主线"}]}),
+            "text": json.dumps({
+                "chapter_analyses": [{
+                    "chapter": 1, "title": "第1章", "role": "铺垫",
+                    "beats": [], "hook": {}, "foreshadow": {}, "scenes": [], "value_change": {},
+                }],
+                "aggregate": {
+                    "hook_type_freq": {}, "hook_min_interval": 1, "climax_cycle": "每5章",
+                    "foreshadow_avg_span": 1, "foreshadow_max_span": 1,
+                    "foreshadow_concurrent_open": 0,
+                },
+            }),
             "model_id": "test-model",
             "prompt_tokens": 100,
             "completion_tokens": 50,
@@ -186,7 +226,7 @@ class TestPipelineRunPass(unittest.TestCase):
         }
         with mock.patch.object(pipeline_mod.llm_client, "chat", return_value=mock_res):
             res = pipeline_mod.run_pass("pass1_structure", self.slices, self.metrics, dry_run=False, model_id=None)
-        self.assertIn("arcs", res)
+        self.assertIn("chapter_analyses", res)
         self.assertEqual(res["_meta"]["model"], "test-model")
         self.assertEqual(res["_meta"]["cost"], 0.01)
 
@@ -228,7 +268,10 @@ class TestPipelineRunPass(unittest.TestCase):
             "elapsed": 0.4,
         }
         mock_good = {
-            "text": json.dumps({"success": True}),
+            "text": json.dumps({
+                "chapter_analyses": [{"chapter": 1, "title": "第1章", "role": "铺垫"}],
+                "aggregate": {"hook_type_freq": {}, "hook_min_interval": 1},
+            }),
             "model_id": "test-model",
             "prompt_tokens": 60,
             "completion_tokens": 30,
@@ -239,7 +282,7 @@ class TestPipelineRunPass(unittest.TestCase):
             with mock.patch.object(pipeline_mod, "ROOT", Path(td)), \
                  mock.patch.object(pipeline_mod.llm_client, "chat", side_effect=[mock_bad, mock_good]):
                 res = pipeline_mod.run_pass("pass1_structure", self.slices, self.metrics, dry_run=False, model_id=None)
-            self.assertTrue(res.get("success"))
+            self.assertIn("chapter_analyses", res)
             debug_file = Path(td) / "corpus" / "debug" / "pass1_structure_attempt0.txt"
             self.assertTrue(debug_file.is_file())
             self.assertIn("不是合法的", debug_file.read_text(encoding="utf-8"))
@@ -380,6 +423,40 @@ class TestPipelineComplianceAndDistill(unittest.TestCase):
         self.assertIn("测试书", text)
         self.assertIn("无可用外部模型", text)
         self.assertIn("采样: 5/20 章", text)
+
+
+class TestPipelineVerbatimCleaning(unittest.TestCase):
+    """pipeline 组装阶段必须清洗原文引用（2026-11-25 实测缺陷）。
+
+    实测事故：模型把原文对白当作「声线证据」抄进 voice-card 的
+    refusal_pattern / anger_pattern，compliance 判「连续 12 字匹配原文」→
+    REJECT，关键资产永远无法入库。assemble.py 的 CLI 路径本来就有
+    _clean_verbatim 这一步，pipeline 这条路漏了，于是同一次扫描时
+    voice-card 5 处硬错误直接阻塞入库（实测一本 6 章示例书）。
+    """
+
+    def test_v2_voice_card_is_cleaned_before_compliance(self):
+        import assemble as asm
+        book_text = "沈青砚握紧断剑，低声道：'剑者，心也，我今日便以此一剑，讨回三年的屈辱。'\n"
+        # 模型抄了原文对白当声线证据
+        voice = {
+            "meta": {"name": "t"},
+            "dialogue": {"character_voices": [
+                {"name": "沈青砚",
+                 "speech_signature": {"anger_pattern": "'剑者，心也，我今日便以此一剑，讨回三年的屈辱。'"}},
+            ]},
+        }
+        cleaned, n = asm._clean_verbatim(voice, book_text)
+        self.assertGreaterEqual(n, 1)
+        self.assertNotIn("讨回三年的屈辱", json.dumps(cleaned, ensure_ascii=False))
+
+    def test_clean_verbatim_is_wired_into_pipeline_main(self):
+        """pipeline 源码里必须真的调用 assemble._clean_verbatim（防止再次漏接线）。"""
+        import inspect
+        src = inspect.getsource(pipeline_mod.main)
+        self.assertIn("_clean_verbatim", src)
+        self.assertGreaterEqual(src.count("_clean_verbatim"), 4,
+                                "voice/structure/commercial/craft 四类资产都应清洗")
 
 
 class TestPipelineMainCLI(unittest.TestCase):

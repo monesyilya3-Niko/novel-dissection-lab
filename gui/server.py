@@ -824,9 +824,27 @@ def ensure_curated_seed_once() -> dict[str, Any]:
     try:
         from gui import essence_service, system_service
 
+        # 2026-11-23：无论是否已灌装，都先清理历史版本写进 books 表的
+        # curated:// 幽灵书（否则老库升级后仍会显示 20 本点开即 404 的书）。
+        # 老库的精选元数据也要跟上代码修正（新库灌装时已是最新值）。
+        try:
+            essence_service.refresh_curated_metadata()
+        except Exception as exc:  # noqa: BLE001 — 修正失败不阻断启动
+            _log.warning("刷新精选库元数据失败: %s", exc)
+
+        purged_books = 0
+        try:
+            purged_books = essence_service.purge_curated_book_rows()
+            if purged_books:
+                # 资产索引缓存里仍保留被删书目的 book 资产，必须同步失效。
+                from gui import asset_index as _asset_index
+                _asset_index.index.invalidate()
+        except Exception as exc:  # noqa: BLE001 — 清理失败不阻断启动
+            _log.warning("清理精选库幽灵书失败: %s", exc)
+
         settings = system_service._load_settings_file()
         if settings.get("curated_seeded"):
-            return {"action": "skipped", "reason": "already_seeded"}
+            return {"action": "skipped", "reason": "already_seeded", "purged_books": purged_books}
 
         # LIKE 里的 `_` 是通配符，必须 ESCAPE（同 essence_service 的垃圾清理修复）
         conn = db.get_conn()
@@ -843,7 +861,8 @@ def ensure_curated_seed_once() -> dict[str, Any]:
         # 避免把"用户已整理过的库"当成"未初始化"反复补写。
         settings["curated_seeded"] = True
         system_service._save_settings_file(settings)
-        return {"action": "seeded" if seeded else "marked", "curated_books": n_curated}
+        return {"action": "seeded" if seeded else "marked", "curated_books": n_curated,
+                "purged_books": purged_books}
     except Exception as exc:  # noqa: BLE001 — 不阻断启动
         _log.warning("精选神作档案就绪初始化跳过: %s", exc)
         return {"action": "failed", "error": str(exc)}

@@ -22,6 +22,7 @@ const STATUS_KEYS: Record<TaskStatus, string> = {
   running: 'analysis_status_running',
   paused: 'analysis_status_paused',
   done: 'analysis_status_done',
+  partial: 'analysis_status_partial',
   error: 'analysis_status_error',
 }
 
@@ -30,6 +31,7 @@ const STATUS_COLOR: Record<TaskStatus, 'default' | 'primary' | 'success' | 'erro
   running: 'primary',
   paused: 'warning',
   done: 'success',
+  partial: 'warning',
   error: 'error',
 }
 
@@ -123,8 +125,19 @@ export default function AnalysisControlBar({ onGoResult, onGoProgress, onGenreCh
     setErrorKey(null)
     setRawError(null)
     try {
+      // 2026-11-23：暂停状态下主按钮仍可点，但 runFullAnalysis 必然 409。
+      // 暂停时把主按钮语义改成「继续分析」，直接恢复后台线程。
+      if (isPaused && typeof resumeAnalysis === 'function') {
+        await resumeAnalysis(genre)
+        if (onGoProgress) onGoProgress(genre)
+        return
+      }
       await runFullAnalysis(genre)
-      onGoResult()
+      // 2026-11-23：runFullAnalysis 只负责启动后台任务，立刻返回。旧实现随即
+      // 跳到「结果」页，看到的是「尚未生成拆书结果」，像点了没反应。正确落点
+      // 是进度页（能看到 running 状态、进度与失败原因）。
+      if (onGoProgress) onGoProgress(genre)
+      else onGoResult()
     } catch (e) {
       // 2026-11-03：此前直接用 e.message，绕过了 friendlyError 的
       // 令牌/体积/符号链接等可操作提示，英文界面下也只会看到后端中文原文。
@@ -203,7 +216,11 @@ export default function AnalysisControlBar({ onGoResult, onGoProgress, onGenreCh
               onClick={doRun}
               startIcon={busy ? <CircularProgress size={14} color="inherit" /> : undefined}
             >
-              {isRunning ? t('analysis_btn_running') : t('analysis_btn_start')}
+              {isRunning
+                ? t('analysis_btn_running')
+                : isPaused
+                  ? t('analysis_btn_resume', '继续分析')
+                  : t('analysis_btn_start')}
             </Button>
           </DisabledTooltipButton>
           {isRunning && typeof pauseAnalysis === 'function' && (

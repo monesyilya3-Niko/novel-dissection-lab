@@ -228,14 +228,20 @@ def section_structure(so: dict) -> str:
             lines.append("- **钩子骨架模板**：")
             for h in hooks[:4]:
                 if isinstance(h, dict) and h.get("skeleton"):
-                    lines.append(f"  - [{h.get('type', '?')}] {h['skeleton']}")
+                    lines.append(f"  - [{h.get('type') or '钩子'}] {h['skeleton']}")
+                elif isinstance(h, str) and h.strip():
+                    lines.append(f"  - {h.strip()}")
     agg = so.get("aggregate")
     if isinstance(agg, dict):
-        if agg.get("hook_type_freq"):
+        if isinstance(agg.get("hook_type_freq"), dict) and agg["hook_type_freq"]:
             top = sorted(agg["hook_type_freq"].items(), key=lambda x: -x[1])[:5]
             lines.append(f"- **高频钩子**：{'、'.join(f'{k}×{v}' for k, v in top)}")
+        elif agg.get("hook_type_freq"):
+            lines.append(f"- **钩子分布（原始记录）**：{agg['hook_type_freq']}")
         if agg.get("foreshadow_avg_span"):
-            lines.append(f"- **伏笔平均跨度**：{agg['foreshadow_avg_span']} 章（同时挂起 ≈{agg.get('foreshadow_concurrent_open', '?')} 条）")
+            conc = agg.get("foreshadow_concurrent_open")
+            conc_txt = f"（同时挂起 ≈{conc} 条）" if conc not in (None, "") else ""
+            lines.append(f"- **伏笔平均跨度**：{agg['foreshadow_avg_span']} 章{conc_txt}")
         if agg.get("climax_cycle"):
             lines.append(f"- **爆发周期**：{agg['climax_cycle']}")
     return "\n".join(lines) + "\n"

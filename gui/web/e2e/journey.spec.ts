@@ -1,5 +1,5 @@
 // novel-lab 完整用户旅程 E2E（含 P0-4 题材必填链路）。
-// 隔离策略：跑在 scripts/e2e_isolated.sh 启动的 rsync 副本服务上（独立端口），
+// 隔离策略：跑在 scripts/e2e_isolated.sh 启动的独立工作树副本服务上（独立端口），
 // 每个用例使用唯一书名（e2e_<用例>_<时间戳>），临时上传目录 /tmp/e2e-book-* 在
 // 每个用例结束后删除（afterEach），跑完全部删除副本目录 →
 // 真实 gui_state/、corpus/、assets/ 零写入，用例之间无交叉污染（单用例级隔离）。
@@ -14,9 +14,17 @@ import * as os from 'os'
 
 // 本文件创建的临时上传目录：每个用例结束后删除（单用例级文件系统隔离）。
 const tempDirs: string[] = []
-test.afterEach(() => {
+test.afterEach(async () => {
   for (const d of tempDirs.splice(0)) {
-    fs.rmSync(d, { recursive: true, force: true })
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        fs.rmSync(d, { recursive: true, force: true, maxRetries: 5 })
+        break
+      } catch (error) {
+        if (attempt >= 4) throw error
+        await new Promise(resolve => setTimeout(resolve, 100 * (attempt + 1)))
+      }
+    }
   }
 })
 
@@ -40,7 +48,7 @@ async function bookCount(baseURL: string): Promise<number> {
   const r = await ctx.get('/api/overview')
   const j = await r.json()
   await ctx.dispose()
-  return j.data.total_books as number
+  return j.data.total_imported_books as number
 }
 
 async function fetchGenres(baseURL: string): Promise<string[]> {
@@ -65,7 +73,8 @@ async function importBookViaUI(page: Page, name: string): Promise<string> {
     ),
     fileInput.setInputFiles(fp),
   ])
-  await expect(page.getByText(/导入成功|已导入/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(`已导入《${name}》`).first()).toBeVisible({ timeout: 30_000 })
+  expect(resp.status()).toBe(200)
   const body = await resp.json()
   return body.data.book_id as string
 }
@@ -79,10 +88,8 @@ test.describe('用户旅程', () => {
     const fileInput = page.locator('input[type="file"]').first()
     await expect(fileInput).toBeAttached({ timeout: 10_000 })
     await fileInput.setInputFiles(fp)
-    await expect(page.getByText(/导入成功|已导入/).first()).toBeVisible({ timeout: 30_000 })
-    // API 验证书已入库
-    const after = await bookCount(baseURL!)
-    expect(after).toBe(before + 1)
+    await expect(page.getByText(`已导入《${path.basename(fp, '.txt')}》`).first()).toBeVisible({ timeout: 30_000 })
+    await expect.poll(() => bookCount(baseURL!), { timeout: 10_000 }).toBe(before + 1)
   })
 })
 

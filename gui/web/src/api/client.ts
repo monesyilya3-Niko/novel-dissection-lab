@@ -277,8 +277,13 @@ async function parseApiResponse<T>(res: Response, path: string,
     throw new ApiError(`服务返回异常响应 (HTTP ${res.status})`, res.status)
   }
   if (json.code !== 0) {
-    // 管理员接口 401 → 会话失效，通知全局回调自动回登录页
-    if (json.code === 401 && path.startsWith('/admin/') && adminUnauthorizedHandler) {
+    // 管理员接口 401 → 会话失效，通知全局回调自动回登录页。
+    // 2026-11-23 P0：/admin/me 是会话探测本身，/admin/login 的 401 是密码错误，
+    // 都不能触发「会话失效」回调——否则 me() 401 → 回调 refreshAdmin → me() 401
+    // 形成无限请求循环（未登录打开管理后台必现）。
+    const isSessionProbe = path.startsWith('/admin/me') || path.startsWith('/admin/login')
+      || path.startsWith('/admin/logout')
+    if (json.code === 401 && path.startsWith('/admin/') && !isSessionProbe && adminUnauthorizedHandler) {
       adminUnauthorizedHandler()
     }
     throw new ApiError(json.message || `请求失败 (code=${json.code})`, json.code)
@@ -439,6 +444,8 @@ export async function getStatus(bookId?: string): Promise<StatusInfo> {
     lastError: (data.lastError ?? '') as string,
     reportError: (data.reportError ?? '') as string,
     takeoverGuidePath: (data.takeoverGuidePath ?? '') as string,
+    chapterStates: (data.chapterStates ?? data.chapter_states ?? undefined) as
+      StatusInfo['chapterStates'],
   }
 }
 
@@ -940,6 +947,10 @@ export const qualityApi = {
   qc: (body: Record<string, unknown>) => post<import('../types').QualityTaskState>('/quality/qc', body),
   taskState: (taskId: string) => get<import('../types').QualityTaskState>(`/quality/tasks/${taskId}`),
   reports: () => get<import('../types').QcReportItem[]>('/quality/reports'),
+  report: (name: string, format: 'md' | 'json' = 'md') =>
+    get<{ name: string; format: string; content: string }>(
+      `/quality/reports/${encodeURIComponent(name)}?format=${format}`,
+    ),
 }
 
 // 系统
@@ -968,7 +979,11 @@ export const modelApi = {
   update: (id: string, body: Record<string, unknown>) => put<Record<string, unknown>>(`/models/${encodeURIComponent(id)}`, body),
   delete: (id: string) => del<Record<string, unknown>>(`/models/${encodeURIComponent(id)}`),
   setKey: (id: string, apiKey: string) => post<Record<string, unknown>>(`/models/${encodeURIComponent(id)}/key`, { api_key: apiKey }),
-  test: (id: string) => post<Record<string, unknown>>(`/models/${encodeURIComponent(id)}/test`),
+  // 后端允许最长 3600 秒；另留 60 秒传输余量，避免健康但慢的模型被前端提前 abort。
+  test: (id: string) =>
+    typedRequest<Record<string, unknown>>(
+      'POST', `/models/${encodeURIComponent(id)}/test`, undefined, 3_660_000,
+    ),
 }
 
 // 资产
@@ -1295,6 +1310,10 @@ export interface EssenceBook {
   platform: string
   totalChapters: number
   totalChars: number
+  /** 纲要模板（人工整理、无全文）；true 时 totalChars/totalChapters 只是参考值。 */
+  isCurated?: boolean
+  /** zh / en：海外标杆的 totalChars 是英文字符数，展示单位不同。 */
+  language?: 'zh' | 'en'
   avgChapterLen: number
   dialogueRatio: number
   rhythmClimaxInterval: number
@@ -1373,6 +1392,8 @@ export const essenceApi = {
     genre?: string
     platform?: string
     book_id?: string
+    /** 后端默认 true（自动写 4 条资产）；前端传 false 改为用户逐条「沉淀入库」。 */
+    auto_save_assets?: boolean
   }) => post<EssenceMacroAnalysisResult>('/essence/analyze', body),
   listAssets: (params?: { book_id?: string; category?: string; tag?: string; genre?: string; platform?: string; query?: string }) => {
     const q = new URLSearchParams()
@@ -1467,6 +1488,8 @@ export interface EssenceStats {
   totalChapters: number
   totalAssets: number
   totalChains: number
+  curatedBooks?: number
+  measuredBooks?: number
   genreDistribution: Record<string, number>
   categoryDistribution: Record<string, number>
 }

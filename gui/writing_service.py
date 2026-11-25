@@ -897,10 +897,19 @@ def task_state(task_id: str) -> dict[str, Any]:
 _MAX_CHAPTER_NO = 100_000
 
 
+def _mark_cancelled_locked(task_id: str) -> bool:
+    task = _WRITING_TASKS.get(task_id)
+    if not task or not task.get("cancelled"):
+        return False
+    task["status"] = "cancelled"
+    task["message"] = "已取消"
+    return True
+
+
 def cancel(task_id: str) -> dict[str, Any]:
     """取消写作任务（2026-11-03）。
 
-    置 cancelled 标记；后台线程在**下一轮开始前**看到标记就退出并置
+    置 cancelled 标记；后台线程在当前 LLM 响应返回后立即丢弃结果并置
     status="cancelled"。正在进行的单次 LLM 调用不会被强行中断（响应体
     读一半丢掉没有意义，也会浪费已花的 token），但结果不会被采用、不会落盘。
     已经结束的任务调用本接口返回其当前状态，不报错（幂等）。
@@ -1017,15 +1026,12 @@ def _run_generate(task_id: str, voice_data: dict, system: str, req: dict) -> Non
         best_qc = 0
 
         for attempt in range(1, max_attempts + 1):
-            # 2026-11-03：每轮开始前检查取消（LLM 调用本身仍在跑完当前轮，
-            # 但不会再进入下一轮，也不会落盘）。
             with _WRITING_LOCK:
-                if _WRITING_TASKS.get(task_id, {}).get("cancelled"):
-                    _WRITING_TASKS[task_id]["status"] = "cancelled"
-                    _WRITING_TASKS[task_id]["message"] = "已取消"
-                    sse.broker.publish({"task_type": "writing", "task_id": task_id,
-                                        "phase": "cancelled"})
-                    return
+                cancelled = _mark_cancelled_locked(task_id)
+            if cancelled:
+                sse.broker.publish({"task_type": "writing", "task_id": task_id,
+                                    "phase": "cancelled"})
+                return
             with _WRITING_LOCK:
                 _WRITING_TASKS[task_id]["status"] = "running" if attempt == 1 else "rewriting"
                 _WRITING_TASKS[task_id]["attempt"] = attempt
@@ -1039,6 +1045,12 @@ def _run_generate(task_id: str, voice_data: dict, system: str, req: dict) -> Non
 
             r = engine_adapter.llm_chat(user=user, system=system, task="writing",
                                         max_tokens=6000, temperature=0.8)
+            with _WRITING_LOCK:
+                cancelled = _mark_cancelled_locked(task_id)
+            if cancelled:
+                sse.broker.publish({"task_type": "writing", "task_id": task_id,
+                                    "phase": "cancelled"})
+                return
             content = r.get("text", "")
 
             # 打分
@@ -1103,33 +1115,41 @@ def _run_generate(task_id: str, voice_data: dict, system: str, req: dict) -> Non
             })
             return
 
-        # 落盘最佳稿：快照→落盘→记账三步原子化（_CHAPTER_WRITE_LOCK），防并发竞态
+        # 取消与落盘必须原子决断：取消先拿到锁就丢弃，落盘先完成则取消按幂等处理。
         from gui import writing_extra
-        with _CHAPTER_WRITE_LOCK:
-            old_words = writing_extra.get_chapter_words(project, chapter_no)
-            is_new = old_words is None
-            chapter_path = engine_adapter.save_chapter(str(novel_dir), chapter_no, best_content or "")
-            # v2.0.2：码字统计（失败不阻断：统计表异常不得让已落盘的章节任务卡住）；
-            # 重复生成同一章节记增量，不重复累加章节数
-            try:
-                writing_extra.record_words(
-                    project,
-                    writing_extra.count_words(best_content or "") - (old_words or 0),
-                    chapters=1 if is_new else 0,
-                )
-            except Exception:
-                pass
-        with _WRITING_LOCK:
-            _WRITING_TASKS[task_id]["status"] = "done"
-            _WRITING_TASKS[task_id]["chapter_path"] = migrate.rel_path(chapter_path)
-            _WRITING_TASKS[task_id]["message"] = (
-                f"完成：一致性 {best_cons:.1f}/100，质量 {best_qc}/100")
+        cancelled = False
+        with _CHAPTER_WRITE_LOCK, _WRITING_LOCK:
+            if _mark_cancelled_locked(task_id):
+                cancelled = True
+            else:
+                old_words = writing_extra.get_chapter_words(project, chapter_no)
+                is_new = old_words is None
+                chapter_path = engine_adapter.save_chapter(str(novel_dir), chapter_no, best_content or "")
+                # v2.0.2：码字统计（失败不阻断：统计表异常不得让已落盘的章节任务卡住）；
+                # 重复生成同一章节记增量，不重复累加章节数
+                try:
+                    writing_extra.record_words(
+                        project,
+                        writing_extra.count_words(best_content or "") - (old_words or 0),
+                        chapters=1 if is_new else 0,
+                    )
+                except Exception:
+                    pass
+                chapter_rel = migrate.rel_path(chapter_path)
+                _WRITING_TASKS[task_id]["status"] = "done"
+                _WRITING_TASKS[task_id]["chapter_path"] = chapter_rel
+                _WRITING_TASKS[task_id]["message"] = (
+                    f"完成：一致性 {best_cons:.1f}/100，质量 {best_qc}/100")
 
+        if cancelled:
+            sse.broker.publish({"task_type": "writing", "task_id": task_id,
+                                "phase": "cancelled"})
+            return
         sse.broker.publish({
             "task_type": "writing", "task_id": task_id,
             "phase": "done", "chapter_no": chapter_no,
             "consistency": best_cons, "quality": best_qc,
-            "chapter_path": migrate.rel_path(chapter_path),
+            "chapter_path": chapter_rel,
         })
 
     except Exception as exc:  # noqa: BLE001

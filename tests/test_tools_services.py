@@ -130,6 +130,19 @@ class TestPoisonChecker(unittest.TestCase):
         types = [i["type"] for i in res["findings"]]
         self.assertIn("simp_behavior", types)
 
+    def test_detect_contextual_enemy_mercy(self):
+        text = "他明明知道对方是灭门仇人，却圣母般地原谅了对方，还把唯一救命情报送给敌人。"
+        res = poison_checker.check_poison(text)
+        self.assertGreater(res["score"], 0)
+        types = [i["type"] for i in res["findings"]]
+        self.assertIn("enemy_mercy", types)
+
+    def test_contextual_enemy_mercy_avoids_allies(self):
+        text = "他宽恕已经悔过的仇人，并把公开路线交给盟友。"
+        res = poison_checker.check_poison(text)
+        self.assertEqual(res["score"], 0)
+        self.assertEqual(res["total_issues"], 0)
+
     def test_detect_power_inconsistency(self):
         text = "刚入上界，林轩震惊地发现，元婴遍地走，曾经以为无敌的大帝如今只能守门。"
         res = poison_checker.check_poison(text)

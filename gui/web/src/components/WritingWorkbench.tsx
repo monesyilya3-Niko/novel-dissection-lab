@@ -258,12 +258,16 @@ export default function WritingWorkbench({
           bgcolor: 'background.paper',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: { xs: 1, md: 'none' } }}>
           <Tabs
             value={mode}
             onChange={(_, v) => setMode(v)}
+            variant="scrollable"
+            scrollButtons="auto"
             sx={{
               minHeight: 40,
+              minWidth: 0,
+              maxWidth: '100%',
               '& .MuiTab-root': { minHeight: 40, py: 0.5, fontWeight: 'bold' },
             }}
           >
@@ -999,6 +1003,16 @@ interface StudioViewProps {
   onSwitchPipeline: () => void
 }
 
+/** 弹窗内联错误：对话框打开时，外层 Alert 会被遮罩挡住，按钮看起来像没反应。 */
+function StudioDialogError({ message, onClose }: { message: string; onClose: () => void }) {
+  if (!message) return null
+  return (
+    <Alert severity="error" sx={{ mb: 2 }} onClose={onClose}>
+      {message}
+    </Alert>
+  )
+}
+
 function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   const { t } = useI18n()
   const [projects, setProjects] = useState<WritingProject[]>([])
@@ -1009,14 +1023,21 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   const [notes, setNotes] = useState<NoteItem[]>([])
   const [stats, setStats] = useState<WritingStats | null>(null)
   const [savedChapters, setSavedChapters] = useState<Array<{ chapterNo: number; title: string; wordCount: number }>>([])
+  const [chapterListState, setChapterListState] = useState<{ project: string; loaded: boolean } | null>(null)
 
   // 中栏编辑状态
   const [chapterNo, setChapterNo] = useState<number>(1)
-  const [chapterTitle, setChapterTitle] = useState<string>('第1章 惊变')
-  const [content, setContent] = useState<string>(
-    '寒风呼啸，少年林凡握紧手中残破铁剑，凝视着眼前深不见底的万丈深渊。宗门考核长老的冷笑声犹在耳畔，但他胸膛内那颗沉寂已久的神秘石珠，正隐隐泛起滚烫的微光。'
-  )
+  const [chapterTitle, setChapterTitle] = useState<string>('第1章')
+  // 2026-11-23：不再预填演示正文。真实用户打开创作室时，编辑器必须是空的；
+  // 旧版硬编码一段「林凡/神秘石珠」示例，用户会误以为是自己的稿件，
+  // 且无工程时输入根本不会保存（草稿 key 依赖 project），属于典型的糊弄式假数据。
+  const [content, setContent] = useState<string>('')
   const [isDirty, setIsDirty] = useState<boolean>(false)
+  // 章节加载失败（非 404）：网络/服务异常时必须禁止保存，避免用空白覆盖服务端真稿。
+  const [chapterLoadError, setChapterLoadError] = useState<string>('')
+  // 加载请求飞行期间用户是否已经动手编辑（用 ref 读取最新值，避免 effect 闭包快照）。
+  const isDirtyRef = useRef(false)
+  isDirtyRef.current = isDirty
   const [saving, setSaving] = useState<boolean>(false)
   const [copyingPrompt, setCopyingPrompt] = useState<boolean>(false)
   const [creatingStudioProj, setCreatingStudioProj] = useState<boolean>(false)
@@ -1064,11 +1085,24 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [isDirty])
 
-  // 切换项目或章号时：优先恢复未入库的本地草稿；若无草稿则拉取服务端章节，404 时严格清空正文防串项
+  // 切换项目或章号时：优先恢复未入库的本地草稿；章节索引确认不存在时不发详情请求，避免空库首屏 404。
   useEffect(() => {
     if (!currentProject) return
+    const listMatchesProject = chapterListState?.project === currentProject
+    if (!listMatchesProject) {
+      if (prevProjectRef.current !== currentProject) {
+        prevProjectRef.current = currentProject
+        serverContentRef.current = ''
+        setContent('')
+        setIsDirty(false)
+        setChapterLoadError('')
+      }
+      return
+    }
+
     const key = `${currentProject}::${chapterNo}`
     loadedChapterKeyRef.current = key
+    setChapterLoadError('')
     const switchedProject = Boolean(prevProjectRef.current && prevProjectRef.current !== currentProject)
     prevProjectRef.current = currentProject
 
@@ -1086,6 +1120,8 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     }
 
     const hasGetChapter = typeof writingApi.getChapter === 'function'
+    const knownMissing = chapterListState.loaded
+      && !savedChaptersRef.current.some((chapter) => chapter.chapterNo === chapterNo)
     if (hasGetChapter || switchedProject || chapterNo > 1 || pendingTitle) {
       setChapterTitle(deriveChapterTitle(chapterNo, undefined, undefined, savedChaptersRef.current, pendingTitle))
     }
@@ -1094,7 +1130,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       serverContentRef.current = ''
       setContent(rawDraft)
       setIsDirty(true)
-      if (hasGetChapter) {
+      if (hasGetChapter && !knownMissing) {
         let cancelled = false
         writingApi.getChapter(currentProject, chapterNo)
           .then((res) => {
@@ -1107,10 +1143,18 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
               setIsDirty(false)
             }
           })
-          .catch(() => {
+          .catch((e) => {
             if (cancelled || loadedChapterKeyRef.current !== key) return
-            serverContentRef.current = ''
-            setIsDirty(rawDraft !== '')
+            // 用鸭子类型取 code，不依赖具体错误类；测试 mock 的普通 Error 也能安全判断。
+            if ((e as { code?: unknown } | null)?.code === 404) {
+              // 404 才是真的“章节不存在”；草稿仍保留，允许用户入库新章。
+              serverContentRef.current = ''
+              setIsDirty(rawDraft !== '')
+            } else {
+              // 网络/服务错误不能当成 404，否则草稿的“待保存”状态会被误判。
+              setChapterLoadError(friendlyError(e))
+              setIsDirty(rawDraft !== '')
+            }
           })
         return () => { cancelled = true }
       }
@@ -1121,27 +1165,44 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     setIsDirty(false)
     if (hasGetChapter) {
       setContent('')
+      if (knownMissing) return
       let cancelled = false
       writingApi.getChapter(currentProject, chapterNo)
         .then((res) => {
           if (cancelled || loadedChapterKeyRef.current !== key) return
           const srv = typeof res?.content === 'string' ? res.content : ''
+          // 用户已在请求飞行期间开始写：绝不能拿服务器旧稿覆盖编辑器内容。
+          if (isDirtyRef.current) {
+            serverContentRef.current = srv
+            return
+          }
           serverContentRef.current = srv
           setContent(srv)
           setIsDirty(false)
           setChapterTitle(deriveChapterTitle(chapterNo, res?.title, srv, savedChaptersRef.current, pendingTitle))
         })
-        .catch(() => {
+        .catch((e) => {
           if (cancelled || loadedChapterKeyRef.current !== key) return
-          serverContentRef.current = ''
-          setContent('')
-          setIsDirty(false)
+          if ((e as { code?: unknown } | null)?.code === 404) {
+            serverContentRef.current = ''
+            setContent('')
+            setIsDirty(false)
+          } else {
+            // 非 404：保留“加载失败”状态并禁止保存，避免空白稿覆盖服务端正文。
+            // 若用户已在飞行期间开始写，保留其内容，不要二次清空。
+            setChapterLoadError(friendlyError(e))
+            serverContentRef.current = ''
+            if (!isDirtyRef.current) {
+              setContent('')
+              setIsDirty(false)
+            }
+          }
         })
       return () => { cancelled = true }
     } else if (switchedProject || chapterNo > 1) {
       setContent('')
     }
-  }, [currentProject, chapterNo])
+  }, [currentProject, chapterNo, chapterListState])
 
   // 左右栏交互
   const [leftTab, setLeftTab] = useState<'outlines' | 'characters' | 'notes'>('outlines')
@@ -1173,12 +1234,25 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
 
   // 命令面板深度跳转：novellab:writing-action { action }
   useEffect(() => {
-    const handler = (e: Event) => {
-      const action = (e as CustomEvent<{ action: string }>).detail?.action
+    const apply = (action?: string) => {
       if (action === 'new-project') setOpenNewProj(true)
       else if (action === 'new-outline') setOpenNewOutline(true)
       else if (action === 'new-character') setOpenNewChar(true)
       else if (action === 'new-note') setOpenNewNote(true)
+    }
+    // 冷启动/lazy 挂载：命令面板触发时本组件可能还没挂载，事件会丢失。
+    // 读取它留下的 pending action 并立即消费。
+    try {
+      const pending = sessionStorage.getItem('novellab.pendingWritingAction')
+      if (pending) {
+        apply(pending)
+        sessionStorage.removeItem('novellab.pendingWritingAction')
+      }
+    } catch { /* ignore */ }
+    const handler = (e: Event) => {
+      const action = (e as CustomEvent<{ action: string }>).detail?.action
+      try { sessionStorage.removeItem('novellab.pendingWritingAction') } catch { /* ignore */ }
+      apply(action)
     }
     window.addEventListener('novellab:writing-action', handler)
     return () => window.removeEventListener('novellab:writing-action', handler)
@@ -1217,6 +1291,36 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
 
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
+
+  // 2026-11-23 P1：伏笔列表此前用写作项目名去查 essenceApi.listChains(projName)，
+  // 而后端按精华库 book_id 归档——项目名几乎永远查不到，列表恒 0、新建后也不出现。
+  // 现在以 chainBookId（精华库书籍）为唯一查询键，并让用户可切换归属书。
+  useEffect(() => {
+    let cancelled = false
+    essenceApi.listBooks()
+      .then((res) => {
+        if (cancelled) return
+        const books = ((res as { books?: Array<{ bookId: string; title: string }> })?.books) || []
+        setEssenceBookOptions(books)
+        setChainBookId((prev) => prev || books[0]?.bookId || '')
+      })
+      .catch(() => { if (!cancelled) setEssenceBookOptions([]) })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!chainBookId) {
+      setChains([])
+      return
+    }
+    essenceApi.listChains(chainBookId)
+      .then((res) => {
+        if (!cancelled) setChains(((res as { chains?: EssenceChain[] })?.chains) || [])
+      })
+      .catch(() => { if (!cancelled) setChains([]) })
+    return () => { cancelled = true }
+  }, [chainBookId])
 
   // 计算当前章对应的伏笔协同推进节点
   const activeForeshadowings = useMemo(() => {
@@ -1271,16 +1375,19 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   const loadProjectData = useCallback(async (projName: string) => {
     if (!projName) return
     try {
-      const [metaRes, outlineRes, charRes, noteRes, statsRes, chainRes, chapsRes] = await Promise.all([
+      const chapterListRequest = typeof writingApi.listChapters === 'function'
+        ? writingApi.listChapters(projName).then(
+          (res) => ({ loaded: true, chapters: res?.chapters ?? [] }),
+          () => ({ loaded: false, chapters: null }),
+        )
+        : Promise.resolve({ loaded: true, chapters: null })
+      const [metaRes, outlineRes, charRes, noteRes, statsRes, chapterListRes] = await Promise.all([
         writingApi.getProjectMeta(projName).catch(() => null),
         writingApi.outlines(projName).catch(() => []),
         writingApi.characters(projName).catch(() => []),
         writingApi.notes(projName).catch(() => []),
         writingApi.stats(projName, 30).catch(() => null),
-        essenceApi?.listChains ? essenceApi.listChains(projName).catch(() => ({ chains: [] })) : Promise.resolve({ chains: [] }),
-        typeof writingApi.listChapters === 'function'
-          ? writingApi.listChapters(projName).catch(() => ({ chapters: [] }))
-          : Promise.resolve({ chapters: [] }),
+        chapterListRequest,
       ])
       setMeta(metaRes)
       if (metaRes) {
@@ -1293,21 +1400,18 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       setCharacters(charRes || [])
       setNotes(noteRes || [])
       setStats(statsRes)
-      const chaps = (chapsRes?.chapters || []).map((c) => ({
+      const chaps = (chapterListRes.chapters || []).map((c) => ({
         chapterNo: c.chapterNo,
         title: c.title,
         wordCount: c.wordCount,
       }))
       setSavedChapters(chaps)
+      setChapterListState({ project: projName, loaded: chapterListRes.loaded })
       const curChSummary = chaps.find((c) => c.chapterNo === chapterNoRef.current)
       if (curChSummary?.title) {
         setChapterTitle((prev) => (!prev || prev === `第${chapterNoRef.current}章` ? curChSummary.title : prev))
       }
-      // 只展示当前项目关联书籍的暗线（2026-11-05 修）。
-      // 原来查不到就回退到「全库暗线」，于是 A 项目的「草蛇灰线」里会冒出
-      // B 书的伏笔，按章号高亮时还会误命中，数据看起来像串了。
-      const loadedChains = (chainRes as { chains?: EssenceChain[] })?.chains || []
-      setChains(loadedChains)
+      // 伏笔列表由 chainBookId 的独立 effect 加载（见上），此处不再按项目名查询。
     } catch (e) {
       console.warn('加载项目详情失败', e)
     }
@@ -1544,6 +1648,9 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       setNewChainTitle('')
       setNewChainDesc('')
       setToast(`伏笔暗线【${newChainTitle}】已建档并启动追踪`)
+      // 立即按归属书刷新，避免新暗线要等切页/刷新才出现。
+      const refreshed = await essenceApi.listChains(chainBookId).catch(() => ({ chains: [] }))
+      setChains(((refreshed as { chains?: EssenceChain[] })?.chains) || [])
       loadProjectData(currentProject)
     } catch (e) {
       setError(friendlyError(e))
@@ -1557,6 +1664,10 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     if (saving) return
     if (!currentProject) {
       setError('请先新建可写的小说工程')
+      return
+    }
+    if (chapterLoadError) {
+      setError('章节加载失败，暂不能保存（避免空白稿覆盖服务器正文）。请刷新或切换章节后重试。')
       return
     }
     if (!content.trim()) {
@@ -1589,7 +1700,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
     } finally {
       setSaving(false)
     }
-  }, [saving, content, currentProject, chapterNo, chapterTitle, loadProjectData])
+  }, [saving, content, currentProject, chapterNo, chapterTitle, loadProjectData, chapterLoadError])
 
   // 快捷键支持：Ctrl+S 保存入库，Alt+N 快速开启下一章
   useEffect(() => {
@@ -1662,6 +1773,8 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
 
   // 编辑器用户改动回调（唯一草稿写盘入口）
   const handleEditorChange = useCallback((nextText: string) => {
+    // 同步写 ref：即使 React 还没重渲染，飞行中的章节请求也必须看到“用户已编辑”。
+    isDirtyRef.current = nextText !== serverContentRef.current
     setContent(nextText)
     persistDraftOnUserEdit(currentProjectRef.current, chapterNoRef.current, nextText)
   }, [persistDraftOnUserEdit])
@@ -1670,6 +1783,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
   const insertTextToEditor = useCallback((textToInsert: string, label: string) => {
     setContent((prev) => {
       const next = prev ? `${prev}\n\n${textToInsert}` : textToInsert
+      isDirtyRef.current = true
       persistDraftOnUserEdit(currentProjectRef.current, chapterNoRef.current, next)
       return next
     })
@@ -1808,14 +1922,28 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       </Paper>
 
       {/* 2. 三栏生产力工作区 */}
-      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+      <Box
+        data-testid="studio-workspace"
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          overflow: { xs: 'auto', md: 'hidden' },
+        }}
+      >
         {/* 左栏：企划大纲树 & 设定智库 (280px) */}
         <Paper
           square
           elevation={0}
+          data-testid="studio-outline-panel"
           sx={{
-            width: 280,
-            borderRight: 1,
+            width: { xs: '100%', md: 280 },
+            minWidth: { xs: 0, md: 280 },
+            minHeight: { xs: 320, md: 0 },
+            flexShrink: 0,
+            borderRight: { xs: 0, md: 1 },
+            borderBottom: { xs: 1, md: 0 },
             borderColor: 'divider',
             display: 'flex',
             flexDirection: 'column',
@@ -2015,7 +2143,19 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
         </Paper>
 
         {/* 中栏：沉浸式正文编辑器 (Flex: 1) */}
-        <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', p: 2, overflow: 'auto' }}>
+        <Box
+          data-testid="studio-editor-panel"
+          sx={{
+            flex: { xs: '0 0 auto', md: 1 },
+            width: { xs: '100%', md: 'auto' },
+            minWidth: 0,
+            minHeight: { xs: 640, md: 0 },
+            display: 'flex',
+            flexDirection: 'column',
+            p: { xs: 1.5, md: 2 },
+            overflow: 'auto',
+          }}
+        >
           {error && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setError('')}>{error}</Alert>}
 
           {/* 章节控制条 */}
@@ -2043,7 +2183,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
                   color="primary"
                   startIcon={<SaveIcon />}
                   onClick={handleSaveChapter}
-                  disabled={saving}
+                  disabled={saving || !!chapterLoadError}
                 >
                   {saving ? '入库中...' : '保存并入库'}
                 </Button>
@@ -2115,17 +2255,37 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
             </Alert>
           )}
 
-          {/* Tiptap 正文编辑器主体 */}
+          {chapterLoadError && (
+            <Alert severity="error" sx={{ mb: 1.5 }}>
+              章节加载失败，已禁止保存以避免空白稿覆盖服务器正文：{chapterLoadError}
+            </Alert>
+          )}
+          {/* 无工程时明确提示：避免用户对空编辑器/无法保存产生误解 */}
+          {!currentProject && (
+            <Alert severity="info" sx={{ mb: 1.5 }}>
+              尚未选择作品。请先点右上角「+ 新建作品」建立小说工程；在未选择作品时输入的内容不会保存。
+            </Alert>
+          )}
+
+          {/* Tiptap 正文编辑器主体。2026-11-23：没有可写工程时不再渲染编辑器——
+              否则用户可输入但草稿 key 依赖 project，切页/刷新即静默丢失。 */}
           <Paper sx={{ flex: 1, minHeight: 480, p: 2, display: 'flex', flexDirection: 'column' }}>
-            <ChapterEditor
-              value={content}
-              onChange={handleEditorChange}
-              minHeight={420}
-              placeholder="在此沉浸创作章节正文……随写随查左侧大纲设定，右侧智能副驾实时排雷并反哺精华资产。"
-              targetChars={3000}
-              enablePoisonCheck={false}
-              enableDeslopCheck={false}
-            />
+            {currentProject ? (
+              <ChapterEditor
+                value={content}
+                onChange={handleEditorChange}
+                minHeight={420}
+                placeholder="在此沉浸创作章节正文……随写随查左侧大纲设定，右侧智能副驾实时排雷并反哺精华资产。"
+                targetChars={3000}
+                enablePoisonCheck={false}
+                enableDeslopCheck={false}
+              />
+            ) : (
+              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5, color: 'text.secondary', minHeight: 420 }}>
+                <Typography variant="h6">还没有可写入的小说作品</Typography>
+                <Typography variant="body2">请先点右上角「+ 新建作品」建立工程；建立后即可在此写作、保存并质检。</Typography>
+              </Box>
+            )}
           </Paper>
         </Box>
 
@@ -2134,9 +2294,14 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
           <Paper
             square
             elevation={0}
+            data-testid="studio-copilot-panel"
             sx={{
-              width: 360,
-              borderLeft: 1,
+              width: { xs: '100%', md: 360 },
+              minWidth: { xs: 0, md: 360 },
+              minHeight: { xs: 480, md: 0 },
+              flexShrink: 0,
+              borderLeft: { xs: 0, md: 1 },
+              borderTop: { xs: 1, md: 0 },
               borderColor: 'divider',
               display: 'flex',
               flexDirection: 'column',
@@ -2244,17 +2409,19 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
                     </Card>
                   )}
 
-                  {/* 去 AI 味结果 */}
+                  {/* 去 AI 味结果。2026-11-23：后端 aiScore 是 0-100
+                      （deslop_service 的 verdict 阈值 18/40/65），旧界面按 x/10
+                      与 >2/>5 判定，30 分会显示“30/10”并标红。 */}
                   {deslopResult && (
-                    <Card variant="outlined" sx={{ p: 1.5, borderColor: deslopResult.aiScore > 3 ? 'warning.main' : 'success.main' }}>
+                    <Card variant="outlined" sx={{ p: 1.5, borderColor: deslopResult.aiScore > 40 ? 'warning.main' : 'success.main' }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
                           AI 指纹: {deslopResult.verdictCn}
                         </Typography>
                         <Chip
                           size="small"
-                          label={`AI评分: ${deslopResult.aiScore}/10`}
-                          color={deslopResult.aiScore > 5 ? 'error' : deslopResult.aiScore > 2 ? 'warning' : 'success'}
+                          label={`AI评分: ${deslopResult.aiScore}/100`}
+                          color={deslopResult.aiScore > 65 ? 'error' : deslopResult.aiScore > 40 ? 'warning' : deslopResult.aiScore > 18 ? 'info' : 'success'}
                         />
                       </Box>
                       {deslopResult.suggestions.length > 0 && (
@@ -2360,6 +2527,21 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
                     </>
                   ) : (
                     <>
+                      <TextField
+                        select
+                        size="small"
+                        fullWidth
+                        label={t('studio_chain_owner_label', '伏笔归属（精华库书籍）')}
+                        value={chainBookId}
+                        onChange={(e) => setChainBookId(e.target.value)}
+                        helperText={essenceBookOptions.length === 0
+                          ? t('studio_chain_book_empty', '精华库还没有书籍档案，请先在「精华工坊」建立档案')
+                          : t('studio_chain_owner_hint', '切换书籍查看对应的伏笔暗线')}
+                      >
+                        {essenceBookOptions.map((b) => (
+                          <MenuItem key={b.bookId} value={b.bookId}>{b.title || b.bookId}</MenuItem>
+                        ))}
+                      </TextField>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
                           草蛇灰线推进图谱
@@ -2604,6 +2786,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       <Dialog open={openMetaDialog} onClose={() => setOpenMetaDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{t('studio_meta_dialog_title', '作品企划与多平台定位')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <StudioDialogError message={error} onClose={() => setError('')} />
           <TextField
             select
             fullWidth
@@ -2661,6 +2844,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       <Dialog open={openNewProj} onClose={() => setOpenNewProj(false)}>
         <DialogTitle>{t('studio_new_proj_title', '新建小说作品')}</DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
+          <StudioDialogError message={error} onClose={() => setError('')} />
           <TextField
             autoFocus
             fullWidth
@@ -2683,6 +2867,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       <Dialog open={openExportDialog} onClose={() => setOpenExportDialog(false)} maxWidth="xs" fullWidth>
         <DialogTitle>{t('studio_export_dialog_title', '全书一键导出与排版生成')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <StudioDialogError message={error} onClose={() => setError('')} />
           <Typography variant="body2" color="text.secondary">
             {t('studio_export_summary', '当前工程《{project}》已写 {chapters} 章，共 {words} 字。', {
               project: currentProjectDisplayName,
@@ -2723,6 +2908,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       <Dialog open={openNewOutline} onClose={() => setOpenNewOutline(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{t('studio_new_outline_title', '规划新章节大纲')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <StudioDialogError message={error} onClose={() => setError('')} />
           <TextField
             autoFocus
             fullWidth
@@ -2755,6 +2941,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       <Dialog open={openNewChar} onClose={() => setOpenNewChar(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{t('studio_new_char_title', '新建核心人物设定卡')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <StudioDialogError message={error} onClose={() => setError('')} />
           <TextField
             autoFocus
             fullWidth
@@ -2802,6 +2989,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       <Dialog open={openNewNote} onClose={() => setOpenNewNote(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{t('studio_new_note_title', '随手记下灵感便签')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <StudioDialogError message={error} onClose={() => setError('')} />
           <TextField
             autoFocus
             fullWidth
@@ -2834,6 +3022,7 @@ function StudioView({ sel, onSwitchPipeline }: StudioViewProps) {
       <Dialog open={openNewChain} onClose={() => setOpenNewChain(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{t('studio_new_chain_title', '记录全书草蛇灰线（伏笔暗线）')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <StudioDialogError message={error} onClose={() => setError('')} />
           <TextField
             select
             fullWidth

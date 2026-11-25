@@ -33,7 +33,13 @@ export default function PoisonCheckPanel() {
       />
       <Paper sx={{ p: 2 }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-          <Tabs value={subTab} onChange={(_, v) => setSubTab(v)}>
+          <Tabs
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
+            value={subTab}
+            onChange={(_, v) => setSubTab(v)}
+          >
             <Tab label={t('poison_tab_scanner', '毒点快速排查 (本地规则)')} />
             <Tab label={t('poison_tab_library', '弃坑避雷规范库 (10大红线)')} />
           </Tabs>
@@ -59,7 +65,7 @@ function PoisonScannerSection() {
 
   const handleScan = async () => {
     if (!text.trim()) {
-      setError(t('poison_placeholder', '请输入或粘贴需要排查的正文段落'))
+      setError(t('poison_empty_error', '请先输入或粘贴需要排查的正文段落'))
       return
     }
     setLoading(true)
@@ -117,6 +123,7 @@ function PoisonScannerSection() {
           onClick={() => {
             setText('')
             setResult(null)
+            setError('')
           }}
           disabled={loading}
         >
@@ -227,7 +234,7 @@ function TabooLibrarySection() {
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(360px, 100%), 1fr))', gap: 2 }}>
         {taboos.map((item) => (
           <Card key={item.id} variant="outlined" sx={{ display: 'flex', flexDirection: 'column' }}>
             <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>

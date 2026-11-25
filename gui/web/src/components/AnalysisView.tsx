@@ -46,12 +46,21 @@ export default function AnalysisView() {
   }, [])
 
   return (
-    <Box sx={{ display: 'flex', height: '100%', minHeight: 0 }}>
+    <Box
+      data-testid="analysis-workspace"
+      sx={{
+        display: 'flex',
+        flexDirection: { xs: 'column', md: 'row' },
+        height: '100%',
+        minHeight: 0,
+      }}
+    >
       {/* 左侧：章节导航 */}
       <Box
         sx={{
           width: { xs: '100%', md: 280 },
-          minWidth: { xs: 'auto', md: 280 },
+          minWidth: { xs: 0, md: 280 },
+          flexShrink: 0,
           borderRight: { xs: 0, md: 1 },
           borderBottom: { xs: 1, md: 0 },
           borderColor: 'divider',
@@ -69,25 +78,34 @@ export default function AnalysisView() {
       </Box>
 
       {/* 主区 */}
-      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <Box
           sx={{
-            px: 2,
+            px: { xs: 1, md: 2 },
             pt: 1,
             borderBottom: '1px solid',
             borderColor: 'divider',
             display: 'flex',
             alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1,
           }}
         >
-          <Tabs value={subTab} onChange={(_e, v) => setSubTab(v as SubTab)} sx={{ minHeight: 40 }} variant="scrollable" scrollButtons="auto">
+          <Tabs
+            data-testid="analysis-tabs"
+            value={subTab}
+            onChange={(_e, v) => setSubTab(v as SubTab)}
+            sx={{ minHeight: 40, width: { xs: '100%', md: 'auto' }, minWidth: 0 }}
+            variant="scrollable"
+            scrollButtons="auto"
+          >
             <Tab value="import" label={t('analysis_tab_import')} sx={{ minHeight: 40 }} />
             <Tab value="reader" label={t('analysis_tab_reader', '原文阅读')} sx={{ minHeight: 40 }} />
             <Tab value="progress" label={t('analysis_tab_progress')} sx={{ minHeight: 40 }} />
             <Tab value="detail" label={t('analysis_tab_detail', '批次明细')} sx={{ minHeight: 40 }} />
             <Tab value="result" label={t('analysis_tab_result')} sx={{ minHeight: 40 }} />
           </Tabs>
-          <Box sx={{ flex: 1 }} />
+          <Box sx={{ flex: 1, display: { xs: 'none', md: 'block' } }} />
           <ContextHelpButton guideKey="analysis" title={t('analysis_help_title')} />
           {/* 一键分析：直接在当前工作台内触发，完成后切到结果页（由 SSE done 自动刷新） */}
           <AnalysisControlBar

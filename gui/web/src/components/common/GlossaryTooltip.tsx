@@ -55,10 +55,12 @@ export default function GlossaryTooltip({ term, children }: GlossaryTooltipProps
   const def = localize(entry.definition, locale)
   const snippet = firstSentence(def)
   const catText = catLabel(entry.category, t)
+  const wrapsSelect = (children.props as { select?: boolean }).select === true
 
   return (
     <Tooltip
       arrow
+      disableInteractive={wrapsSelect}
       title={
         <Box
           onClick={() => app?.openHelp('glossary', termKey)}

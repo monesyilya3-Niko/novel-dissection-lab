@@ -273,7 +273,7 @@ describe('App 顶层应用框架与导航集成测试', () => {
     expect(await screen.findByText('欢迎使用暮冬念春')).toBeDefined()
   })
 
-  it('未登录管理员时按 Alt+9 不会越权切换到 admin 工作台', async () => {
+  it('未登录时按 Alt+9 进入管理员登录页（鉴权由后端兜底）', async () => {
     render(
       <ThemeModeProvider>
         <I18nProvider>
@@ -285,8 +285,8 @@ describe('App 顶层应用框架与导航集成测试', () => {
     expect(await screen.findByTestId('workbench-home')).toBeDefined()
 
     fireEvent.keyDown(window, { key: '9', altKey: true })
-    expect(screen.getByTestId('workbench-home')).toBeDefined()
-    expect(screen.queryByTestId('workbench-admin')).toBeNull()
+    // 2026-11-23：管理员入口始终可达；未登录时呈现登录表单，不会获得任何管理员权限。
+    expect(await screen.findByTestId('workbench-admin')).toBeDefined()
   })
 })
 

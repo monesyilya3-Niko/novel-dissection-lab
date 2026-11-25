@@ -22,6 +22,15 @@ vi.mock('../api/client', () => ({
   friendlyError: vi.fn((e) => String(e)),
 }))
 
+describe('SystemWorkbench 响应式页签', () => {
+  it('主工作台页签在窄屏可横向滚动', async () => {
+    vi.mocked(systemApi.status).mockResolvedValue({ disk: {}, counts: {}, model: {}, paths: {} } as any)
+    render(<SystemWorkbench />)
+    expect(screen.getByRole('tablist').parentElement).toHaveClass('MuiTabs-scrollableX')
+    await screen.findByRole('heading', { name: '系统状态' })
+  })
+})
+
 describe('SystemWorkbench 系统与合规工作台双语国际化支持', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -143,7 +152,7 @@ describe('SystemWorkbench 系统与合规工作台双语国际化支持', () => 
     expect(await screen.findByRole('heading', { name: '系统设置' })).toBeInTheDocument()
     expect(screen.getByText('服务')).toBeInTheDocument()
     expect(screen.getByText('环境变量覆盖')).toBeInTheDocument()
-    expect(screen.getByText(/设置修改请通过环境变量/)).toBeInTheDocument()
+    expect(screen.getByText(/此页是只读诊断信息/)).toBeInTheDocument()
 
     // 切换到模型配置页签
     fireEvent.click(screen.getByRole('tab', { name: '模型配置' }))
@@ -204,7 +213,7 @@ describe('SystemWorkbench 系统与合规工作台双语国际化支持', () => 
     expect(await screen.findByRole('heading', { name: 'System Settings' })).toBeInTheDocument()
     expect(screen.getByText('Services')).toBeInTheDocument()
     expect(screen.getByText('Environment Overrides')).toBeInTheDocument()
-    expect(screen.getByText(/To modify settings, use environment variables/)).toBeInTheDocument()
+    expect(screen.getByText(/This page is read-only diagnostics/)).toBeInTheDocument()
 
     // 切换到英文模型管理面板
     fireEvent.click(screen.getByRole('tab', { name: 'Model Config' }))

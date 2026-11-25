@@ -13,11 +13,14 @@ test.beforeEach(async ({ page, baseURL }) => {
   const resp = await api.get('/api/writing/projects')
   const body = await resp.json()
   await api.dispose()
-  test.skip(!Array.isArray(body?.data) || body.data.length === 0,
-    '需要至少一个写作项目才能验证写作台')
+  test.skip(!Array.isArray(body?.data) || !body.data.some((project: { read_only?: boolean }) => !project.read_only),
+    '需要至少一个可写写作项目才能验证写作台')
   await page.goto('/')
-  // 进入「辅助写作」
-  await page.getByRole('button', { name: '辅助写作', exact: false }).first().click()
+  const nav = page.getByTestId('nav-writing')
+  if (!(await nav.isVisible())) {
+    await page.getByRole('button', { name: '打开导航', exact: true }).click()
+  }
+  await nav.click()
 })
 
 test('写作台加载：Studio 默认可见，模式切换栏存在', async ({ page }) => {
@@ -48,6 +51,29 @@ test('Pipeline 分组导航可点击且切换面板', async ({ page }) => {
     // advanced 模式：9 个流水线页签全部平铺
     expect(flatTabs, 'advanced 模式应有多个流水线页签').toBeGreaterThan(2)
   }
+})
+
+test.describe('移动端 Studio', () => {
+  test.use({ viewport: { width: 375, height: 812 } })
+
+  test('三栏纵向堆叠且编辑器与副驾均可访问', async ({ page }) => {
+    const workspace = page.getByTestId('studio-workspace')
+    await expect(workspace).toBeVisible()
+
+    for (const id of ['studio-outline-panel', 'studio-editor-panel', 'studio-copilot-panel']) {
+      const box = await page.getByTestId(id).boundingBox()
+      expect(box, `${id} 应有真实尺寸`).not.toBeNull()
+      expect(box!.x).toBeGreaterThanOrEqual(0)
+      expect(box!.width).toBeGreaterThan(300)
+      expect(box!.x + box!.width).toBeLessThanOrEqual(376)
+    }
+
+    const horizontalOverflow = await workspace.evaluate((el) => el.scrollWidth - el.clientWidth)
+    expect(horizontalOverflow, '移动端工作区不应横向裁切').toBeLessThanOrEqual(1)
+
+    await page.getByRole('tab', { name: '精华资产反哺', exact: true }).click()
+    await expect(page.getByRole('tab', { name: /五维提炼卡/ })).toBeVisible()
+  })
 })
 
 test('切换到 Pipeline 再切回 Studio 不报错', async ({ page }) => {

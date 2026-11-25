@@ -253,6 +253,7 @@ _PASS_SLICE_KEY = {
     "pass2_character": "pass2_character",
     "pass3_style": "pass3_style",
     "pass4_commercial": "pass4_commercial",
+    "pass5_craft": "pass5_craft",
 }
 
 
@@ -295,6 +296,13 @@ def build_single_batch_slices(
         return {"pass3_style": {"chapters": [chapter_entry]}}
     if kind == "pass4_commercial":
         return {"pass4_commercial": {"chapters": [chapter_entry]}}
+    if kind == "pass5_craft":
+        # build_user_input(pass5) 会同时读 pass1（开篇）与 pass3（中段/高潮）切片；
+        # 单批模式下两处都填当前批，保证模型拿到正文而不是空提示。
+        return {
+            "pass1_structure": {"chapters": [chapter_entry]},
+            "pass3_style": {"chapters": [chapter_entry]},
+        }
     raise ValueError(f"未知 Pass: {kind}")
 
 

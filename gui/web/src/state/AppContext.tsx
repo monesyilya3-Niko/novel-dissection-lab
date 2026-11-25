@@ -12,6 +12,10 @@ import type { Book, BookResults, Chapter, Overview, ProgressEvent, StatusInfo } 
 import type { WorkbenchKey } from '../layout/WorkbenchNav'
 import * as api from '../api/client'
 import { systemApi, adminApi, friendlyError } from '../api/client'
+import { readStorage, removeStorage } from '../safeStorage'
+
+/** 管理员会话提示（仅表示"可能已登录"，用于避免每次页面加载都打 401 探测）。 */
+export const ADMIN_SESSION_HINT = 'novellab.admin.session'
 
 interface AppState {
   // 当前导入的书
@@ -99,7 +103,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshStatus = useCallback(async () => {
     const s = await api.getStatus(bookIdRef.current ?? undefined)
     setStatus(s)
+    // 2026-11-23：一次章节读取失败曾让「初始化失败」红条永久挂在所有页面。
+    // 只要状态刷新成功，就说明服务可用，清掉旧错误。
+    setInitError(null)
     if (s.bookId) bookIdRef.current = s.bookId
+    // 2026-11-23：刷新页面/SSE 断档后，批次矩阵必须从 /api/status 的快照恢复。
+    // 旧实现只靠 SSE 事件累积，刷新后所有批变回 pending（顶栏却不一致）。
+    if (s.chapterStates) {
+      const restored: Record<string, { status: string; asset?: string }> = {}
+      for (const [key, val] of Object.entries(s.chapterStates)) {
+        restored[key] = val.asset
+          ? { status: val.status, asset: val.asset }
+          : { status: val.status }
+      }
+      setBatchStates(restored)
+    }
   }, [])
 
   const refreshOverview = useCallback(async () => {
@@ -139,7 +157,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setBatchStates((prev) => ({ ...prev, [key]: { status: e.status } }))
       }
       // 任务结束/完成时刷新一次状态。
-      if (e.status === 'done') {
+      if (e.status === 'done' || (e.status as string) === 'partial') {
         refreshStatus()
         refreshBookResults()
         refreshOverview()
@@ -290,6 +308,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsAdmin(!!r.loggedIn)
     } catch {
       setIsAdmin(false)
+      // 探测失败说明会话不存在/已过期：清掉提示，后续页面不再无意义地打 401。
+      removeStorage(ADMIN_SESSION_HINT)
     }
   }, [])
 
@@ -310,7 +330,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .catch(fail)
     refreshOverview().catch(fail)
     refreshThresholds()
-    refreshAdmin()
+    // 只有本地存在管理员会话提示时才探测 /admin/me。
+    // 未登录用户此前每次页面加载都必打一条 401 红色错误（P2 审计项）。
+    if (readStorage(ADMIN_SESSION_HINT) === '1') refreshAdmin()
     return () => { cancelled = true }
   }, [refreshStatus, refreshOverview, refreshThresholds, refreshAdmin])
   /* eslint-enable react-hooks/set-state-in-effect */

@@ -436,6 +436,10 @@ def _describe_genre_pack(data: dict[str, Any]) -> list[str]:
     present = [label for key, label in _GENRE_PACK_SECTIONS if key in data]
     if present:
         out.append(f"包含板块：{'、'.join(present)}")
+    meta = data.get("meta") or {}
+    books = meta.get("source_books") if isinstance(meta.get("source_books"), list) else []
+    if meta.get("scope") == "genre-generalized" or len(books) < 3:
+        out.append("说明：通用题材骨架（非多书聚合实测）；题材专属世界/语言规则可能未配置，写作时以题材文风卡原文为准。")
     return out
 
 
@@ -538,6 +542,14 @@ def describe_asset(kind: str, name: str, data: Any) -> str:
     lines.append("## 适用位置")
     lines.append(_KIND_USAGE.get(kind, "资产库浏览。"))
     return "\n".join(lines)
+
+
+def _disk_report_files() -> list[Path]:
+    """reports/ 顶层的拆书/笔法报告文件（按名称稳定排序）。"""
+    root = config.REPORTS_DIR
+    if not root.is_dir():
+        return []
+    return sorted(root.glob("*.md"))
 
 
 class AssetIndex:
@@ -777,6 +789,21 @@ class AssetIndex:
         """按单个 kind 查询（assets 卡 / report / book）。"""
         if kind == "report":
             rows = db.list_reports(book_id)
+            # 2026-11-23 P0：DB reports 表可能从未同步（迁移/CLI 产出的报告只在磁盘）。
+            # 旧实现直接返回空，首页报告 KPI 为 0、资产库报告分类“消失”。
+            # 现在把磁盘报告按 stem 合并进来（DB 优先，磁盘补缺，避免重复）。
+            existing = {Path(str(r.get("path") or "")).stem for r in rows}
+            for fp in _disk_report_files():
+                stem = fp.stem
+                if stem in existing:
+                    continue
+                report_type = "craft" if stem.endswith("-笔法分析") else "book"
+                bid = stem[:-len("-拆书报告")] if stem.endswith("-拆书报告") else (
+                    stem[:-len("-笔法分析")] if stem.endswith("-笔法分析") else "")
+                if book_id and bid != book_id:
+                    continue
+                rows.append({"path": str(fp), "title": stem,
+                             "book_id": bid, "type": report_type})
             return [self._report_row_to_item(r) for r in rows]
         if kind == "book":
             rows = db.get_books(book_id=book_id, genre=genre)
@@ -824,27 +851,48 @@ class AssetIndex:
     def _report_row_to_item(row: dict[str, Any]) -> dict[str, Any]:
         path = row.get("path", "")
         stem = Path(path).stem if path else row.get("title", "")
+        size = None
+        mtime = None
+        if path:
+            try:
+                st = migrate.resolve_rel_path(path).stat()
+                size, mtime = st.st_size, st.st_mtime
+            except OSError:
+                pass
         return {
             "kind": "report",
             "id": f"report:{stem}",
             "name": stem,
             "path": path,
-            "size": None,
-            "mtime": None,
+            "size": size,
+            "mtime": mtime,
             "book_id": row.get("book_id"),
             "report_kind": row.get("type", "book"),
         }
 
     @staticmethod
     def _book_row_to_item(row: dict[str, Any]) -> dict[str, Any]:
+        path = row.get("source_path")
+        size = None
+        mtime = None
+        if path:
+            try:
+                st = migrate.resolve_rel_path(path).stat()
+                size, mtime = st.st_size, st.st_mtime
+            except OSError:
+                pass
         return {
             "kind": "book",
             "id": f"book:{row.get('book_id')}",
-            "name": row.get("book_id"),
-            "path": row.get("source_path"),
-            "size": None,
-            "mtime": None,
+            # 2026-11-23：列表名用书名而不是内部 book_id（此前资产库整屏都是
+            # 示例-仙侠-52ffa2c1 这类内部标识），体积用源文件实测值而不是 0.0 KB。
+            "name": row.get("title") or row.get("book_id"),
+            "path": path,
+            "size": size,
+            "mtime": mtime,
             "book_id": row.get("book_id"),
+            "purpose": _KIND_PURPOSE.get("book", ""),
+            "usage": _KIND_USAGE.get("book", ""),
         }
 
     def _list_from_scan(self, kind: str | None, genre: str | None,
@@ -857,12 +905,15 @@ class AssetIndex:
         total = len(items)
         return {"total": total, "items": items[offset:offset + limit]}
 
+    def _report_total(self) -> int:
+        return len(self._query_kind("report", None, None))
+
     def count_by_kind(self) -> dict[str, int]:
         """按 kind 计数（SQLite GROUP BY，空则回退扫描计数）。"""
         if self._db_ready():
             counts = db.count_by_kind()
             # 合并 report/book 计数（兼容阶段一 overview）。
-            counts["report"] = len(db.list_reports())
+            counts["report"] = self._report_total()
             counts["book"] = len(db.get_books())
             return counts
         return dict(self.scan()["counts"])
@@ -922,9 +973,18 @@ class AssetIndex:
             return {"kind": "report", "id": asset_id, "name": name,
                     "markdown": fp.read_text(encoding="utf-8-sig")}
         if kind == "book":
-            fp = config.CORPUS_DIR / f"{name}.txt"
+            # 2026-11-23：name 是 book_id，不是文件名。旧实现拼 CORPUS_DIR/<book_id>.txt，
+            # 正常导入的书（book_id 带哈希后缀）必定 404「语料不存在」。
+            row = {}
+            try:
+                rows = db.get_books(book_id=name)
+                row = rows[0] if rows else {}
+            except Exception:  # noqa: BLE001
+                row = {}
+            src = row.get("source_path")
+            fp = migrate.resolve_rel_path(str(src)) if src else config.CORPUS_DIR / f"{name}.txt"
             if not fp.is_file():
-                alt = config.CORPUS_DIR / f"{name}.md"
+                alt = fp.with_suffix(".md")
                 if alt.is_file():
                     fp = alt
                 else:
@@ -936,7 +996,8 @@ class AssetIndex:
                     preview = fh.read(2000)
             except (OSError, UnicodeDecodeError):
                 preview = ""
-            return {"kind": "book", "id": asset_id, "name": name,
+            return {"kind": "book", "id": asset_id,
+                    "name": row.get("title") or name,
                     "size": fp.stat().st_size,
                     "preview": preview}
         fp = config.ASSETS_ROOT / f"{name}.json"
@@ -965,7 +1026,7 @@ class AssetIndex:
             return {
                 "total_books": len(db.get_books()),
                 "total_genre_packs": counts.get("genre_pack", 0),
-                "total_reports": len(db.list_reports()),
+                "total_reports": self._report_total(),
                 "total_assets": _asset_total(assets_by_kind),
                 "assets_by_kind": assets_by_kind,
                 "model_configured": self._model_configured(),
@@ -976,7 +1037,7 @@ class AssetIndex:
         return {
             "total_books": counts.get("book", 0),
             "total_genre_packs": counts.get("genre_pack", 0),
-            "total_reports": counts.get("report", 0),
+            "total_reports": self._report_total(),
             "total_assets": _asset_total(counts),
             "assets_by_kind": counts,
             "model_configured": data["model_configured"],

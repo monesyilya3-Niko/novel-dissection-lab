@@ -218,5 +218,40 @@ class TestOverviewAPI(unittest.TestCase):
         self.assertIn(payload["code"], (400, 404))
 
 
+class TestDiskReportsWhenDbEmpty(unittest.TestCase):
+    """2026-11-23 P0 回归：DB reports 表为空时，磁盘报告仍须出现在概览/资产库。
+
+    实测生产库 reports=0、磁盘 12 份 .md，旧实现首页「报告 0」、资产库报告分类为空。
+    """
+
+    def setUp(self):
+        self._iso = _isolation.isolate_paths(Path(tempfile.mkdtemp(prefix="disk_reports_")))
+        self._iso.__enter__()
+        from gui import db
+        config.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        config.ASSETS_ROOT.mkdir(parents=True, exist_ok=True)
+        db.init_schema()
+        db.apply_migrations()
+        (config.REPORTS_DIR / "bookX-拆书报告.md").write_text("# 报告X", encoding="utf-8")
+        (config.REPORTS_DIR / "bookX-笔法分析.md").write_text("# 笔法X", encoding="utf-8")
+        asset_index.index = asset_index.AssetIndex(ttl_seconds=0)
+        asset_index.index.invalidate()
+
+    def tearDown(self):
+        from gui import db
+        db.close()
+        self._iso.__exit__(None, None, None)
+        asset_index.index = asset_index.AssetIndex(ttl_seconds=5)
+        asset_index.index.invalidate()
+
+    def test_overview_and_report_assets_use_disk(self):
+        ov = asset_index.index.get_overview()
+        self.assertEqual(ov["total_reports"], 2)
+        listed = asset_index.index.list_assets("report")
+        self.assertEqual(listed["total"], 2)
+        self.assertEqual({it["name"] for it in listed["items"]},
+                         {"bookX-拆书报告", "bookX-笔法分析"})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

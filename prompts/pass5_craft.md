@@ -59,7 +59,16 @@
           "description": "在什么场景下用什么手法",
           "effect": "达到什么效果",
           "skeleton": "抽象可复用骨架",
-          "anti_pattern": "该作者不会这么写的反例"
+          "anti_pattern": "该作者不会这么写的反例",
+          "deep_analysis": {
+            "reader_psychology": "读者心理机制：这个手法利用了读者的哪种阅读期待或挫败感，为什么有效（100-200 字）",
+            "execution_steps": "执行步骤：1. 第一步 2. 第二步 3. 第三步（分步写清，可照着做）",
+            "applicable_scene": "适用场景：什么题材/节奏位置/情绪节点下用",
+            "usage_boundary": "使用边界：什么时候不该用、用过头有什么副作用",
+            "intensity_control": "强度控制：弱档与强档分别怎么处理",
+            "combo_patterns": "组合套路：常与哪些技法搭配使用",
+            "migration_checklist": "迁移清单：换成自己的书时逐项核对什么"
+          }
         }
       ],
       "buried_payoff_ratio": 0.6,
@@ -186,6 +195,7 @@
 字段说明：
 - **全部 10 个维度必须都有输出**，每个维度至少 1 个技法。禁止留空维度。
 - 每个维度的 `techniques` 数组至少包含 1 个技法，理想 2+ 个。
+- **每条技法都必须带 `deep_analysis`，7 个字段全部填满、不得留空**：这是万字笔法报告的主要篇幅来源，缺任何一段都会让报告变成空壳。每字段 100-200 字高质量中文，`execution_steps` 用「1. 2. 3.」分步。
 - `buried_payoff_ratio` = 已回收伏笔 / 总伏笔数（0-1）。
 - `subtext_ratio` = 含潜台词的对话 / 总对话数（0-1 估算）。
 - `skeleton` 必须是可直接套用的抽象模板，配 `anti_pattern` 反例。

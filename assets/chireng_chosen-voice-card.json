@@ -161,10 +161,6 @@
   "emotion_handling": {
     "mode": "混合式",
     "body_reaction_vocabulary": [
-      "体感式",
-      "动作外化式",
-      "直陈式",
-      "简直可爱死了",
       "手指都捏白了",
       "心跳如鼓"
     ],

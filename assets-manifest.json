@@ -1,6 +1,6 @@
 {
-  "version": "1.2.2",
-  "generated_at": "2026-11-18T01:48:58.417954-08:00",
+  "version": "1.3.0",
+  "generated_at": "2026-11-25T01:13:37.766090-08:00",
   "files": {
     "campus-redemption-commercial-obs-distilled.json": {
       "sha256": "433289e106b711c07e85b2ae30f060b2fbc332ed151dcd404d62e50a438850f6",
@@ -62,10 +62,11 @@
       ]
     },
     "chireng_chosen-voice-card.json": {
-      "sha256": "d70e424dfce24e4cb63b72e48023f0d7cf97b207c822e7f52bab703615d8a51b",
+      "sha256": "a0938662740e552332044fbcd483a13157a734c83c2942f0389c8d90c59d2166",
       "previous_hashes": [
         "3c6a54dc5b3edc2f25cb5382e83b1d789ca35b5eb801ca7d19450a6f4561d363",
-        "0c914b926eed0e10f25a5aeb7b61d7839e9bbcf7624ba208b58e8e0e63f35184"
+        "0c914b926eed0e10f25a5aeb7b61d7839e9bbcf7624ba208b58e8e0e63f35184",
+        "d70e424dfce24e4cb63b72e48023f0d7cf97b207c822e7f52bab703615d8a51b"
       ]
     },
     "dialogue-library.json": {
@@ -83,10 +84,11 @@
       ]
     },
     "duanju-shuangwen-genre-pack.json": {
-      "sha256": "fb18ad00725aa0ad86065027377a63e7f4ec7838e0a56abb09507e82290f14ed",
+      "sha256": "729d642a002b6ae300b8062a8566897a476a6f271936f0928206a6835b199bb3",
       "previous_hashes": [
         "a8e0f89cbe5d8c1d93796c686e42df0bc4ff3b9185855d5fb21309438ff101cf",
-        "0b366afe2315dcc21d2b0fa7926f111dceb5d355a5e0f63c6182828c74aaf254"
+        "0b366afe2315dcc21d2b0fa7926f111dceb5d355a5e0f63c6182828c74aaf254",
+        "fb18ad00725aa0ad86065027377a63e7f4ec7838e0a56abb09507e82290f14ed"
       ]
     },
     "dushi-bingwang-genre-pack.json": {
@@ -457,10 +459,11 @@
       ]
     },
     "goudai-changsheng-genre-pack.json": {
-      "sha256": "a47d161ad18f2830b7d244c2d12982aed0a0013367c3487418bef7369bc63461",
+      "sha256": "14bbf32f0f1eb3a9b28201bf40061eb397522c902394b41ac6359959b7dab022",
       "previous_hashes": [
         "d23d709e5be9e10329fee8a44cfb1d64da2bc755495d71bcb4017e9c18cb35ec",
-        "a718cb53763ea142d005bbd31bbb01ea368ca5b84cb509d0307cc7b3c9247417"
+        "a718cb53763ea142d005bbd31bbb01ea368ca5b84cb509d0307cc7b3c9247417",
+        "a47d161ad18f2830b7d244c2d12982aed0a0013367c3487418bef7369bc63461"
       ]
     },
     "gufeng-shiqing-genre-pack.json": {
@@ -473,10 +476,11 @@
       ]
     },
     "guize-guaitan-genre-pack.json": {
-      "sha256": "571c6c451bab152e298f5fab77f4441296aa0d8d8878b8998fbd49803af37a84",
+      "sha256": "4ed1aa0621ecc91a933e3930e1a11f91af7272f9afbc5a431ab212375cc0eb52",
       "previous_hashes": [
         "c279470ed2867d7fd2549a042416a2559982e341bd214ee1468ffb10676ceb2b",
-        "1f5e6b51b71a4f5694b014eeeadbf296e7d68f631787a72e01b6013791771335"
+        "1f5e6b51b71a4f5694b014eeeadbf296e7d68f631787a72e01b6013791771335",
+        "571c6c451bab152e298f5fab77f4441296aa0d8d8878b8998fbd49803af37a84"
       ]
     },
     "guyan-naodong-genre-pack.json": {
@@ -665,10 +669,11 @@
       ]
     },
     "qingning_chosen-voice-card.json": {
-      "sha256": "aaa49b775b2f03e0e721b0f149500cc6312f570ac43f7d441d4b32afa69f212a",
+      "sha256": "853372f2d6720e575c442b9a20f454081bcf90978dc2da446c8d8d700edaa8dc",
       "previous_hashes": [
         "c7b5db5f16160cd683df444a555978dfcaf9767efdfe5f2dd80e70a3cf3656ad",
-        "aa5217c32264f59413b07a9ea4738ec5db981d08587be067b0e68a6ba58c5d5c"
+        "aa5217c32264f59413b07a9ea4738ec5db981d08587be067b0e68a6ba58c5d5c",
+        "aaa49b775b2f03e0e721b0f149500cc6312f570ac43f7d441d4b32afa69f212a"
       ]
     },
     "realistic-romance-genre-pack.json": {
@@ -697,10 +702,11 @@
       ]
     },
     "sangshi_chosen-voice-card.json": {
-      "sha256": "e2d8d8bdaf963c5fd8124b6281d8bf216390fec7c4cb944680e7709e9102813e",
+      "sha256": "195b71a0a1ea1b4b12a9f315a11abb2e96e0e52de9aacfffb871a50f4ec5d1e7",
       "previous_hashes": [
         "be45d5c756cbc05d73710d4861e31d25b1e9820040ef7a53092c640d2ffbd4ea",
-        "d8349b99582abecf799612c429448d516abc55f6d1106fae27be01ab8fad2b99"
+        "d8349b99582abecf799612c429448d516abc55f6d1106fae27be01ab8fad2b99",
+        "e2d8d8bdaf963c5fd8124b6281d8bf216390fec7c4cb944680e7709e9102813e"
       ]
     },
     "shuangdian-library.json": {
@@ -738,10 +744,11 @@
       ]
     },
     "suyixinjian_chosen-voice-card.json": {
-      "sha256": "05e8be5245f4ec0708990ef1c4864f1535cf8afea141693fb9aadb6413736c00",
+      "sha256": "cd2482cbf375b756bbba72cf1f601e76836bcabb3a1e93a2aa07c35c5f781884",
       "previous_hashes": [
         "10d3395e5cb9c2e0e876f77adc8e4d565d817a11953540cdcfa668ef0acd4dbd",
-        "61361cf4b170974d5d44ab8328a8c3a546ff3486b6a65c9ae6386a43cf2d0a06"
+        "61361cf4b170974d5d44ab8328a8c3a546ff3486b6a65c9ae6386a43cf2d0a06",
+        "05e8be5245f4ec0708990ef1c4864f1535cf8afea141693fb9aadb6413736c00"
       ]
     },
     "taboo-library.json": {
@@ -935,10 +942,11 @@
       ]
     },
     "暮冬念春-voice-card.json": {
-      "sha256": "a132e9d3f624f2419229098c1fc2c36e33c77a5c84dc30f3c9543decd446eb7f",
+      "sha256": "b89c18a72d438365630dd5fd6233ee01b0fae9bf5b3e3dfc508ea19e04a07c73",
       "previous_hashes": [
         "f408265b5997cb80672d2ca581de84c85cc326f84f40717ee62a22f0e842cd51",
-        "0e37d1754beb2b47ab8adb3d4bde41a5da86d7ed306ea91dcfbd6670d81fc430"
+        "0e37d1754beb2b47ab8adb3d4bde41a5da86d7ed306ea91dcfbd6670d81fc430",
+        "a132e9d3f624f2419229098c1fc2c36e33c77a5c84dc30f3c9543decd446eb7f"
       ]
     },
     "通用-现实言情-voice-card.json": {

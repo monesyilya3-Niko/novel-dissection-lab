@@ -235,7 +235,8 @@ describe('WritingExtras 创作扩展工作台', () => {
       expect(screen.getByText('全书总字数')).toBeInTheDocument()
       expect(screen.getByTestId('creation-rate-chart')).toBeInTheDocument()
       expect(screen.getByTestId('emotion-wave-chart')).toBeInTheDocument()
-      expect(screen.getByTestId('rhythm-radar-chart')).toBeInTheDocument()
+      // 2026-11-23：无数据源的节奏雷达空壳卡片已移除，避免用户找不存在的测算入口。
+      expect(screen.queryByTestId('rhythm-radar-chart')).toBeNull()
     })
 
     // 切换到规范导出

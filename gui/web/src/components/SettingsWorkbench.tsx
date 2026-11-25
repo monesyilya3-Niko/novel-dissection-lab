@@ -184,6 +184,9 @@ export default function SettingsWorkbench() {
         defaultWords: '2400',
         maxAttempts: '3',
       })
+      // 「重置为默认」必须把本页可见的界面偏好也恢复默认；旧实现只重置后端阈值，
+      // 界面模式仍停留在用户原来选的进阶/简洁，用户会以为重置没生效。
+      setUiMode('simple')
       setMessage(t('settings_msg_reset'))
       await refreshThresholds()
     } catch (e) {

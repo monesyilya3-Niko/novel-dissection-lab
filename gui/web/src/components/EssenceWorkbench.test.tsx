@@ -180,6 +180,7 @@ describe('EssenceWorkbench', () => {
         text: '第1章 惊变\n寒风呼啸，少年拔剑。',
         platform: 'fanqie',
         genre: 'xianxia',
+        auto_save_assets: false,
       })
     })
 
@@ -260,6 +261,19 @@ describe('EssenceWorkbench', () => {
     })
   })
 
+  it('整本反哺成功只显示一条通知', async () => {
+    mockAdoptBook.mockResolvedValue({ adopted: true, bookId: 'book_01', totalAdopted: 2 })
+    render(<EssenceWorkbench />)
+    fireEvent.click(screen.getByText('已精读书籍档案'))
+    expect(await screen.findByText('仙逆')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '整本反哺' }))
+    fireEvent.click(await screen.findByRole('button', { name: '确认注入' }))
+    await waitFor(() => {
+      expect(mockAdoptBook).toHaveBeenCalledWith('book_01', '测试创作项目')
+    })
+    expect(await screen.findAllByText(/全套五维资产/)).toHaveLength(1)
+  })
+
   it('切换到宪法正典审查并执行合规检测', async () => {
     mockCheckConstitution.mockResolvedValue({
       complianceScore: 90,
@@ -311,6 +325,35 @@ describe('EssenceWorkbench', () => {
     expect(screen.getByText('合规得分: 90 / 100')).toBeInTheDocument()
     expect(screen.getByText('严禁时代脱节或现代高科技穿越')).toBeInTheDocument()
     expect(screen.getByText('角色: 苏念')).toBeInTheDocument()
+  })
+
+  it('为提示关闭、书籍和暗线删除图标提供可访问名称', async () => {
+    mockListChains.mockResolvedValue({
+      chains: [{
+        id: 101,
+        bookId: 'book_01',
+        title: '九品功法残卷',
+        category: '力量伏笔',
+        plantChapter: 3,
+        revealChapter: 25,
+        climaxChapter: 60,
+        description: '残卷伏笔',
+        status: 'planted',
+      }],
+    })
+    render(<EssenceWorkbench />)
+
+    fireEvent.click(screen.getByRole('button', { name: '开始深度精读与宏观解构' }))
+    expect(screen.getByText('请输入书籍名称')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    expect(screen.queryByText('请输入书籍名称')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: '伏笔暗线图谱' }))
+    expect(await screen.findByRole('button', { name: '删除暗线「九品功法残卷」' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: '已精读书籍档案' }))
+    expect(await screen.findByRole('button', { name: '删除《仙逆》的书籍精读档案' })).toBeInTheDocument()
+    expect(screen.getByRole('tablist').parentElement).toHaveClass('MuiTabs-scrollableX')
   })
 
   it('在英文 en-US 语言环境下正确渲染五大标签页及核心交互元素', async () => {

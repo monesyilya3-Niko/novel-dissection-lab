@@ -254,7 +254,8 @@ export default function AssetLibrary() {
                         secondary={
                           <>
                             <Box component="span" sx={{ display: 'block' }}>
-                              {getKindLabel(it.kind, t)} · {(it.size / 1024).toFixed(1)} KB
+                              {getKindLabel(it.kind, t)} ·{' '}
+                              {it.size != null ? `${(it.size / 1024).toFixed(1)} KB` : '—'}
                               {/* 同题材的题材包 / 文风卡成对存在且同名，这里点明区别 */}
                               {it.kind === 'genre_pack' || it.kind === 'prose_card' ? (
                                 <Box component="span" sx={{ ml: 0.5, opacity: 0.7 }}>

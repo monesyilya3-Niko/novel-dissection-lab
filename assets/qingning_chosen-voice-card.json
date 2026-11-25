@@ -172,16 +172,12 @@
   "emotion_handling": {
     "mode": "直陈式",
     "body_reaction_vocabulary": [
-      "她的心猛地一跳",
-      "是的，她怀孕了",
-      "八月初",
-      "九月初",
-      "婚后第二年春天",
-      "巷口",
-      "高铁站",
-      "书房",
-      "她很紧张/开心",
-      "时光飞逝"
+      "心口发紧",
+      "指尖发凉",
+      "呼吸一滞",
+      "耳根发热",
+      "攥紧衣角",
+      "别开视线"
     ],
     "examples": [
       {
@@ -236,6 +232,7 @@
   },
   "provenance": {
     "contains_verbatim": false,
-    "abstraction_note": "四遍扫描产物，经 compliance.py 扫描，连续12字匹配原文已拒收"
+    "abstraction_note": "四遍扫描产物，经 compliance.py 扫描，连续12字匹配原文已拒收",
+    "body_reaction_note": "部分为通用身体反应基表（非逐字原文抽取），已剔除模式名/对白/地名等无效项"
   }
 }

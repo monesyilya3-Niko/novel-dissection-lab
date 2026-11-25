@@ -148,10 +148,10 @@ export default function ImportPanel({ compact }: Props) {
           ) : null}
         </Alert>
       )}
-      {/* 已导入书目（2026-11-03 补）：此前导入后刷新页面就找不回自己的书 */}
-      <LibraryList />
-      {/* 内置示例语料：一键导入试手 */}
-      <SampleList onImported={() => setError(null)} />
+      {/* 2026-11-23：compact（左侧栏）只保留上传入口；书目与示例放在「导入」主区，
+          否则同一屏出现两套一模一样的导入面板与书目列表（默认页重复）。 */}
+      {!compact && <LibraryList />}
+      {!compact && <SampleList onImported={() => setError(null)} />}
     </Box>
   )
 }
@@ -211,6 +211,12 @@ function SampleList({ onImported }: { onImported: () => void }) {
           />
         ))}
       </Box>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.25 }}>
+        {t(
+          'analysis_sample_report_note',
+          '示例语料仅用于体验拆书流程，篇幅不足以生成正式万字报告；导入你自己的书即可生成。',
+        )}
+      </Typography>
       {error && (
         <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError(null)}>
           {error}
@@ -228,11 +234,12 @@ function SampleList({ onImported }: { onImported: () => void }) {
  */
 function LibraryList() {
   const { t } = useI18n()
-  const { book, openBook } = useApp()
+  const { book, openBook, status } = useApp()
   const [items, setItems] = useState<LibraryBook[]>([])
   const bookId = book?.bookId
   const [loadedOnce, setLoadedOnce] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [openError, setOpenError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -252,10 +259,28 @@ function LibraryList() {
     return () => {
       cancelled = true
     }
-  }, [bookId])
+    // 2026-11-23：分析完成/失败后要重新拉列表，否则「已导入书目」一直显示「待拆」，
+    // 直到整页刷新。status?.status 从 running→done/partial/error 时触发。
+  }, [bookId, status?.status])
+
+  const doOpen = async (id: string) => {
+    setOpenError(null)
+    try {
+      await openBook(id)
+    } catch (e) {
+      // 2026-11-23：旧实现 void openBook(...) 把 404 吞掉，用户看到的是“点了没反应”。
+      setOpenError(friendlyError(e))
+    }
+  }
 
   if (!loadedOnce && items.length === 0) return null
-  if (error) return null
+  if (error) {
+    return (
+      <Alert severity="warning" sx={{ mt: 2 }}>
+        {t('analysis_library_load_failed', '书目列表加载失败：')}{error}
+      </Alert>
+    )
+  }
   if (items.length === 0) return null
 
   return (
@@ -270,13 +295,13 @@ function LibraryList() {
             key={b.bookId}
             // 2026-11-05：列表项此前只有展示、点不动——用户看到书也切不回去，
             // 刷新页面后 book_id 只剩在这个列表里，等于找不回自己的书。
-            onClick={() => { if (book?.bookId !== b.bookId) void openBook(b.bookId) }}
+            onClick={() => { if (book?.bookId !== b.bookId) void doOpen(b.bookId) }}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
-                if (book?.bookId !== b.bookId) void openBook(b.bookId)
+                if (book?.bookId !== b.bookId) void doOpen(b.bookId)
               }
             }}
             sx={{
@@ -294,14 +319,23 @@ function LibraryList() {
               size="small"
               label={b.status === 'done'
                 ? t('analysis_library_status_done', '已拆')
-                : t('analysis_library_status_idle', '待拆')}
-              color={b.status === 'done' ? 'success' : 'default'}
+                : b.status === 'partial'
+                  ? t('analysis_library_status_partial', '部分完成')
+                  : b.status === 'error'
+                    ? t('analysis_library_status_error', '失败')
+                    : t('analysis_library_status_idle', '待拆')}
+              color={b.status === 'done' ? 'success' : b.status === 'partial' ? 'warning' : b.status === 'error' ? 'error' : 'default'}
               variant="outlined"
               sx={{ height: 18, fontSize: 11 }}
             />
           </Box>
         ))}
       </Box>
+      {openError && (
+        <Alert severity="error" sx={{ mt: 1 }} onClose={() => setOpenError(null)}>
+          {openError}
+        </Alert>
+      )}
     </Box>
   )
 }

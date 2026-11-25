@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import WritingWorkbench from './WritingWorkbench'
 import { writingApi } from '../api/client'
@@ -13,6 +13,7 @@ const mockOutlines = vi.fn()
 const mockCharacters = vi.fn()
 const mockNotes = vi.fn()
 const mockStats = vi.fn()
+const mockListChapters = vi.fn()
 const mockImportChapter = vi.fn()
 const mockDeslop = vi.fn()
 const mockCheckPoisons = vi.fn()
@@ -31,6 +32,7 @@ vi.mock('../api/client', () => ({
     characters: (proj: string) => mockCharacters(proj),
     notes: (proj: string) => mockNotes(proj),
     stats: (proj: string, days?: number) => mockStats(proj, days),
+    listChapters: (proj: string) => mockListChapters(proj),
     importChapter: (body: any) => mockImportChapter(body),
     deslop: (text: string) => mockDeslop(text),
     export: (proj: string, fmt?: string) => mockExport(proj, fmt),
@@ -53,6 +55,7 @@ vi.mock('../api/client', () => ({
   essenceApi: {
     listAssets: (params?: any) => mockListAssets(params),
     listChains: (bookId?: string) => mockListChains(bookId),
+    listBooks: vi.fn().mockResolvedValue({ books: [{ bookId: 'book_01', title: '测试书' }] }),
     createChain: vi.fn().mockResolvedValue({ id: 99, title: 'new chain' }),
   },
   assetApi: {
@@ -126,6 +129,7 @@ describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
       streakDays: 5,
       history: [],
     })
+    mockListChapters.mockResolvedValue({ project: 'p1', chapters: [] })
     mockListAssets.mockResolvedValue({
       assets: [
         {
@@ -175,6 +179,7 @@ describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
     render(<WritingWorkbench />)
     expect(screen.getByText('沉浸创作室 (Studio)')).toBeInTheDocument()
     expect(screen.getByText('工坊流水线 (Pipeline)')).toBeInTheDocument()
+    expect(screen.getAllByRole('tablist')[0].parentElement).toHaveClass('MuiTabs-scrollableX')
 
     await waitFor(() => {
       // 顶栏作品与平台定位
@@ -276,6 +281,14 @@ describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
 
     render(<WritingWorkbench />)
     await waitFor(() => expect(screen.getByText('⚡ 排毒与去AI')).toBeInTheDocument())
+
+    // 2026-11-23：编辑器不再预填演示正文，必须先通过真实「插入正文」链路写入内容。
+    fireEvent.click(screen.getByText('精华资产反哺'))
+    await waitFor(() => expect(screen.getByText('插入正文')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('插入正文'))
+    await waitFor(() =>
+      expect(screen.getByText(/已成功将【30秒退婚逆袭钩子】插入当前正文/)).toBeInTheDocument(),
+    )
 
     fireEvent.click(screen.getByText('⚡ 排毒与去AI'))
     await waitFor(() => {
@@ -458,6 +471,12 @@ describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
       { id: 'proj-a', name: '甲作品', readOnly: false },
       { id: 'proj-b', name: '乙作品', readOnly: false },
     ])
+    mockListChapters.mockImplementation((proj: string) => Promise.resolve({
+      project: proj,
+      chapters: proj === 'proj-a'
+        ? [{ chapterNo: 1, title: '第1章 破境', wordCount: 11 }]
+        : [],
+    }))
 
     render(<WritingWorkbench />)
     await waitFor(() => {
@@ -468,12 +487,43 @@ describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
     // 未做用户编辑时不应写入 localStorage 草稿
     expect(localStorage.getItem('novel_draft_proj-a_ch1')).toBeNull()
 
-    // 点击「下一章」切到第 2 章（404）：第 2 章草稿不得被第 1 章正文覆盖！
+    // 索引确认第 2 章不存在时跳过详情请求，且不得把第 1 章正文带到新章。
     fireEvent.click(screen.getByText('下一章'))
     await waitFor(() => {
-      expect(mockGetChapter).toHaveBeenCalledWith('proj-a', 2)
+      expect(screen.getByDisplayValue('第2章')).toBeInTheDocument()
+      expect(screen.queryByText('甲项目第一章服务端真稿')).not.toBeInTheDocument()
     })
+    expect(mockGetChapter).not.toHaveBeenCalledWith('proj-a', 2)
     expect(localStorage.getItem('novel_draft_proj-a_ch2')).toBeNull()
+  })
+
+  it('空项目章节索引加载完成后不请求不存在的第 1 章', async () => {
+    let resolveChapters!: (value: { project: string; chapters: [] }) => void
+    mockListChapters.mockReturnValue(new Promise((resolve) => { resolveChapters = resolve }))
+    const mockGetChapter = vi.fn()
+    ;(writingApi as Record<string, unknown>).getChapter = mockGetChapter
+
+    render(<WritingWorkbench />)
+    await waitFor(() => expect(mockListChapters).toHaveBeenCalledWith('p1'))
+    await act(async () => {
+      resolveChapters({ project: 'p1', chapters: [] })
+    })
+
+    expect(mockGetChapter).not.toHaveBeenCalled()
+  })
+
+  it('章节索引读取失败时仍请求详情，避免误判为空稿覆盖服务端正文', async () => {
+    mockListChapters.mockRejectedValue(new Error('offline'))
+    const mockGetChapter = vi.fn().mockResolvedValue({
+      project: 'p1', chapterNo: 1, title: '第1章 真稿', content: '服务端已有正文', wordCount: 6,
+    })
+    ;(writingApi as Record<string, unknown>).getChapter = mockGetChapter
+
+    render(<WritingWorkbench />)
+    await waitFor(() => {
+      expect(mockGetChapter).toHaveBeenCalledWith('p1', 1)
+      expect(screen.getByText('服务端已有正文')).toBeInTheDocument()
+    })
   })
 
   it('保存章节同步传递 title 字段并在请求飞行中拦截连点', async () => {
@@ -484,6 +534,16 @@ describe('WritingWorkbench - 沉浸式创作室与多空间闭环', () => {
 
     render(<WritingWorkbench />)
     await waitFor(() => expect(screen.getByText('番茄小说')).toBeInTheDocument())
+
+    // 2026-11-23：编辑器初始为空，先走真实插入链路写入正文，并显式填写标题。
+    fireEvent.click(screen.getByText('精华资产反哺'))
+    await waitFor(() => expect(screen.getByText('插入正文')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('插入正文'))
+    await waitFor(() =>
+      expect(screen.getByText(/已成功将【30秒退婚逆袭钩子】插入当前正文/)).toBeInTheDocument(),
+    )
+    fireEvent.change(screen.getByLabelText('章节标题'), { target: { value: '第1章 惊变' } })
+
     const saveBtn = screen.getByText('保存并入库')
 
     fireEvent.click(saveBtn)

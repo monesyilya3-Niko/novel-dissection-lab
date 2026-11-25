@@ -32,6 +32,8 @@ interface ModelInfo {
   roles: string[]
   hasKey: boolean
   note?: string
+  contextWindow?: number
+  apiKeyEnv?: string
 }
 
 interface Preset {
@@ -40,6 +42,8 @@ interface Preset {
   protocol: string
   baseUrl: string
   modelName: string
+  contextWindow?: number
+  apiKeyEnv?: string
 }
 
 export default function ModelManager() {
@@ -47,6 +51,8 @@ export default function ModelManager() {
   const app = useAppOptional()
   const [models, setModels] = useState<ModelInfo[]>([])
   const [presets, setPresets] = useState<Preset[]>([])
+  const [roles, setRoles] = useState<Record<string, string>>({})
+  const [routes, setRoutes] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -62,12 +68,15 @@ export default function ModelManager() {
   // Form state
   const [form, setForm] = useState({
     id: '', label: '', protocol: 'openai', baseUrl: '', modelName: '', note: '', apiKey: '',
+    contextWindow: '', apiKeyEnv: '',
   })
 
   const loadModels = useCallback(async () => {
     try {
       const data = await modelApi.list()
       setModels((data.models ?? []) as ModelInfo[])
+      setRoles((data.roles as Record<string, string>) || {})
+      setRoutes((data.routes as Record<string, string>) || {})
     } catch (e) {
       setError(friendlyError(e))
     } finally {
@@ -92,6 +101,8 @@ export default function ModelManager() {
             protocol: String(p.protocol ?? 'openai'),
             baseUrl: String(p.baseUrl ?? p.base_url ?? ''),
             modelName: String(p.modelName ?? p.model_name ?? ''),
+            contextWindow: Number(p.contextWindow ?? p.context_window ?? 0) || undefined,
+            apiKeyEnv: String(p.apiKeyEnv ?? p.api_key_env ?? ''),
           }))
       setPresets(list)
     } catch { /* ignore */ }
@@ -102,7 +113,7 @@ export default function ModelManager() {
     loadPresets()
   }, [loadModels, loadPresets])
 
-  const resetForm = () => setForm({ id: '', label: '', protocol: 'openai', baseUrl: '', modelName: '', note: '', apiKey: '' })
+  const resetForm = () => setForm({ id: '', label: '', protocol: 'openai', baseUrl: '', modelName: '', note: '', apiKey: '', contextWindow: '', apiKeyEnv: '' })
 
   const openAdd = () => {
     resetForm()
@@ -114,6 +125,7 @@ export default function ModelManager() {
     setForm({
       id: m.id, label: m.label, protocol: m.protocol,
       baseUrl: m.baseUrl, modelName: m.modelName, note: m.note || '', apiKey: '',
+      contextWindow: String(m.contextWindow ?? ''), apiKeyEnv: m.apiKeyEnv || '',
     })
     setEditing(m)
     setShowAdd(true)
@@ -124,6 +136,8 @@ export default function ModelManager() {
       ...prev,
       id: p.name, label: p.label, protocol: p.protocol,
       baseUrl: p.baseUrl, modelName: p.modelName, note: '',
+      contextWindow: p.contextWindow ? String(p.contextWindow) : '',
+      apiKeyEnv: p.apiKeyEnv || '',
     }))
   }
 
@@ -138,6 +152,12 @@ export default function ModelManager() {
         base_url: form.baseUrl, model_name: form.modelName,
       }
       if (form.note) body.note = form.note
+      // 2026-11-23：预设置信字段必须一并提交，否则 GUI 添加的模型丢掉
+      // context_window，llm_client 的上下文预算预检直接失效（长 prompt 静默失败）。
+      const cw = Number(form.contextWindow)
+      if (Number.isFinite(cw) && cw > 0) body.context_window = Math.trunc(cw)
+      if (editing) body.context_window = Number.isFinite(cw) && cw > 0 ? Math.trunc(cw) : ''
+      if (form.apiKeyEnv.trim() || editing) body.api_key_env = form.apiKeyEnv.trim()
       if (!editing && form.apiKey.trim()) body.api_key = form.apiKey.trim()
 
       if (editing) {
@@ -222,13 +242,40 @@ export default function ModelManager() {
       {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage('')}>{message}</Alert>}
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
+      {Object.keys(roles).length > 0 && (
+        <Paper sx={{ p: 1.5, mb: 2 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            {t('model_mgr_roles_title', '当前模型路由')}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 0.5 }}>
+            {['default', 'cheap', 'strong'].map((r) => (
+              <Typography key={r} variant="body2" sx={{ fontSize: 12 }}>
+                <b>{r}</b> → {roles[r] || t('model_mgr_role_unbound', '未绑定')}
+              </Typography>
+            ))}
+          </Box>
+          {Object.keys(routes).length > 0 && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              {t('model_mgr_routes_title', '任务路由')}：
+              {Object.entries(routes).slice(0, 8).map(([task, role]) => `${task}→${role}`).join(' · ')}
+            </Typography>
+          )}
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+            {t(
+              'model_mgr_roles_hint',
+              '分析/写作使用上面绑定的角色。调整角色或任务路由请在终端运行 python scripts/model_config.py role|route（GUI 暂未提供编辑）。',
+            )}
+          </Typography>
+        </Paper>
+      )}
+
       {models.length === 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>{t('model_mgr_empty_hint')}</Alert>
       )}
 
       {models.map((m) => (
         <Paper key={m.id} sx={{ p: 2, mb: 1.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5 }}>
             <Box sx={{ flex: 1 }}>
               <Typography variant="subtitle2">
                 {m.label} <Chip label={m.id} size="small" />
@@ -238,13 +285,18 @@ export default function ModelManager() {
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12 }}>
                 {m.modelName} @ {m.baseUrl}
               </Typography>
-              {m.roles.length > 0 && (
-                <Typography variant="caption" color="text.secondary">
-                  {t('model_mgr_role_prefix')}{m.roles.join(', ')}
-                </Typography>
-              )}
+              {(() => {
+                // 角色绑定在 cfg.roles；兼容后端/测试在模型对象里直接给的 roles。
+                const bound = Object.entries(roles).filter(([, mid]) => mid === m.id).map(([r]) => r)
+                if (bound.length === 0 && Array.isArray(m.roles)) bound.push(...m.roles)
+                return bound.length > 0 ? (
+                  <Typography variant="caption" color="text.secondary">
+                    {t('model_mgr_role_prefix')}{bound.join(', ')}
+                  </Typography>
+                ) : null
+              })()}
             </Box>
-            <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', flexShrink: 0, width: { xs: '100%', sm: 'auto' } }}>
               <Button size="small" startIcon={<PlayArrowIcon />} onClick={() => testModel(m.id)} disabled={testing === m.id}>
                 {testing === m.id ? t('model_mgr_btn_testing') : t('model_mgr_btn_test')}
               </Button>
@@ -266,6 +318,7 @@ export default function ModelManager() {
       <Dialog open={showAdd} onClose={() => setShowAdd(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editing ? `${t('model_mgr_dialog_edit_prefix')}${editing.id}` : t('model_mgr_dialog_add')}</DialogTitle>
         <DialogContent>
+          {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
           {!editing && presets.length > 0 && (
             <Box sx={{ mb: 2 }}>
               <Typography variant="caption" color="text.secondary">{t('model_mgr_quick_preset')}</Typography>
@@ -311,8 +364,24 @@ export default function ModelManager() {
               helperText={t('model_mgr_key_helper')}
             />
           )}
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <TextField
+              label={t('model_mgr_field_context_window', '上下文窗口（tokens）')}
+              fullWidth size="small" type="number"
+              value={form.contextWindow}
+              onChange={(e) => setForm({ ...form, contextWindow: e.target.value })}
+              helperText={t('model_mgr_field_context_window_helper', '用于发送前的上下文预算预检；留空则不预检。')}
+            />
+            <TextField
+              label={t('model_mgr_field_api_key_env', '密钥环境变量（可选）')}
+              fullWidth size="small"
+              value={form.apiKeyEnv}
+              onChange={(e) => setForm({ ...form, apiKeyEnv: e.target.value })}
+              helperText={t('model_mgr_field_api_key_env_helper', '例如 VULTR_API_KEY；设置后环境变量优先于本地密钥库。')}
+            />
+          </Box>
           <TextField
-            label={t('model_mgr_field_note')} fullWidth size="small"
+            label={t('model_mgr_field_note')} fullWidth size="small" sx={{ mt: 1.5 }}
             value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })}
           />
         </DialogContent>
@@ -328,6 +397,7 @@ export default function ModelManager() {
       <Dialog open={!!showKey} onClose={() => setShowKey(null)} maxWidth="sm" fullWidth>
         <DialogTitle>{t('model_mgr_key_dialog_title')}{showKey}</DialogTitle>
         <DialogContent>
+          {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
           <TextField
             label={t('model_mgr_key_field')} fullWidth size="small" type="password"
             value={apiKey} onChange={(e) => setApiKey(e.target.value)}

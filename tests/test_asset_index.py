@@ -17,6 +17,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -209,6 +210,45 @@ class TestAssetIndex(unittest.TestCase):
             v for k, v in ov["assets_by_kind"].items() if k not in ("report", "book")
         )
         self.assertEqual(ov["total_assets"], expected_assets)
+
+
+class TestReportCountUnion(unittest.TestCase):
+    """报告 KPI 必须与资产列表共用数据库/磁盘合并去重口径。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(prefix="report_union_qa_")
+        self.addCleanup(self._tmp.cleanup)
+        self.reports_dir = Path(self._tmp.name)
+        self.idx = asset_index.AssetIndex()
+        patcher = mock.patch.object(config, "REPORTS_DIR", self.reports_dir)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _assert_total(self, db_rows, expected):
+        for name in ("overlap", "disk-only"):
+            (self.reports_dir / f"{name}-拆书报告.md").write_text("# 报告", encoding="utf-8")
+        with (
+            mock.patch.object(self.idx, "_db_ready", return_value=True),
+            mock.patch.object(asset_index.db, "count_by_kind", return_value={}),
+            mock.patch.object(asset_index.db, "get_books", return_value=[]),
+            mock.patch.object(asset_index.db, "list_reports", return_value=db_rows),
+            mock.patch.object(self.idx, "_model_configured", return_value=True),
+        ):
+            self.assertEqual(self.idx.count_by_kind()["report"], expected)
+            overview = self.idx.get_overview()
+            self.assertEqual(overview["total_reports"], expected)
+            self.assertEqual(overview["assets_by_kind"]["report"], expected)
+            self.assertEqual(self.idx.list_assets("report")["total"], expected)
+
+    def test_db_only_and_disk_only_reports_are_summed(self):
+        self._assert_total([
+            {"path": "reports/db-only-拆书报告.md", "book_id": "a", "type": "book"},
+        ], 3)
+
+    def test_overlapping_db_and_disk_report_is_counted_once(self):
+        self._assert_total([
+            {"path": "reports/overlap-拆书报告.md", "book_id": "a", "type": "book"},
+        ], 2)
 
 
 class TestListBooksSummary(unittest.TestCase):

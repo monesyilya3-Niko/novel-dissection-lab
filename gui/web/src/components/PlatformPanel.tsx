@@ -244,7 +244,13 @@ export default function PlatformPanel() {
         steps={['粘贴章节正文（可选标题）', '选择目标平台', '先“检查合规性”再“签约深度诊断”，按报告逐条修改']}
       />
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-        <Tabs value={panelTab} onChange={(_, v) => setPanelTab(v)}>
+        <Tabs
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          value={panelTab}
+          onChange={(_, v) => setPanelTab(v)}
+        >
           <Tab icon={<AssignmentTurnedInIcon fontSize="small" />} iconPosition="start" label={t('platform_tab_diagnose', '多平台合规与签约诊断')} />
           <Tab icon={<SportsEsportsIcon fontSize="small" />} iconPosition="start" label={t('platform_tab_litrpg', 'LitRPG 属性面板与海外排版')} />
         </Tabs>

@@ -12,27 +12,8 @@
     "target_platform": "长篇通用",
     "scope": "genre-generalized",
     "confidence": 0.6,
-    "note": "通用题材包：苟道流/长生不死/稳健修仙/熬死仇敌/因果不沾",
-    "source_books": [
-      {
-        "title": "苟道长生标杆代表作一",
-        "platform": "番茄",
-        "performance": "千万级爆款",
-        "voice_card_ref": "goudai-changsheng_ref1"
-      },
-      {
-        "title": "苟道长生热门畅销作二",
-        "platform": "番茄",
-        "performance": "高追读榜首",
-        "voice_card_ref": "goudai-changsheng_ref2"
-      },
-      {
-        "title": "苟道长生经典完结作三",
-        "platform": "番茄",
-        "performance": "高评分必读",
-        "voice_card_ref": "goudai-changsheng_ref3"
-      }
-    ]
+    "note": "通用题材包：苟道流/长生不死/稳健修仙/熬死仇敌/因果不沾；暂无合规语料样本，规则由编辑手工整理，非具体作品实测",
+    "source_books": []
   },
   "commercial": {
     "opening_analysis": {

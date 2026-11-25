@@ -38,7 +38,6 @@ import { useApp } from '../state/AppContext'
 import { useThemeMode } from '../state/ThemeModeContext'
 import { useUiModeOptional } from '../state/UiModeContext'
 import { useI18n } from '../state/I18nContext'
-import { requestSystemTab } from './SystemWorkbench'
 import type { WorkbenchKey } from '../layout/WorkbenchNav'
 import type { AssetKind } from '../types'
 
@@ -66,10 +65,6 @@ interface WorkbenchMetaItem {
 
 function emitAssetFilter(kind: AssetKind) {
   window.dispatchEvent(new CustomEvent('novellab:asset-filter', { detail: { kind } }))
-}
-
-function emitWritingAction(action: string) {
-  window.dispatchEvent(new CustomEvent('novellab:writing-action', { detail: { action } }))
 }
 
 function emitAnalysisTab(tab: string) {
@@ -119,6 +114,16 @@ export default function CommandPalette() {
 
   const items: CommandItem[] = useMemo(() => {
     const list: CommandItem[] = []
+    // 2026-11-23：WritingWorkbench 是 lazy 组件，requestAnimationFrame 时往往还没挂载，
+    // 事件被丢掉 → 命令面板的「新建项目/大纲/人物」看起来完全没反应。
+    // 先写 sessionStorage 作为冷启动兜底，再延迟广播一次给已挂载的实例。
+    const goWritingAction = (action: string) => {
+      try { sessionStorage.setItem('novellab.pendingWritingAction', action) } catch { /* ignore */ }
+      setWorkbench('writing')
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('novellab:writing-action', { detail: { action } }))
+      }, 120)
+    }
     const gWorkbench = t('cmd_group_workbench', '工作台')
     const gCreation = t('cmd_group_creation', '创作')
     const gAssets = t('cmd_group_assets', '资产')
@@ -145,10 +150,7 @@ export default function CommandPalette() {
       icon: <AddIcon fontSize="small" />,
       group: gCreation,
       keywords: 'new project 新建 项目 创建 create novel book writing',
-      run: () => {
-        setWorkbench('writing')
-        requestAnimationFrame(() => emitWritingAction('new-project'))
-      },
+      run: () => goWritingAction('new-project'),
     })
     list.push({
       id: 'creation-new-outline',
@@ -156,10 +158,7 @@ export default function CommandPalette() {
       icon: <MenuBookIcon fontSize="small" />,
       group: gCreation,
       keywords: 'outline 大纲 规划 章节 outline chapter volume structure beats',
-      run: () => {
-        setWorkbench('writing')
-        requestAnimationFrame(() => emitWritingAction('new-outline'))
-      },
+      run: () => goWritingAction('new-outline'),
     })
     list.push({
       id: 'creation-new-character',
@@ -167,10 +166,7 @@ export default function CommandPalette() {
       icon: <PersonIcon fontSize="small" />,
       group: gCreation,
       keywords: 'character 人物 人设 角色 persona card name naming protagonist',
-      run: () => {
-        setWorkbench('writing')
-        requestAnimationFrame(() => emitWritingAction('new-character'))
-      },
+      run: () => goWritingAction('new-character'),
     })
     list.push({
       id: 'creation-go-studio',
@@ -306,7 +302,7 @@ export default function CommandPalette() {
       group: gSystem,
       keywords: 'model 模型 配置 config api key llm openai anthropic provider',
       run: () => {
-        requestSystemTab(2)
+        void import('./SystemWorkbench').then(({ requestSystemTab }) => requestSystemTab(2))
         setWorkbench('system')
       },
     })

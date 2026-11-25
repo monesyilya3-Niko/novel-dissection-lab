@@ -42,6 +42,20 @@ describe('ModelManager 模型管理面板', () => {
     })
   })
 
+  it('模型操作按钮在窄屏换行且不依赖整页横向滚动', async () => {
+    mockList.mockResolvedValueOnce({
+      models: [{
+        id: 'mobile-model', label: '移动端模型', protocol: 'openai',
+        baseUrl: 'https://api.example.com/v1', modelName: 'mobile-model',
+        roles: [], hasKey: false,
+      }],
+    })
+
+    render(<ModelManager />)
+    const edit = await screen.findByRole('button', { name: '编辑' })
+    expect(edit.parentElement).toHaveStyle({ display: 'flex', flexWrap: 'wrap' })
+  })
+
   it('初始加载时展示加载态，模型为空时展示空配置引导', async () => {
     mockList.mockResolvedValueOnce({ models: [] })
 
@@ -181,6 +195,35 @@ describe('ModelManager 模型管理面板', () => {
           label: 'Claude 3.5 Sonnet Updated',
         }),
       )
+      expect(screen.getByText('模型已更新')).toBeInTheDocument()
+    })
+  })
+
+  it('编辑时显示并可清空上下文窗口与密钥环境变量', async () => {
+    mockList.mockResolvedValue({
+      models: [{
+        id: 'custom-model', label: '自定义模型', protocol: 'openai',
+        baseUrl: 'https://api.example.com/v1', modelName: 'custom-model',
+        roles: [], hasKey: false, contextWindow: 32768, apiKeyEnv: 'OLD_MODEL_KEY',
+      }],
+    })
+    mockUpdate.mockResolvedValueOnce({ success: true })
+
+    render(<ModelManager />)
+    fireEvent.click(await screen.findByText('编辑'))
+
+    const contextWindow = screen.getByLabelText('上下文窗口（tokens）') as HTMLInputElement
+    const apiKeyEnv = screen.getByLabelText('密钥环境变量（可选）') as HTMLInputElement
+    expect(contextWindow.value).toBe('32768')
+    expect(apiKeyEnv.value).toBe('OLD_MODEL_KEY')
+    fireEvent.change(contextWindow, { target: { value: '' } })
+    fireEvent.change(apiKeyEnv, { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('custom-model', expect.objectContaining({
+        context_window: '', api_key_env: '',
+      }))
       expect(screen.getByText('模型已更新')).toBeInTheDocument()
     })
   })

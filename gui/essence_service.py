@@ -56,6 +56,15 @@ def _format_book_dict(r: db.RowLike) -> dict[str, Any]:
     d["summary"] = meta.get("summary", f"《{d.get('title', '')}》（共 {t_chaps} 章）")
     d["createdAt"] = d.get("created_at", "")
     d["updatedAt"] = d.get("updated_at", "")
+    # 2026-11-23：显式标记「纲要模板」书（无全文，只有人工整理的标杆资产）。
+    # 前端据此展示「纲要模板」徽标，并避免把它当成可拆书的已导入语料。
+    d["isCurated"] = bool(meta.get("isCurated") or b_id.startswith("curated_"))
+    # 2026-11-23：海外标杆的 total_chars 是英文字符数，不能按中文「字」展示。
+    d["language"] = (
+        "en" if meta.get("englishTitle")
+        or str(d.get("platform") or "") in ("western_canon", "royalroad")
+        else "zh"
+    )
     return d
 
 
@@ -871,6 +880,12 @@ def get_overall_stats() -> dict[str, Any]:
     total_chapters = conn.execute("SELECT coalesce(sum(total_chapters), 0) FROM essence_books").fetchone()[0]
     total_assets = conn.execute("SELECT count(*) FROM essence_assets").fetchone()[0]
     total_chains = conn.execute("SELECT count(*) FROM essence_chains").fetchone()[0]
+    # 2026-11-23：区分「有全文的实测书」与「纲要模板书」。curated 只有人工整理的
+    # 五维资产，没有原文；total_chars/chapters 是参考体量，不是实测值。
+    curated_books = conn.execute(
+        "SELECT count(*) FROM essence_books WHERE source_path LIKE 'curated://%'"
+    ).fetchone()[0]
+    measured_books = int(total_books) - int(curated_books)
 
     genre_rows = conn.execute("SELECT genre, count(*) as cnt FROM essence_books GROUP BY genre ORDER BY cnt DESC").fetchall()
     genre_distribution = {r["genre"]: r["cnt"] for r in genre_rows}
@@ -884,8 +899,12 @@ def get_overall_stats() -> dict[str, Any]:
         "total_chapters": total_chapters,
         "total_assets": total_assets,
         "total_chains": total_chains,
+        "curated_books": curated_books,
+        "measured_books": measured_books,
         "genre_distribution": genre_distribution,
         "category_distribution": category_distribution,
+        "curatedBooks": curated_books,
+        "measuredBooks": measured_books,
         "totalBooks": total_books,
         "totalChars": total_chars,
         "totalChapters": total_chapters,
@@ -911,6 +930,14 @@ def export_book_outline_markdown(book_id: str) -> str:
         "",
         "> 本文档由小说精华数据库 (Novel Essence Database) 自动解构导出。",
         "",
+    ]
+    if book.get("isCurated"):
+        lines += [
+            "> ⚠️ **本档案是人工整理的纲要模板（无全文）**：体量、对白占比与节奏数字均为参考值，"
+            "不是对该书全文的实测分析；引用时请注明“标杆参考”。",
+            "",
+        ]
+    lines += [
         "## 一、全书基础档案",
         "",
         f"- **题材定位**：{book.get('genre', '通用')}",
@@ -1006,6 +1033,14 @@ def export_chapter_beats_markdown(book_id: str) -> str:
     lines = [
         f"# 《{book.get('title', '未命名作品')}》分章节拍与轻提纲清单",
         "",
+    ]
+    if book.get("isCurated"):
+        lines += [
+            f"> ⚠️ **本档案是人工整理的纲要模板（无全文）**：以下 {total_chapters} 行节拍"
+            f"是按均长约 {avg_len} 字生成的参考骨架，不含逐章原文分析。",
+            "",
+        ]
+    lines += [
         f"- 全书共 {total_chapters} 章节 · 均长约 {avg_len} 字",
         "",
         "| 章节序号 | 节奏定位 | 剧情节拍与暗线事件 | 推荐字数 |",
@@ -1176,12 +1211,15 @@ CURATED_MASTERPIECES: list[dict[str, Any]] = [
         "book_id": "curated_mudongnianchun",
         "title": "暮冬念春",
         "genre": "yanqing",
-        "platform": "jinjiang",
+        # 2026-11-23：与仓库内实测资产对齐（assets/暮冬念春-voice-card.json
+        # quantitative_source：全文字符 328,658；157 章；对白 15.32%；番茄连载）。
+        # 旧值 420,000 字/晋江是人工估数，和软件自己量出来的数据冲突。
+        "platform": "fanqie",
         "total_chapters": 157,
-        "total_chars": 420000,
+        "total_chars": 328658,
         "meta": {
-            "avgChapterLen": 2675,
-            "dialogueRatio": 0.122,
+            "avgChapterLen": 2093,
+            "dialogueRatio": 0.1532,
             "rhythmClimaxInterval": 4,
             "aiSlopScore": 1.2,
             "summary": "现实言情与双向救赎群像典范。寒冬江岸救赎开局，克制深情、电影感动作白描，彻底消除AI味。",
@@ -2771,6 +2809,56 @@ CURATED_MASTERPIECES: list[dict[str, Any]] = [
 ]
 
 
+def refresh_curated_metadata() -> int:
+    """用当前 CURATED_MASTERPIECES 修正已灌装库的元数据（2026-11-23）。
+
+    只更新**已存在**的 curated 行（不复活用户删掉的书、不重灌资产），用于让
+    老库拿到代码里修正后的字数/平台/参考值（例如《暮冬念春》420,000→328,658）。
+    返回实际更新的行数。
+    """
+    if not db.table_exists("essence_books"):
+        return 0
+    now = _now_iso()
+    updated = 0
+    with db.tx() as conn:
+        for b in CURATED_MASTERPIECES:
+            cur = conn.execute(
+                """
+                UPDATE essence_books SET
+                    title = ?, genre = ?, platform = ?,
+                    total_chapters = ?, total_chars = ?,
+                    analyzed_chapters = 0, meta_json = ?, updated_at = ?
+                WHERE book_id = ? AND source_path LIKE 'curated://%'
+                """,
+                (
+                    b["title"], b["genre"], b["platform"],
+                    b["total_chapters"], b["total_chars"],
+                    json.dumps(b.get("meta", {}), ensure_ascii=False), now,
+                    b["book_id"],
+                ),
+            )
+            updated += int(cur.rowcount or 0)
+    return updated
+
+
+def purge_curated_book_rows() -> int:
+    """删除历史版本误写入 ``books`` 表的精选库幽灵书（2026-11-23）。
+
+    ``books`` 表只允许放「有真实正文、可拆书」的语料。旧版
+    ``ensure_curated_library`` 把 20 本 ``curated://`` 纲要模板写进了 books，
+    造成三个用户可见后果：
+      - 分析页「已导入书目」列出 20 本，点开却是 404「书籍未导入」；
+      - 资产总数虚增 20（book 类资产）；
+      - HomeDashboard「已拆书」与真实语料进度对不上。
+    只删除 source_path 明确为 curated:// 的行，真实导入的书一律不碰。
+    """
+    if not db.table_exists("books"):
+        return 0
+    with db.tx() as conn:
+        cur = conn.execute("DELETE FROM books WHERE source_path LIKE 'curated://%'")
+        return int(cur.rowcount or 0)
+
+
 def ensure_curated_library(clean_raw_corpus: bool = True) -> dict[str, Any]:
     """清洗生僻语料垃圾书并全量入库 20 大传世神作精品档案（含 8 部西方先锋标杆）。"""
     conn = db.get_conn()
@@ -2810,13 +2898,14 @@ def ensure_curated_library(clean_raw_corpus: bool = True) -> dict[str, Any]:
                 INSERT INTO essence_books
                     (book_id, title, source_path, genre, platform, total_chapters, total_chars,
                      analyzed_chapters, status, meta_json, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
                 ON CONFLICT(book_id) DO UPDATE SET
                     title = excluded.title,
                     genre = excluded.genre,
                     platform = excluded.platform,
                     total_chapters = excluded.total_chapters,
                     total_chars = excluded.total_chars,
+                    analyzed_chapters = 0,
                     meta_json = excluded.meta_json,
                     updated_at = excluded.updated_at
                 """,
@@ -2828,7 +2917,6 @@ def ensure_curated_library(clean_raw_corpus: bool = True) -> dict[str, Any]:
                     b["platform"],
                     b["total_chapters"],
                     b["total_chars"],
-                    b["total_chapters"],
                     "ready",
                     meta_json,
                     now,
@@ -2836,21 +2924,11 @@ def ensure_curated_library(clean_raw_corpus: bool = True) -> dict[str, Any]:
                 ),
             )
 
-            if db.table_exists("books"):
-                tx_conn.execute(
-                    """
-                    INSERT INTO books
-                        (book_id, title, source_path, genre, status, imported_at, updated_at)
-                    VALUES (?, ?, ?, ?, 'ready', ?, ?)
-                    ON CONFLICT(book_id) DO UPDATE SET
-                        title = excluded.title,
-                        source_path = excluded.source_path,
-                        genre = excluded.genre,
-                        status = 'ready',
-                        updated_at = excluded.updated_at
-                    """,
-                    (b_id, b["title"], f"curated://{b_id}", b["genre"], now, now),
-                )
+            # ⚠️ 2026-11-23 起禁止把精选库写入 books 表。
+            # books 表是「可拆书语料」的唯一真相源；curated 只有人工纲要资产、
+            # 没有全文，写进去会让 /api/books 列出 20 本点开即 404 的幽灵书，
+            # 并把资产总数/已导入书目虚增。精选库只存在于 essence_books /
+            # essence_assets / essence_chains，由精华库工作台消费。
 
             # 写入对应五维资产卡（存在同名则跳过）
             for asset in b.get("assets", []):

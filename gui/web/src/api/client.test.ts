@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, deepToCamel, friendlyError, getOverview } from './client'
+import { ApiError, deepToCamel, friendlyError, getOverview, modelApi } from './client'
 
 // fetch mock 助手：返回 envelope JSON
 function mockFetchOnce(payload: unknown, init?: { ok?: boolean; status?: number; json?: boolean }) {
@@ -101,6 +101,21 @@ describe('typedRequest 请求核心', () => {
     const err = await p.catch((e) => e)
     expect(friendlyError(err)).toBe('请求超时，请重试')
     vi.useRealTimers()
+  })
+})
+
+describe('模型连通性测试超时', () => {
+  it('覆盖后端 3600 秒上限并留出响应余量', async () => {
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+    vi.mocked(fetch).mockImplementationOnce(mockFetchOnce({
+      code: 0, data: { success: true }, message: '',
+    }) as never)
+    try {
+      await modelApi.test('slow-model')
+      expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 3_660_000)
+    } finally {
+      timeoutSpy.mockRestore()
+    }
   })
 })
 

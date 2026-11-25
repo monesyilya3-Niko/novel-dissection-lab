@@ -882,6 +882,37 @@ class TestCuratedSeedOnce(unittest.TestCase):
             "用户删除的精选书被启动逻辑复活了",
         )
 
+    def test_refresh_curated_metadata_updates_existing(self):
+        server.ensure_curated_seed_once()
+        conn = db.get_conn()
+        conn.execute(
+            "UPDATE essence_books SET total_chars=999, platform='jinjiang' "
+            "WHERE book_id='curated_mudongnianchun'")
+        conn.commit()
+        n = essence_service.refresh_curated_metadata()
+        self.assertGreaterEqual(n, len(essence_service.CURATED_MASTERPIECES))
+        row = conn.execute(
+            "SELECT total_chars, platform FROM essence_books "
+            "WHERE book_id='curated_mudongnianchun'").fetchone()
+        self.assertEqual(row["total_chars"], 328658)
+        self.assertEqual(row["platform"], "fanqie")
+
+    def test_purge_curated_books_keeps_real_rows(self):
+        """2026-11-23：精选库纲要模板不得留在 books 表；真实导入书不得被误删。"""
+        server.ensure_curated_seed_once()
+        from gui import migrate
+        with db.tx() as conn:
+            migrate._upsert_book(conn, "real_book", "真实书", "C:/real.txt", "xianxia", "done")
+            # 模拟历史版本写进 books 表的幽灵行（新代码不再写入，必须显式造数据）。
+            migrate._upsert_book(conn, "curated_legacy", "旧幽灵", "curated://curated_legacy",
+                                 "xianxia", "ready")
+        n = essence_service.purge_curated_book_rows()
+        self.assertEqual(n, 1)
+        rows = db.get_books()
+        self.assertEqual([r["book_id"] for r in rows], ["real_book"])
+        # 精华库档案本身必须保留（它仍是可浏览/可反哺的标杆资产）。
+        self.assertIsNotNone(essence_service.get_book("curated_dune"))
+
     def test_existing_manual_library_gets_marked_not_reseeded(self):
         """老库已有人工 curated 数据时：只落标记，不重复灌装。"""
         essence_service.create_or_update_book(

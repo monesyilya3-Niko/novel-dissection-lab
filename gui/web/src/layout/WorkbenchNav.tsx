@@ -86,7 +86,7 @@ function getNavItemDefs(t: (k: string, fb?: string) => string): Record<Workbench
 export function buildNavGroups(
   t: (k: string, fb?: string) => string,
   mode: UIMode,
-  isAdmin: boolean,
+  _isAdmin: boolean,
 ): NavGroupDef[] {
   const defs = getNavItemDefs(t)
   return [
@@ -107,7 +107,9 @@ export function buildNavGroups(
     {
       id: 'manage',
       title: t('nav_group_manage', '管理'),
-      items: isAdmin ? [defs.system, defs.settings, defs.admin] : [defs.system, defs.settings],
+      // 2026-11-23：管理员入口不能只在已登录时显示——首次部署的用户根本找不到
+      // 登录表单（只能靠 Ctrl+K 搜）。未登录时点进去就是登录页，由后端鉴权兜底。
+      items: [defs.system, defs.settings, defs.admin],
       collapsible: false,
       defaultOpen: true,
       subtle: mode === 'simple',
@@ -252,7 +254,7 @@ export default function WorkbenchNav({ active, onChange, mode = 'advanced', isAd
       <Box sx={{ flex: 1 }} />
       <Box sx={{ px: 2.5, pb: 1 }}>
         <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: '0.1em' }}>
-          v1.2.2
+          v1.3.0
         </Typography>
       </Box>
     </Box>

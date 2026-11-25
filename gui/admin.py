@@ -395,7 +395,10 @@ def change_password(username: str, old_password: str, new_password: str, ip: str
         salt = bytes.fromhex(data["salt"])
         if not hmac.compare_digest(_hash_password(old_password, salt), data.get("password_hash", "")):
             audit(username, ip, "admin.change_password.failed", "原密码错误")
-            raise ServiceError("原密码错误", 401)
+            # 2026-11-23：原密码错误是**表单校验失败**，不是会话失效。旧实现用 401，
+            # 前端把它当成"会话被吊销"直接退出登录，用户输错一次就被踢回登录页，
+            # 新密码也丢了。改 400 让界面正常显示"原密码错误"。
+            raise ServiceError("原密码错误", 400)
         new_salt = secrets.token_bytes(16)
         data["salt"] = new_salt.hex()
         data["password_hash"] = _hash_password(new_password, new_salt)
@@ -634,7 +637,11 @@ def get_dashboard() -> dict[str, Any]:
             "items": items,
         },
         "assetsTotal": overview.get("total_assets", 0),
-        "reportsTotal": overview.get("total_reports", 0),
+        # 2026-11-23：报告可能只在磁盘、尚未同步进 reports 表；为 0 时回退扫描。
+        "reportsTotal": overview.get("total_reports", 0) or (
+            sum(1 for _ in config.REPORTS_DIR.glob("*.md"))
+            if config.REPORTS_DIR.is_dir() else 0
+        ),
         "assetsByKind": overview.get("assets_by_kind", {}),
         "diskBytes": disk,
         "diskTotalBytes": sum(disk.values()),
@@ -754,10 +761,10 @@ def _delete_book_locked(book_id: str, username: str, ip: str) -> dict[str, Any]:
     if state is None:
         raise ServiceError(f"书籍不存在: {book_id}", 404)
 
-    # 分析中的书籍禁止删除（避免与后台任务竞态；前端按钮只是第一道防线）。
+    # 分析中或暂停中的书籍禁止删除（paused 任务仍持有后台线程，可继续写盘）。
     # 生产状态名是 "running"，旧协议/测试兼容 "analyzing"。
-    if isinstance(state, dict) and state.get("status") in ("analyzing", "running"):
-        raise ServiceError("书籍正在分析中，无法删除", 409)
+    if isinstance(state, dict) and state.get("status") in ("analyzing", "running", "paused"):
+        raise ServiceError("书籍正在分析或暂停中，无法删除", 409)
 
     removed: list[str] = []
     skipped: list[str] = []

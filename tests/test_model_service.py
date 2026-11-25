@@ -157,6 +157,19 @@ class TestModelCrud(unittest.TestCase):
         flags = {m["id"]: m["has_key"] for m in out["models"]}
         self.assertEqual(flags, {"m1": False, "m2": True})
 
+    def test_list_models_exposes_api_key_env_for_editing(self):
+        model_service.add_model(self._body(api_key_env="EXAMPLE_MODEL_KEY"))
+        model = model_service.list_models()["models"][0]
+        self.assertEqual(model["api_key_env"], "EXAMPLE_MODEL_KEY")
+
+    def test_update_model_clears_optional_fields(self):
+        model_service.add_model(self._body(context_window=32768, api_key_env="OLD_KEY"))
+        got = model_service.update_model("m1", {"context_window": "", "api_key_env": ""})
+        self.assertIsNone(got["context_window"])
+        self.assertEqual(got["api_key_env"], "")
+        self.assertNotIn("context_window", self.saved["cfg"]["models"]["m1"])
+        self.assertNotIn("api_key_env", self.saved["cfg"]["models"]["m1"])
+
     def test_update_model(self):
         model_service.add_model(self._body())
         got = model_service.update_model("m1", {"label": "新名", "timeout": 60,

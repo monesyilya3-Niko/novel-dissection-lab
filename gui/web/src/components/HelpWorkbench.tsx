@@ -278,8 +278,8 @@ const GUIDES: FeatureGuide[] = [
         detail: { 'zh-CN': '顶部点击资产类型 Chip（或"全部"）。涵盖声线卡、结构、商业、笔法、题材包、文风卡、蒸馏规则、桥段、报告、语料与索引。', 'en-US': 'Filter across 11 kinds: Voice, Structure, Commercial, Craft, Genre Pack, Style, Distilled Rules, Tropes, Reports, Corpus, and Index.' },
       },
       {
-        title: { 'zh-CN': '搜索与筛选', 'en-US': 'Search and Filter' },
-        detail: { 'zh-CN': '搜索框输入关键词过滤，或点击左侧分类树快速定位指定题材资产。', 'en-US': 'Search keywords or use the category sidebar to instantly navigate genre assets.' },
+        title: { 'zh-CN': '翻页浏览', 'en-US': 'Browse Pages' },
+        detail: { 'zh-CN': '资产较多时用列表底部分页浏览；当前版本暂未提供关键字搜索与分类树。', 'en-US': 'Use the pagination at the bottom of the list. Keyword search and a category tree are not available in this version.' },
       },
       {
         title: { 'zh-CN': '查看详情', 'en-US': 'Inspect Details' },
@@ -310,7 +310,7 @@ const GUIDES: FeatureGuide[] = [
       },
       {
         title: { 'zh-CN': '资产编辑', 'en-US': 'Asset Editing' },
-        detail: { 'zh-CN': '选择一个资产手动编辑，保存时自动创建安全版本镜像并保留历史。', 'en-US': 'Manually edit asset JSON schemas with automatic version archiving.' },
+        detail: { 'zh-CN': '选择一个资产手动编辑；保存采用原子替换，但界面不保留历史版本，改动前请先在外部备份。', 'en-US': 'Edit asset JSON manually. Saves are atomic, but the UI keeps no version history; back up externally before changes.' },
       },
       {
         title: { 'zh-CN': '平台适配', 'en-US': 'Platform Adaptation' },
@@ -602,9 +602,9 @@ const DATA_FLOW_DIAGRAM: Record<Locale, string> = {
 // 组件：术语表面板
 // ---------------------------------------------------------------------------
 
-function GlossaryPanel() {
+function GlossaryPanel({ anchor }: { anchor?: string }) {
   const { t, locale } = useI18n()
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(anchor ?? '')
   const [catFilter, setCatFilter] = useState<'all' | TermCategory>('all')
 
   const catOptions: Array<{ key: 'all' | TermCategory; label: string }> = useMemo(() => [
@@ -621,14 +621,19 @@ function GlossaryPanel() {
   }), [t])
 
   const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
     return GLOSSARY.filter(tItem => {
-      const termStr = tItem.term[locale] || tItem.term['zh-CN']
-      const defStr = tItem.definition[locale] || tItem.definition['zh-CN']
-      const matchQ = !query || termStr.toLowerCase().includes(query.toLowerCase()) || defStr.toLowerCase().includes(query.toLowerCase())
+      const searchable = [
+        ...Object.values(tItem.term),
+        ...Object.values(tItem.definition),
+        ...Object.values(tItem.example ?? {}),
+        tItem.pinyin ?? '',
+      ].join('\n').toLowerCase()
+      const matchQ = !normalizedQuery || searchable.includes(normalizedQuery)
       const matchC = catFilter === 'all' || tItem.category === catFilter
       return matchQ && matchC
     })
-  }, [query, catFilter, locale])
+  }, [query, catFilter])
 
   return (
     <Box>
@@ -659,7 +664,15 @@ function GlossaryPanel() {
         const defText = item.definition[locale] || item.definition['zh-CN']
         const exText = item.example ? (item.example[locale] || item.example['zh-CN']) : undefined
         return (
-          <Card key={termName} sx={{ mb: 2, border: '1px solid', borderColor: 'divider' }}>
+          <Card
+            key={termName}
+            sx={{
+              mb: 2,
+              border: '1px solid',
+              borderColor: anchor && termName.includes(anchor) ? 'primary.main' : 'divider',
+              bgcolor: anchor && termName.includes(anchor) ? 'action.hover' : 'inherit',
+            }}
+          >
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                 <Typography variant="h6" sx={{ fontFamily: fontStack.serif, color: 'primary.main' }}>
@@ -948,7 +961,9 @@ export default function HelpWorkbench({ initialTab = 'start', initialAnchor = nu
       <Tabs
         value={tab}
         onChange={(_, v) => setTab(v)}
-        sx={{ mb: 3, borderBottom: '1px solid', borderColor: 'divider' }}
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={{ mb: 3, minWidth: 0, borderBottom: '1px solid', borderColor: 'divider' }}
       >
         <Tab value="start" label={t('help_tab_start')} />
         <Tab value="glossary" label={t('help_tab_glossary')} />
@@ -956,7 +971,7 @@ export default function HelpWorkbench({ initialTab = 'start', initialAnchor = nu
         <Tab value="faq" label={t('help_tab_faq')} />
       </Tabs>
       {tab === 'start' && <StartPanel />}
-      {tab === 'glossary' && <GlossaryPanel />}
+      {tab === 'glossary' && <GlossaryPanel key={initialAnchor ?? 'glossary'} anchor={initialAnchor ?? undefined} />}
       {tab === 'guides' && <GuidesPanel anchor={initialAnchor} />}
       {tab === 'faq' && <FaqPanel />}
 

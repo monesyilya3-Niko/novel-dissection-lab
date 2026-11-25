@@ -240,9 +240,26 @@ export default function DeslopPanel() {
                     {t('deslop_suggestions_title')}
                   </Typography>
                   {result.suggestions.length === 0 ? (
-                    <Typography variant="body2" color="success.main">
-                      {t('deslop_clean_success')}
-                    </Typography>
+                    // 2026-11-23：不能只看 suggestions 是否为空。实测同一屏会出现
+                    // 「100 分 / 重度 AI 味 / 2 条问题」却显示「文风非常自然」——因为
+                    // 模型没给 suggestions。有 issues 时必须如实提示。
+                    (result.issues?.length ?? 0) > 0 || (result.stats?.issuesCount ?? 0) > 0 ? (
+                      <Typography variant="body2" color="warning.main">
+                        {t(
+                          'deslop_no_suggestions_but_issues',
+                          '检测到 {n} 个问题，但模型没有给出逐条改写建议；请查看下方问题列表。',
+                          {
+                            n: String(
+                              Math.max(result.issues?.length ?? 0, result.stats?.issuesCount ?? 0),
+                            ),
+                          },
+                        )}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" color="success.main">
+                        {t('deslop_clean_success')}
+                      </Typography>
+                    )
                   ) : (
                     result.suggestions.map((s, idx) => (
                       <Typography key={idx} variant="body2" color="text.secondary" sx={{ mb: 1, display: 'flex', gap: 1 }}>

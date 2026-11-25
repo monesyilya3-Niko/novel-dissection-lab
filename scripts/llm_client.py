@@ -19,6 +19,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -187,6 +188,16 @@ def any_model_configured() -> bool:
         return False
 
 
+def _is_keyless_local_model(model: dict) -> bool:
+    if model.get("api_key_env"):
+        return False
+    try:
+        host = (urlsplit(str(model.get("base_url") or "")).hostname or "").lower()
+    except ValueError:
+        return False
+    return host in {"127.0.0.1", "localhost", "::1"}
+
+
 def any_model_ready() -> bool:
     """是否存在至少一个已具备调用凭据（或本地免密）的模型（排除未配 Key 的仓库模板）。"""
     if not any_model_configured():
@@ -201,8 +212,7 @@ def any_model_ready() -> bool:
                 continue
             if m.get("protocol") == "ollama":
                 return True
-            base = str(m.get("base_url") or "").lower()
-            if not m.get("api_key_env") and ("127.0.0.1" in base or "localhost" in base):
+            if _is_keyless_local_model(m):
                 return True
             if resolve_api_key(mid, m):
                 return True
@@ -479,12 +489,35 @@ def _call_anthropic(model: dict, api_key: str, system: str,
         content = raw["content"]
         if not isinstance(content, list) or not content:
             raise TypeError("content 必须是非空列表")
+        # 只取 text 块；thinking / redacted_thinking / tool_use 等块不带 text 键。
+        # 2026-11-25 实测：经 Anthropic 协议调推理型模型（deepseek-4.1-flash 等）
+        # 时，响应固定是 [thinking, text] 两段，旧实现要求每个块都有 text，
+        # 于是一律抛「响应格式异常」，整个模型不可用。
         text_blocks = []
+        saw_non_text = False
         for b in content:
-            if not isinstance(b, dict) or "text" not in b:
+            if not isinstance(b, dict):
                 raise TypeError(f"content block 格式异常: {b}")
-            text_blocks.append(str(b.get("text", "")))
-        text = "".join(text_blocks)
+            btype = b.get("type")
+            if btype == "text" or (btype is None and "text" in b):
+                text_blocks.append(str(b.get("text", "")))
+            elif btype in ("thinking", "redacted_thinking", "tool_use", "tool_result"):
+                saw_non_text = True
+                continue
+            elif "text" in b:
+                text_blocks.append(str(b.get("text", "")))
+            else:
+                raise TypeError(f"content block 格式异常: {b}")
+        if not text_blocks and saw_non_text:
+            # 全是非文本块：正文为空，交给 _reject_empty_text 报「模型没产出正文」，
+            # 而不是含糊的「响应格式异常」。reasoning 用于给出更准的提示。
+            text = ""
+            reasoning = "".join(
+                str(b.get("thinking", "")) for b in content
+                if isinstance(b, dict) and b.get("type") == "thinking")
+        else:
+            text = "".join(text_blocks)
+            reasoning = ""
     except (KeyError, TypeError, IndexError, AttributeError) as exc:
         raise LLMError(f"响应格式异常: {json.dumps(raw, ensure_ascii=False)[:400]}") from exc
     usage = raw.get("usage") if isinstance(raw, dict) else {}
@@ -492,7 +525,8 @@ def _call_anthropic(model: dict, api_key: str, system: str,
         usage = {}
     # anthropic 的 stop_reason 等价于 openai 的 finish_reason（"max_tokens" 表示截断）
     _reject_empty_text(text, model, max_tokens, usage,
-                       finish_reason=raw.get("stop_reason") if isinstance(raw, dict) else None)
+                       finish_reason=raw.get("stop_reason") if isinstance(raw, dict) else None,
+                       reasoning=reasoning)
     return {
         "text": text,
         "prompt_tokens": usage.get("input_tokens", 0),
@@ -750,12 +784,20 @@ def _chat_one(mid: str, model: dict, user: str, system: str,
         raise LLMError(f"未知协议 '{protocol}'，支持: {', '.join(PROTOCOL_HANDLERS)}")
 
     api_key = resolve_api_key(mid, model)
-    if protocol != "ollama" and not api_key:
+    if protocol != "ollama" and not api_key and not _is_keyless_local_model(model):
         raise LLMError(
             f"模型 '{mid}' 缺少 API Key。\n"
             f"  设置环境变量 {model.get('api_key_env', 'N/A')}，或运行:\n"
             f"  python model_config.py key {mid}"
         )
+
+    # max_tokens 是输出上限；按实际 prompt 收紧，避免 32K 窗口被输出预算独占。
+    window = model.get("context_window")
+    if isinstance(window, int) and window > 0:
+        prompt_tokens = estimate_tokens(system) + estimate_tokens(user)
+        available_output = window - prompt_tokens - _RESPONSE_HEADROOM_TOKENS
+        if available_output > 0:
+            max_tokens = min(max_tokens, available_output)
 
     # 发请求前先校验装不装得下。超预算的请求网关不会报错，只会返回空文本，
     # 上层看到的是「JSON 解析失败」，根本指不到真正原因（2026-11-11 实测）。

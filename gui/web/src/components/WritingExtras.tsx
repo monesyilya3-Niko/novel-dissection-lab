@@ -41,7 +41,6 @@ import { useI18n } from '../state/I18nContext'
 import { ink, glassCard } from '../ink'
 import CreationRateChart from './charts/CreationRateChart'
 import EmotionWaveChart from './charts/EmotionWaveChart'
-import RhythmRadarChart from './charts/RhythmRadarChart'
 import ReaderRetentionChart from './charts/ReaderRetentionChart'
 
 const OUTLINE_STATUS_COLOR: Record<string, 'default' | 'primary' | 'success'> = {
@@ -246,6 +245,9 @@ function OutlinePanel({ project }: { project: string }) {
 
   const load = useCallback(() => {
     const cur = ++reqIdRef.current
+    // 2026-11-23：切换项目立刻清空旧行，失败也清空；否则 GET 失败时上一个项目的
+    // 大纲会继续显示在新项目名下（用户以为数据串了/被覆盖）。
+    setItems([])
     writingApi
       .outlines(project)
       .then((res) => {
@@ -254,6 +256,7 @@ function OutlinePanel({ project }: { project: string }) {
       })
       .catch((e) => {
         if (cur !== reqIdRef.current) return
+        setItems([])
         setError(t('extras_err_load_outlines', '加载大纲失败: {msg}', { msg: friendlyError(e) }))
       })
   }, [project, t])
@@ -587,6 +590,7 @@ function CharacterPanel({ project }: { project: string }) {
 
   const load = useCallback(() => {
     const cur = ++reqIdRef.current
+    setItems([])
     writingApi
       .characters(project)
       .then((res) => {
@@ -595,6 +599,7 @@ function CharacterPanel({ project }: { project: string }) {
       })
       .catch((e) => {
         if (cur !== reqIdRef.current) return
+        setItems([])
         setError(t('extras_err_load_characters', '加载人物卡失败: {msg}', { msg: friendlyError(e) }))
       })
   }, [project, t])
@@ -853,6 +858,7 @@ function NotePanel({ project }: { project: string }) {
 
   const load = useCallback(() => {
     const cur = ++reqIdRef.current
+    setItems([])
     writingApi
       .notes(project)
       .then((res) => {
@@ -861,6 +867,7 @@ function NotePanel({ project }: { project: string }) {
       })
       .catch((e) => {
         if (cur !== reqIdRef.current) return
+        setItems([])
         setError(t('extras_err_load_notes', '加载便签失败: {msg}', { msg: friendlyError(e) }))
       })
   }, [project, t])
@@ -1406,17 +1413,10 @@ function DashboardPanel({ project }: { project: string }) {
                 )}
               </Paper>
             </Grid>
-            <Grid item xs={12} md={6}>
-              <Paper elevation={0} sx={{ p: 2.5, height: '100%', ...glassCard(isDark) }}>
-                <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 0.5 }}>
-                  {t('extras_dash_radar_title')}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                  {t('extras_dash_radar_subtitle')}
-                </Typography>
-                <RhythmRadarChart height={240} />
-              </Paper>
-            </Grid>
+            {/* 2026-11-23：移除“爽点节奏雷达”空壳卡片。
+                它没有任何数据源（RhythmRadarChart 无 metrics 且未开 demo），
+                永远显示“暂无数据，请先测算”，而页面没有能提供该数据的控件。
+                等真正接入测算数据后再恢复，避免用户反复找不存在的按钮。 */}
 
             {/* 商业成色与读者留存全景（读者留存预测结果） */}
             {retentionResult && (

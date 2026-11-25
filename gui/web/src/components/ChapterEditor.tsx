@@ -55,6 +55,25 @@ interface ChapterEditorProps {
   charactersForbidden?: Record<string, string[]>
 }
 
+/**
+ * 安全读取编辑器纯文本。
+ *
+ * 2026-11-23 实测崩溃：切换工作台/卸载瞬间 Tiptap 的 editor 实例可能已 destroy
+ * 但仍是非 null 引用，此时 `editor.getText()` 内部 `state.doc` 为 null，
+ * 抛 `Cannot read properties of null (reading 'nodes')`，被 ErrorBoundary
+ * 捕获后整个工作台白屏。所有对 getText 的调用必须走这里。
+ */
+function safeEditorText(editor: ReturnType<typeof useEditor>): string | null {
+  if (!editor || editor.isDestroyed) return null
+  try {
+    // state/doc 在 destroy 竞态窗口内可能为 null；try 兜住比逐字段探测更稳。
+    if (!editor.state || !editor.state.doc) return null
+    return editor.getText({ blockSeparator: '\n' })
+  } catch {
+    return null
+  }
+}
+
 /** 纯文本 → 编辑器初始 HTML（转义 + 换行分段）。 */
 function textToHtml(text: string): string {
   return `<p>${text
@@ -127,13 +146,17 @@ export default function ChapterEditor({
       },
     },
     onUpdate: ({ editor }) => {
-      onChange(editor.getText({ blockSeparator: '\n' }))
+      const text = safeEditorText(editor)
+      if (text !== null) onChange(text)
     },
   })
 
   // 外部 value 变化时同步回编辑器（清空或载入新文本都同步；getText 对比防循环，emitUpdate: false 防反向触发 onUpdate）。
   useEffect(() => {
-    if (editor && editor.getText({ blockSeparator: '\n' }) !== value) {
+    if (!editor || editor.isDestroyed) return
+    const current = safeEditorText(editor)
+    if (current === null) return
+    if (current !== value) {
       if (value === '') {
         editor.commands.clearContent(false)
       } else {
@@ -151,7 +174,7 @@ export default function ChapterEditor({
   }, [value])
 
   const handleQuickPoisonCheck = async () => {
-    const text = editor?.getText({ blockSeparator: '\n' }) || value
+    const text = safeEditorText(editor) ?? value
     if (!text.trim()) {
       setPoisonError(t('editor_empty_text', '正文为空，请先编写章节内容'))
       setPoisonResult(null)
@@ -178,7 +201,7 @@ export default function ChapterEditor({
   }
 
   const handleQuickDeslopCheck = async () => {
-    const text = editor?.getText({ blockSeparator: '\n' }) || value
+    const text = safeEditorText(editor) ?? value
     if (!text.trim()) {
       setDeslopError(t('editor_empty_text', '正文为空，请先编写章节内容'))
       setDeslopResult(null)
@@ -205,7 +228,7 @@ export default function ChapterEditor({
   }
 
   const handleQuickConstitutionCheck = async () => {
-    const text = editor?.getText({ blockSeparator: '\n' }) || value
+    const text = safeEditorText(editor) ?? value
     if (!text.trim()) {
       setConstitutionError(t('editor_empty_text', '正文为空，请先编写章节内容'))
       setConstitutionResult(null)

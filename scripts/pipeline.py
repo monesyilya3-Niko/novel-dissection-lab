@@ -26,6 +26,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -259,6 +260,77 @@ def _has_payload(out: dict) -> bool:
     return False
 
 
+def _pass_output_incomplete(kind: str, out: dict) -> str | None:
+    """检查 pass 输出是否缺少该 pass 的**必需顶层字段**（2026-11-23）。
+
+    背景：实测 glm-5.3-flash 在 pass1 把 8192 completion tokens 全烧在思考上，
+    只返回了一个 ``{"type","strength","skeleton"}`` 的钩子对象。旧实现只要
+    ``extract_json`` 成功就写盘并标 success——于是 structure-obs 缺
+    ``chapter_analyses``，报告与资产看起来"有卡"实际是空壳。这里按 prompt
+    的【输出 JSON 结构】做最小完整性门禁，缺失即重试；重试用尽判失败，
+    让批次在进度页显示为 failed，而不是静默产出空壳。
+    """
+    if not isinstance(out, dict):
+        return "输出不是 JSON 对象"
+
+    def _empty(v: Any) -> bool:
+        return v is None or (isinstance(v, (list, dict, str)) and len(v) == 0)
+
+    if kind == "pass1_structure":
+        ca = out.get("chapter_analyses")
+        if not isinstance(ca, list) or not ca:
+            return "缺少非空的 chapter_analyses 数组（章节骨架）"
+        if not isinstance(out.get("aggregate"), dict) or not out.get("aggregate"):
+            return "缺少 aggregate 聚合对象（钩子频次/爆发周期/伏笔跨度）"
+    elif kind == "pass2_character":
+        # 兼容历史/不同模型的字段名：character_voices（prompt 契约）/ voices / characters。
+        # 三者任一为非空列表即视为有载荷；下游 normalize_pass2 也按同一口径归一。
+        cv = out.get("character_voices") or out.get("voices") or out.get("characters")
+        if not isinstance(cv, list) or not cv:
+            return "缺少非空的 character_voices 数组（角色声线）"
+    elif kind == "pass3_style":
+        if not isinstance(out.get("narration"), dict) or _empty(out.get("narration")):
+            return "缺少 narration 叙述视角对象"
+        if not isinstance(out.get("dialogue"), dict) or _empty(out.get("dialogue")):
+            return "缺少 dialogue 对白系统对象"
+    elif kind == "pass4_commercial":
+        if not isinstance(out.get("payoff_density"), dict) or _empty(out.get("payoff_density")):
+            return "缺少 payoff_density 爽点密度对象"
+        if not isinstance(out.get("opening_analysis"), dict) or _empty(out.get("opening_analysis")):
+            return "缺少 opening_analysis 开篇分析对象"
+    elif kind == "pass5_craft":
+        if not isinstance(out.get("craft_analysis"), dict) or _empty(out.get("craft_analysis")):
+            return "缺少 craft_analysis 十维笔法拆解对象"
+        if not isinstance(out.get("craft_summary"), dict) or _empty(out.get("craft_summary")):
+            return "缺少 craft_summary 技法总览对象"
+        # 2026-11-25：deep_analysis 7 段是万字笔法报告的主要篇幅来源。
+        # 提示词未要求该字段时，模型从不产出，报告深度段全空（实测缺段 28/28）。
+        # 这里做一次覆盖率门禁：全部技法都没有 deep_analysis 才算「不完整」，
+        # 个别技法缺字段交给 deep_analyze 报警告，不因此整轮重试。
+        ca = out["craft_analysis"]
+        tech_total = 0
+        tech_with_deep = 0
+        for dim in ca.values():
+            if not isinstance(dim, dict):
+                continue
+            for t in (dim.get("techniques") or []):
+                if not isinstance(t, dict):
+                    continue
+                tech_total += 1
+                da = t.get("deep_analysis")
+                if isinstance(da, dict) and any(
+                        str(da.get(k) or "").strip() for k in (
+                            "reader_psychology", "execution_steps", "applicable_scene",
+                            "usage_boundary", "intensity_control", "combo_patterns",
+                            "migration_checklist")):
+                    tech_with_deep += 1
+        if tech_total and tech_with_deep == 0:
+            return ("每条技法都缺 deep_analysis 七段（reader_psychology / execution_steps / "
+                    "applicable_scene / usage_boundary / intensity_control / combo_patterns / "
+                    "migration_checklist）")
+    return None
+
+
 def _extract_output_schema_spec(template: str) -> str:
     """从 USER 模板中提取【输出 JSON 结构】及后续字段说明，确保模型拿到精确 JSON 契约。"""
     if not template:
@@ -283,8 +355,10 @@ def run_pass(kind: str, slices: dict, metrics: dict, dry_run: bool,
         return {"_dry_run": True, "model": mid}
 
     # 首次调用 + 解析失败后的纠错重试（最多 3 轮）
-    # Pass2/3/5 需要更多 token 输出（角色声线详细要求 + imagery + 8维笔法分析）
-    max_tok = 16384 if kind in ("pass2_character", "pass3_style", "pass5_craft") else 8192
+    # Pass2/3/5 需要更多 token 输出（角色声线详细要求 + imagery + 8维笔法分析）。
+    # 2026-11-23：推理型模型会把 8192 全烧在 thinking 上、正文只剩一个钩子对象；
+    # pass1/pass4 的完整 JSON 结构较大，统一抬到 32768，避免"输出被思考吃掉"。
+    max_tok = 32768 if kind in ("pass1_structure", "pass4_commercial") else 16384
     for attempt in range(3):
         r = llm_client.chat(user=user, system=system, task=kind, model_id=model_id,
                             max_tokens=max_tok, temperature=0.3)
@@ -320,6 +394,26 @@ def run_pass(kind: str, slices: dict, metrics: dict, dry_run: bool,
                     print(f"      ⚠ 仅提取到 {n} 个角色，重试（要求全部出场角色）...")
                     system = system + "\n\n【重要】请输出对话切片中所有出场≥5次的角色（主角、女主、重要配角都要），不要只输出一个。"
                     continue
+            # 2026-11-23：顶层字段完整性门禁（防止模型只返回一个钩子/片段就落盘）
+            incomplete = _pass_output_incomplete(kind, out)
+            if incomplete:
+                print(f"      ⚠ {kind} 输出不完整：{incomplete}，重试...")
+                if attempt < 2:
+                    extra_hint = ""
+                    if kind == "pass5_craft" and "deep_analysis" in incomplete:
+                        extra_hint = (
+                            "\n本次每条技法的 techniques 里都必须加 deep_analysis 对象，"
+                            "七个字段（reader_psychology / execution_steps / applicable_scene / "
+                            "usage_boundary / intensity_control / combo_patterns / migration_checklist）"
+                            "全部填写中文内容，每字段至少 100 字。")
+                    system = system + (
+                        f"\n\n【重要】上一次输出缺少必需字段：{incomplete}。"
+                        "必须严格按【输出 JSON 结构】输出完整对象，"
+                        "只输出一个合法 JSON，不要省略数组/对象，不要只给单个片段。"
+                        + extra_hint
+                    )
+                    continue
+                raise PassRefused(f"{kind} 连续输出不完整：{incomplete}")
             out["_meta"] = {
                 "model": r["model_id"],
                 "tokens_in": r["prompt_tokens"],
@@ -652,6 +746,23 @@ def main(argv: list[str] | None = None) -> int:
         co_path = ASSETS_DIR / f"{name}-commercial-obs.json"
         cc_path = ASSETS_DIR / f"{name}-craft-card.json"
 
+        # 2026-11-25 实测缺陷：assemble.py CLI 组装后会用 _clean_verbatim 清洗
+        # 模型照抄的原文台词，但 pipeline 这条路从没调用它——模型把原文对白当
+        # 「声线证据」抄进 refusal_pattern/anger_pattern，compliance 一律判
+        # 「连续 12 字匹配原文」REJECT，于是关键资产永远无法入库（实测一本示例书
+        # 5 处硬错误直接阻塞入库）。这里补齐与 assemble.py 同一步骤。
+        import assemble as _assemble_mod
+        _book_text = text
+        voice, _cv = _assemble_mod._clean_verbatim(voice, _book_text)
+        if _cv:
+            print(f"  ⚠ 已清洗 {_cv} 处原文引用（voice-card）")
+        comm_obs, _cv = _assemble_mod._clean_verbatim(comm_obs, _book_text)
+        if _cv:
+            print(f"  ⚠ 已清洗 {_cv} 处原文引用（commercial-obs）")
+        struct_obs, _cv = _assemble_mod._clean_verbatim(struct_obs, _book_text)
+        if _cv:
+            print(f"  ⚠ 已清洗 {_cv} 处原文引用（structure-obs）")
+
         # 5. Pass5 笔法分析 + craft-card 组装（校验先于写盘：全部组装并校验通过后再统一写入 ASSETS_DIR）
         print("[5/7] Pass5 笔法分析:")
         # 构建资产摘要供 Pass5 参考
@@ -681,6 +792,10 @@ def main(argv: list[str] | None = None) -> int:
             (raw_dir / "pass5_craft.json").write_text(
                 json.dumps(pass5_result, ensure_ascii=False, indent=2), encoding="utf-8")
             craft_card = assemble_craft_card(name, args.genre, manifest, m, pass5_result)
+            # 与 assemble.py CLI 同步：craft-card 同样要清洗原文引用后再送合规扫描。
+            craft_card, _cv = _assemble_mod._clean_verbatim(craft_card, _book_text)
+            if _cv:
+                print(f"  ⚠ 已清洗 {_cv} 处原文引用（craft-card）")
             # 深度分析校验 + 补齐（deep_analyze 不生成内容，只校验结构）
             try:
                 import deep_analyze

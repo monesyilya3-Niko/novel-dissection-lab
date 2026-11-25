@@ -266,6 +266,14 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '关闭',
     'en-US': 'Close',
   },
+  action_scroll_left: {
+    'zh-CN': '向左滚动页签',
+    'en-US': 'Scroll tabs left',
+  },
+  action_scroll_right: {
+    'zh-CN': '向右滚动页签',
+    'en-US': 'Scroll tabs right',
+  },
   action_export: {
     'zh-CN': '导出',
     'en-US': 'Export',
@@ -531,6 +539,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '请在此粘贴需要检测的章节正文或剧情草稿...',
     'en-US': 'Paste chapter draft or plot outline to inspect for fatal taboos...',
   },
+  poison_empty_error: {
+    'zh-CN': '请先输入或粘贴需要排查的正文段落',
+    'en-US': 'Enter or paste a passage to inspect before scanning.',
+  },
   poison_scan_action: {
     'zh-CN': '一键扫描毒点',
     'en-US': 'Scan for Taboos',
@@ -660,6 +672,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   deslop_clean_success: {
     'zh-CN': '✓ 文风非常自然生动，未检测到典型 AI 模板句式与机械套路！',
     'en-US': '✓ Prose is exceptionally natural and vivid, no typical AI clichés or mechanical tropes detected!',
+  },
+  deslop_no_suggestions_but_issues: {
+    'zh-CN': '检测到 {n} 个问题，但模型没有给出逐条改写建议；请查看下方问题列表。',
+    'en-US': '{n} issues were detected, but the model gave no per-issue rewrite suggestions; see the issue list below.',
   },
   deslop_word_count: {
     'zh-CN': '有效字数',
@@ -2238,12 +2254,32 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   },
   // 精华库总览（书籍页顶部四项指标）
   essence_stats_books: {
-    'zh-CN': '精读著作',
-    'en-US': 'Studied Books',
+    'zh-CN': '标杆档案',
+    'en-US': 'Benchmark Files',
   },
   essence_stats_chars: {
-    'zh-CN': '总字数',
-    'en-US': 'Total Characters',
+    'zh-CN': '参考体量',
+    'en-US': 'Reference Size',
+  },
+  essence_stats_note: {
+    'zh-CN': '其中 {curated} 部为人工整理的纲要模板（无全文，不可拆书），{measured} 部有实测全文。',
+    'en-US': '{curated} are hand-curated outline templates (no full text, not analyzable); {measured} have measured full text.',
+  },
+  essence_book_curated_badge: {
+    'zh-CN': '纲要模板',
+    'en-US': 'Outline Template',
+  },
+  essence_book_reference_size: {
+    'zh-CN': '参考',
+    'en-US': 'Reference',
+  },
+  essence_book_unit_zh_chars: {
+    'zh-CN': '字',
+    'en-US': 'Chinese chars',
+  },
+  essence_book_unit_en_chars: {
+    'zh-CN': '英文字符',
+    'en-US': 'English chars',
   },
   essence_stats_assets: {
     'zh-CN': '五维资产',
@@ -2362,8 +2398,8 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'en-US': 'Save Asset',
   },
   essence_macro_toast_done: {
-    'zh-CN': '深度精读与宏观提炼完成，已建立书籍档案！',
-    'en-US': 'Deep reading and macro extraction complete. Book archive created!',
+    'zh-CN': '深度精读与宏观提炼完成，书籍档案已建立；请按需点击「沉淀入库」保存资产。',
+    'en-US': 'Deep reading complete. Book archive created; click "Save Asset" on the ones you want to keep.',
   },
   essence_macro_toast_saved: {
     'zh-CN': '已成功入库资产：',
@@ -2456,6 +2492,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   essence_books_btn_refresh: {
     'zh-CN': '刷新档案',
     'en-US': 'Refresh Archives',
+  },
+  essence_books_delete_label: {
+    'zh-CN': '删除《{title}》的书籍精读档案',
+    'en-US': 'Delete masterpiece archive "{title}"',
   },
   essence_books_empty: {
     'zh-CN': '暂无已精读的书籍档案。请先在「离线精读与解构提炼」页签输入样本进行解析。',
@@ -2566,6 +2606,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   essence_chains_form_status: {
     'zh-CN': '当前状态',
     'en-US': 'Current Status',
+  },
+  essence_chains_delete_label: {
+    'zh-CN': '删除暗线「{title}」',
+    'en-US': 'Delete plot chain "{title}"',
   },
   essence_chains_form_desc: {
     'zh-CN': '暗线铺设逻辑与爽点释放机制',
@@ -2725,8 +2769,16 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'en-US': 'Enter a chapter path or paste text, then click Check',
   },
   quality_check_target_label: {
-    'zh-CN': '章节路径（或粘贴文本）',
-    'en-US': 'Chapter Path (or Paste Draft)',
+    'zh-CN': '章节路径（可选）',
+    'en-US': 'Chapter Path (Optional)',
+  },
+  quality_check_path_precedence: {
+    'zh-CN': '已填写路径时优先使用路径；要检查下方正文，请先清空路径。',
+    'en-US': 'When a path is set it takes precedence; clear it to check the pasted text below.',
+  },
+  quality_check_text_hint: {
+    'zh-CN': '也可以直接粘贴章节正文，无需填写路径。',
+    'en-US': 'You can also paste chapter text directly without a path.',
   },
   quality_check_voice_label: {
     'zh-CN': 'voice-card（可选）',
@@ -2786,6 +2838,14 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '判定：',
     'en-US': 'Verdict: ',
   },
+  quality_book_skipped_badge: {
+    'zh-CN': '{n} 项未执行',
+    'en-US': '{n} checks skipped',
+  },
+  quality_book_skipped_detail: {
+    'zh-CN': '本次有 {n} 项检查因前置条件不足未执行：{checks}。此结果不代表这些维度已通过。',
+    'en-US': '{n} checks were skipped due to missing prerequisites: {checks}. This result does not mean those dimensions passed.',
+  },
   quality_book_collapse: {
     'zh-CN': '收起',
     'en-US': 'Collapse',
@@ -2828,9 +2888,33 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '分',
     'en-US': ' pts',
   },
+  quality_qc_layer_skipped: {
+    'zh-CN': '{n} 项未评估',
+    'en-US': '{n} skipped',
+  },
+  quality_qc_skipped_note: {
+    'zh-CN': '有 {n} 个维度因缺少前置资产（voice-card / 题材包 / 原文）未实际评估，仍按 100 分计入总分：{dims}。补齐资产后重跑才能得到真实分数。',
+    'en-US': '{n} dimensions were not evaluated due to missing prerequisites (voice card / genre pack / source text) and still count as 100: {dims}. Add the assets and rerun for a real score.',
+  },
   quality_qc_report_saved: {
     'zh-CN': '报告已落盘：',
     'en-US': 'Report saved to disk: ',
+  },
+  quality_qc_issues_title: {
+    'zh-CN': '问题详情（{n}）',
+    'en-US': 'Issue Details ({n})',
+  },
+  quality_qc_issues_truncated: {
+    'zh-CN': '仅显示前 {limit} 条（共 {n} 条），完整内容请查看已保存的 QC 报告。',
+    'en-US': 'Showing the first {limit} of {n}; open the saved QC report for the full list.',
+  },
+  quality_qc_view_report: {
+    'zh-CN': '查看',
+    'en-US': 'View',
+  },
+  quality_qc_close: {
+    'zh-CN': '关闭',
+    'en-US': 'Close',
   },
   quality_qc_history_title: {
     'zh-CN': '历史报告',
@@ -3159,6 +3243,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '出错',
     'en-US': 'Error',
   },
+  analysis_status_partial: {
+    'zh-CN': '部分完成',
+    'en-US': 'Partially completed',
+  },
   analysis_batches_unit: {
     'zh-CN': '批',
     'en-US': 'batches',
@@ -3329,6 +3417,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '已导入书目',
     'en-US': 'Imported books',
   },
+  analysis_library_load_failed: {
+    'zh-CN': '书目列表加载失败：',
+    'en-US': 'Failed to load book list: ',
+  },
   analysis_library_status_done: {
     'zh-CN': '已拆',
     'en-US': 'Analyzed',
@@ -3336,6 +3428,14 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   analysis_library_status_idle: {
     'zh-CN': '待拆',
     'en-US': 'Not analyzed',
+  },
+  analysis_library_status_partial: {
+    'zh-CN': '部分完成',
+    'en-US': 'Partially analyzed',
+  },
+  analysis_library_status_error: {
+    'zh-CN': '失败',
+    'en-US': 'Failed',
   },
   analysis_import_only_txt: {
     'zh-CN': '仅支持 .txt / .md 文件导入（UTF-8、GBK、GB18030、UTF-16 编码均可）',
@@ -3380,6 +3480,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   analysis_sample_help_title: {
     'zh-CN': '查看导入与拆书指南',
     'en-US': 'View Import & Deconstruction Guide',
+  },
+  analysis_sample_report_note: {
+    'zh-CN': '示例语料仅用于体验拆书流程，篇幅不足以生成正式万字报告；导入你自己的书即可生成。',
+    'en-US': 'Samples are for trying the pipeline only; they are too short for the formal 10,000-character report. Import your own book to generate one.',
   },
   analysis_prog_title: {
     'zh-CN': '分析进度',
@@ -3472,6 +3576,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   analysis_pass_commercial: {
     'zh-CN': '商业评估',
     'en-US': 'Commercial Pass',
+  },
+  analysis_pass_craft: {
+    'zh-CN': '笔法深拆',
+    'en-US': 'Craft Pass',
   },
   help_title: {
     'zh-CN': '帮助中心',
@@ -3661,6 +3769,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '暂无拆书数据',
     'en-US': 'No deconstruction data yet',
   },
+  batch_status_refresh: {
+    'zh-CN': '刷新',
+    'en-US': 'Refresh',
+  },
   batch_chip_has_assets: {
     'zh-CN': '已有资产',
     'en-US': 'Assets Present',
@@ -3712,6 +3824,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   asset_edit_json_valid: {
     'zh-CN': 'JSON 合法',
     'en-US': 'Valid JSON',
+  },
+  asset_edit_draft_restored: {
+    'zh-CN': '已恢复上次未保存的草稿；保存后才会写入磁盘。',
+    'en-US': 'Restored the unsaved draft from last time; save to write it to disk.',
   },
   asset_edit_save_success: {
     'zh-CN': '保存成功',
@@ -3809,6 +3925,18 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '路径',
     'en-US': 'Paths',
   },
+  system_comp_scope_note: {
+    'zh-CN': '默认只扫描资产元数据（抽象级别、contains_verbatim、引用长度）。要执行原文 12 字连续比对，请在下方填写原文 TXT 路径。',
+    'en-US': 'By default only asset metadata is scanned (abstraction level, contains_verbatim, quote length). Fill in the source TXT path below to run the 12-character verbatim comparison.',
+  },
+  system_comp_voice_label: {
+    'zh-CN': 'voice-card 路径（可选）',
+    'en-US': 'Voice Card Path (Optional)',
+  },
+  system_comp_book_label: {
+    'zh-CN': '原文 TXT 路径（可选，用于 12-gram 比对）',
+    'en-US': 'Source TXT Path (Optional, for 12-gram check)',
+  },
   system_comp_title: {
     'zh-CN': '版权合规扫描',
     'en-US': 'Copyright Compliance Scan',
@@ -3854,8 +3982,8 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'en-US': '(Not set)',
   },
   system_settings_notice: {
-    'zh-CN': '设置修改请通过环境变量或直接编辑 gui/config.py。GUI 写入设置属阶段三规划。',
-    'en-US': 'To modify settings, use environment variables or edit gui/config.py directly. GUI writing is planned for Phase 3.',
+    'zh-CN': '此页是只读诊断信息。评分阈值、写作默认值等请到「设置」页修改；端口与批次大小通过环境变量配置。',
+    'en-US': 'This page is read-only diagnostics. Edit scoring thresholds and writing defaults on the Settings page; port and batch size are configured via environment variables.',
   },
   model_mgr_title: {
     'zh-CN': '模型管理',
@@ -3876,6 +4004,22 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   model_mgr_role_prefix: {
     'zh-CN': '角色：',
     'en-US': 'Roles: ',
+  },
+  model_mgr_roles_title: {
+    'zh-CN': '当前模型路由',
+    'en-US': 'Current Model Routing',
+  },
+  model_mgr_role_unbound: {
+    'zh-CN': '未绑定',
+    'en-US': 'Unbound',
+  },
+  model_mgr_routes_title: {
+    'zh-CN': '任务路由',
+    'en-US': 'Task Routes',
+  },
+  model_mgr_roles_hint: {
+    'zh-CN': '分析/写作使用上面绑定的角色。调整角色或任务路由请在终端运行 python scripts/model_config.py role|route（GUI 暂未提供编辑）。',
+    'en-US': 'Analysis and writing use the bound roles above. To change roles or task routes, run python scripts/model_config.py role|route (GUI editing is not yet available).',
   },
   model_mgr_btn_test: {
     'zh-CN': '测试',
@@ -3956,6 +4100,22 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   model_mgr_field_note: {
     'zh-CN': '备注',
     'en-US': 'Notes',
+  },
+  model_mgr_field_context_window: {
+    'zh-CN': '上下文窗口（tokens）',
+    'en-US': 'Context Window (tokens)',
+  },
+  model_mgr_field_context_window_helper: {
+    'zh-CN': '用于发送前的上下文预算预检；留空则不预检。',
+    'en-US': 'Used for the pre-send context budget check; leave empty to skip it.',
+  },
+  model_mgr_field_api_key_env: {
+    'zh-CN': '密钥环境变量（可选）',
+    'en-US': 'API Key Env Var (Optional)',
+  },
+  model_mgr_field_api_key_env_helper: {
+    'zh-CN': '例如 VULTR_API_KEY；设置后环境变量优先于本地密钥库。',
+    'en-US': 'e.g. VULTR_API_KEY; the env var takes precedence over the local secret store.',
   },
   model_mgr_btn_cancel: {
     'zh-CN': '取消',
@@ -4405,6 +4565,18 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '笔法卡片',
     'en-US': 'Prose Cards',
   },
+  admin_assets_kind_book: {
+    'zh-CN': '书籍（语料）',
+    'en-US': 'Book (Corpus)',
+  },
+  admin_assets_kind_prose_card_index: {
+    'zh-CN': '题材文风卡索引',
+    'en-US': 'Prose Card Index',
+  },
+  admin_assets_delete_virtual_tip: {
+    'zh-CN': '该行由书籍/报告索引派生，请在对应页面管理',
+    'en-US': 'Derived from the book/report index; manage it on its own page.',
+  },
   admin_assets_kind_report: {
     'zh-CN': '报告',
     'en-US': 'Reports',
@@ -4422,8 +4594,8 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'en-US': 'Kind',
   },
   admin_assets_delete_confirm: {
-    'zh-CN': '删除资产「{name}」？（将移入回收站）',
-    'en-US': 'Delete asset "{name}"? (Moved to recycle bin)',
+    'zh-CN': '删除资产「{name}」？此操作无法在界面撤销。',
+    'en-US': 'Delete asset "{name}"? This cannot be undone in the UI.',
   },
   admin_assets_delete_success: {
     'zh-CN': '已删除资产「{name}」',
@@ -5143,6 +5315,10 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
     'zh-CN': '未知错误',
     'en-US': 'Unknown Error',
   },
+  error_boundary_reload: {
+    'zh-CN': '刷新页面',
+    'en-US': 'Reload Page',
+  },
   error_boundary_retry: {
     'zh-CN': '重试',
     'en-US': 'Retry',
@@ -5745,6 +5921,14 @@ export const TRANSLATIONS: Record<string, Record<Locale, string>> = {
   studio_chain_book_hint: {
     'zh-CN': '伏笔回收链与精华书籍绑定，便于跨章节追踪埋点与回收',
     'en-US': 'Foreshadowing chains bind to an Essence book for cross-chapter tracking',
+  },
+  studio_chain_owner_label: {
+    'zh-CN': '伏笔归属（精华库书籍）',
+    'en-US': 'Chain Owner (Essence Book)',
+  },
+  studio_chain_owner_hint: {
+    'zh-CN': '切换书籍查看对应的伏笔暗线',
+    'en-US': 'Switch books to view their foreshadowing chains',
   },
   error_action_llm_quota_or_402: {
     'zh-CN': '外部模型密钥已失效或订阅/余额不足（HTTP 401/402/403）。请前往「系统 → 模型管理」更新有效 API Key，或直接使用内置「离线量化拆解 / 复制写作 Prompt」无模型模式继续工作。',

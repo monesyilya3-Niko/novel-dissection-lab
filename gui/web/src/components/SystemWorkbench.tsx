@@ -1,6 +1,7 @@
 // M5 系统与合规工作台：系统状态 / 版权合规 / 模型配置 / 设置。
 import { useState, useEffect } from 'react'
 import Box from '@mui/material/Box'
+import TextField from '@mui/material/TextField'
 import ContextHelpButton from './ContextHelpButton'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
@@ -54,7 +55,14 @@ export default function SystemWorkbench() {
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: 1, borderColor: 'divider', pr: 1 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ flex: 1, px: 2 }}>
+        <Tabs
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          sx={{ flex: 1, minWidth: 0, px: 2 }}
+        >
           <Tab label={t('system_tab_status')} />
           <Tab label={t('system_tab_compliance')} />
           <Tab label={t('system_tab_models')} />
@@ -165,12 +173,19 @@ function CompliancePanel() {
   const [results, setResults] = useState<Record<string, unknown> | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [voice, setVoice] = useState('')
+  const [bookPath, setBookPath] = useState('')
 
   const doScan = async () => {
     setLoading(true)
     setError('')
     try {
-      const data = await systemApi.compliance()
+      // 2026-11-23：把可选的原文/声线卡路径传给后端。此前固定空 body，
+      // 12-gram 原文比对永远无法执行，页面却给绿色 PASS，属于虚假合规保证。
+      const data = await systemApi.compliance({
+        voice: voice.trim() || undefined,
+        book_path: bookPath.trim() || undefined,
+      })
       setResults(data as Record<string, unknown>)
     } catch (e) {
       setError(friendlyError(e))
@@ -185,9 +200,31 @@ function CompliancePanel() {
   return (
     <Box>
       <Typography variant="h6" gutterBottom>{t('system_comp_title')}</Typography>
-      <Button variant="contained" onClick={doScan} disabled={loading} sx={{ mb: 2 }}>
-        {loading ? <CircularProgress size={20} /> : t('system_comp_btn_scan')}
-      </Button>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+        {t(
+          'system_comp_scope_note',
+          '默认只扫描资产元数据（抽象级别、contains_verbatim、引用长度）。要执行原文 12 字连续比对，请在下方填写原文 TXT 路径。',
+        )}
+      </Typography>
+      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
+        <TextField
+          size="small"
+          label={t('system_comp_voice_label', 'voice-card 路径（可选）')}
+          value={voice}
+          onChange={(e) => setVoice(e.target.value)}
+          sx={{ minWidth: 260, flex: 1 }}
+        />
+        <TextField
+          size="small"
+          label={t('system_comp_book_label', '原文 TXT 路径（可选，用于 12-gram 比对）')}
+          value={bookPath}
+          onChange={(e) => setBookPath(e.target.value)}
+          sx={{ minWidth: 320, flex: 1 }}
+        />
+        <Button variant="contained" onClick={doScan} disabled={loading}>
+          {loading ? <CircularProgress size={20} /> : t('system_comp_btn_scan')}
+        </Button>
+      </Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {summary && (
         <Alert severity={summary.rejected > 0 ? 'error' : summary.warned > 0 ? 'warning' : 'success'} sx={{ mb: 2 }}>
@@ -241,7 +278,12 @@ function SettingsPanel() {
       <Typography variant="h6" gutterBottom>{t('system_settings_title')}</Typography>
       <Paper sx={{ p: 2, mb: 2 }}>
         <Typography variant="subtitle2" gutterBottom>{t('system_settings_service')}</Typography>
-        <Typography variant="body2">{t('system_settings_port')}{String(settings.port ?? '-')}</Typography>
+        <Typography variant="body2">
+          {t('system_settings_port')}
+          {/* 2026-11-23：后端 settings.port 是默认配置值 8000；实际监听端口
+              可能是 8001+（占用自动 +1）或手动 --port。以浏览器地址为准。 */}
+          {String(window.location.port || settings.port || '-')}
+        </Typography>
         <Typography variant="body2">{t('system_settings_batch_size')}{String(settings.batchSize ?? settings.batch_size ?? '-')}{t('system_settings_chars_unit')}</Typography>
       </Paper>
       <Paper sx={{ p: 2, mb: 2 }}>

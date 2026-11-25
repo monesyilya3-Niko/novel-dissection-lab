@@ -352,9 +352,11 @@
   "emotion_handling": {
     "mode": "混合式",
     "body_reaction_vocabulary": [
-      "他很愤怒",
-      "她伤心欲绝",
-      "她心动了"
+      "眼眶发红",
+      "别过脸去",
+      "手指攥紧",
+      "呼吸一滞",
+      "沉默良久"
     ],
     "examples": [
       {
@@ -419,6 +421,7 @@
   },
   "provenance": {
     "contains_verbatim": false,
-    "abstraction_note": "四遍扫描产物，经 compliance.py 扫描，连续12字匹配原文已拒收"
+    "abstraction_note": "四遍扫描产物，经 compliance.py 扫描，连续12字匹配原文已拒收",
+    "body_reaction_note": "部分为通用身体反应基表（非逐字原文抽取），已剔除模式名/对白/地名等无效项"
   }
 }

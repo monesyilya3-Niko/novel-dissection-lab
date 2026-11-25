@@ -18,6 +18,39 @@ if str(ROOT) not in sys.path:
 from gui import config, quality_service  # noqa: E402
 from gui.services import ServiceError, detect_asset_kind  # noqa: E402
 
+
+class TestQcReportRead(unittest.TestCase):
+    """2026-11-23：QC 历史报告可读 + 路径穿越拦截。"""
+
+    def setUp(self):
+        self.qc_dir = config.REPORTS_DIR / "qc"
+        self.qc_dir.mkdir(parents=True, exist_ok=True)
+
+    def test_read_markdown_and_json(self):
+        (self.qc_dir / "demo-qc.md").write_text("# 质检报告\nPASS", encoding="utf-8")
+        (self.qc_dir / "demo-qc.json").write_text('{"verdict":"PASS"}', encoding="utf-8")
+        self.assertIn("PASS", quality_service.get_qc_report("demo-qc", "md")["content"])
+        self.assertIn('"PASS"', quality_service.get_qc_report("demo-qc", "json")["content"])
+
+    def test_chinese_report_list_get_round_trip(self):
+        name = "暮冬念春-q-abc123-qc"
+        (self.qc_dir / f"{name}.md").write_text("# 中文质检报告\nPASS", encoding="utf-8")
+        (self.qc_dir / f"{name}.json").write_text('{"verdict":"PASS"}', encoding="utf-8")
+
+        listed = {item["name"] for item in quality_service.list_qc_reports()}
+        self.assertIn(name, listed)
+        self.assertIn("中文质检报告", quality_service.get_qc_report(name, "md")["content"])
+        self.assertIn('"PASS"', quality_service.get_qc_report(name, "json")["content"])
+
+    def test_reject_path_traversal_and_missing(self):
+        for bad in ("../secret", "..\\secret", "a/b", "a\\b", "", ".", "..",
+                    "/etc/secret", "C:\\secret", "name:stream"):
+            with self.subTest(name=bad), self.assertRaises(ServiceError) as cm:
+                quality_service.get_qc_report(bad, "md")
+            self.assertEqual(cm.exception.code, 400)
+        with self.assertRaises(ServiceError):
+            quality_service.get_qc_report("no-such-report", "md")
+
 _TMP = None
 _SAVED = {}
 

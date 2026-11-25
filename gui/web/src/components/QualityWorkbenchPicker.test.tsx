@@ -40,7 +40,7 @@ describe('质检路径选择器（桌面版）', () => {
     fireEvent.click(screen.getByRole('button', { name: '选择文件…' }))
     await waitFor(() => expect(pickPathMock).toHaveBeenCalledWith('file'))
     await waitFor(() =>
-      expect(screen.getByLabelText('章节路径（或粘贴文本）')).toHaveValue('C:/稿子/第1章.txt'),
+      expect(screen.getByLabelText('章节路径（可选）')).toHaveValue('C:/稿子/第1章.txt'),
     )
   })
 
@@ -60,6 +60,6 @@ describe('质检路径选择器（桌面版）', () => {
     render(<QualityWorkbench />)
     fireEvent.click(screen.getByRole('button', { name: '选择文件…' }))
     await waitFor(() => expect(pickPathMock).toHaveBeenCalledTimes(1))
-    expect(screen.getByLabelText('章节路径（或粘贴文本）')).toHaveValue('')
+    expect(screen.getByLabelText('章节路径（可选）')).toHaveValue('')
   })
 })

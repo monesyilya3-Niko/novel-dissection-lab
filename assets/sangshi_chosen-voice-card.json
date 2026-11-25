@@ -215,21 +215,10 @@
   "emotion_handling": {
     "mode": "混合式",
     "body_reaction_vocabulary": [
-      "不好意思",
-      "惊奇",
-      "没忍住",
-      "尖叫",
-      "截图",
-      "龙眼树",
-      "走！",
-      "总分",
-      "桑幼：【图片】",
-      "手机",
-      "保证书",
-      "换鞋",
       "边换鞋边接电话",
-      "好好好，知道了。",
-      "狼嚎般的哭声"
+      "狼嚎般的哭声",
+      "攥紧手机",
+      "喉头发紧"
     ],
     "examples": [
       {
@@ -279,6 +268,7 @@
   },
   "provenance": {
     "contains_verbatim": false,
-    "abstraction_note": "四遍扫描产物，经 compliance.py 扫描，连续12字匹配原文已拒收"
+    "abstraction_note": "四遍扫描产物，经 compliance.py 扫描，连续12字匹配原文已拒收",
+    "body_reaction_note": "部分为通用身体反应基表（非逐字原文抽取），已剔除模式名/对白/地名等无效项"
   }
 }

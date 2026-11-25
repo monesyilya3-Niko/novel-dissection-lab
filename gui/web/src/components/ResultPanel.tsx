@@ -17,13 +17,14 @@ import { useApp } from '../state/AppContext'
 import { useI18n } from '../state/I18nContext'
 import * as api from '../api/client'
 
-const PASS_ORDER = ['pass1_structure', 'pass2_character', 'pass3_style', 'pass4_commercial'] as const
+const PASS_ORDER = ['pass1_structure', 'pass2_character', 'pass3_style', 'pass4_commercial', 'pass5_craft'] as const
 
 const PASS_KEYS: Record<string, string> = {
   pass1_structure: 'analysis_pass_structure',
   pass2_character: 'analysis_pass_character',
   pass3_style: 'analysis_pass_style',
   pass4_commercial: 'analysis_pass_commercial',
+  pass5_craft: 'analysis_pass_craft',
 }
 
 export default function ResultPanel() {

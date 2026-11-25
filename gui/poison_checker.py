@@ -43,6 +43,9 @@ POISON_PATTERNS = [
         "patterns": [
             r"(得饶人处且饶人|不想脏了自己的手|这次就放你一马|冤冤相报何时了|放他离去吧)",
             r"(留你一条狗命走吧|任由仇人踉跄离去|废了修为放你走|化干戈为玉帛)",
+            r"(?:灭门仇人|仇敌|仇人|敌人).{0,40}(?:圣母般地?)?(?:原谅|放过)",
+            r"(?:圣母般|毫无原则).{0,20}(?:原谅|放过)",
+            r"(?:把|将).{0,30}(?:救命情报|关键情报|机密|底牌).{0,20}(?:送给|交给|透露给).{0,10}(?:敌人|仇人|对手)",
             r"(?i)(killing you would make me no better|spare your life this once|let the villain walk away|let him walk away free|mercy on my enemies)",
         ],
         "reason": "对曾动杀心的敌人心慈手软，违背网文斩草除根爽感铁律，极度损毁主角智商与立意。",

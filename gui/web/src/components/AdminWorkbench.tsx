@@ -42,7 +42,8 @@ import {
 import { ink, fadeUp } from '../ink'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import { useI18n } from '../state/I18nContext'
-import { useAppOptional } from '../state/AppContext'
+import { useAppOptional, ADMIN_SESSION_HINT } from '../state/AppContext'
+import { writeStorage, removeStorage } from '../safeStorage'
 
 function fmtSize(bytes: number): string {
   if (!bytes) return '0 B'
@@ -74,11 +75,13 @@ export default function AdminWorkbench() {
     try {
       const r = await adminApi.me()
       setMe({ username: r.username })
+      writeStorage(ADMIN_SESSION_HINT, '1')
       // 刷新页面后恢复强制改密状态（后端 /api/admin/me 返回 mustChangePassword）
       setForceChangePw(!!r.mustChangePassword)
     } catch {
       setMe(null)
       setForceChangePw(false)
+      removeStorage(ADMIN_SESSION_HINT)
     } finally {
       setChecking(false)
     }
@@ -89,12 +92,15 @@ export default function AdminWorkbench() {
   // 会话失效（401）自动回登录页并同步全局导航可见性
   useEffect(() => {
     onAdminUnauthorized(() => {
+      // 2026-11-23 P0：这里不能再调 refreshAdmin（它内部就是 /admin/me），
+      // 否则 401 回调会自我触发成无限循环。只把本组件退回登录表单；
+      // 全局导航的 admin 可见性会在下一次正常刷新时收敛。
       setMe(null)
       setForceChangePw(false)
-      void refreshAdmin?.()
+      removeStorage(ADMIN_SESSION_HINT)
     })
     return () => onAdminUnauthorized(null)
-  }, [refreshAdmin])
+  }, [])
 
   if (checking) {
     return (
@@ -120,6 +126,7 @@ export default function AdminWorkbench() {
       username={me.username}
       onLogout={() => {
         setMe(null)
+        removeStorage(ADMIN_SESSION_HINT)
         void refreshAdmin?.()
       }}
       forceChangePw={forceChangePw}
@@ -457,10 +464,14 @@ function BooksPanel() {
                     color={b.status === 'analyzing' ? 'warning' : 'default'} />
                 </TableCell>
                 <TableCell align="right">
+                  {/* 2026-11-23：后端分析中的状态是 running/paused，旧实现只认
+                      'analyzing'，删除按钮在实时分析时仍可点，确认后 409 被弹窗遮住。 */}
                   <Button
                     size="small" color="error"
-                    disabled={b.status === 'analyzing'}
-                    title={b.status === 'analyzing' ? t('admin_books_delete_analyzing_tip', '分析中的书籍不可删除') : t('admin_books_delete_tip', '删除本书全部数据')}
+                    disabled={b.status === 'analyzing' || b.status === 'running' || b.status === 'paused'}
+                    title={(b.status === 'analyzing' || b.status === 'running' || b.status === 'paused')
+                      ? t('admin_books_delete_analyzing_tip', '分析中的书籍不可删除')
+                      : t('admin_books_delete_tip', '删除本书全部数据')}
                     onClick={() => setConfirm(b)}
                   >
                     {t('admin_books_delete_btn', '删除')}
@@ -482,6 +493,7 @@ function BooksPanel() {
           <DialogContentText>
             {t('admin_books_dialog_desc', '将彻底删除《{title}》的状态文件、原文、分析资产与数据库记录，此操作不可恢复。继续吗？').replace('{title}', confirm?.title || '')}
           </DialogContentText>
+          {error && <Alert severity="error" sx={{ mt: 1.5 }}>{error}</Alert>}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirm(null)} disabled={deleting}>{t('admin_cancel', '取消')}</Button>
@@ -527,6 +539,8 @@ function AssetsPanel() {
       case 'genre_prose_card': return t('admin_assets_kind_genre_prose_card', '题材文风卡')
       case 'distilled': return t('admin_assets_kind_distilled', '蒸馏规则')
       case 'trope': return t('admin_assets_kind_trope', '桥段')
+      case 'book': return t('admin_assets_kind_book', '书籍（语料）')
+      case 'prose_card_index': return t('admin_assets_kind_prose_card_index', '题材文风卡索引')
       case 'report': return t('admin_assets_kind_report', '报告')
       default: return k
     }
@@ -549,7 +563,8 @@ function AssetsPanel() {
   useEffect(() => { load() }, [load])
 
   const del = async (itemKind: string, id: string, name: string) => {
-    const confirmMsg = t('admin_assets_delete_confirm', '删除资产「{name}」？（将移入回收站）').replace('{name}', name)
+    // 2026-11-23：界面没有回收站/恢复入口，不能再承诺“移入回收站”。
+    const confirmMsg = t('admin_assets_delete_confirm', '删除资产「{name}」？此操作无法在界面撤销。').replace('{name}', name)
     if (!window.confirm(confirmMsg)) return
     try {
       await adminApi.deleteAsset(itemKind, id)
@@ -568,8 +583,8 @@ function AssetsPanel() {
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel>{t('admin_assets_filter_kind', '类型')}</InputLabel>
-            <Select value={kind} label={t('admin_assets_filter_kind', '类型')} onChange={(e) => setKind(e.target.value)}>
+            <InputLabel id="admin-asset-kind-label">{t('admin_assets_filter_kind', '类型')}</InputLabel>
+            <Select labelId="admin-asset-kind-label" value={kind} label={t('admin_assets_filter_kind', '类型')} onChange={(e) => setKind(e.target.value)}>
               {ASSET_KINDS.map((k) => (
                 <MenuItem key={k} value={k}>{getKindLabel(k)}</MenuItem>
               ))}
@@ -598,10 +613,25 @@ function AssetsPanel() {
                     <Chip size="small" label={getKindLabel(it.kind)} />
                   </TableCell>
                   <TableCell align="right">
-                    <Button size="small" color="error"
-                      onClick={() => del(it.kind, it.id, it.name)}>
-                      {t('admin_books_delete_btn', '删除')}
-                    </Button>
+                    {/* 2026-11-23：book/report/prose_card_index 是虚拟资产行，没有
+                        可删除的资产文件；旧实现按钮可点但必然 404，看起来像坏按钮。 */}
+                    {(() => {
+                      const virtual = it.kind === 'book' || it.kind === 'report'
+                        || it.kind === 'prose_card_index'
+                      return (
+                        <Button
+                          size="small"
+                          color="error"
+                          disabled={virtual}
+                          title={virtual
+                            ? t('admin_assets_delete_virtual_tip', '该行由书籍/报告索引派生，请在对应页面管理')
+                            : undefined}
+                          onClick={() => del(it.kind, it.id, it.name)}
+                        >
+                          {t('admin_books_delete_btn', '删除')}
+                        </Button>
+                      )
+                    })()}
                   </TableCell>
                 </TableRow>
               ))}

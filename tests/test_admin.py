@@ -374,6 +374,23 @@ class TestAdminDeleteBook(_AdminBase):
         self.assertTrue((config.CORPUS_DIR / "book1.txt").exists(),
                         "409 时文件必须保留")
 
+    def test_delete_book_active_statuses_409(self):
+        self._init()
+        for status in ("running", "paused"):
+            book_id = f"book_{status}"
+            self._make_book(book_id, status=status)
+            with self.subTest(status=status):
+                try:
+                    admin.delete_book(book_id, "admin", "127.0.0.1")
+                except ServiceError as exc:
+                    self.assertEqual(exc.code, 409)
+                else:
+                    self.fail("运行中或暂停中的书籍不得删除")
+                self.assertTrue((config.CORPUS_DIR / f"{book_id}.txt").exists(),
+                                "409 时原文必须保留")
+                self.assertTrue((config.STATE_JSON_DIR / f"gui_state_{book_id}.json").exists(),
+                                "409 时状态文件必须保留")
+
     def test_delete_book_bad_id(self):
         self._init()
         for bad in ("../evil", "a/b", "..\\evil", ""):

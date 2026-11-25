@@ -9,6 +9,10 @@ import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
 import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
 import LinearProgress from '@mui/material/LinearProgress'
@@ -19,6 +23,7 @@ import { hasDesktopBridge, pickPath, type PickKind } from '../desktopBridge'
 import type { QualityTaskState, QcReportItem, WritingProject } from '../types'
 import { friendlyError } from '../api/client'
 import QcVisuals from './QcVisuals'
+import MarkdownReport from './MarkdownReport'
 import PoisonCheckPanel from './PoisonCheckPanel'
 import EmptyState from './common/EmptyState'
 import { useI18n } from '../state/I18nContext'
@@ -76,7 +81,9 @@ function ProjectQuickSelect({ onPick }: { onPick: (dir: string) => void }) {
       onChange={(e) => {
         const val = e.target.value
         setSelected(val)
-        if (val) onPick(`novel/${val}`)
+        // 2026-11-23 修：后端 resolve_chapter_target 的相对路径根已经是 NOVEL_DIR，
+        // 旧写法 `novel/<val>` 会解析成 novel/novel/<val>（必 404）；"无"也必须清空。
+        onPick(val)
       }}
     >
       <MenuItem value="">{t('quality_check_option_none', '无')}</MenuItem>
@@ -115,7 +122,14 @@ export default function QualityWorkbench() {
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: 1, borderColor: 'divider', pr: 1 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ flex: 1, px: 2 }}>
+        <Tabs
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          sx={{ flex: 1, minWidth: 0, px: 2 }}
+        >
         <Tab label={t('quality_tab_check')} />
         <Tab label={t('quality_tab_book')} />
         <Tab label={t('quality_tab_qc')} />
@@ -155,11 +169,13 @@ function CheckPanel() {
       .then((j) => {
         const items = ((j as Record<string, unknown>).items ?? []) as { id: string; name: string; kind: string }[]
         setAssets(items)
-        if (items.length > 0) setVoice(items[0].id)
+        // 2026-11-23：不再自动选第一张 voice 卡。此前中文稿会被默认拿
+        // Lord_of_the_Mysteries（英文）的声线卡打分，低分看起来像稿子问题。
       })
       .catch((e) => setError(`${t('quality_check_load_asset_failed')}${e}`))
     // genre-pack 可选：默认不选，保持与之前一致的行为（不传即不用题材包）。
-    assetApi.list({ kind: 'genre_pack', limit: 50 })
+    // limit 抬到 200：此前固定 50，第 51 个题材包（如青春甜宠）在选择器里直接消失。
+    assetApi.list({ kind: 'genre_pack', limit: 200 })
       .then((j) => {
         const items = ((j as Record<string, unknown>).items ?? []) as { id: string; name: string; kind: string }[]
         setGenrePacks(items)
@@ -206,12 +222,21 @@ function CheckPanel() {
           {loading ? <CircularProgress size={20} /> : t('quality_check_btn_start')}
         </Button>
       </Box>
-      {!target.trim() && (
-        <TextField
-          label={t('quality_check_text_label')} multiline rows={5} fullWidth value={text}
-          onChange={(e) => setText(e.target.value)} sx={{ mb: 2 }} size="small"
-        />
-      )}
+      <TextField
+        label={t('quality_check_text_label')}
+        multiline
+        rows={5}
+        fullWidth
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        sx={{ mb: 2 }}
+        size="small"
+        helperText={
+          target.trim()
+            ? t('quality_check_path_precedence', '已填写路径时优先使用路径；要检查下方正文，请先清空路径。')
+            : t('quality_check_text_hint', '也可以直接粘贴章节正文，无需填写路径。')
+        }
+      />
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {!result && !error && !loading && (
         <EmptyState
@@ -227,7 +252,7 @@ function CheckPanel() {
               <Typography variant="subtitle1">
                 {t('quality_check_score_quality')}{quality.score}/100 <Chip label={verdictLabel(quality.verdict, t)} size="small" color={quality.verdict === 'PASS' ? 'success' : quality.verdict === 'WARN' ? 'warning' : 'error'} />
               </Typography>
-              {(quality.details ?? []).slice(0, 10).map((d, i) => (
+              {(quality.details ?? []).slice(0, 12).map((d, i) => (
                 <Typography key={i} variant="body2" sx={{ fontSize: 12 }}>{d}</Typography>
               ))}
             </Box>
@@ -235,7 +260,7 @@ function CheckPanel() {
           {consistency && (
             <Box>
               <Typography variant="subtitle1">{t('quality_check_score_consistency')}{consistency.score?.toFixed(1)}/100</Typography>
-              {(consistency.details ?? []).slice(0, 8).map((d, i) => (
+              {(consistency.details ?? []).slice(0, 5).map((d, i) => (
                 <Typography key={i} variant="body2" sx={{ fontSize: 12 }}>{d}</Typography>
               ))}
             </Box>
@@ -266,7 +291,16 @@ function BookQualityPanel() {
     setExpanded(false)
     try {
       const r = await qualityApi.book({ target })
-      setResult(r)
+      // 2026-11-23 P0：book_quality_check 的失败分支是 HTTP 200 + `{"error": ...}`
+      // （scripts/book_quality.py:619-623），旧实现直接 setResult，于是
+      // 「未找到章节文件」被渲染成 verdict 空、共 0 个问题的“通过”卡片。
+      const err = r && typeof r === 'object' ? (r as Record<string, unknown>).error : null
+      if (err) {
+        setError(String(err))
+        setResult(null)
+      } else {
+        setResult(r)
+      }
     } catch (e) {
       setError(friendlyError(e))
     } finally {
@@ -274,6 +308,8 @@ function BookQualityPanel() {
     }
   }
 
+  const coverage = (result?.coverage ?? null) as { skipped?: string[]; skipped_reason?: string } | null
+  const skippedChecks = Array.isArray(coverage?.skipped) ? coverage!.skipped! : []
   const issues = (result?.issues ?? []) as { type?: string; severity?: string; detail?: string; chapter?: number }[]
   const verdict = result?.verdict as string | undefined
   // 2026-09-17（终审 M-5）：book_quality_check 的 issues 最多 issues_limit 条，而
@@ -329,10 +365,29 @@ function BookQualityPanel() {
         <Paper sx={{ p: 2 }}>
           <Typography variant="subtitle1">
             {t('quality_book_verdict_label')}<Chip label={verdictLabel(verdict, t)} size="small" color={verdict === 'PASS' ? 'success' : verdict === 'WARN' ? 'warning' : 'error'} />
+            {skippedChecks.length > 0 && (
+              <Chip
+                size="small"
+                color="warning"
+                variant="outlined"
+                sx={{ ml: 1 }}
+                label={t('quality_book_skipped_badge', '{n} 项未执行', { n: String(skippedChecks.length) })}
+              />
+            )}
           </Typography>
           <Typography variant="body2" sx={{ mt: 1 }}>
             {locale === 'en-US' ? `Total ${totalIssues} issues` : `共 ${totalIssues} 个问题`}
           </Typography>
+          {skippedChecks.length > 0 && (
+            <Alert severity="warning" sx={{ mt: 1.5 }}>
+              {t(
+                'quality_book_skipped_detail',
+                '本次有 {n} 项检查因前置条件不足未执行：{checks}。此结果不代表这些维度已通过。',
+                { n: String(skippedChecks.length), checks: skippedChecks.join('、') },
+              )}
+              {coverage?.skipped_reason ? `（${coverage.skipped_reason}）` : ''}
+            </Alert>
+          )}
           {issuesCutShort && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
               {cutShortHint}
@@ -369,6 +424,7 @@ function QcPanel() {
   const [taskState, setTaskState] = useState<QualityTaskState | null>(null)
   const [reports, setReports] = useState<QcReportItem[]>([])
   const [error, setError] = useState('')
+  const [preview, setPreview] = useState<{ name: string; content: string } | null>(null)
   const sseUnsubRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
@@ -407,6 +463,24 @@ function QcPanel() {
     }
   }
 
+  // 2026-11-23：qc 引擎对缺少前置资产的维度（无 voice-card / 题材包 / 原文）
+  // 会跳过并把该维记 100 分（raw.skipped），旧 UI 直接展示总分，用户看到
+  // 「人物弧线 100 / 手法运用 100 / 禁用词 100」以为都查过了。这里把未评估
+  // 维度显式列出并给总分加限定说明。
+  const qcIssues = taskState?.issues ?? []
+  const qcTotalIssues = taskState?.totalIssues ?? qcIssues.length
+  const qcIssuesLimit = taskState?.issuesLimit ?? 50
+  const qcIssuesTruncated = taskState?.issuesTruncated === true || qcTotalIssues > qcIssues.length
+
+  const skippedDims = (taskState?.layers ?? []).flatMap((l) =>
+    (l.dimensions ?? [])
+      .filter((d) => {
+        const raw = d.raw as Record<string, unknown> | undefined
+        return Boolean(raw && (raw.skipped || raw.skippedReason))
+      })
+      .map((d) => `${l.label}·${d.label}`),
+  )
+
   return (
     <Box>
       <Typography variant="h6" gutterBottom>{t('quality_qc_title')}</Typography>
@@ -431,16 +505,55 @@ function QcPanel() {
           {taskState.status === 'error' && <Alert severity="error" sx={{ mt: 1 }}>{taskState.error}</Alert>}
           {(taskState.layers ?? []).length > 0 && (
             <Box sx={{ mt: 1 }}>
-              {taskState.layers.map((layer) => (
-                <Typography key={layer.layer} variant="body2">
-                  {layer.layer} {layer.label}：{layer.score?.toFixed(1)}{t('quality_qc_score_suffix')}（{layer.dimensions.length}{t('quality_qc_layer_suffix')}）
-                </Typography>
-              ))}
+              {taskState.layers.map((layer) => {
+                const skippedInLayer = (layer.dimensions ?? []).filter((d) => {
+                  const raw = d.raw as Record<string, unknown> | undefined
+                  return Boolean(raw && (raw.skipped || raw.skippedReason))
+                }).length
+                return (
+                  <Typography key={layer.layer} variant="body2">
+                    {layer.layer} {layer.label}：{layer.score?.toFixed(1)}{t('quality_qc_score_suffix')}（{layer.dimensions.length}{t('quality_qc_layer_suffix')}
+                    {skippedInLayer > 0 ? `，${t('quality_qc_layer_skipped', '{n} 项未评估', { n: String(skippedInLayer) })}` : ''}）
+                  </Typography>
+                )
+              })}
             </Box>
+          )}
+          {taskState.status === 'done' && skippedDims.length > 0 && (
+            <Alert severity="warning" sx={{ mt: 1.5 }}>
+              {t(
+                'quality_qc_skipped_note',
+                '有 {n} 个维度因缺少前置资产（voice-card / 题材包 / 原文）未实际评估，仍按 100 分计入总分：{dims}。补齐资产后重跑才能得到真实分数。',
+                { n: String(skippedDims.length), dims: skippedDims.join('、') },
+              )}
+            </Alert>
           )}
           {taskState.status === 'done' && (taskState.layers ?? []).length > 0 && (
             <Box sx={{ mt: 2 }}>
               <QcVisuals layers={taskState.layers ?? []} issues={taskState.issues ?? []} />
+            </Box>
+          )}
+          {taskState.status === 'done' && qcIssues.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                {t('quality_qc_issues_title', '问题详情（{n}）', {
+                  n: String(qcTotalIssues),
+                })}
+              </Typography>
+              {qcIssues.slice(0, qcIssuesLimit).map((iss, i) => (
+                <Typography key={i} variant="body2" sx={{ fontSize: 12 }}>
+                  [{iss.severity}] {iss.chapter ? `Ch${iss.chapter} ` : ''}{iss.type} — {iss.detail}
+                </Typography>
+              ))}
+              {qcIssuesTruncated && (
+                <Typography variant="caption" color="text.secondary">
+                  {t(
+                    'quality_qc_issues_truncated',
+                    '仅显示前 {limit} 条（共 {n} 条），完整内容请查看已保存的 QC 报告。',
+                    { n: String(qcTotalIssues), limit: String(qcIssuesLimit) },
+                  )}
+                </Typography>
+              )}
             </Box>
           )}
           {taskState.reportMd && <Alert severity="success" sx={{ mt: 1 }}>{t('quality_qc_report_saved')}{taskState.reportMd}</Alert>}
@@ -451,15 +564,40 @@ function QcPanel() {
         <Box>
           <Typography variant="subtitle2" gutterBottom>{t('quality_qc_history_title')}</Typography>
           {reports.slice(0, 10).map((r) => (
-            <Typography key={r.name} variant="body2" sx={{ fontSize: 12 }}>
-              {/* 2026-11-03：以前只显示名称/判定/分数，后端返回的 createdAt
-                  从未渲染——历史报告排在一起无法分辨哪份是最新的。 */}
-              {r.createdAt ? `${r.createdAt.replace('T', ' ').slice(0, 16)} ` : ''}
-              {r.name} — {r.verdict} {r.totalScore != null ? `(${r.totalScore.toFixed(1)})` : ''}
-            </Typography>
+            <Box key={r.name} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" sx={{ fontSize: 12, flex: 1 }}>
+                {/* 2026-11-03：以前只显示名称/判定/分数，后端返回的 createdAt
+                    从未渲染——历史报告排在一起无法分辨哪份是最新的。 */}
+                {r.createdAt ? `${r.createdAt.replace('T', ' ').slice(0, 16)} ` : ''}
+                {r.name} — {r.verdict} {r.totalScore != null ? `(${r.totalScore.toFixed(1)})` : ''}
+              </Typography>
+              <Button
+                size="small"
+                variant="text"
+                onClick={async () => {
+                  try {
+                    const rep = await qualityApi.report(r.name, 'md')
+                    setPreview({ name: r.name, content: rep.content })
+                  } catch (e) {
+                    setError(friendlyError(e))
+                  }
+                }}
+              >
+                {t('quality_qc_view_report', '查看')}
+              </Button>
+            </Box>
           ))}
         </Box>
       )}
+      <Dialog open={!!preview} onClose={() => setPreview(null)} maxWidth="md" fullWidth>
+        <DialogTitle>{preview?.name}</DialogTitle>
+        <DialogContent dividers sx={{ maxHeight: '70vh' }}>
+          {preview && <MarkdownReport markdown={preview.content} />}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreview(null)}>{t('quality_qc_close', '关闭')}</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

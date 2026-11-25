@@ -104,6 +104,7 @@ def list_models() -> dict[str, Any]:
             "model_name": m.get("model_name", ""),
             "roles": m.get("roles", []),
             "has_key": has_key,
+            "api_key_env": m.get("api_key_env", ""),
             "context_window": m.get("context_window"),
             "note": m.get("note", ""),
         })

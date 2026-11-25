@@ -354,7 +354,9 @@ class TestReportSyncAssembleAndFullAnalysis(unittest.TestCase):
         self.assertEqual(st["status"], "done")
         self.assertEqual(st["report_error"], "")
         self.assertTrue((config.REPORTS_DIR / f"{bid}-拆书报告.md").is_file())
-        self.assertEqual(len(db.list_reports(book_id=bid)), 1)
+        # 2026-11-23：GUI 补齐 pass5 后，笔法卡与笔法分析报告也会生成 → 两份报告。
+        self.assertTrue((config.REPORTS_DIR / f"{bid}-笔法分析.md").is_file())
+        self.assertEqual(len(db.list_reports(book_id=bid)), 2)
 
 
 class TestTakeoverAndOfflineReportsEndpoints(unittest.TestCase):
@@ -373,7 +375,7 @@ class TestTakeoverAndOfflineReportsEndpoints(unittest.TestCase):
         self._iso.__exit__(None, None, None)
 
     def test_route_count_is_140(self):
-        self.assertEqual(len(router.ROUTES), 140)
+        self.assertEqual(len(router.ROUTES), 141)
 
     def test_takeover_flow_and_offline_report_generation(self):
         # 构造 10 章大体积语料以验证采样与 Pass 5 ~40,000 字截断保护

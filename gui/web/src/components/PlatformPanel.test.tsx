@@ -70,6 +70,11 @@ vi.mock('../api/client', () => ({
 }))
 
 describe('PlatformPanel', () => {
+  it('平台子页签在窄屏可横向滚动', () => {
+    render(<PlatformPanel />)
+    expect(screen.getByRole('tablist').parentElement).toHaveClass('MuiTabs-scrollableX')
+  })
+
   it('渲染平台列表并展示平台字数要求', async () => {
     render(<PlatformPanel />)
     expect(screen.getByText('多平台适配与签约诊断')).toBeDefined()

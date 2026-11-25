@@ -134,6 +134,15 @@ export default function JourneyStepper({ overview, onNavigate }: JourneyStepperP
                 <StepLabel
                   StepIconComponent={JourneyStepIcon}
                   onClick={() => handleClick(idx)}
+                  // 键盘可达：视觉上是按钮，键盘用户也必须能触发。
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleClick(idx)
+                    }
+                  }}
                   sx={{ cursor: 'pointer', '& .MuiStepLabel-iconContainer': { cursor: 'pointer' } }}
                   data-testid={`journey-step-${def.key}`}
                 >

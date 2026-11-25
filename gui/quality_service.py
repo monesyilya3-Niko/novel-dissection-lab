@@ -478,6 +478,14 @@ def _readable_target_name(display_target: str) -> str:
     return (safe or "qc")[:40]
 
 
+def _valid_qc_report_name(name: str) -> bool:
+    return (
+        isinstance(name, str)
+        and name not in (".", "..")
+        and re.fullmatch(r"[\w一-鿿.-]{1,200}", name) is not None
+    )
+
+
 def list_qc_reports() -> list[dict[str, Any]]:
     """列出 reports/qc/ 下的历史报告（按时间倒序）。
 
@@ -489,6 +497,9 @@ def list_qc_reports() -> list[dict[str, Any]]:
     reports = []
     if qc_dir.is_dir():
         for fp in qc_dir.glob("*.json"):
+            if not _valid_qc_report_name(fp.stem):
+                _log.warning(f"跳过名称不安全的质检报告 {fp.name}")
+                continue
             try:
                 data = json.loads(fp.read_text(encoding="utf-8-sig"))
                 created = (data.get("meta") or {}).get("created_at")
@@ -507,6 +518,30 @@ def list_qc_reports() -> list[dict[str, Any]]:
     # 按时间倒序：文件名不再能代表先后（GUI 落盘带 task_id，CLI 不带）
     reports.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     return reports
+
+
+def get_qc_report(name: str, fmt: str = "md") -> dict[str, Any]:
+    """读取一份 QC 历史报告正文（2026-11-23）。
+
+    此前历史列表只能看文件名，点不开也下载不了（前端也没有对应端点）。
+    只允许 reports/qc 下的 ``<name>.md`` / ``<name>.json``，name 必须来自
+    list_qc_reports 的 stem，禁止路径分隔符与穿越。
+    """
+    if not _valid_qc_report_name(name):
+        raise ServiceError("非法报告名", 400)
+    if fmt not in ("md", "json"):
+        raise ServiceError("format 只支持 md / json", 400)
+    qc_dir = (config.REPORTS_DIR / "qc").resolve()
+    fp = (qc_dir / f"{name}.{fmt}").resolve()
+    if not fp.is_relative_to(qc_dir):
+        raise ServiceError("非法报告路径", 400)
+    if not fp.is_file():
+        raise ServiceError("报告不存在", 404)
+    try:
+        content = fp.read_text(encoding="utf-8-sig")
+    except OSError as exc:
+        raise ServiceError(f"读取报告失败: {exc}", 500) from exc
+    return {"name": name, "format": fmt, "content": content}
 
 
 # ---------------------------------------------------------------------------

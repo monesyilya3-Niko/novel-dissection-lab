@@ -385,6 +385,44 @@ describe('AppContext 全局状态上下文与业务编排测试', () => {
     })
   })
 
+  it('状态快照替换旧批次：新分析清空后不得残留上一轮成功状态', async () => {
+    vi.mocked(api.getStatus).mockResolvedValue({
+      ...sampleStatus,
+      status: 'done',
+      done: 3,
+      chapterStates: {
+        'c1-b0': { status: 'success' },
+        'c1-b1': { status: 'success' },
+        'c2-b0': { status: 'success' },
+      },
+    })
+    render(<AppProvider><TestConsumer /></AppProvider>)
+
+    await waitFor(() => {
+      expect(capturedCtx?.batchStates['c2-b0']).toEqual({ status: 'success' })
+    })
+
+    vi.mocked(api.getStatus).mockResolvedValue({
+      ...sampleStatus,
+      status: 'running',
+      chapterStates: {},
+    })
+    await act(async () => {
+      await capturedCtx!.refreshStatus()
+    })
+    expect(capturedCtx!.batchStates).toEqual({})
+
+    vi.mocked(api.getStatus).mockResolvedValue({
+      ...sampleStatus,
+      status: 'running',
+      chapterStates: { 'c1-b0': { status: 'running' } },
+    })
+    await act(async () => {
+      await capturedCtx!.refreshStatus()
+    })
+    expect(capturedCtx!.batchStates).toEqual({ 'c1-b0': { status: 'running' } })
+  })
+
   it('SSE 事件推送：接收 batch 状态并在 done 与 report_ready 时自动刷新数据', async () => {
     const { unmount } = render(
       <AppProvider>

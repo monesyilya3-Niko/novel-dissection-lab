@@ -33,7 +33,8 @@ class TestRescanLoopExists(unittest.TestCase):
         src = (ROOT / "gui" / "services.py").read_text(encoding="utf-8")
         start = src.find("_rescan_rounds = 0")
         self.assertGreater(start, 0, "主循环缺少重扫轮次计数")
-        tail = src[start:start + 4000]
+        # 窗口需覆盖整个主循环；2026-11-23 加入 pass5 尽力而为分支后代码变长。
+        tail = src[start:start + 8000]
         self.assertIn('"pending"', tail,
                       "重扫判定里没有检查 pending 状态")
         self.assertIn("_MAX_RESCAN_ROUNDS", tail,
@@ -43,7 +44,7 @@ class TestRescanLoopExists(unittest.TestCase):
         """停止标志置位时不得继续重扫。"""
         src = (ROOT / "gui" / "services.py").read_text(encoding="utf-8")
         start = src.find("_rescan_rounds = 0")
-        tail = src[start:start + 2000]
+        tail = src[start:start + 4000]
         self.assertIn("stop_flag", tail,
                       "重扫循环未检查 stop_flag，停止请求可能被忽略")
 

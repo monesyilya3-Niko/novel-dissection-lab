@@ -55,9 +55,12 @@ export function getJourneyStatuses(overview: Overview | null): JourneyStatus[] {
   const modelOk = Boolean(overview.modelConfigured && overview.modelReady !== false)
   const s1: JourneyStatus = modelOk ? 'done' : 'pending'
   const s2: JourneyStatus = overview.totalBooks > 0 ? 'done' : (modelOk ? 'active' : 'pending')
-  const hasRecentActivity = Array.isArray(overview.recentActivity) && overview.recentActivity.length > 0
-  const s3Done = (overview.totalAssets >= 4 && overview.totalBooks > 0) || (hasRecentActivity && overview.totalAssets > 0)
-  const s3: JourneyStatus = s3Done ? 'done' : (overview.totalBooks > 0 ? 'active' : 'pending')
+  // 2026-11-23：第 3 步是「写一章并质检」，必须用真实的写作章节数与 QC 报告数。
+  // 旧判据 totalAssets>=4 在内置资产 138 张时恒真：拆完一本书就谎报"写+质检完成"。
+  const wroteChapter = (overview.totalWritingChapters ?? 0) > 0
+  const ranQc = (overview.totalQcReports ?? 0) > 0
+  const s3Done = wroteChapter && ranQc
+  const s3: JourneyStatus = s3Done ? 'done' : (wroteChapter || overview.totalBooks > 0 ? 'active' : 'pending')
   return [s1, s2, s3]
 }
 

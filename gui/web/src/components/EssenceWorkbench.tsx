@@ -9,6 +9,7 @@ import MenuItem from '@mui/material/MenuItem'
 import Chip from '@mui/material/Chip'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
+import TabScrollButton, { type TabScrollButtonProps } from '@mui/material/TabScrollButton'
 import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
@@ -119,6 +120,20 @@ function getProjectId(p: WritingProject): string {
   return p.id || p.name
 }
 
+function EssenceTabScrollButton(props: TabScrollButtonProps) {
+  const { t } = useI18n()
+  return (
+    <TabScrollButton
+      {...props}
+      component="button"
+      type="button"
+      aria-label={props.direction === 'left'
+        ? t('action_scroll_left', '向左滚动页签')
+        : t('action_scroll_right', '向右滚动页签')}
+    />
+  )
+}
+
 export default function EssenceWorkbench() {
   const { t } = useI18n()
   const [tab, setTab] = useState(0)
@@ -132,7 +147,14 @@ export default function EssenceWorkbench() {
       />
       <Paper sx={{ p: 2 }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-          <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto">
+          <Tabs
+            value={tab}
+            onChange={(_, v) => setTab(v)}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
+            ScrollButtonComponent={EssenceTabScrollButton}
+          >
             <Tab icon={<AutoAwesomeIcon fontSize="small" />} iconPosition="start" label={t('essence_tab_macro')} />
             <Tab icon={<LayersIcon fontSize="small" />} iconPosition="start" label={t('essence_tab_assets')} />
             <Tab icon={<AccountTreeIcon fontSize="small" />} iconPosition="start" label={t('essence_tab_chains')} />
@@ -194,6 +216,9 @@ function MacroExtractSection({ onGoAssets }: { onGoAssets: () => void }) {
         text: text.trim(),
         platform,
         genre,
+        // 2026-11-23：后端默认 auto_save_assets=true 会先写 4 条资产，界面却仍
+        // 显示 4 个「沉淀入库」按钮——再点一遍就是 8 条重复卡。改为前端显式保存。
+        auto_save_assets: false,
       })
       setResult(res)
       setSavedIndices({})
@@ -242,7 +267,7 @@ function MacroExtractSection({ onGoAssets }: { onGoAssets: () => void }) {
         {t('essence_macro_desc')}
       </Typography>
 
-      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
+      {error && <Alert severity="error" closeText={t('action_close')} onClose={() => setError('')}>{error}</Alert>}
 
       <Paper variant="outlined" sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -414,6 +439,7 @@ function MacroExtractSection({ onGoAssets }: { onGoAssets: () => void }) {
                 <Alert
                   severity="success"
                   sx={{ mb: 1.5 }}
+                  closeText={t('action_close')}
                   onClose={() => setSavedNotice('')}
                   action={
                     <Button color="inherit" size="small" onClick={onGoAssets}>
@@ -576,7 +602,7 @@ function EssenceAssetsSection() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
+      {error && <Alert severity="error" closeText={t('action_close')} onClose={() => setError('')}>{error}</Alert>}
 
       {/* 筛选栏 */}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -819,8 +845,8 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
       const res = await essenceApi.exportOutline(book.bookId)
       downloadMarkdownFile(`《${book.title}》全书五维大纲.md`, res.markdown)
       const msg = `已导出《${book.title}》全书五维大纲`
-      setToast(msg)
-      onToast?.(msg)
+      if (onToast) onToast(msg)
+      else setToast(msg)
     } catch (e) {
       setError(friendlyError(e))
     }
@@ -831,8 +857,8 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
       const res = await essenceApi.exportBeats(book.bookId)
       downloadMarkdownFile(`《${book.title}》分章节拍轻提纲.md`, res.markdown)
       const msg = `已导出《${book.title}》分章节拍轻提纲`
-      setToast(msg)
-      onToast?.(msg)
+      if (onToast) onToast(msg)
+      else setToast(msg)
     } catch (e) {
       setError(friendlyError(e))
     }
@@ -844,8 +870,8 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
     try {
       const res = await essenceApi.adoptBook(adoptBookDialog.bookId, adoptProject)
       const msg = `已将《${adoptBookDialog.title}》的全套五维资产 (${res.totalAdopted}项) 一键反哺至项目 [${adoptProject}]！`
-      setToast(msg)
-      onToast?.(msg)
+      if (onToast) onToast(msg)
+      else setToast(msg)
       setAdoptBookDialog(null)
     } catch (e) {
       setError(friendlyError(e))
@@ -867,7 +893,7 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
+      {error && <Alert severity="error" closeText={t('action_close')} onClose={() => setError('')}>{error}</Alert>}
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="body2" color="text.secondary">
@@ -883,8 +909,8 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
         <Paper variant="outlined" sx={{ p: 1.5 }}>
           <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
             {[
-              [t('essence_stats_books', '精读著作'), stats.totalBooks],
-              [t('essence_stats_chars', '总字数'), stats.totalChars.toLocaleString()],
+              [t('essence_stats_books', '标杆档案'), stats.totalBooks],
+              [t('essence_stats_chars', '参考体量'), stats.totalChars.toLocaleString()],
               [t('essence_stats_assets', '五维资产'), stats.totalAssets],
               [t('essence_stats_chains', '伏笔暗线'), stats.totalChains],
             ].map(([label, value]) => (
@@ -896,6 +922,12 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
               </Box>
             ))}
           </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+            {t('essence_stats_note', '其中 {curated} 部为人工整理的纲要模板（无全文，不可拆书），{measured} 部有实测全文。', {
+              curated: String(stats.curatedBooks ?? 0),
+              measured: String(stats.measuredBooks ?? stats.totalBooks),
+            })}
+          </Typography>
         </Paper>
       ) : null}
 
@@ -917,18 +949,35 @@ function EssenceBooksSection({ onToast }: { onToast?: (msg: string) => void }) {
                     <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
                       {b.title}
                     </Typography>
-                    <IconButton size="small" color="error" onClick={() => handleDelete(b.bookId)}>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      aria-label={t('essence_books_delete_label', '删除《{title}》的书籍精读档案', { title: b.title })}
+                      onClick={() => handleDelete(b.bookId)}
+                    >
                       <DeleteOutlineIcon fontSize="small" />
                     </IconButton>
                   </Box>
 
-                  <Box sx={{ display: 'flex', gap: 0.5, my: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 0.5, my: 1, flexWrap: 'wrap' }}>
                     <Chip size="small" label={GENRE_LABELS[b.genre] || b.genre} />
                     <Chip size="small" label={PLATFORM_LABELS[b.platform] || b.platform} variant="outlined" />
+                    {b.isCurated && (
+                      <Chip
+                        size="small"
+                        color="info"
+                        variant="outlined"
+                        label={t('essence_book_curated_badge', '纲要模板')}
+                      />
+                    )}
                   </Box>
 
                   <Typography variant="body2" color="text.secondary">
-                    {b.totalChapters ?? 0} 章 | {(b.totalChars ?? 0).toLocaleString()} 字
+                    {b.isCurated ? t('essence_book_reference_size', '参考') + ' ' : ''}
+                    {b.totalChapters ?? 0} 章 | {(b.totalChars ?? 0).toLocaleString()}{' '}
+                    {b.language === 'en'
+                      ? t('essence_book_unit_en_chars', '英文字符')
+                      : t('essence_book_unit_zh_chars', '字')}
                   </Typography>
 
                   <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -1136,7 +1185,7 @@ function EssenceChainsSection() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
+      {error && <Alert severity="error" closeText={t('action_close')} onClose={() => setError('')}>{error}</Alert>}
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
@@ -1206,7 +1255,12 @@ function EssenceChainsSection() {
                           color={statusConfig.color}
                         />
                       </Box>
-                      <IconButton size="small" color="error" onClick={() => handleDelete(c.id)}>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        aria-label={t('essence_chains_delete_label', '删除暗线「{title}」', { title: c.title })}
+                        onClick={() => handleDelete(c.id)}
+                      >
                         <DeleteOutlineIcon fontSize="small" />
                       </IconButton>
                     </Box>
@@ -1483,7 +1537,7 @@ function ConstitutionCheckSection() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
+      {error && <Alert severity="error" closeText={t('action_close')} onClose={() => setError('')}>{error}</Alert>}
 
       <Box>
         <Typography variant="h6" sx={{ fontWeight: 'bold' }}>

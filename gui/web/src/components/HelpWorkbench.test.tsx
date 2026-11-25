@@ -21,6 +21,7 @@ describe('HelpWorkbench 帮助中心与功能指南全量双语支持', () => {
     expect(screen.getByRole('tab', { name: '术语表' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: '功能指南' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: '常见问题' })).toBeInTheDocument()
+    expect(screen.getByRole('tablist').parentElement).toHaveClass('MuiTabs-scrollableX')
 
     // 默认展示新手上路生态全景与工作流
     expect(screen.getByText('生态全景：数据是怎么流动的')).toBeInTheDocument()
@@ -74,6 +75,25 @@ describe('HelpWorkbench 帮助中心与功能指南全量双语支持', () => {
     fireEvent.click(screen.getByRole('tab', { name: '常见问题' }))
     expect(screen.getByText('导入 .txt 后没反应？')).toBeInTheDocument()
     expect(screen.getByText('蒸馏和拆书是什么关系？')).toBeInTheDocument()
+  })
+
+  it('中文界面可搜索英文术语、英文定义与拼音', () => {
+    render(
+      <I18nProvider initialLocale="zh-CN">
+        <HelpWorkbench initialTab="glossary" />
+      </I18nProvider>,
+    )
+
+    const searchInput = screen.getByPlaceholderText('搜索术语…')
+    fireEvent.change(searchInput, { target: { value: 'deslop' } })
+    expect(screen.getByText('去AI味')).toBeInTheDocument()
+    expect(screen.queryByText('声线卡')).not.toBeInTheDocument()
+
+    fireEvent.change(searchInput, { target: { value: 'fingerprints' } })
+    expect(screen.getByText('去AI味')).toBeInTheDocument()
+
+    fireEvent.change(searchInput, { target: { value: 'zhēng liú' } })
+    expect(screen.getByText('蒸馏')).toBeInTheDocument()
   })
 
   it('支持 initialTab 与 initialAnchor 深度锚点联动', () => {

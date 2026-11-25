@@ -568,13 +568,9 @@
   "emotion_handling": {
     "mode": "混合式",
     "body_reaction_vocabulary": [
-      "喜欢",
       "小鹿乱撞",
       "撕心裂肺",
-      "动作做到一半停住",
-      "不知道",
-      "也许",
-      "没有一个能确认"
+      "动作做到一半停住"
     ],
     "examples": [
       {

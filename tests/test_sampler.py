@@ -84,6 +84,47 @@ All ends well.
         self.assertEqual(chaps[3][0], "Chapter 3 The Journey")
         self.assertEqual(chaps[4][0], "CHAPTER 4 Epilogue")
 
+    def test_split_chapters_markdown_headings(self):
+        """Markdown 标题修饰的章节必须识别（2026-11-25 实测缺陷）。
+
+        实测事故：用户用 Markdown 整理的整本合集里标题写作
+        ``# 第134章 油热那一声``，旧正则从行首要求直接是「第」，
+        一本 137 章的书被切成 1 章——拆书、采样、报告全部失真。
+        """
+        text = """
+这是书籍简介段落，不属于任何一章。
+# 第001章　暮冬未尽时
+第一章正文。
+## 第002章　没听完的歌
+第二章正文。
+### 第3章 袖里藏青紫
+第三章正文。
+"""
+        chaps = sampler.split_chapters(text)
+        self.assertEqual(len(chaps), 4)
+        self.assertEqual(chaps[0][0], "（无标题开头）")
+        self.assertIn("第001章", chaps[1][0])
+        self.assertIn("第002章", chaps[2][0])
+        self.assertIn("第3章", chaps[3][0])
+        self.assertIn("第一章正文", chaps[1][1])
+
+    def test_split_chapters_toc_lines_are_not_chapters(self):
+        """目录里的「· 第001章…」是索引，不能当正文标题切章。"""
+        text = """【目录】
+  · 第001章　暮冬未尽时（2322 字）
+  · 第002章　没听完的歌（2206 字）
+
+# 第001章　暮冬未尽时
+正文一。
+# 第002章　没听完的歌
+正文二。
+"""
+        chaps = sampler.split_chapters(text)
+        # 只有「无标题开头」(含目录) + 2 个正文章
+        self.assertEqual(len(chaps), 3)
+        self.assertIn("第001章", chaps[1][0])
+        self.assertEqual(chaps[1][0].count("字）"), 0)
+
     def test_split_chapters_special_titles(self):
         """楔子/番外/序章等非编号标题必须识别（2026-11-01）。
 

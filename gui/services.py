@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import threading
 import time
 from collections import OrderedDict
@@ -22,7 +23,10 @@ from gui.sse import broker
 _log = get_logger("services")
 
 # 每个 pass 分析的 kind 名（串行顺序）。
-PASS_ORDER = ("pass1_structure", "pass2_character", "pass3_style", "pass4_commercial")
+# 2026-11-23：GUI 主链路补上 pass5_craft。此前只跑 4 pass，笔法卡/笔法分析报告
+# 在 GUI 里永远不可能生成（结果页却始终展示「笔法卡」），属于明确的资产缺口。
+PASS_ORDER = ("pass1_structure", "pass2_character", "pass3_style", "pass4_commercial",
+              "pass5_craft")
 
 # 离线 Web-AI 拆书接管支持的全部五遍扫描 Pass。
 TAKEOVER_PASSES: tuple[tuple[str, str], ...] = (
@@ -236,6 +240,16 @@ def _books_put_locked(book_id: str, book: dict[str, Any]) -> None:
 def _load_book_from_disk(book_id: str, src_path: str) -> dict[str, Any]:
     """从源文件重载书籍（B9 透明重载路径）。"""
     src = Path(src_path)
+    if not src.is_absolute() or not src.exists():
+        # migrate CLI 在 books 表里存的是相对 ROOT 的路径（corpus/xxx.txt）。
+        # 直接 Path(rel) 会相对当前工作目录解析，重启/淘汰后书就打不开了。
+        try:
+            from gui import migrate as _migrate
+            resolved = _migrate.resolve_rel_path(str(src_path))
+            if resolved.exists():
+                src = resolved
+        except Exception:  # noqa: BLE001
+            pass
     if not src.exists():
         raise ServiceError(f"源文件已丢失: {src_path}", 404)
     # 经 _secure_read_text：防符号链接、FIFO、超大文件（与 import 同一路防线）。
@@ -503,7 +517,8 @@ def _chapters_meta(book_id: str, book: dict[str, Any]) -> list[dict[str, Any]]:
         batch_metas = []
         for b in batches:
             key = state_store.batch_id(i, b["batch_index"])
-            st = chapter_states.get(key, {}).get("status", "pending")
+            record = chapter_states.get(key)
+            st = record.get("status", "pending") if isinstance(record, dict) else "pending"
             batch_metas.append({
                 "chapter_index": i,
                 "batch_index": b["batch_index"],
@@ -525,6 +540,58 @@ def _chapters_meta(book_id: str, book: dict[str, Any]) -> list[dict[str, Any]]:
 # 分析执行（串行：章→批→pass）
 # ---------------------------------------------------------------------------
 
+# 每本书最多保留的归档轮次。归档是按时间戳新建目录、永不覆盖的，重跑多次
+# 会无声堆积（一本书 4 张卡 + 2 份报告，重跑 100 次就是几百 MB）。
+# 只保留最近 N 轮，够回滚也够追查，不会把用户磁盘吃满。
+_MAX_ANALYSIS_ARCHIVES_PER_BOOK = 5
+
+
+def _archive_analysis_outputs(book_id: str, reason: str) -> list[str]:
+    """把旧整书卡与报告移入本地归档，避免新分析失败时仍展示旧产物。"""
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+    book_archive_root = config.STATE_ROOT / "analysis_archive" / book_id
+    archive = book_archive_root / f"{stamp}-{reason}"
+    sources = [
+        (config.ASSETS_ROOT / f"{book_id}-voice-card.json", "assets"),
+        (config.ASSETS_ROOT / f"{book_id}-structure-obs.json", "assets"),
+        (config.ASSETS_ROOT / f"{book_id}-commercial-obs.json", "assets"),
+        (config.ASSETS_ROOT / f"{book_id}-craft-card.json", "assets"),
+        (config.REPORTS_DIR / f"{book_id}-拆书报告.md", "reports"),
+        (config.REPORTS_DIR / f"{book_id}-笔法分析.md", "reports"),
+    ]
+    moved: list[str] = []
+    for src, category in sources:
+        if not src.is_file():
+            continue
+        dst_dir = archive / category
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        dst = dst_dir / src.name
+        shutil.move(str(src), str(dst))
+        moved.append(str(dst))
+    if moved:
+        _prune_analysis_archives(book_archive_root)
+    return moved
+
+
+def _prune_analysis_archives(book_archive_root: Path) -> None:
+    """只保留最近 N 轮归档，删除更旧的（按目录名的时间戳前缀排序）。
+
+    失败一律吞掉：清理是尽力而为，绝不能因为删不掉旧归档就让分析失败。
+    """
+    try:
+        dirs = sorted(
+            (d for d in book_archive_root.iterdir() if d.is_dir()),
+            key=lambda d: d.name,
+        )
+    except OSError:
+        return
+    for stale in dirs[:-_MAX_ANALYSIS_ARCHIVES_PER_BOOK]:
+        try:
+            shutil.rmtree(stale)
+        except OSError:
+            _log.warning("清理旧分析归档失败: %s", stale)
+
+
 def start_analysis(
     book_id: str,
     genre: str,
@@ -532,8 +599,9 @@ def start_analysis(
     batch_size: int | None = None,
     *,
     generate_reports: bool | None = None,
+    resume: bool = False,
 ) -> dict[str, Any]:
-    """开始/重启分析。串行跑，后台线程执行，SSE 推送进度。"""
+    """开始新分析或续传。串行跑，后台线程执行，SSE 推送进度。"""
     _get_book_or_raise(book_id)
     if not engine_adapter.any_model_configured():
         raise ServiceError("未配置外部模型，请先运行 model_config.py 配置（PRD Q7：首版 GUI 仅支持已配置模型）", 400)
@@ -554,6 +622,10 @@ def start_analysis(
         if rt and rt.get("thread") and rt["thread"].is_alive():
             raise ServiceError("分析已在运行中", 409)
 
+        # 新分析先归档旧整书产物并清空批次；续传必须保留 success 批，避免重复扣费。
+        if not resume:
+            _archive_analysis_outputs(book_id, "restart")
+
         # 【修复 H3】必须把 status 重置为 running 并清掉上一次的 report_error。
         # 否则重跑一本已分析完（status="done"）的书时，报告监听线程 _watch 首次
         # 轮询就读到残留的 "done"，立刻用旧/半成品资产生成报告，并与新启动的
@@ -563,9 +635,17 @@ def start_analysis(
             state["model_id"] = model_id
             state["batch_size"] = bs
             state["status"] = "running"
+            if not resume:
+                state["chapter_states"] = {}
+                state["asset_index"] = {}
+                state["cursor"] = ""
+                state["analysis_run_id"] = datetime.now(timezone.utc).isoformat()
             if generate_reports is not None:
                 state["generate_reports"] = bool(generate_reports)
             state.pop("report_error", None)
+            # 2026-11-23：重跑时旧错误必须清掉，否则进度页一边显示 running
+            # 一边挂着上一次的红色失败原因，用户以为新任务又失败了。
+            state.pop("last_error", None)
 
         # 启动后台线程（在锁内完成登记与启动，保证并发安全）
         stop_flag = threading.Event()
@@ -597,6 +677,7 @@ def _record_batch_failure(
     total_batches: int,
     ctx: dict[str, Any],
     exc: Exception,
+    passes: dict[str, str] | None = None,
 ) -> bool:
     """记录单批失败；若命中鉴权/欠费熔断则生成离线接管指引并返回 True（主循环立即退出）。"""
     err_text = str(exc)[:500]
@@ -614,7 +695,7 @@ def _record_batch_failure(
         except Exception as off_exc:  # noqa: BLE001
             _log.warning("生成离线接管指引失败 %s: %s", book_id, off_exc)
         with state_store.update_state(book_id) as state:
-            state_store.set_batch_state(state, ci, bi, "failed")
+            state_store.set_batch_state(state, ci, bi, "failed", passes=passes)
             state["status"] = "error"
             state["last_error"] = err_text
             if guide_rel:
@@ -631,10 +712,33 @@ def _record_batch_failure(
         })
         return True
     with state_store.update_state(book_id) as state:
-        state_store.set_batch_state(state, ci, bi, "failed")
+        state_store.set_batch_state(state, ci, bi, "failed", passes=passes)
         state["last_error"] = err_text
     _publish(book_id, ci, bi, "failed", done + 1, total_batches, ctx)
     return False
+
+
+def _pass_asset_valid(book_id: str, ci: int, bi: int, pass_name: str) -> bool:
+    """批级产物存在且含有效载荷；损坏或纯拒答文件视为待补跑。"""
+    try:
+        data = json.loads(state_store.asset_path(book_id, ci, bi, pass_name).read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    return any(k not in _MERGE_SKIP_KEYS and v not in (None, "", [], {}) for k, v in data.items())
+
+
+def _pending_passes(book_id: str, ci: int, bi: int, existing: object | None) -> tuple[str, ...]:
+    """续传时只补跑缺失/失败的 pass；新批或失败批则执行全部 pass。"""
+    if not isinstance(existing, dict) or existing.get("status") != "success":
+        return PASS_ORDER
+    recorded = existing.get("passes") if isinstance(existing.get("passes"), dict) else {}
+    return tuple(
+        name for name in PASS_ORDER
+        if (name in recorded and recorded.get(name) != "success")
+        or not _pass_asset_valid(book_id, ci, bi, name)
+    )
 
 
 def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: int, ctx: dict[str, Any]) -> None:
@@ -656,6 +760,7 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
         # 接口 200、提示说会重扫、该批却永远停在 pending。
         # 现在整趟遍历结束后，只要还有 pending 批就再扫一轮（最多 MAX_RESCAN_ROUNDS 轮）。
         _rescan_rounds = 0
+        outputs_archived = False
         while True:
             for ci, (ctitle, cbody) in enumerate(chapters, start=1):
                 batches = engine_adapter.split_batches(cbody, batch_size)
@@ -663,9 +768,11 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
                     bi = b["batch_index"]
                     key = state_store.batch_id(ci, bi)
 
-                    # 断点续传：已 success 的批直接跳过，不重复分析（设计 §3.3/§5）。
                     existing = state_store.load_state(book_id).get("chapter_states", {}).get(key)
-                    if existing and existing.get("status") == "success":
+                    if not isinstance(existing, dict):
+                        existing = None
+                    passes_to_run = _pending_passes(book_id, ci, bi, existing)
+                    if existing and existing.get("status") == "success" and not passes_to_run:
                         done += 1
                         continue
 
@@ -679,25 +786,52 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
                     # /api/status 却永远显示 paused，前端也就不再刷新进度。
                     _resume_status_if_paused(book_id)
 
+                    if not outputs_archived:
+                        _archive_analysis_outputs(book_id, "resume")
+                        outputs_archived = True
+                    pass_status = {
+                        name: ("pending" if name in passes_to_run else "success")
+                        for name in PASS_ORDER
+                    }
+
                     _publish(book_id, ci, bi, "running", done, total_batches, ctx)
                     # 标记 running 落盘（原子读改写：HTTP 线程可能同时在 pause/retry）
                     with state_store.update_state(book_id) as state:
-                        state_store.set_batch_state(state, ci, bi, "running")
+                        state_store.set_batch_state(state, ci, bi, "running", passes=pass_status)
 
-                    # 串行跑四个 pass
-                    batch_results = {}
                     last_asset = None
+                    pass5_error = ""
                     try:
-                        for pass_name in PASS_ORDER:
-                            out = engine_adapter.run_batch(
-                                pass_name, ci, ctitle, b["text"], metrics,
-                                dry_run=False, model_id=model_id,
-                            )
-                            batch_results[pass_name] = out
-                            # 每个 pass 落一个资产文件
+                        for pass_name in passes_to_run:
+                            try:
+                                out = engine_adapter.run_batch(
+                                    pass_name, ci, ctitle, b["text"], metrics,
+                                    dry_run=False, model_id=model_id,
+                                )
+                            except Exception as pass_exc:  # noqa: BLE001
+                                pass_status[pass_name] = "failed"
+                                # pass5 失败保留 pass1-4，但整本书必须显示部分完成，不能冒充全部成功。
+                                if pass_name == "pass5_craft":
+                                    pass5_error = str(pass_exc)[:500]
+                                    _log.warning(
+                                        "pass5 笔法拆解失败，保留 pass1-4 资产 book=%s c%d-b%d: %s",
+                                        book_id, ci, bi, pass_exc,
+                                    )
+                                    continue
+                                raise
+                            # 每个 pass 原子落一个资产文件，避免中断留下半份 JSON。
                             ap = state_store.asset_path(book_id, ci, bi, pass_name)
                             ap.parent.mkdir(parents=True, exist_ok=True)
-                            ap.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+                            tmp = ap.with_name(f"{ap.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+                            try:
+                                tmp.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+                                os.replace(tmp, ap)
+                            finally:
+                                try:
+                                    tmp.unlink(missing_ok=True)
+                                except OSError:
+                                    pass
+                            pass_status[pass_name] = "success"
                             # 资产相对路径以 ASSETS_ROOT 为基准（不假设 ASSETS_ROOT 在 ROOT_DIR 下，
                             # 兼容测试/自定义目录隔离），供前端按 book_id/ch/batch/pass 定位。
                             try:
@@ -705,21 +839,23 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
                             except ValueError:
                                 last_asset = str(ap)
                     except Exception as exc:  # noqa: BLE001
-                        if _record_batch_failure(book_id, book, chapters, genre, ci, bi, done, total_batches, ctx, exc):
+                        if _record_batch_failure(book_id, book, chapters, genre, ci, bi, done, total_batches, ctx, exc, pass_status):
                             return
                         done += 1
                         continue
 
-                    # 记录成功（资产取 pass1 作为代表，asset_index 只记批）
+                    # 基础拆书成功仍记 success；pass5 失败通过 passes 与整书 partial 状态暴露。
                     with state_store.update_state(book_id) as state:
-                        state_store.set_batch_state(state, ci, bi, "success", asset=last_asset)
+                        state_store.set_batch_state(state, ci, bi, "success", asset=last_asset, passes=pass_status)
+                        if pass5_error:
+                            state["last_error"] = pass5_error
                     done += 1
                     _publish(book_id, ci, bi, "success", done, total_batches, ctx)
 
             # 一趟遍历结束：若仍有 pending（retry_failed 改回来的），再来一轮
             _st = state_store.load_state(book_id)
             _has_pending = any(
-                (v or {}).get("status") == "pending"
+                isinstance(v, dict) and v.get("status") == "pending"
                 for v in (_st.get("chapter_states") or {}).values())
             if not _has_pending or ctx["stop_flag"].is_set():
                 break
@@ -731,8 +867,14 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
         # 统计最终成功/失败批数：若全部失败（0 批成功且存在 failed），绝不伪装成 done！
         final_state = state_store.load_state(book_id)
         ch_states = (final_state.get("chapter_states") or {}).values()
-        success_total = sum(1 for v in ch_states if (v or {}).get("status") == "success")
-        failed_total = sum(1 for v in ch_states if (v or {}).get("status") == "failed")
+        success_total = sum(1 for v in ch_states if isinstance(v, dict) and v.get("status") == "success")
+        failed_total = sum(1 for v in ch_states if isinstance(v, dict) and v.get("status") == "failed")
+        degraded_total = sum(
+            1 for v in ch_states
+            if isinstance(v, dict)
+            and isinstance(v.get("passes"), dict)
+            and v["passes"].get("pass5_craft") == "failed"
+        )
         if failed_total > 0 and success_total == 0:
             err_msg = final_state.get("last_error") or f"全部 {failed_total} 个批次均分析失败"
             with state_store.update_state(book_id) as state:
@@ -767,12 +909,25 @@ def _run_analysis(book_id: str, genre: str, model_id: str | None, batch_size: in
                 with state_store.update_state(book_id) as st_err:
                     st_err["report_error"] = str(exc)[:500]
 
+        # 2026-11-23 企业级修正：部分批次失败时不能伪装成 done。
+        # 旧实现只要有一批成功就写 status="done"，UI 顶部显示「已完成」，
+        # 但 done/total 只有 1/3 且 last_error 仍在——用户会以为拆完了。
+        # 现在用独立的 partial 状态，报告/资产仍按成功批次生成。
+        final_status = "partial" if failed_total > 0 or degraded_total > 0 else "done"
         with state_store.update_state(book_id) as state:
-            state["status"] = "done"
-            if failed_total == 0:
+            state["status"] = final_status
+            if failed_total == 0 and degraded_total == 0:
                 state.pop("last_error", None)
-        _sync_book_status(book_id, "done")
-        _publish(book_id, 0, 0, "done", done, total_batches, ctx)
+            else:
+                problems = []
+                if failed_total:
+                    problems.append(f"{failed_total} 个批次分析失败，成功 {success_total} 个")
+                if degraded_total:
+                    problems.append(f"{degraded_total} 个批次笔法分析失败，基础拆书结果已保留")
+                detail = final_state.get("last_error")
+                state["last_error"] = "；".join(problems) + (f"；{detail}" if detail else "")
+        _sync_book_status(book_id, final_status)
+        _publish(book_id, 0, 0, final_status, done, total_batches, ctx)
     except Exception as exc:  # noqa: BLE001
         _log.exception("拆书任务未捕获异常 book_id=%s", book_id)
         err_msg = str(exc)[:500]
@@ -962,7 +1117,7 @@ def resume(book_id: str, genre: str | None = None, model_id: str | None = None) 
     g = genre or state.get("genre", "unknown")
     mid = model_id or state.get("model_id")
     bs = state.get("batch_size") or config.batch_size_from_env()
-    return start_analysis(book_id, g, mid, bs)
+    return start_analysis(book_id, g, mid, bs, resume=True)
 
 
 def retry_failed(book_id: str) -> dict[str, Any]:
@@ -1069,7 +1224,10 @@ def get_status(book_id: str | None = None) -> dict[str, Any]:
     total = 0
     if book:
         total = _count_total_batches(book["chapters"], state.get("batch_size") or config.batch_size_from_env())
-    done = sum(1 for v in state.get("chapter_states", {}).values() if v.get("status") == "success")
+    done = sum(
+        1 for v in state.get("chapter_states", {}).values()
+        if isinstance(v, dict) and v.get("status") == "success"
+    )
     return {
         "book_id": book_id,
         "status": state.get("status", "idle"),
@@ -1437,13 +1595,43 @@ def generate_book_reports(
 def get_overview() -> dict[str, Any]:
     """首页概览聚合：SQL 聚合计数 + 已拆书本数 + 模型状态。"""
     ov = asset_index.index.get_overview()
-    # 「已拆 N 本」来自 SQLite books 表（status='done'）优先，回退 gui_state 目录。
+    # 2026-11-23：`total_books` 在首页的标签是「已拆书」，必须只数真正分析完成的
+    # 书（status=done），不能回退成「导入过但从未分析」的书——旧实现无 done 书时
+    # 用 state_store 全量列表兜底，首页会显示「已拆书 2」而实际一本都没拆。
     done_books = db.get_books(status="done")
-    if done_books:
-        ov["total_books"] = len(done_books)
-    else:
-        books = state_store.list_books_summary()
-        ov["total_books"] = len(books)
+    ov["total_books"] = len(done_books)
+    try:
+        ov["total_imported_books"] = len(db.get_books())
+    except Exception:  # noqa: BLE001
+        ov["total_imported_books"] = 0
+    # 2026-11-23：首页「使用旅程」第 3 步需要真实的写作/质检信号。
+    # 旧判据只看资产数——内置资产 138 张，拆完一本书就让「写一章并质检」自动打勾。
+    try:
+        ov["total_writing_chapters"] = sum(
+            1 for _ in config.NOVEL_DIR.rglob("chapter-*.txt")
+        ) if config.NOVEL_DIR.is_dir() else 0
+    except OSError:
+        ov["total_writing_chapters"] = 0
+    try:
+        qc_dir = config.REPORTS_DIR / "qc"
+        ov["total_qc_reports"] = sum(1 for _ in qc_dir.glob("*-qc.json")) if qc_dir.is_dir() else 0
+    except OSError:
+        ov["total_qc_reports"] = 0
+    # 2026-11-23：首页「最近动态」此前后端恒返回 []，区块永远不出现。
+    # 用 books 表的 updated_at 派生最近 5 条真实动态（不再需要独立活动日志表）。
+    try:
+        _status_cn = {
+            "done": "已完成拆书", "error": "拆书失败", "running": "拆解中",
+            "paused": "已暂停", "partial": "部分完成", "ready": "已导入", "idle": "待拆",
+        }
+        recent = []
+        for b in sorted(db.get_books(), key=lambda r: r.get("updated_at") or "",
+                        reverse=True)[:5]:
+            title = b.get("title") or b.get("book_id")
+            recent.append(f"《{title}》 · {_status_cn.get(b.get('status') or '', b.get('status') or '')}")
+        ov["recent_activity"] = recent
+    except Exception:  # noqa: BLE001
+        ov["recent_activity"] = []
     ov["model_configured"] = engine_adapter.any_model_configured()
     ov["model_ready"] = engine_adapter.any_model_ready()
     return ov
@@ -1687,11 +1875,20 @@ def get_book_results(book_id: str) -> dict[str, Any]:
 
     title = (voice.get("meta") or {}).get("source_title", book_id)
 
-    # 报告关联：reports 目录下 {book_id}-拆书报告.md / {book_id}-笔法分析.md。
+    # 报告关联：reports 目录下 `<stem>-拆书报告.md` / `<stem>-笔法分析.md`。
+    # 2026-11-23：CLI/迁移产出的报告以**书名**为 stem，GUI 以 book_id 为 stem；
+    # 旧实现只认 book_id，迁移书的报告明明存在却显示「暂无报告」。
     report_ids = []
-    for name in (f"{book_id}-拆书报告", f"{book_id}-笔法分析"):
-        if (config.REPORTS_DIR / f"{name}.md").is_file():
-            report_ids.append(f"report:{name}")
+    stems = [book_id]
+    if title and title != book_id:
+        stems.append(str(title))
+    for stem in stems:
+        for suffix in ("拆书报告", "笔法分析"):
+            name = f"{stem}-{suffix}"
+            if (config.REPORTS_DIR / f"{name}.md").is_file():
+                rid = f"report:{name}"
+                if rid not in report_ids:
+                    report_ids.append(rid)
 
     return {
         "book_id": book_id,
@@ -1805,8 +2002,7 @@ def _assemble_after_analysis(book_id: str, genre: str,
     做法：按章节/批次顺序把批级 pass 结果合并成一份"整书 pass"，再走与 CLI
     相同的 normalize + assemble 路径，落盘并立即重索引。
 
-    GUI 只跑 4 个 pass（PASS_ORDER 不含 pass5），所以 craft-card 无法生成——
-    这是 GUI 与 CLI 的能力差异，不是本次遗漏；笔法报告在缺卡时留空提示。
+    2026-11-23：GUI 已补齐 pass5_craft，与 CLI 一致生成 craft-card 与笔法报告。
     """
     import json as _json
 
@@ -1855,8 +2051,26 @@ def _assemble_after_analysis(book_id: str, genre: str,
                 return out if out else None
             return None
 
-        for fp in sorted(base.glob(f"c*-b*-{pass_name}.json"),
-                         key=lambda p: _batch_sort_key(p.name)):
+        records = state.get("chapter_states")
+        candidates: list[Path] = []
+        if isinstance(records, dict):
+            for key, rec in records.items():
+                if not isinstance(rec, dict) or rec.get("status") != "success":
+                    continue
+                parsed = state_store.parse_cursor(key)
+                if not parsed:
+                    continue
+                pass_states = rec.get("passes")
+                if isinstance(pass_states, dict) and pass_states.get(pass_name) != "success":
+                    continue
+                fp = state_store.asset_path(book_id, parsed[0], parsed[1], pass_name)
+                if fp.is_file():
+                    candidates.append(fp)
+        else:
+            # 兼容直接调用组装的旧测试/迁移工具；生产状态始终带 chapter_states。
+            candidates = list(base.glob(f"c*-b*-{pass_name}.json"))
+
+        for fp in sorted(candidates, key=lambda p: _batch_sort_key(p.name)):
             try:
                 part = _json.loads(fp.read_text(encoding="utf-8-sig"))
             except (OSError, ValueError):
@@ -1969,6 +2183,16 @@ def _assemble_after_analysis(book_id: str, genre: str,
         except Exception as exc:  # noqa: BLE001
             _log.warning("组装 %s 失败: %s", name, exc)
 
+    # craft-card：pass5 十维笔法深度拆解（2026-11-23 补齐 GUI 缺口）
+    try:
+        pass5 = _merge("pass5_craft")
+        if pass5:
+            card = engine_adapter.assemble_asset_craft_card(
+                title, genre, manifest, metrics, pass5)
+            _write("craft-card", card)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("组装 craft-card 失败: %s", exc)
+
     if written:
         _log.info("分析后已组装 %d 张整书资产卡: %s", len(written), written)
     return written
@@ -1980,6 +2204,20 @@ def _batch_sort_key(filename: str) -> tuple[int, int, str]:
     if not m:
         return (10**9, 10**9, filename)
     return (int(m.group(1)), int(m.group(2)), m.group(3))
+
+
+def _is_sample_book(book_id: str, title: str = "", source_path: str | None = None) -> bool:
+    """是否为内置示例语料（2026-11-23）。
+
+    示例只有 3 章、约 1.5 万字，客观上无法产出 ≥10000 字的正式双报告。
+    旧实现让它走同一套铁律二硬校验，新手第一次「一键分析」100% 得到
+    「铁律二未通过」的红色失败提示，像软件坏了。这里识别示例书，改用
+    明确的「示例不生成正式报告」说明，而不是假装成功或硬报错。
+    """
+    if str(book_id or "").startswith("示例-") or str(title or "").startswith("示例-"):
+        return True
+    src = str(source_path or "").replace("/", "\\")
+    return "\\samples\\" in src
 
 
 def _generate_reports_inner(book_id: str, book: dict[str, Any]) -> None:
@@ -1999,11 +2237,13 @@ def _generate_reports_inner(book_id: str, book: dict[str, Any]) -> None:
 
     book_dict = book if isinstance(book, dict) else {}
     db_title = None
+    db_src = None
     try:
         if db._db_ready():
             db_rows = db.get_books(book_id=book_id)
             if db_rows:
                 db_title = db_rows[0].get("title")
+                db_src = db_rows[0].get("source_path")
     except Exception as exc:  # noqa: BLE001
         _log.debug("读取报告书名回退跳过 %s: %s", book_id, exc)
     state_title = state_store.load_state(book_id).get("title")
@@ -2031,9 +2271,14 @@ def _generate_reports_inner(book_id: str, book: dict[str, Any]) -> None:
         len(book_md), len(craft_md), book_text=book_md, craft_text=craft_md
     )
     if not chk.get("ok"):
-        msg = (f"铁律二未通过：拆书报告 {chk['book_chars']} 字 + 笔法分析 "
-               f"{chk['craft_chars']} 字 = 合计 {chk['total']} 字 < 硬门槛 "
-               f"{chk['min_chars']} 字（已阻止写盘，未产出任何报告文件）")
+        if _is_sample_book(book_id, title, db_src):
+            msg = (f"这是内置示例语料（{chk['total']} 字），仅用于体验拆书流程，"
+                   f"篇幅不足以生成正式万字报告（硬门槛 {chk['min_chars']} 字）。"
+                   "资产卡已正常生成；导入你自己的书即可生成正式报告。")
+        else:
+            msg = (f"铁律二未通过：拆书报告 {chk['book_chars']} 字 + 笔法分析 "
+                   f"{chk['craft_chars']} 字 = 合计 {chk['total']} 字 < 硬门槛 "
+                   f"{chk['min_chars']} 字（已阻止写盘，未产出任何报告文件）")
         with state_store.update_state(book_id) as state:
             state["report_error"] = msg
         broker.publish({

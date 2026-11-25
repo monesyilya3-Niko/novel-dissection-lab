@@ -24,8 +24,12 @@ function ErrorFallbackView({ error, onRetry }: { error: Error | null; onRetry: (
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         {error?.message || t('error_boundary_unknown', '未知错误')}
       </Typography>
-      <Button variant="outlined" onClick={onRetry}>
+      <Button variant="outlined" onClick={onRetry} sx={{ mr: 1 }}>
         {t('error_boundary_retry', '重试')}
+      </Button>
+      {/* 懒加载 chunk 失败时纯重试通常会再次失败；给一个明确的整页刷新出口。 */}
+      <Button variant="outlined" onClick={() => window.location.reload()}>
+        {t('error_boundary_reload', '刷新页面')}
       </Button>
     </Box>
   )

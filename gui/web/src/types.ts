@@ -74,7 +74,7 @@ export interface ApiResponse<T> {
 }
 
 // 服务端状态机：idle | running | paused | done | error
-export type TaskStatus = 'idle' | 'running' | 'paused' | 'done' | 'error'
+export type TaskStatus = 'idle' | 'running' | 'paused' | 'done' | 'partial' | 'error'
 
 export interface StatusInfo {
   status: TaskStatus
@@ -85,6 +85,8 @@ export interface StatusInfo {
   lastError?: string
   reportError?: string
   takeoverGuidePath?: string
+  /** 批次状态快照（c1-b0 → {status, asset}）；刷新后据此恢复进度矩阵。 */
+  chapterStates?: Record<string, { status: string; asset?: string | null }>
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +125,14 @@ export interface AssetItem {
 }
 
 export interface Overview {
+  /** 已拆完的书（status=done），首页「已拆书」KPI 用。 */
   totalBooks: number
+  /** 已导入的书（含未拆），用于判断是否真正的新手空库。 */
+  totalImportedBooks?: number
+  /** 写作项目中已入库的章节数（chapter-*.txt）。 */
+  totalWritingChapters?: number
+  /** reports/qc 下已生成的 QC 报告数。 */
+  totalQcReports?: number
   totalGenrePacks: number
   totalReports: number
   totalAssets: number
@@ -365,6 +374,9 @@ export interface QualityTaskState {
   totalScore: number | null
   layers: QcLayer[]
   issues: QcIssue[]
+  totalIssues?: number
+  issuesTruncated?: boolean
+  issuesLimit?: number
   meta: Record<string, unknown>
   reportJson: string | null
   reportMd: string | null

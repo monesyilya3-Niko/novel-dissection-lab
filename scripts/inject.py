@@ -260,12 +260,18 @@ def render_structure_obs(so: dict) -> str:
             parts.append("### 钩子骨架（抽象模板）")
             for h in hooks[:3]:
                 if isinstance(h, dict) and h.get("skeleton"):
-                    parts.append(f"- [{h.get('type', '?')}] {h['skeleton']}")
+                    parts.append(f"- [{h.get('type') or '钩子'}] {h['skeleton']}")
+                elif isinstance(h, str) and h.strip():
+                    # 2026-11-23：部分 structure-obs 的 hook 是字符串，旧实现直接丢弃。
+                    parts.append(f"- {h.strip()}")
     agg = so.get("aggregate")
     if isinstance(agg, dict):
-        if agg.get("hook_type_freq"):
+        if isinstance(agg.get("hook_type_freq"), dict) and agg["hook_type_freq"]:
             parts.append("### 钩子频次")
-            parts.append(json.dumps(agg["hook_type_freq"], ensure_ascii=False))
+            parts.append("、".join(f"{k}×{v}" for k, v in agg["hook_type_freq"].items()))
+        elif agg.get("hook_type_freq"):
+            parts.append("### 钩子分布（原始记录）")
+            parts.append(str(agg["hook_type_freq"]))
         # 2026-11-03：结构参数此前只渲染了伏笔平均跨度，其余全丢。
         # 这些是「按这本书的节奏写」最关键的数字，写了不渲染等于没拆。
         params = []
@@ -359,18 +365,40 @@ def render_genre_pack(gp: dict) -> str:
         parts.append("### 章节结构模板（各段职责与占比）")
         for r in roles:
             beats = "、".join(r.get("beats") or [])
-            parts.append(f"- {r.get('role','?')}（占比 {r.get('ratio','?')}，{r.get('typical_position','?')}）：{beats}")
+            meta_bits = []
+            if r.get("ratio") not in (None, ""):
+                meta_bits.append(f"占比 {r['ratio']}")
+            if r.get("typical_position"):
+                meta_bits.append(str(r["typical_position"]))
+            meta_txt = f"（{'，'.join(meta_bits)}）" if meta_bits else ""
+            parts.append(f"- {r.get('role') or '章节段'}{meta_txt}：{beats}")
     hs = st.get("hook_system") or {}
     hts = hs.get("hook_types")
     if isinstance(hts, list) and hts:
         parts.append("### 钩子系统（章末钩子按此选型）")
         for t in hts:
-            parts.append(f"- {t.get('type','?')}（频率 {t.get('frequency','?')}）：{t.get('skeleton','')}")
+            freq = t.get("frequency")
+            freq_txt = f"（频率 {freq}）" if freq not in (None, "") else ""
+            parts.append(f"- {t.get('type') or '钩子'}{freq_txt}：{t.get('skeleton') or ''}")
         if hs.get("anti_repetition_rule"):
             parts.append(f"- 防重复：{hs['anti_repetition_rule']}")
     fp = st.get("foreshadow_pattern") or {}
     if fp:
-        parts.append(f"- 伏笔节奏：平均 {fp.get('avg_span','?')} 章回收，同时开放 {fp.get('concurrent_open','?')} 条，埋法：{'、'.join(fp.get('plant_technique') or [])}")
+        # 2026-11-23：派生题材包用的是 avg_span_chapters / max_concurrent_open，
+        # 旧实现只认 avg_span / concurrent_open，于是每份写作 prompt 都出现
+        # 「平均 ? 章回收，同时开放 ? 条」。两种键名都认，缺失项直接不渲染。
+        avg = fp.get("avg_span") or fp.get("avg_span_chapters")
+        concurrent = fp.get("concurrent_open") or fp.get("max_concurrent_open")
+        bits = []
+        if avg:
+            bits.append(f"平均 {avg} 章回收")
+        if concurrent:
+            bits.append(f"同时开放 {concurrent} 条")
+        plant = fp.get("plant_technique") or []
+        if plant:
+            bits.append(f"埋法：{'、'.join(plant)}")
+        if bits:
+            parts.append(f"- 伏笔节奏：{'，'.join(bits)}")
 
     # 4. 商业：爽点类型 + 卡点 + 更新节奏
     co = gp.get("commercial") or {}
